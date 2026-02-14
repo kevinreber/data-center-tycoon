@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { useGameStore, DEFAULT_COLORS, RACK_COST, MAX_SERVERS_PER_CABINET, MAX_CABINETS, MAX_SPINES, SIM, ENVIRONMENT_CONFIG, formatGameTime, COOLING_CONFIG, LOAN_OPTIONS, ACHIEVEMENT_CATALOG } from '@/stores/gameStore'
+import { useGameStore, DEFAULT_COLORS, RACK_COST, MAX_SERVERS_PER_CABINET, MAX_CABINETS, MAX_SPINES, SIM, ENVIRONMENT_CONFIG, formatGameTime, COOLING_CONFIG, LOAN_OPTIONS, ACHIEVEMENT_CATALOG, CONTRACT_TIER_COLORS } from '@/stores/gameStore'
 import type { NodeType, LayerColors, CabinetEnvironment } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Server, Network, Power, Cpu, Eye, SlidersHorizontal, EyeOff, RotateCcw, HardDrive, Plus, TrendingUp, TrendingDown, DollarSign, ArrowRightLeft, AlertTriangle, Radio, Info, Shield, Clock, Zap, Droplets, Landmark, Siren, Trophy, Wrench } from 'lucide-react'
+import { Server, Network, Power, Cpu, Eye, SlidersHorizontal, EyeOff, RotateCcw, HardDrive, Plus, TrendingUp, TrendingDown, DollarSign, ArrowRightLeft, AlertTriangle, Radio, Info, Shield, Clock, Zap, Droplets, Landmark, Siren, Trophy, Wrench, FileText, Check } from 'lucide-react'
 import {
   Tooltip,
   TooltipContent,
@@ -51,6 +51,7 @@ export function HUD() {
     loans, loanPayments, takeLoan,
     activeIncidents, resolveIncident,
     achievements,
+    contractOffers, activeContracts, acceptContract, contractRevenue, contractPenalties, completedContracts,
   } = useGameStore()
   const [showGuide, setShowGuide] = useState(true)
   const [selectedEnv, setSelectedEnv] = useState<CabinetEnvironment>('production')
@@ -62,7 +63,7 @@ export function HUD() {
 
   const canUpgrade = cabinets.some((c) => c.serverCount < MAX_SERVERS_PER_CABINET)
   const canAddLeaf = cabinets.some((c) => !c.hasLeafSwitch)
-  const netIncome = revenue - expenses - loanPayments
+  const netIncome = revenue + contractRevenue - expenses - loanPayments - contractPenalties
   const activeServers = cabinets.filter((c) => c.powerStatus).reduce((sum, c) => sum + c.serverCount, 0)
   const throttledCount = cabinets.filter((c) => c.powerStatus && c.heatLevel >= SIM.throttleTemp).reduce((sum, c) => sum + c.serverCount, 0)
 
@@ -441,6 +442,12 @@ export function HUD() {
                   <span className="text-neon-red tabular-nums">-50%</span>
                 </div>
               )}
+              {contractRevenue > 0 && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground ml-4">Contracts</span>
+                  <span className="text-neon-green tabular-nums">+${contractRevenue.toFixed(0)}</span>
+                </div>
+              )}
               <div className="border-t border-border my-0.5" />
               <div className="flex justify-between text-xs">
                 <span className="flex items-center gap-1 text-neon-red">
@@ -461,6 +468,12 @@ export function HUD() {
                 <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground ml-4">Loans</span>
                   <span className="text-muted-foreground tabular-nums">${loanPayments.toFixed(2)}</span>
+                </div>
+              )}
+              {contractPenalties > 0 && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-neon-red ml-4">SLA Penalties</span>
+                  <span className="text-neon-red tabular-nums">${contractPenalties.toFixed(0)}</span>
                 </div>
               )}
               <div className="border-t border-border my-0.5" />
@@ -704,8 +717,146 @@ export function HUD() {
           </div>
         </div>
 
-        {/* Second row: Cooling, Loans, Incidents, Achievements */}
-        <div className="grid grid-cols-[1fr_1fr_1fr_1fr] gap-3">
+        {/* Second row: Contracts, Cooling, Loans, Incidents, Achievements */}
+        <div className="grid grid-cols-[1fr_1fr_1fr_1fr_1fr] gap-3">
+          {/* CONTRACTS panel */}
+          <div className="rounded-lg border border-border bg-card p-3 glow-green">
+            <div className="flex items-center gap-2 mb-2">
+              <FileText className="size-3.5 text-neon-purple" />
+              <span className="text-xs font-bold text-neon-purple tracking-widest">CONTRACTS</span>
+              {activeContracts.length > 0 && (
+                <Badge className="ml-auto bg-neon-purple/20 text-neon-purple border-neon-purple/30 font-mono text-xs">
+                  {activeContracts.length} ACTIVE
+                </Badge>
+              )}
+            </div>
+            {/* Active contracts */}
+            {activeContracts.length > 0 && (
+              <div className="flex flex-col gap-1.5 mb-2 pb-2 border-b border-border/50">
+                {activeContracts.map((contract) => {
+                  const tierColor = CONTRACT_TIER_COLORS[contract.def.tier]
+                  const isViolating = contract.consecutiveViolations > 0
+                  return (
+                    <Tooltip key={contract.id}>
+                      <TooltipTrigger asChild>
+                        <div
+                          className={`rounded border p-1.5 cursor-help ${
+                            isViolating
+                              ? 'border-neon-red/40 bg-neon-red/5'
+                              : 'border-border/50 bg-card'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold truncate" style={{ color: tierColor }}>
+                              {contract.def.company}
+                            </span>
+                            <span className="text-xs text-muted-foreground tabular-nums">
+                              {contract.ticksRemaining}t
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between mt-0.5">
+                            <span className="text-xs text-neon-green tabular-nums">
+                              +${contract.def.revenuePerTick}/t
+                            </span>
+                            {isViolating && (
+                              <span className="text-xs text-neon-red animate-pulse flex items-center gap-0.5">
+                                <AlertTriangle className="size-2.5" />
+                                SLA {contract.consecutiveViolations}/{contract.def.terminationTicks}
+                              </span>
+                            )}
+                          </div>
+                          {/* Progress bar */}
+                          <div className="w-full h-1 bg-border rounded-full overflow-hidden mt-1">
+                            <div
+                              className="h-full rounded-full"
+                              style={{
+                                width: `${Math.round((1 - contract.ticksRemaining / contract.def.durationTicks) * 100)}%`,
+                                backgroundColor: isViolating ? '#ff4444' : tierColor,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="max-w-60">
+                        <p className="font-bold" style={{ color: tierColor }}>{contract.def.company} ({contract.def.tier.toUpperCase()})</p>
+                        <p className="text-xs mt-1">{contract.def.description}</p>
+                        <p className="text-xs mt-1">Requires: {contract.def.minServers} servers, &lt;{contract.def.maxTemp}°C</p>
+                        <p className="text-xs">Earned: ${contract.totalEarned.toFixed(0)} | Penalties: ${contract.totalPenalties.toFixed(0)}</p>
+                        <p className="text-xs">Completion bonus: ${contract.def.completionBonus.toLocaleString()}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  )
+                })}
+              </div>
+            )}
+            {/* Contract offers */}
+            {contractOffers.length > 0 ? (
+              <div className="flex flex-col gap-1">
+                <span className="text-xs text-muted-foreground mb-0.5">Available:</span>
+                {contractOffers.map((def, i) => {
+                  const tierColor = CONTRACT_TIER_COLORS[def.tier]
+                  const activeProductionServers = cabinets
+                    .filter((c) => c.environment === 'production' && c.powerStatus)
+                    .reduce((sum, c) => sum + c.serverCount, 0)
+                  const canAccept = activeContracts.length < 3 &&
+                    activeProductionServers >= def.minServers
+                  return (
+                    <Tooltip key={`${def.type}-${i}`}>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => acceptContract(i)}
+                          disabled={activeContracts.length >= 3}
+                          className="justify-between font-mono text-xs transition-all w-full"
+                          style={{
+                            borderColor: `${tierColor}33`,
+                          }}
+                        >
+                          <span className="flex items-center gap-1.5 truncate">
+                            <span
+                              className="w-1.5 h-1.5 rounded-full shrink-0"
+                              style={{ backgroundColor: tierColor }}
+                            />
+                            {def.company}
+                          </span>
+                          <span className="text-neon-green shrink-0">+${def.revenuePerTick}/t</span>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="max-w-60">
+                        <p className="font-bold" style={{ color: tierColor }}>{def.company} ({def.tier.toUpperCase()})</p>
+                        <p className="text-xs mt-1">{def.description}</p>
+                        <p className="text-xs mt-1">Requires: {def.minServers} prod servers, &lt;{def.maxTemp}°C avg temp</p>
+                        <p className="text-xs">Duration: {def.durationTicks} ticks | Bonus: ${def.completionBonus.toLocaleString()}</p>
+                        <p className="text-xs">Penalty: -${def.penaltyPerTick}/tick if SLA violated</p>
+                        {!canAccept && activeContracts.length < 3 && (
+                          <p className="text-xs text-neon-red mt-1">Need {def.minServers} online production servers (have {activeProductionServers})</p>
+                        )}
+                      </TooltipContent>
+                    </Tooltip>
+                  )
+                })}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground italic">
+                {cabinets.length < 2
+                  ? 'Build at least 2 cabinets to attract tenants.'
+                  : 'New offers coming soon...'}
+              </p>
+            )}
+            {activeContracts.length >= 3 && (
+              <p className="text-xs text-neon-purple/60 italic mt-1">Max 3 active contracts</p>
+            )}
+            {completedContracts > 0 && (
+              <div className="flex justify-between text-xs mt-2 pt-1.5 border-t border-border/50">
+                <span className="flex items-center gap-1 text-muted-foreground">
+                  <Check className="size-3" />
+                  Completed
+                </span>
+                <span className="text-neon-green tabular-nums">{completedContracts}</span>
+              </div>
+            )}
+          </div>
           {/* COOLING panel */}
           <div className="rounded-lg border border-border bg-card p-3 glow-green">
             <div className="flex items-center gap-2 mb-2">

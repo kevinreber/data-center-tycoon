@@ -88,7 +88,7 @@
 ## Brainstorm: Additional Features
 
 ### Customer & Contract System
-- [ ] Tenant contracts — Companies rent capacity with SLA requirements (uptime %, latency, bandwidth); missing SLAs means penalties or lost contracts
+- [x] Tenant contracts — Companies rent capacity with SLA requirements (uptime %, latency, bandwidth); missing SLAs means penalties or lost contracts
 - [ ] Customer types — AI training (GPU-heavy), streaming (high bandwidth), crypto (cheap power), enterprise (high security); each with different demands and revenue
 - [ ] RFP bidding — Compete against rival data centers for large contracts by offering better pricing, uptime, or green certifications
 
