@@ -1,5 +1,7 @@
 import { create } from 'zustand'
 
+export type ViewMode = 'cabinet' | 'above_cabinet'
+
 export interface RackNode {
   id: string
   type: 'server' | 'leaf_switch' | 'spine_switch'
@@ -13,8 +15,10 @@ interface GameState {
   money: number
   pue: number
   avgHeat: number
+  viewMode: ViewMode
   addRack: (type: RackNode['type']) => void
   togglePower: (id: string) => void
+  setViewMode: (mode: ViewMode) => void
 }
 
 const POWER_DRAW: Record<RackNode['type'], number> = {
@@ -49,6 +53,7 @@ export const useGameStore = create<GameState>((set) => ({
   money: 50000,
   pue: 0,
   avgHeat: 0,
+  viewMode: 'cabinet' as ViewMode,
   addRack: (type) =>
     set((state) => {
       const cost = RACK_COST[type]
@@ -77,4 +82,5 @@ export const useGameStore = create<GameState>((set) => ({
         ...calcStats(newRacks),
       }
     }),
+  setViewMode: (mode) => set({ viewMode: mode }),
 }))

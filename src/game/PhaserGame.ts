@@ -1,4 +1,5 @@
 import Phaser from 'phaser'
+import type { ViewMode } from '@/stores/gameStore'
 
 const COLORS = {
   server: { top: 0x00ff88, side: 0x00cc66, front: 0x009944 },
@@ -6,19 +7,36 @@ const COLORS = {
   spine_switch: { top: 0xff6644, side: 0xcc4422, front: 0x993311 },
 }
 
+// Which view plane each node type belongs to
+const NODE_PLANE: Record<string, ViewMode> = {
+  server: 'cabinet',
+  leaf_switch: 'above_cabinet',
+  spine_switch: 'above_cabinet',
+}
+
 const TILE_W = 64
 const TILE_H = 32
 const COLS = 12
 const ROWS = 8
+
+interface RackEntry {
+  id: string
+  type: string
+  col: number
+  row: number
+  powerOn: boolean
+}
 
 class DataCenterScene extends Phaser.Scene {
   private gridGraphics: Phaser.GameObjects.Graphics | null = null
   private floorGraphics: Phaser.GameObjects.Graphics | null = null
   private rackSprites: Map<string, Phaser.GameObjects.Graphics> = new Map()
   private rackLabels: Map<string, Phaser.GameObjects.Text> = new Map()
+  private rackEntries: Map<string, RackEntry> = new Map()
   private nodeCount = 0
   private offsetX = 0
   private offsetY = 0
+  private currentViewMode: ViewMode = 'cabinet'
 
   constructor() {
     super({ key: 'DataCenterScene' })
@@ -95,6 +113,7 @@ class DataCenterScene extends Phaser.Scene {
     this.gridGraphics.setDepth(1)
   }
 
+  /** Draw a solid filled isometric cube */
   private drawIsoCube(
     g: Phaser.GameObjects.Graphics,
     x: number,
@@ -146,28 +165,116 @@ class DataCenterScene extends Phaser.Scene {
     g.lineBetween(x + hw, y + hh - depth, x, y + h - depth)
   }
 
-  addRackToScene(id: string, type: string) {
-    const col = this.nodeCount % COLS
-    const row = Math.floor(this.nodeCount / COLS) % ROWS
-    this.nodeCount++
+  /** Draw a dashed line between two points */
+  private drawDashedLine(
+    g: Phaser.GameObjects.Graphics,
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    dashLen: number,
+    gapLen: number
+  ) {
+    const dx = x2 - x1
+    const dy = y2 - y1
+    const dist = Math.sqrt(dx * dx + dy * dy)
+    const nx = dx / dist
+    const ny = dy / dist
+    let drawn = 0
+    let drawing = true
 
-    const { x, y } = this.isoToScreen(col, row)
-    // Center in tile
+    while (drawn < dist) {
+      const segLen = drawing ? dashLen : gapLen
+      const end = Math.min(drawn + segLen, dist)
+      if (drawing) {
+        g.lineBetween(
+          x1 + nx * drawn,
+          y1 + ny * drawn,
+          x1 + nx * end,
+          y1 + ny * end
+        )
+      }
+      drawn = end
+      drawing = !drawing
+    }
+  }
+
+  /** Draw a dashed wireframe isometric cube (ghost outline for other-plane objects) */
+  private drawDashedIsoCube(
+    g: Phaser.GameObjects.Graphics,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    depth: number,
+    color: number,
+    alpha: number
+  ) {
+    const hw = w / 2
+    const hh = h / 2
+    const dash = 4
+    const gap = 3
+
+    g.lineStyle(1, color, alpha)
+
+    // Top face edges
+    this.drawDashedLine(g, x, y - depth, x + hw, y + hh - depth, dash, gap)
+    this.drawDashedLine(g, x + hw, y + hh - depth, x, y + h - depth, dash, gap)
+    this.drawDashedLine(g, x, y + h - depth, x - hw, y + hh - depth, dash, gap)
+    this.drawDashedLine(g, x - hw, y + hh - depth, x, y - depth, dash, gap)
+
+    // Vertical edges
+    this.drawDashedLine(g, x - hw, y + hh - depth, x - hw, y + hh, dash, gap)
+    this.drawDashedLine(g, x + hw, y + hh - depth, x + hw, y + hh, dash, gap)
+    this.drawDashedLine(g, x, y + h - depth, x, y + h, dash, gap)
+
+    // Bottom face visible edges
+    this.drawDashedLine(g, x - hw, y + hh, x, y + h, dash, gap)
+    this.drawDashedLine(g, x + hw, y + hh, x, y + h, dash, gap)
+  }
+
+  /** Render a single rack node based on the current view mode */
+  private renderRack(entry: RackEntry) {
+    // Clean up existing graphics for this rack
+    const oldG = this.rackSprites.get(entry.id)
+    if (oldG) oldG.destroy()
+    const oldLabel = this.rackLabels.get(entry.id)
+    if (oldLabel) oldLabel.destroy()
+
+    const { x, y } = this.isoToScreen(entry.col, entry.row)
     const cx = x
     const cy = y + TILE_H / 2
-
-    const colors = COLORS[type as keyof typeof COLORS] ?? COLORS.server
+    const colors = COLORS[entry.type as keyof typeof COLORS] ?? COLORS.server
     const cubeW = 36
     const cubeH = 18
     const cubeDepth = 20
 
+    const nodePlane = NODE_PLANE[entry.type] ?? 'cabinet'
+    const isSolidPlane = nodePlane === this.currentViewMode
+    const baseAlpha = entry.powerOn ? 0.9 : 0.25
+
     const g = this.add.graphics()
-    this.drawIsoCube(g, cx, cy, cubeW, cubeH, cubeDepth, colors, 0.9)
-    g.setDepth(10 + row * COLS + col)
 
-    this.rackSprites.set(id, g)
+    if (isSolidPlane) {
+      // Solid filled cube — this node belongs to the active plane
+      this.drawIsoCube(g, cx, cy, cubeW, cubeH, cubeDepth, colors, baseAlpha)
+    } else {
+      // Dashed wireframe — ghost outline for the other plane
+      this.drawDashedIsoCube(
+        g, cx, cy, cubeW, cubeH, cubeDepth,
+        colors.top,
+        entry.powerOn ? 0.3 : 0.1
+      )
+    }
 
-    // LED indicator dot on top
+    g.setDepth(10 + entry.row * COLS + entry.col)
+    this.rackSprites.set(entry.id, g)
+
+    // LED indicator dot
+    const labelAlpha = isSolidPlane
+      ? (entry.powerOn ? 1 : 0.15)
+      : (entry.powerOn ? 0.3 : 0.08)
+
     const label = this.add
       .text(cx, cy - cubeDepth - 6, '●', {
         fontFamily: 'monospace',
@@ -175,19 +282,40 @@ class DataCenterScene extends Phaser.Scene {
         color: `#${colors.top.toString(16).padStart(6, '0')}`,
       })
       .setOrigin(0.5)
-      .setDepth(11 + row * COLS + col)
-    this.rackLabels.set(id, label)
+      .setAlpha(labelAlpha)
+      .setDepth(11 + entry.row * COLS + entry.col)
+
+    this.rackLabels.set(entry.id, label)
+  }
+
+  /** Re-render all racks (called when view mode changes) */
+  private rerenderAllRacks() {
+    for (const entry of this.rackEntries.values()) {
+      this.renderRack(entry)
+    }
+  }
+
+  addRackToScene(id: string, type: string) {
+    const col = this.nodeCount % COLS
+    const row = Math.floor(this.nodeCount / COLS) % ROWS
+    this.nodeCount++
+
+    const entry: RackEntry = { id, type, col, row, powerOn: true }
+    this.rackEntries.set(id, entry)
+    this.renderRack(entry)
   }
 
   toggleRackPower(id: string, powerOn: boolean) {
-    const g = this.rackSprites.get(id)
-    if (g) {
-      g.setAlpha(powerOn ? 1 : 0.25)
-    }
-    const label = this.rackLabels.get(id)
-    if (label) {
-      label.setAlpha(powerOn ? 1 : 0.15)
-    }
+    const entry = this.rackEntries.get(id)
+    if (!entry) return
+    entry.powerOn = powerOn
+    this.renderRack(entry)
+  }
+
+  setViewMode(mode: ViewMode) {
+    if (mode === this.currentViewMode) return
+    this.currentViewMode = mode
+    this.rerenderAllRacks()
   }
 }
 

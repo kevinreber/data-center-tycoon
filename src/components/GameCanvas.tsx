@@ -8,6 +8,7 @@ export function GameCanvas() {
   const prevRackCount = useRef(0)
 
   const racks = useGameStore((s) => s.racks)
+  const viewMode = useGameStore((s) => s.viewMode)
 
   useEffect(() => {
     if (!gameRef.current) {
@@ -36,6 +37,14 @@ export function GameCanvas() {
       scene.toggleRackPower(rack.id, rack.powerStatus)
     }
   }, [racks])
+
+  // Sync view mode to Phaser
+  useEffect(() => {
+    if (!gameRef.current) return
+    const scene = getScene(gameRef.current)
+    if (!scene) return
+    scene.setViewMode(viewMode)
+  }, [viewMode])
 
   return (
     <div
