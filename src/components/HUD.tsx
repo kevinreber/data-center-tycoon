@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { useGameStore, DEFAULT_COLORS, RACK_COST, MAX_SERVERS_PER_CABINET, MAX_CABINETS, MAX_SPINES, SIM } from '@/stores/gameStore'
-import type { NodeType, LayerColors } from '@/stores/gameStore'
+import { useGameStore, DEFAULT_COLORS, RACK_COST, MAX_SERVERS_PER_CABINET, MAX_CABINETS, MAX_SPINES, SIM, ENVIRONMENT_CONFIG } from '@/stores/gameStore'
+import type { NodeType, LayerColors, CabinetEnvironment } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Server, Network, Power, Cpu, Eye, SlidersHorizontal, EyeOff, RotateCcw, HardDrive, Plus, TrendingUp, TrendingDown, DollarSign, ArrowRightLeft, AlertTriangle, Radio } from 'lucide-react'
+import { Server, Network, Power, Cpu, Eye, SlidersHorizontal, EyeOff, RotateCcw, HardDrive, Plus, TrendingUp, TrendingDown, DollarSign, ArrowRightLeft, AlertTriangle, Radio, Info, Shield } from 'lucide-react'
 import {
   Tooltip,
   TooltipContent,
@@ -44,10 +44,16 @@ export function HUD() {
     addCabinet, upgradeNextCabinet, addLeafToNextCabinet, addSpineSwitch,
     toggleCabinetPower, toggleSpinePower,
     toggleLayerVisibility, setLayerOpacity, setLayerColor,
-    revenue, expenses, powerCost, coolingCost, avgHeat,
+    revenue, expenses, powerCost, coolingCost, avgHeat, mgmtBonus,
     trafficStats, trafficVisible, toggleTrafficVisible,
   } = useGameStore()
   const [showGuide, setShowGuide] = useState(true)
+  const [selectedEnv, setSelectedEnv] = useState<CabinetEnvironment>('production')
+
+  const envEntries = Object.entries(ENVIRONMENT_CONFIG) as [CabinetEnvironment, typeof ENVIRONMENT_CONFIG['production']][]
+  const prodCount = cabinets.filter((c) => c.environment === 'production').length
+  const labCount = cabinets.filter((c) => c.environment === 'lab').length
+  const mgmtCount = cabinets.filter((c) => c.environment === 'management').length
 
   const canUpgrade = cabinets.some((c) => c.serverCount < MAX_SERVERS_PER_CABINET)
   const canAddLeaf = cabinets.some((c) => !c.hasLeafSwitch)
@@ -74,22 +80,24 @@ export function HUD() {
             <ol className="text-xs font-mono text-muted-foreground space-y-1.5 list-decimal list-inside">
               <li>
                 <strong className="text-foreground">Build cabinets</strong>
-                {' '}&mdash; Each grid square is a cabinet slot. Add cabinets to start.
+                {' '}&mdash; Choose an environment type, then add cabinets to the grid.
               </li>
               <li>
-                <strong className="text-foreground">Fill cabinets</strong>
-                {' '}&mdash; Add <span className="text-neon-green">Servers</span> (up to 4 per cabinet)
-                and <span className="text-neon-cyan">Leaf Switches</span> (ToR, 1 per cabinet on top).
+                <strong className="text-foreground">Choose environments</strong>
+                {' '}&mdash; <span style={{ color: ENVIRONMENT_CONFIG.production.color }}>Production</span> earns full revenue.
+                {' '}<span style={{ color: ENVIRONMENT_CONFIG.lab.color }}>Lab</span> runs cooler at 25% revenue.
+                {' '}<span style={{ color: ENVIRONMENT_CONFIG.management.color }}>Management</span> reduces cooling costs facility-wide.
               </li>
               <li>
-                <strong className="text-foreground">Build the fabric</strong>
-                {' '}&mdash; Add <span className="text-neon-orange">Spine Switches</span> in the
-                elevated row above to link leaf switches together.
+                <strong className="text-foreground">Fill &amp; connect</strong>
+                {' '}&mdash; Add <span className="text-neon-green">Servers</span> (up to 4/cabinet),
+                {' '}<span className="text-neon-cyan">Leaf Switches</span> (ToR), and
+                {' '}<span className="text-neon-orange">Spine Switches</span> for the fabric.
               </li>
               <li>
-                <strong className="text-foreground">Earn revenue</strong>
-                {' '}&mdash; Active servers generate <span className="text-neon-yellow">${SIM.revenuePerServer}/tick</span>.
-                Watch your heat &mdash; overheating throttles income!
+                <strong className="text-foreground">Scale smart</strong>
+                {' '}&mdash; Servers generate <span className="text-neon-yellow">${SIM.revenuePerServer}/tick</span>.
+                As you grow, add Management cabinets to control rising cooling costs.
               </li>
             </ol>
           </div>
@@ -232,24 +240,63 @@ export function HUD() {
               <span className="text-xs font-bold text-neon-green tracking-widest">BUILD</span>
             </div>
             <div className="flex flex-col gap-2">
+              {/* Environment selector */}
+              <div className="flex flex-col gap-1.5">
+                <span className="text-xs text-muted-foreground">Environment:</span>
+                <div className="flex gap-1">
+                  {envEntries.map(([env, config]) => (
+                    <Tooltip key={env}>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="xs"
+                          onClick={() => setSelectedEnv(env)}
+                          className={`font-mono text-xs flex-1 transition-all ${
+                            selectedEnv === env
+                              ? 'border-2'
+                              : 'border border-border/50 opacity-50 hover:opacity-80'
+                          }`}
+                          style={{
+                            borderColor: selectedEnv === env ? config.color : undefined,
+                            color: selectedEnv === env ? config.color : undefined,
+                            backgroundColor: selectedEnv === env ? `${config.color}15` : undefined,
+                          }}
+                        >
+                          {config.label}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="max-w-52">
+                        <p className="font-bold" style={{ color: config.color }}>{config.name}</p>
+                        <p className="text-xs mt-1">{config.guidance}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  ))}
+                </div>
+              </div>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => addCabinet()}
+                    onClick={() => addCabinet(selectedEnv)}
                     disabled={money < RACK_COST.cabinet || cabinets.length >= MAX_CABINETS}
-                    className="justify-between font-mono text-xs border-neon-green/20 hover:border-neon-green/50 hover:bg-neon-green/10 hover:text-neon-green transition-all"
+                    className="justify-between font-mono text-xs transition-all"
+                    style={{
+                      borderColor: `${ENVIRONMENT_CONFIG[selectedEnv].color}33`,
+                      '--hover-border': `${ENVIRONMENT_CONFIG[selectedEnv].color}80`,
+                      '--hover-bg': `${ENVIRONMENT_CONFIG[selectedEnv].color}1a`,
+                      color: undefined,
+                    } as React.CSSProperties}
                   >
                     <span className="flex items-center gap-1.5">
                       <HardDrive className="size-3" />
-                      New Cabinet
+                      New {ENVIRONMENT_CONFIG[selectedEnv].name}
                     </span>
                     <span className="text-muted-foreground">${RACK_COST.cabinet.toLocaleString()}</span>
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom">
-                  Place a new cabinet with 1 server ({cabinets.length}/{MAX_CABINETS} slots used)
+                  Place a new {ENVIRONMENT_CONFIG[selectedEnv].name.toLowerCase()} cabinet with 1 server ({cabinets.length}/{MAX_CABINETS} slots used)
                 </TooltipContent>
               </Tooltip>
               <Tooltip>
@@ -343,6 +390,24 @@ export function HUD() {
                   {cabinets.filter((c) => c.powerStatus).length + spineSwitches.filter((s) => s.powerStatus).length}
                 </span>
               </div>
+              {mgmtBonus > 0 && (
+                <div className="flex justify-between text-xs mt-1">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="flex items-center gap-1 cursor-help" style={{ color: ENVIRONMENT_CONFIG.management.color }}>
+                        <Shield className="size-3" />
+                        MGMT Bonus
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="max-w-48">
+                      Management servers are reducing cooling overhead across your entire facility
+                    </TooltipContent>
+                  </Tooltip>
+                  <span style={{ color: ENVIRONMENT_CONFIG.management.color }}>
+                    -{Math.round(mgmtBonus * 100)}%
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -401,6 +466,15 @@ export function HUD() {
               <div className="mt-2 pt-2 border-t border-neon-red/30">
                 <p className="text-xs text-neon-red font-bold animate-pulse">
                   THERMAL THROTTLE &gt;{SIM.throttleTemp}°C
+                </p>
+              </div>
+            )}
+            {/* Contextual environment guidance */}
+            {cabinets.length >= 6 && mgmtCount === 0 && (
+              <div className="mt-2 pt-2 border-t" style={{ borderColor: `${ENVIRONMENT_CONFIG.management.color}30` }}>
+                <p className="text-xs flex items-start gap-1" style={{ color: ENVIRONMENT_CONFIG.management.color }}>
+                  <Info className="size-3 mt-0.5 shrink-0" />
+                  Your facility is growing. Management cabinets can reduce cooling costs across all equipment.
                 </p>
               </div>
             )}
@@ -499,7 +573,12 @@ export function HUD() {
               <span className="text-xs font-bold text-neon-green tracking-widest">EQUIPMENT</span>
               {(cabinets.length + spineSwitches.length) > 0 && (
                 <span className="text-xs text-muted-foreground ml-auto">
-                  {cabinets.length} cab + {spineSwitches.length} spine
+                  {prodCount > 0 && <span style={{ color: ENVIRONMENT_CONFIG.production.color }}>{prodCount}P</span>}
+                  {prodCount > 0 && (labCount > 0 || mgmtCount > 0) && ' '}
+                  {labCount > 0 && <span style={{ color: ENVIRONMENT_CONFIG.lab.color }}>{labCount}L</span>}
+                  {labCount > 0 && mgmtCount > 0 && ' '}
+                  {mgmtCount > 0 && <span style={{ color: ENVIRONMENT_CONFIG.management.color }}>{mgmtCount}M</span>}
+                  {cabinets.length > 0 && ' + '}{spineSwitches.length}S
                 </span>
               )}
             </div>
@@ -508,29 +587,33 @@ export function HUD() {
             ) : (
               <div className="flex gap-1.5 flex-wrap max-h-28 overflow-y-auto">
                 {cabinets.map((c) => {
+                  const envConfig = ENVIRONMENT_CONFIG[c.environment]
                   const leafTag = c.hasLeafSwitch ? '+L' : ''
                   const isThrottled = c.powerStatus && c.heatLevel >= SIM.throttleTemp
                   const label = `C${c.id.replace('cab-', '')} ×${c.serverCount}${leafTag}`
-                  const colorClass = isThrottled
-                    ? 'bg-neon-red/20 text-neon-red border-neon-red/30 hover:bg-neon-red/30'
-                    : c.powerStatus
-                      ? 'bg-neon-green/20 text-neon-green border-neon-green/30 hover:bg-neon-green/30'
-                      : 'bg-muted text-muted-foreground border-border hover:bg-muted/80'
+                  const envColor = envConfig.color
 
                   return (
                     <Tooltip key={c.id}>
                       <TooltipTrigger asChild>
                         <Badge
-                          className={`cursor-pointer font-mono text-xs border transition-all ${colorClass}`}
+                          className="cursor-pointer font-mono text-xs border transition-all"
+                          style={{
+                            backgroundColor: isThrottled ? 'rgba(255,68,68,0.2)' : c.powerStatus ? `${envColor}20` : undefined,
+                            color: isThrottled ? '#ff4444' : c.powerStatus ? envColor : undefined,
+                            borderColor: isThrottled ? 'rgba(255,68,68,0.3)' : c.powerStatus ? `${envColor}40` : undefined,
+                          }}
                           onClick={() => toggleCabinetPower(c.id)}
                         >
+                          <span className="opacity-60 mr-0.5">{envConfig.label}</span>
                           {label}
                           {!c.powerStatus && ' OFF'}
                           {isThrottled && ' HOT'}
                         </Badge>
                       </TooltipTrigger>
                       <TooltipContent side="top">
-                        {c.serverCount} server{c.serverCount > 1 ? 's' : ''}
+                        <span style={{ color: envColor }}>{envConfig.name}</span>
+                        {' — '}{c.serverCount} server{c.serverCount > 1 ? 's' : ''}
                         {c.hasLeafSwitch ? ' + leaf' : ''}
                         {' — '}{Math.round(c.heatLevel)}°C
                         {isThrottled ? ' (THROTTLED)' : ''}

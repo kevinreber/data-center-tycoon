@@ -2,9 +2,55 @@ import { create } from 'zustand'
 
 export type NodeType = 'server' | 'leaf_switch' | 'spine_switch'
 export type GameSpeed = 0 | 1 | 2 | 3
+export type CabinetEnvironment = 'production' | 'lab' | 'management'
+
+export interface EnvironmentConfig {
+  label: string           // Short display label (e.g. "PROD")
+  name: string            // Full name
+  revenueMultiplier: number  // fraction of base revenue (1.0 = full, 0 = none)
+  heatMultiplier: number     // fraction of base heat generation
+  description: string        // Short in-game description
+  guidance: string           // When/why a player should build this
+  color: string              // CSS color for UI badges
+  frameColors: { top: number; side: number; front: number }  // Isometric frame tint
+}
+
+export const ENVIRONMENT_CONFIG: Record<CabinetEnvironment, EnvironmentConfig> = {
+  production: {
+    label: 'PROD',
+    name: 'Production',
+    revenueMultiplier: 1.0,
+    heatMultiplier: 1.0,
+    description: 'Revenue-generating workloads at full capacity.',
+    guidance: 'Your bread and butter. Production cabinets run customer workloads and generate maximum revenue per server.',
+    color: '#00ff88',
+    frameColors: { top: 0x1a3a2a, side: 0x14302a, front: 0x0e2a1e },
+  },
+  lab: {
+    label: 'LAB',
+    name: 'Lab / Dev',
+    revenueMultiplier: 0.25,
+    heatMultiplier: 0.7,
+    description: 'Development and test workloads at reduced load.',
+    guidance: 'Lab cabinets earn 25% revenue running lighter dev workloads, but generate 30% less heat. Essential for testing configurations before deploying to production.',
+    color: '#cc66ff',
+    frameColors: { top: 0x2a1a3a, side: 0x221432, front: 0x1a0e2a },
+  },
+  management: {
+    label: 'MGMT',
+    name: 'Management',
+    revenueMultiplier: 0,
+    heatMultiplier: 0.5,
+    description: 'Infrastructure monitoring, DCIM, and BMC controllers.',
+    guidance: 'No direct revenue, but each active management server reduces cooling overhead by 3% across your entire facility (max 30%). Not needed early on, but as you scale past 6+ cabinets the cooling savings pay for themselves.',
+    color: '#ffaa00',
+    frameColors: { top: 0x3a3a1a, side: 0x302a14, front: 0x2a1e0e },
+  },
+}
 
 export interface Cabinet {
   id: string
+  environment: CabinetEnvironment
   serverCount: number     // 1–4 servers per cabinet
   hasLeafSwitch: boolean  // ToR switch mounted on top
   powerStatus: boolean
@@ -69,6 +115,20 @@ export function coolingOverheadFactor(avgHeat: number): number {
   if (avgHeat <= 70) return 0.65
   if (avgHeat <= 80) return 0.90
   return 1.2 + (avgHeat - 80) * 0.05
+}
+
+/** Management bonus: each active mgmt server reduces cooling overhead by 3%, capped at 30% */
+const MGMT_BONUS_PER_SERVER = 0.03
+const MGMT_BONUS_CAP = 0.30
+
+export function calcManagementBonus(cabinets: Cabinet[]): number {
+  let mgmtServers = 0
+  for (const cab of cabinets) {
+    if (cab.environment === 'management' && cab.powerStatus) {
+      mgmtServers += cab.serverCount
+    }
+  }
+  return Math.min(MGMT_BONUS_CAP, mgmtServers * MGMT_BONUS_PER_SERVER)
 }
 
 // ── Existing Constants ────────────────────────────────────────────
@@ -218,11 +278,12 @@ function calcStats(cabinets: Cabinet[], spines: SpineSwitch[]) {
   }
 
   const avgHeat = activeCabs > 0 ? Math.round(heatSum / activeCabs) : SIM.ambientTemp
-  const overhead = coolingOverheadFactor(avgHeat)
+  const mgmtBonus = calcManagementBonus(cabinets)
+  const overhead = coolingOverheadFactor(avgHeat) * (1 - mgmtBonus)
   const coolingPower = Math.round(itPower * overhead)
   const pue = itPower > 0 ? +((itPower + coolingPower) / itPower).toFixed(2) : 0
 
-  return { totalPower: itPower, coolingPower, avgHeat, pue }
+  return { totalPower: itPower, coolingPower, avgHeat, pue, mgmtBonus }
 }
 
 // ── State Interface ───────────────────────────────────────────────
@@ -237,6 +298,7 @@ interface GameState {
   money: number
   pue: number
   avgHeat: number
+  mgmtBonus: number       // management cooling bonus (0–0.30)
 
   // Simulation
   gameSpeed: GameSpeed
@@ -256,7 +318,7 @@ interface GameState {
   trafficVisible: boolean
 
   // Actions
-  addCabinet: () => void
+  addCabinet: (environment: CabinetEnvironment) => void
   upgradeNextCabinet: () => void
   addLeafToNextCabinet: () => void
   addSpineSwitch: () => void
@@ -281,6 +343,7 @@ export const useGameStore = create<GameState>((set) => ({
   money: 50000,
   pue: 0,
   avgHeat: SIM.ambientTemp,
+  mgmtBonus: 0,
 
   // Simulation
   gameSpeed: 1,
@@ -308,12 +371,13 @@ export const useGameStore = create<GameState>((set) => ({
 
   // ── Build Actions ───────────────────────────────────────────
 
-  addCabinet: () =>
+  addCabinet: (environment: CabinetEnvironment) =>
     set((state) => {
       if (state.money < COSTS.cabinet) return state
       if (state.cabinets.length >= MAX_CABINETS) return state
       const cab: Cabinet = {
         id: `cab-${nextCabId++}`,
+        environment,
         serverCount: 1,
         hasLeafSwitch: false,
         powerStatus: true,
@@ -439,10 +503,11 @@ export const useGameStore = create<GameState>((set) => ({
       // 1. Update heat per cabinet
       const newCabinets = state.cabinets.map((cab) => {
         let heat = cab.heatLevel
+        const envConfig = ENVIRONMENT_CONFIG[cab.environment]
 
         if (cab.powerStatus) {
-          // Heat generation from active equipment
-          heat += cab.serverCount * SIM.heatPerServer
+          // Heat generation from active equipment (scaled by environment)
+          heat += cab.serverCount * SIM.heatPerServer * envConfig.heatMultiplier
           if (cab.hasLeafSwitch) heat += SIM.heatPerLeaf
         }
 
@@ -458,21 +523,17 @@ export const useGameStore = create<GameState>((set) => ({
       // 2. Calculate stats with updated heat
       const stats = calcStats(newCabinets, state.spineSwitches)
 
-      // 3. Calculate revenue
-      let activeServers = 0
-      let throttledServers = 0
+      // 3. Calculate revenue (scaled by environment)
+      let revenue = 0
       for (const cab of newCabinets) {
         if (cab.powerStatus) {
-          if (cab.heatLevel >= SIM.throttleTemp) {
-            throttledServers += cab.serverCount
-          } else {
-            activeServers += cab.serverCount
-          }
+          const envConfig = ENVIRONMENT_CONFIG[cab.environment]
+          const baseRevenue = cab.serverCount * SIM.revenuePerServer * envConfig.revenueMultiplier
+          // Throttled servers earn half revenue
+          const throttled = cab.heatLevel >= SIM.throttleTemp
+          revenue += throttled ? baseRevenue * 0.5 : baseRevenue
         }
       }
-      // Throttled servers earn half revenue
-      const revenue = activeServers * SIM.revenuePerServer +
-        throttledServers * SIM.revenuePerServer * 0.5
 
       // 4. Calculate expenses
       const powerCost = +(stats.totalPower / 1000 * SIM.powerCostPerKW).toFixed(2)
