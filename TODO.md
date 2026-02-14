@@ -36,11 +36,15 @@
 - [ ] Bandwidth capacity and current traffic tracking
 
 ## Simulation
-- [ ] Heat simulation (heat levels update over time based on load/cooling)
-- [ ] Realistic PUE calculation (based on cooling type, load, ambient temp)
-- [ ] Revenue generation from running servers
-- [ ] Operating cost simulation (power bills, cooling costs)
-- [ ] Cooling mechanics (air vs. water, efficiency trade-offs)
+- [x] Heat simulation (heat levels update over time based on load/cooling)
+- [x] Realistic PUE calculation (based on cooling type, load, ambient temp)
+- [x] Revenue generation from running servers
+- [x] Operating cost simulation (power bills, cooling costs)
+- [x] Cooling mechanics — air cooling implemented; water cooling TBD
+- [x] Game tick system with speed controls (Pause, 1x, 2x, 3x)
+- [x] Thermal throttling (servers above 80°C earn half revenue)
+- [x] Finance panel (revenue/expense breakdown per tick)
+- [ ] Water cooling upgrade (higher efficiency, different trade-offs)
 
 ## Incident System
 - [ ] Timer-based random event roller
