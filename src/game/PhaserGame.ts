@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
-import type { LayerVisibility, LayerOpacity, LayerColors, LayerColorOverrides, TrafficLink } from '@/stores/gameStore'
-import { DEFAULT_COLORS } from '@/stores/gameStore'
+import type { LayerVisibility, LayerOpacity, LayerColors, LayerColorOverrides, TrafficLink, CabinetEnvironment } from '@/stores/gameStore'
+import { DEFAULT_COLORS, ENVIRONMENT_CONFIG } from '@/stores/gameStore'
 
 const COLORS = DEFAULT_COLORS
 
@@ -24,8 +24,6 @@ const SPINE_W = 50
 const SPINE_H = 25
 const SPINE_DEPTH = 16
 
-// Frame color (dark metal)
-const FRAME_COLORS: LayerColors = { top: 0x1a2a3a, side: 0x142230, front: 0x0e1a28 }
 
 interface CabinetEntry {
   id: string
@@ -34,6 +32,7 @@ interface CabinetEntry {
   serverCount: number
   hasLeafSwitch: boolean
   powerOn: boolean
+  environment: CabinetEnvironment
 }
 
 interface SpineEntry {
@@ -279,8 +278,9 @@ class DataCenterScene extends Phaser.Scene {
 
     let currentY = cy // bottom of the stack (floor level)
 
-    // 1. Base frame (always visible, dark metal)
-    this.drawIsoCube(g, cx, currentY, CUBE_W, CUBE_H, BASE_DEPTH, FRAME_COLORS, 0.8 * powerMult)
+    // 1. Base frame (tinted by environment)
+    const envFrameColors = ENVIRONMENT_CONFIG[entry.environment].frameColors
+    this.drawIsoCube(g, cx, currentY, CUBE_W, CUBE_H, BASE_DEPTH, envFrameColors, 0.8 * powerMult)
     currentY -= BASE_DEPTH + SECTION_GAP
 
     // 2. Server layers (green, stacked)
@@ -338,6 +338,7 @@ class DataCenterScene extends Phaser.Scene {
     // Cabinet ID label at the top
     const topY = cy - BASE_DEPTH - entry.serverCount * (SERVER_DEPTH + SECTION_GAP) -
       (entry.hasLeafSwitch ? LEAF_DEPTH + SECTION_GAP : 0) - 10
+    const envConfig = ENVIRONMENT_CONFIG[entry.environment]
     const idLabel = this.add
       .text(cx, topY, entry.id.replace('cab-', 'C'), {
         fontFamily: 'monospace',
@@ -348,6 +349,18 @@ class DataCenterScene extends Phaser.Scene {
       .setAlpha(powerMult * 0.7)
       .setDepth(baseDepth + 1)
     labels.push(idLabel)
+
+    // Environment tag below cabinet ID
+    const envLabel = this.add
+      .text(cx, topY + 9, envConfig.label, {
+        fontFamily: 'monospace',
+        fontSize: '5px',
+        color: envConfig.color,
+      })
+      .setOrigin(0.5)
+      .setAlpha(powerMult * 0.5)
+      .setDepth(baseDepth + 1)
+    labels.push(envLabel)
 
     g.setDepth(baseDepth)
     this.cabinetGraphics.set(entry.id, g)
@@ -513,22 +526,23 @@ class DataCenterScene extends Phaser.Scene {
 
   // ── Public API ──────────────────────────────────────────
 
-  addCabinetToScene(id: string, serverCount: number, hasLeafSwitch: boolean) {
+  addCabinetToScene(id: string, serverCount: number, hasLeafSwitch: boolean, environment: CabinetEnvironment = 'production') {
     const col = this.cabCount % CAB_COLS
     const row = Math.floor(this.cabCount / CAB_COLS) % CAB_ROWS
     this.cabCount++
 
-    const entry: CabinetEntry = { id, col, row, serverCount, hasLeafSwitch, powerOn: true }
+    const entry: CabinetEntry = { id, col, row, serverCount, hasLeafSwitch, powerOn: true, environment }
     this.cabEntries.set(id, entry)
     this.renderCabinet(entry)
   }
 
-  updateCabinet(id: string, serverCount: number, hasLeafSwitch: boolean, powerOn: boolean) {
+  updateCabinet(id: string, serverCount: number, hasLeafSwitch: boolean, powerOn: boolean, environment: CabinetEnvironment = 'production') {
     const entry = this.cabEntries.get(id)
     if (!entry) return
     entry.serverCount = serverCount
     entry.hasLeafSwitch = hasLeafSwitch
     entry.powerOn = powerOn
+    entry.environment = environment
     this.renderCabinet(entry)
   }
 

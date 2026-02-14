@@ -36,13 +36,13 @@ export function GameCanvas() {
     // Add new cabinets
     for (let i = prevCabCount.current; i < cabinets.length; i++) {
       const cab = cabinets[i]
-      scene.addCabinetToScene(cab.id, cab.serverCount, cab.hasLeafSwitch)
+      scene.addCabinetToScene(cab.id, cab.serverCount, cab.hasLeafSwitch, cab.environment)
     }
     prevCabCount.current = cabinets.length
 
-    // Update all existing cabinets (server count, leaf switch, power may have changed)
+    // Update all existing cabinets (server count, leaf switch, power, environment may have changed)
     for (const cab of cabinets) {
-      scene.updateCabinet(cab.id, cab.serverCount, cab.hasLeafSwitch, cab.powerStatus)
+      scene.updateCabinet(cab.id, cab.serverCount, cab.hasLeafSwitch, cab.powerStatus, cab.environment)
     }
   }, [cabinets])
 
