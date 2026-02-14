@@ -66,3 +66,65 @@
 - [ ] Sound effects
 - [ ] Placement animations
 - [ ] Tutorial / guided first-time experience
+
+---
+
+## Brainstorm: Additional Features
+
+### Customer & Contract System
+- [ ] Tenant contracts — Companies rent capacity with SLA requirements (uptime %, latency, bandwidth); missing SLAs means penalties or lost contracts
+- [ ] Customer types — AI training (GPU-heavy), streaming (high bandwidth), crypto (cheap power), enterprise (high security); each with different demands and revenue
+- [ ] RFP bidding — Compete against rival data centers for large contracts by offering better pricing, uptime, or green certifications
+
+### Staff & HR
+- [ ] Hire technicians — Network engineers, electricians, cooling specialists with skill levels affecting repair speed and incident prevention
+- [ ] Training programs — Send staff to certifications (CCNA, DCIM) to unlock advanced infrastructure options
+- [ ] Shift management — Night shift staff cheaper but slower; understaffing during incidents causes cascading failures
+
+### Research & Tech Tree
+- [ ] R&D lab — Invest to unlock technologies: liquid immersion cooling, optical interconnects, ARM servers, custom ASICs
+- [ ] Tech tree progression — Branch between efficiency (lower PUE), performance (higher density), or resilience (better failover)
+- [ ] Patent system — Developed tech can be patented for passive income or license others' tech
+
+### Reputation & Market
+- [ ] Reputation score — Uptime history, green energy, and incident response build public reputation affecting which customers approach you
+- [ ] Stock price / company valuation — Live ticker reflecting performance, unlocking investor funding for expansion
+- [ ] Competitor AI — Rival data center companies bid on same contracts, race to adopt tech, and poach your staff
+
+### Environmental & Regulatory
+- [ ] Carbon footprint tracker — Government carbon taxes scale with fossil fuel usage; green certifications (LEED, Energy Star) attract premium tenants
+- [ ] Zoning & permits — Expanding requires city permits; community opposition if facility is too noisy or power-hungry
+- [ ] Water usage management — Water-cooled systems draw from local supply; droughts force switches to air cooling
+- [ ] E-waste disposal — Decommissioned hardware must be recycled properly with cost and reputation implications
+
+### Physical Security & Compliance
+- [ ] Security tiers — Biometric access, mantrap entries, CCTV; higher security unlocks government and finance contracts
+- [ ] Compliance certifications — SOC 2, HIPAA, PCI-DSS; each requires specific infrastructure (isolated cages, encrypted networking)
+- [ ] Physical intrusion events — Social engineering attempts, tailgating, break-ins that test your security setup
+
+### Multi-Site Expansion
+- [ ] Multiple locations — Build data centers in different regions (US-East, EU-West, Asia-Pacific) with different costs, weather, and regulations
+- [ ] Inter-site networking — Connect sites via dark fiber or leased lines; latency matters for multi-region workloads
+- [ ] Edge deployments — Small edge PoPs in cities for low-latency delivery, feeding into main facilities
+
+### Workload Simulation
+- [ ] AI training jobs — Long-running GPU workloads generating massive heat, needing uninterrupted power; completion earns big payouts
+- [ ] Traffic patterns — Day/night cycles with peak hours; streaming spikes in evening, batch processing runs overnight
+- [ ] Workload migration — Manually or automatically migrate VMs when racks overheat or switches fail
+
+### Disaster & Recovery
+- [ ] Backup generators — Diesel or natural gas with finite fuel; power outages test UPS and generator capacity
+- [ ] Fire suppression systems — Gas-based (expensive, electronics-safe) vs. water-based (cheap, destructive); fires from overloaded circuits
+- [ ] Disaster recovery drills — Periodic failover tests; passing boosts reputation, failing reveals weaknesses
+
+### Economy & Finance
+- [ ] Loan system — Take loans for rapid expansion; interest payments eat into margins
+- [ ] Spot pricing for power — Electricity costs fluctuate with market rates; buy long-term contracts or gamble on spot pricing
+- [ ] Hardware depreciation — Servers lose value and efficiency over time; refresh cycles are strategic decisions
+- [ ] Insurance policies — Insure against specific disasters; cheaper premiums with good safety records
+
+### Social & Meta
+- [ ] Leaderboards — Compare PUE, uptime, revenue, or green energy % with other players
+- [ ] Achievement system — "365 days without downtime", "Reached Tier 3 in under 1 hour", "Zero carbon footprint"
+- [ ] Sandbox mode — Unlimited budget, all tech unlocked for creative building
+- [ ] Scenario challenges — "Recover from catastrophic flood", "Build zero-emission facility", "Handle Black Friday traffic surge"
