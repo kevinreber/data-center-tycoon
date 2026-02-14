@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { useGameStore, DEFAULT_COLORS, RACK_COST, MAX_SERVERS_PER_CABINET, MAX_CABINETS, MAX_SPINES, SIM, ENVIRONMENT_CONFIG } from '@/stores/gameStore'
+import { useGameStore, DEFAULT_COLORS, RACK_COST, MAX_SERVERS_PER_CABINET, MAX_CABINETS, MAX_SPINES, SIM, ENVIRONMENT_CONFIG, formatGameTime } from '@/stores/gameStore'
 import type { NodeType, LayerColors, CabinetEnvironment } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Server, Network, Power, Cpu, Eye, SlidersHorizontal, EyeOff, RotateCcw, HardDrive, Plus, TrendingUp, TrendingDown, DollarSign, ArrowRightLeft, AlertTriangle, Radio, Info, Shield } from 'lucide-react'
+import { Server, Network, Power, Cpu, Eye, SlidersHorizontal, EyeOff, RotateCcw, HardDrive, Plus, TrendingUp, TrendingDown, DollarSign, ArrowRightLeft, AlertTriangle, Radio, Info, Shield, Clock, Zap } from 'lucide-react'
 import {
   Tooltip,
   TooltipContent,
@@ -46,6 +46,7 @@ export function HUD() {
     toggleLayerVisibility, setLayerOpacity, setLayerColor,
     revenue, expenses, powerCost, coolingCost, avgHeat, mgmtBonus,
     trafficStats, trafficVisible, toggleTrafficVisible,
+    gameHour, demandMultiplier, spikeActive,
   } = useGameStore()
   const [showGuide, setShowGuide] = useState(true)
   const [selectedEnv, setSelectedEnv] = useState<CabinetEnvironment>('production')
@@ -485,6 +486,50 @@ export function HUD() {
             <div className="flex items-center gap-2 mb-2">
               <Radio className="size-3.5 text-neon-cyan" />
               <span className="text-xs font-bold text-neon-cyan tracking-widest">TRAFFIC</span>
+            </div>
+            {/* Time-of-day and demand indicator */}
+            <div className="flex flex-col gap-1.5 mb-2 pb-2 border-b border-border/50">
+              <div className="flex justify-between text-xs">
+                <span className="flex items-center gap-1 text-muted-foreground">
+                  <Clock className="size-3" />
+                  Time
+                </span>
+                <span className="text-foreground tabular-nums font-bold">{formatGameTime(gameHour)}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="flex items-center gap-1 text-muted-foreground cursor-help">
+                      <Zap className="size-3" />
+                      Demand
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-52">
+                    Traffic demand follows a 24h cycle: low overnight, peak in the evening. Random spikes can occur at any time.
+                  </TooltipContent>
+                </Tooltip>
+                <span className={`tabular-nums font-bold ${
+                  demandMultiplier > 1.2 ? 'text-neon-red' : demandMultiplier > 0.8 ? 'text-neon-yellow' : 'text-neon-green'
+                }`}>
+                  {Math.round(demandMultiplier * 100)}%
+                </span>
+              </div>
+              {/* Demand bar */}
+              <div className="w-full h-1.5 bg-border rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all"
+                  style={{
+                    width: `${Math.min(100, Math.round(demandMultiplier / 1.5 * 100))}%`,
+                    backgroundColor: demandMultiplier > 1.2 ? '#ff4444' : demandMultiplier > 0.8 ? '#ffaa00' : '#00ff88',
+                  }}
+                />
+              </div>
+              {spikeActive && (
+                <p className="text-xs text-neon-red font-bold animate-pulse flex items-center gap-1">
+                  <AlertTriangle className="size-3" />
+                  TRAFFIC SPIKE
+                </p>
+              )}
             </div>
             {trafficStats.totalFlows === 0 ? (
               <p className="text-xs text-muted-foreground italic">

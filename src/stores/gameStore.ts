@@ -168,14 +168,76 @@ export { POWER_DRAW }
 // ── Traffic Constants ────────────────────────────────────────────
 
 const TRAFFIC = {
-  gbpsPerServer: 1,         // each active server generates 1 Gbps of east-west traffic
+  gbpsPerServer: 1,         // each active server generates 1 Gbps of east-west traffic (at 1.0x demand)
   linkCapacityGbps: 10,     // each leaf→spine uplink is 10 Gbps
 }
 
 export { TRAFFIC }
 
+// ── Time-of-Day / Demand Constants ──────────────────────────────
+
+/** Minutes of in-game time that pass per tick (96 ticks = 1 full day) */
+const MINUTES_PER_TICK = 15
+
+/** Chance per tick of a random traffic spike starting (when none is active) */
+const SPIKE_CHANCE = 0.05
+
+/** Duration range for a traffic spike (in ticks) */
+const SPIKE_MIN_TICKS = 3
+const SPIKE_MAX_TICKS = 8
+
+/** Magnitude range of a traffic spike (additive on top of base demand) */
+const SPIKE_MIN_MAG = 0.2
+const SPIKE_MAX_MAG = 0.5
+
+/**
+ * Base demand curve: [hour, multiplier] pairs (linearly interpolated).
+ * Models a typical data center traffic pattern:
+ * - Quiet overnight (0.25x–0.3x)
+ * - Morning ramp-up
+ * - Business hours plateau (~0.9x–1.0x)
+ * - Evening peak (~1.3x–1.4x) driven by streaming/consumer traffic
+ * - Late-night decline
+ */
+const DEMAND_CURVE: [number, number][] = [
+  [0, 0.30],
+  [5, 0.25],
+  [7, 0.60],
+  [9, 0.85],
+  [12, 0.95],
+  [15, 1.10],
+  [18, 1.30],
+  [20, 1.40],
+  [21, 1.20],
+  [23, 0.50],
+  [24, 0.30],
+]
+
+/** Interpolate the base demand multiplier for a given hour (0–24) */
+function baseDemand(hour: number): number {
+  const h = ((hour % 24) + 24) % 24 // normalise to 0–24
+  for (let i = 0; i < DEMAND_CURVE.length - 1; i++) {
+    const [h0, d0] = DEMAND_CURVE[i]
+    const [h1, d1] = DEMAND_CURVE[i + 1]
+    if (h >= h0 && h <= h1) {
+      const t = (h - h0) / (h1 - h0)
+      return d0 + t * (d1 - d0)
+    }
+  }
+  return DEMAND_CURVE[0][1]
+}
+
+/** Format a game hour (float 0–24) as "HH:MM" */
+export function formatGameTime(hour: number): string {
+  const h = ((Math.floor(hour) % 24) + 24) % 24
+  const m = Math.floor((hour % 1) * 60)
+  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`
+}
+
+export { MINUTES_PER_TICK }
+
 /** Calculate traffic flows across the leaf-spine fabric */
-function calcTraffic(cabinets: Cabinet[], spines: SpineSwitch[]): TrafficStats {
+function calcTraffic(cabinets: Cabinet[], spines: SpineSwitch[], demandMultiplier = 1): TrafficStats {
   const emptyStats: TrafficStats = {
     totalFlows: 0,
     totalBandwidthGbps: 0,
@@ -211,7 +273,7 @@ function calcTraffic(cabinets: Cabinet[], spines: SpineSwitch[]): TrafficStats {
   let redirectedFlows = 0
 
   for (const cab of leafCabinets) {
-    const cabTraffic = cab.serverCount * TRAFFIC.gbpsPerServer
+    const cabTraffic = cab.serverCount * TRAFFIC.gbpsPerServer * demandMultiplier
     const perSpineBw = cabTraffic / activeSpines.length
 
     for (const spine of activeSpines) {
@@ -317,6 +379,13 @@ interface GameState {
   trafficStats: TrafficStats
   trafficVisible: boolean
 
+  // Time-of-day / demand
+  gameHour: number              // 0–24 float, current in-game time
+  demandMultiplier: number      // effective demand (base curve + spike), affects traffic
+  spikeActive: boolean          // whether a random traffic spike is in progress
+  spikeTicks: number            // ticks remaining on current spike
+  spikeMagnitude: number        // additive demand from current spike
+
   // Actions
   addCabinet: (environment: CabinetEnvironment) => void
   upgradeNextCabinet: () => void
@@ -368,6 +437,13 @@ export const useGameStore = create<GameState>((set) => ({
     spineUtilization: {},
   },
   trafficVisible: true,
+
+  // Time-of-day / demand
+  gameHour: 8,                // start at 8:00 AM
+  demandMultiplier: baseDemand(8),
+  spikeActive: false,
+  spikeTicks: 0,
+  spikeMagnitude: 0,
 
   // ── Build Actions ───────────────────────────────────────────
 
@@ -445,7 +521,7 @@ export const useGameStore = create<GameState>((set) => ({
       return {
         cabinets: newCabinets,
         ...calcStats(newCabinets, state.spineSwitches),
-        trafficStats: calcTraffic(newCabinets, state.spineSwitches),
+        trafficStats: calcTraffic(newCabinets, state.spineSwitches, state.demandMultiplier),
       }
     }),
 
@@ -457,7 +533,7 @@ export const useGameStore = create<GameState>((set) => ({
       return {
         spineSwitches: newSpines,
         ...calcStats(state.cabinets, newSpines),
-        trafficStats: calcTraffic(state.cabinets, newSpines),
+        trafficStats: calcTraffic(state.cabinets, newSpines, state.demandMultiplier),
       }
     }),
 
@@ -496,8 +572,42 @@ export const useGameStore = create<GameState>((set) => ({
 
   tick: () =>
     set((state) => {
+      // Advance in-game clock (wraps at 24)
+      const newHour = (state.gameHour + MINUTES_PER_TICK / 60) % 24
+
+      // Calculate base demand from time-of-day curve
+      const base = baseDemand(newHour)
+
+      // Manage traffic spikes
+      let spikeActive = state.spikeActive
+      let spikeTicks = state.spikeTicks
+      let spikeMagnitude = state.spikeMagnitude
+
+      if (spikeActive) {
+        spikeTicks--
+        if (spikeTicks <= 0) {
+          spikeActive = false
+          spikeTicks = 0
+          spikeMagnitude = 0
+        }
+      } else if (Math.random() < SPIKE_CHANCE) {
+        // Start a new spike
+        spikeActive = true
+        spikeTicks = SPIKE_MIN_TICKS + Math.floor(Math.random() * (SPIKE_MAX_TICKS - SPIKE_MIN_TICKS + 1))
+        spikeMagnitude = +(SPIKE_MIN_MAG + Math.random() * (SPIKE_MAX_MAG - SPIKE_MIN_MAG)).toFixed(2)
+      }
+
+      const demandMultiplier = +(base + (spikeActive ? spikeMagnitude : 0)).toFixed(2)
+
       if (state.cabinets.length === 0 && state.spineSwitches.length === 0) {
-        return { tickCount: state.tickCount + 1 }
+        return {
+          tickCount: state.tickCount + 1,
+          gameHour: newHour,
+          demandMultiplier,
+          spikeActive,
+          spikeTicks,
+          spikeMagnitude,
+        }
       }
 
       // 1. Update heat per cabinet
@@ -523,7 +633,7 @@ export const useGameStore = create<GameState>((set) => ({
       // 2. Calculate stats with updated heat
       const stats = calcStats(newCabinets, state.spineSwitches)
 
-      // 3. Calculate revenue (scaled by environment)
+      // 3. Calculate revenue (scaled by environment and demand)
       let revenue = 0
       for (const cab of newCabinets) {
         if (cab.powerStatus) {
@@ -544,8 +654,8 @@ export const useGameStore = create<GameState>((set) => ({
       const netIncome = revenue - expenses
       const newMoney = Math.round((state.money + netIncome) * 100) / 100
 
-      // 6. Calculate traffic flows
-      const trafficStats = calcTraffic(newCabinets, state.spineSwitches)
+      // 6. Calculate traffic flows (scaled by demand multiplier)
+      const trafficStats = calcTraffic(newCabinets, state.spineSwitches, demandMultiplier)
 
       return {
         cabinets: newCabinets,
@@ -556,6 +666,11 @@ export const useGameStore = create<GameState>((set) => ({
         coolingCost,
         money: newMoney,
         trafficStats,
+        gameHour: newHour,
+        demandMultiplier,
+        spikeActive,
+        spikeTicks,
+        spikeMagnitude,
         ...stats,
       }
     }),
