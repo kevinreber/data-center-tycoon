@@ -2,12 +2,24 @@ import { create } from 'zustand'
 
 export type ViewMode = 'cabinet' | 'above_cabinet'
 
+export type NodeType = 'server' | 'leaf_switch' | 'spine_switch'
+
 export interface RackNode {
   id: string
-  type: 'server' | 'leaf_switch' | 'spine_switch'
+  type: NodeType
   powerStatus: boolean
   heatLevel: number
 }
+
+export interface LayerColors {
+  top: number
+  side: number
+  front: number
+}
+
+export type LayerVisibility = Record<NodeType, boolean>
+export type LayerOpacity = Record<NodeType, number>
+export type LayerColorOverrides = Record<NodeType, LayerColors | null>
 
 interface GameState {
   racks: RackNode[]
@@ -16,9 +28,21 @@ interface GameState {
   pue: number
   avgHeat: number
   viewMode: ViewMode
-  addRack: (type: RackNode['type']) => void
+  layerVisibility: LayerVisibility
+  layerOpacity: LayerOpacity
+  layerColors: LayerColorOverrides
+  addRack: (type: NodeType) => void
   togglePower: (id: string) => void
   setViewMode: (mode: ViewMode) => void
+  toggleLayerVisibility: (type: NodeType) => void
+  setLayerOpacity: (type: NodeType, opacity: number) => void
+  setLayerColor: (type: NodeType, colors: LayerColors | null) => void
+}
+
+export const DEFAULT_COLORS: Record<NodeType, LayerColors> = {
+  server: { top: 0x00ff88, side: 0x00cc66, front: 0x009944 },
+  leaf_switch: { top: 0x00aaff, side: 0x0088cc, front: 0x006699 },
+  spine_switch: { top: 0xff6644, side: 0xcc4422, front: 0x993311 },
 }
 
 const POWER_DRAW: Record<RackNode['type'], number> = {
@@ -54,6 +78,9 @@ export const useGameStore = create<GameState>((set) => ({
   pue: 0,
   avgHeat: 0,
   viewMode: 'cabinet' as ViewMode,
+  layerVisibility: { server: true, leaf_switch: true, spine_switch: true },
+  layerOpacity: { server: 1, leaf_switch: 1, spine_switch: 1 },
+  layerColors: { server: null, leaf_switch: null, spine_switch: null },
   addRack: (type) =>
     set((state) => {
       const cost = RACK_COST[type]
@@ -83,4 +110,25 @@ export const useGameStore = create<GameState>((set) => ({
       }
     }),
   setViewMode: (mode) => set({ viewMode: mode }),
+  toggleLayerVisibility: (type) =>
+    set((state) => ({
+      layerVisibility: {
+        ...state.layerVisibility,
+        [type]: !state.layerVisibility[type],
+      },
+    })),
+  setLayerOpacity: (type, opacity) =>
+    set((state) => ({
+      layerOpacity: {
+        ...state.layerOpacity,
+        [type]: Math.max(0, Math.min(1, opacity)),
+      },
+    })),
+  setLayerColor: (type, colors) =>
+    set((state) => ({
+      layerColors: {
+        ...state.layerColors,
+        [type]: colors,
+      },
+    })),
 }))

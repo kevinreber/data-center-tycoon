@@ -8,9 +8,9 @@
 - [x] Architectural dashed-line rendering for "other plane" objects
 
 ## Next PR: Layer Filters
-- [ ] Toggle visibility of individual layers within a view (cables, switches, servers, power)
-- [ ] Filter UI (checkboxes or toggle chips in HUD)
-- [ ] Per-layer opacity/color controls
+- [x] Toggle visibility of individual layers within a view (cables, switches, servers, power)
+- [x] Filter UI (checkboxes or toggle chips in HUD)
+- [x] Per-layer opacity/color controls
 
 ## Future: Sub-Floor View (Plane 1)
 - [ ] Third view mode: raised floor plenum

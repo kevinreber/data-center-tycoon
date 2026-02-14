@@ -9,6 +9,9 @@ export function GameCanvas() {
 
   const racks = useGameStore((s) => s.racks)
   const viewMode = useGameStore((s) => s.viewMode)
+  const layerVisibility = useGameStore((s) => s.layerVisibility)
+  const layerOpacity = useGameStore((s) => s.layerOpacity)
+  const layerColors = useGameStore((s) => s.layerColors)
 
   useEffect(() => {
     if (!gameRef.current) {
@@ -45,6 +48,30 @@ export function GameCanvas() {
     if (!scene) return
     scene.setViewMode(viewMode)
   }, [viewMode])
+
+  // Sync layer visibility to Phaser
+  useEffect(() => {
+    if (!gameRef.current) return
+    const scene = getScene(gameRef.current)
+    if (!scene) return
+    scene.setLayerVisibility(layerVisibility)
+  }, [layerVisibility])
+
+  // Sync layer opacity to Phaser
+  useEffect(() => {
+    if (!gameRef.current) return
+    const scene = getScene(gameRef.current)
+    if (!scene) return
+    scene.setLayerOpacity(layerOpacity)
+  }, [layerOpacity])
+
+  // Sync layer colors to Phaser
+  useEffect(() => {
+    if (!gameRef.current) return
+    const scene = getScene(gameRef.current)
+    if (!scene) return
+    scene.setLayerColors(layerColors)
+  }, [layerColors])
 
   return (
     <div
