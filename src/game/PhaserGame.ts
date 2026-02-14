@@ -1,11 +1,8 @@
 import Phaser from 'phaser'
-import type { ViewMode } from '@/stores/gameStore'
+import type { ViewMode, NodeType, LayerVisibility, LayerOpacity, LayerColors, LayerColorOverrides } from '@/stores/gameStore'
+import { DEFAULT_COLORS } from '@/stores/gameStore'
 
-const COLORS = {
-  server: { top: 0x00ff88, side: 0x00cc66, front: 0x009944 },
-  leaf_switch: { top: 0x00aaff, side: 0x0088cc, front: 0x006699 },
-  spine_switch: { top: 0xff6644, side: 0xcc4422, front: 0x993311 },
-}
+const COLORS = DEFAULT_COLORS
 
 // Which view plane each node type belongs to
 const NODE_PLANE: Record<string, ViewMode> = {
@@ -37,6 +34,9 @@ class DataCenterScene extends Phaser.Scene {
   private offsetX = 0
   private offsetY = 0
   private currentViewMode: ViewMode = 'cabinet'
+  private layerVisibility: LayerVisibility = { server: true, leaf_switch: true, spine_switch: true }
+  private layerOpacity: LayerOpacity = { server: 1, leaf_switch: 1, spine_switch: 1 }
+  private layerColors: LayerColorOverrides = { server: null, leaf_switch: null, spine_switch: null }
 
   constructor() {
     super({ key: 'DataCenterScene' })
@@ -233,7 +233,7 @@ class DataCenterScene extends Phaser.Scene {
     this.drawDashedLine(g, x + hw, y + hh, x, y + h, dash, gap)
   }
 
-  /** Render a single rack node based on the current view mode */
+  /** Render a single rack node based on the current view mode and layer filters */
   private renderRack(entry: RackEntry) {
     // Clean up existing graphics for this rack
     const oldG = this.rackSprites.get(entry.id)
@@ -241,17 +241,28 @@ class DataCenterScene extends Phaser.Scene {
     const oldLabel = this.rackLabels.get(entry.id)
     if (oldLabel) oldLabel.destroy()
 
+    const nodeType = entry.type as NodeType
+
+    // If layer is hidden, don't render at all
+    if (!this.layerVisibility[nodeType]) {
+      this.rackSprites.delete(entry.id)
+      this.rackLabels.delete(entry.id)
+      return
+    }
+
     const { x, y } = this.isoToScreen(entry.col, entry.row)
     const cx = x
     const cy = y + TILE_H / 2
-    const colors = COLORS[entry.type as keyof typeof COLORS] ?? COLORS.server
+    const defaultColors = COLORS[nodeType] ?? COLORS.server
+    const colors: LayerColors = this.layerColors[nodeType] ?? defaultColors
     const cubeW = 36
     const cubeH = 18
     const cubeDepth = 20
 
     const nodePlane = NODE_PLANE[entry.type] ?? 'cabinet'
     const isSolidPlane = nodePlane === this.currentViewMode
-    const baseAlpha = entry.powerOn ? 0.9 : 0.25
+    const opacityMult = this.layerOpacity[nodeType]
+    const baseAlpha = (entry.powerOn ? 0.9 : 0.25) * opacityMult
 
     const g = this.add.graphics()
 
@@ -263,7 +274,7 @@ class DataCenterScene extends Phaser.Scene {
       this.drawDashedIsoCube(
         g, cx, cy, cubeW, cubeH, cubeDepth,
         colors.top,
-        entry.powerOn ? 0.3 : 0.1
+        (entry.powerOn ? 0.3 : 0.1) * opacityMult
       )
     }
 
@@ -272,8 +283,8 @@ class DataCenterScene extends Phaser.Scene {
 
     // LED indicator dot
     const labelAlpha = isSolidPlane
-      ? (entry.powerOn ? 1 : 0.15)
-      : (entry.powerOn ? 0.3 : 0.08)
+      ? (entry.powerOn ? 1 : 0.15) * opacityMult
+      : (entry.powerOn ? 0.3 : 0.08) * opacityMult
 
     const label = this.add
       .text(cx, cy - cubeDepth - 6, '●', {
@@ -315,6 +326,21 @@ class DataCenterScene extends Phaser.Scene {
   setViewMode(mode: ViewMode) {
     if (mode === this.currentViewMode) return
     this.currentViewMode = mode
+    this.rerenderAllRacks()
+  }
+
+  setLayerVisibility(visibility: LayerVisibility) {
+    this.layerVisibility = visibility
+    this.rerenderAllRacks()
+  }
+
+  setLayerOpacity(opacity: LayerOpacity) {
+    this.layerOpacity = opacity
+    this.rerenderAllRacks()
+  }
+
+  setLayerColors(colors: LayerColorOverrides) {
+    this.layerColors = colors
     this.rerenderAllRacks()
   }
 }
