@@ -44,13 +44,25 @@
 - [x] Game tick system with speed controls (Pause, 1x, 2x, 3x)
 - [x] Thermal throttling (servers above 80°C earn half revenue)
 - [x] Finance panel (revenue/expense breakdown per tick)
-- [ ] Water cooling upgrade (higher efficiency, different trade-offs)
+- [x] Water cooling upgrade (higher efficiency, different trade-offs)
 
 ## Incident System
-- [ ] Timer-based random event roller
-- [ ] Real-world incidents: fiber cuts, squirrels, DDoS, pipe leaks
+- [x] Timer-based random event roller
+- [x] Real-world incidents: fiber cuts, squirrels, DDoS, pipe leaks
 - [ ] Creative incidents: sentient AI, solar flares, quantum decoherence
-- [ ] Incident notification UI and resolution mechanics
+- [x] Incident notification UI and resolution mechanics
+
+## Loan System
+- [x] Small/Medium/Large loan options with interest rates
+- [x] Per-tick loan repayment deducted from income
+- [x] Max 3 active loans, finance panel integration
+- [ ] Spot pricing for power (market rate fluctuations)
+
+## Achievement System
+- [x] 15 achievements tracking milestones (equipment, money, incidents, cooling)
+- [x] Achievement unlock toast notifications
+- [x] Full achievements panel in HUD
+- [ ] Sandbox mode (unlimited budget, all tech unlocked)
 
 ## Scaling Tiers
 - [ ] Tier 1: Solar/Grid Power + Air Cooling
@@ -122,13 +134,13 @@
 - [ ] Disaster recovery drills — Periodic failover tests; passing boosts reputation, failing reveals weaknesses
 
 ### Economy & Finance
-- [ ] Loan system — Take loans for rapid expansion; interest payments eat into margins
+- [x] Loan system — Take loans for rapid expansion; interest payments eat into margins
 - [ ] Spot pricing for power — Electricity costs fluctuate with market rates; buy long-term contracts or gamble on spot pricing
 - [ ] Hardware depreciation — Servers lose value and efficiency over time; refresh cycles are strategic decisions
 - [ ] Insurance policies — Insure against specific disasters; cheaper premiums with good safety records
 
 ### Social & Meta
 - [ ] Leaderboards — Compare PUE, uptime, revenue, or green energy % with other players
-- [ ] Achievement system — "365 days without downtime", "Reached Tier 3 in under 1 hour", "Zero carbon footprint"
+- [x] Achievement system — "365 days without downtime", "Reached Tier 3 in under 1 hour", "Zero carbon footprint"
 - [ ] Sandbox mode — Unlimited budget, all tech unlocked for creative building
 - [ ] Scenario challenges — "Recover from catastrophic flood", "Build zero-emission facility", "Handle Black Friday traffic surge"
