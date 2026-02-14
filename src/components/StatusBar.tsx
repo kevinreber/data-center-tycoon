@@ -1,4 +1,4 @@
-import { useGameStore } from '@/stores/gameStore'
+import { useGameStore, formatGameTime } from '@/stores/gameStore'
 
 interface StatusBarProps {
   activeNodes: number
@@ -8,7 +8,7 @@ interface StatusBarProps {
 const SPEED_LABELS = ['PAUSED', '1x', '2x', '3x']
 
 export function StatusBar({ activeNodes, totalNodes }: StatusBarProps) {
-  const { gameSpeed, tickCount } = useGameStore()
+  const { gameSpeed, tickCount, gameHour, demandMultiplier, spikeActive } = useGameStore()
 
   return (
     <footer className="flex items-center justify-between px-4 py-1.5 border-t border-border bg-card text-xs text-muted-foreground">
@@ -24,6 +24,14 @@ export function StatusBar({ activeNodes, totalNodes }: StatusBarProps) {
         </span>
         <span className="tabular-nums">
           TICK: {tickCount.toLocaleString()}
+        </span>
+        <span className="tabular-nums">
+          TIME: {formatGameTime(gameHour)}
+        </span>
+        <span className={`tabular-nums ${
+          spikeActive ? 'text-neon-red animate-pulse' : demandMultiplier > 1.0 ? 'text-neon-yellow' : ''
+        }`}>
+          DEMAND: {Math.round(demandMultiplier * 100)}%{spikeActive ? ' SPIKE' : ''}
         </span>
       </div>
       <div className="flex items-center gap-4">
