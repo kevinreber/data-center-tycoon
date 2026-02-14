@@ -5,8 +5,9 @@ import { useGameStore } from '@/stores/gameStore'
 import { Zap, DollarSign, Thermometer, Activity } from 'lucide-react'
 
 function App() {
-  const { totalPower, money, pue, avgHeat, racks } = useGameStore()
-  const activeNodes = racks.filter((r) => r.powerStatus).length
+  const { totalPower, money, pue, avgHeat, cabinets, spineSwitches } = useGameStore()
+  const totalNodes = cabinets.length + spineSwitches.length
+  const activeNodes = cabinets.filter((c) => c.powerStatus).length + spineSwitches.filter((s) => s.powerStatus).length
 
   return (
     <div className="h-screen flex flex-col bg-background text-foreground font-mono overflow-hidden">
@@ -17,7 +18,7 @@ function App() {
             FABRIC TYCOON
           </h1>
           <span className="text-xs text-muted-foreground hidden sm:inline">
-            Build servers, design network fabrics, and manage power to scale your data center.
+            Build cabinets, design network fabrics, and manage power to scale your data center.
           </span>
           <span className="inline-block w-2 h-4 bg-neon-green animate-blink ml-1" />
         </div>
@@ -63,7 +64,7 @@ function App() {
       </main>
 
       {/* Bottom status bar */}
-      <StatusBar activeNodes={activeNodes} totalNodes={racks.length} />
+      <StatusBar activeNodes={activeNodes} totalNodes={totalNodes} />
     </div>
   )
 }

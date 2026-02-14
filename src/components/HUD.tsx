@@ -1,21 +1,15 @@
 import { useState } from 'react'
-import { useGameStore, DEFAULT_COLORS } from '@/stores/gameStore'
+import { useGameStore, DEFAULT_COLORS, RACK_COST, MAX_SERVERS_PER_CABINET, MAX_CABINETS, MAX_SPINES } from '@/stores/gameStore'
 import type { NodeType, LayerColors } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Server, Network, Power, Cpu, Layers, Eye, SlidersHorizontal, EyeOff, RotateCcw } from 'lucide-react'
+import { Server, Network, Power, Cpu, Eye, SlidersHorizontal, EyeOff, RotateCcw, HardDrive, Plus } from 'lucide-react'
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-
-const RACK_COST: Record<string, number> = {
-  server: 2000,
-  leaf_switch: 5000,
-  spine_switch: 12000,
-}
 
 const LAYER_DEFS: { type: NodeType; label: string; colorClass: string; glowClass: string; neonVar: string }[] = [
   { type: 'server', label: 'Servers', colorClass: 'neon-green', glowClass: 'text-neon-green', neonVar: '#00ff88' },
@@ -45,12 +39,16 @@ function deriveColors(topHex: number): LayerColors {
 
 export function HUD() {
   const {
-    racks, totalPower, money, viewMode,
+    cabinets, spineSwitches, totalPower, money,
     layerVisibility, layerOpacity, layerColors,
-    addRack, togglePower, setViewMode,
+    addCabinet, upgradeNextCabinet, addLeafToNextCabinet, addSpineSwitch,
+    toggleCabinetPower, toggleSpinePower,
     toggleLayerVisibility, setLayerOpacity, setLayerColor,
   } = useGameStore()
   const [showGuide, setShowGuide] = useState(true)
+
+  const canUpgrade = cabinets.some((c) => c.serverCount < MAX_SERVERS_PER_CABINET)
+  const canAddLeaf = cabinets.some((c) => !c.hasLeafSwitch)
 
   return (
     <TooltipProvider>
@@ -70,75 +68,26 @@ export function HUD() {
             </div>
             <ol className="text-xs font-mono text-muted-foreground space-y-1.5 list-decimal list-inside">
               <li>
-                <strong className="text-foreground">Build your data center</strong>
-                {' '}&mdash; Use the BUILD panel to deploy servers and network switches.
+                <strong className="text-foreground">Build cabinets</strong>
+                {' '}&mdash; Each grid square is a cabinet slot. Add cabinets to start.
               </li>
               <li>
-                <strong className="text-foreground">Design a network fabric</strong>
-                {' '}&mdash; Add <span className="text-neon-green">Servers</span> to handle
-                compute, <span className="text-neon-cyan">Leaf Switches</span> to connect
-                them, and <span className="text-neon-orange">Spine Switches</span> to link
-                leaves together.
+                <strong className="text-foreground">Fill cabinets</strong>
+                {' '}&mdash; Add <span className="text-neon-green">Servers</span> (up to 4 per cabinet)
+                and <span className="text-neon-cyan">Leaf Switches</span> (ToR, 1 per cabinet on top).
+              </li>
+              <li>
+                <strong className="text-foreground">Build the fabric</strong>
+                {' '}&mdash; Add <span className="text-neon-orange">Spine Switches</span> in the
+                elevated row above to link leaf switches together.
               </li>
               <li>
                 <strong className="text-foreground">Manage power</strong>
-                {' '}&mdash; Each node draws power. Click a node badge in NODES to toggle
-                its power on/off.
-              </li>
-              <li>
-                <strong className="text-foreground">Watch your floor</strong>
-                {' '}&mdash; The isometric view above shows your deployed nodes. Keep an
-                eye on power and heat as you scale up.
+                {' '}&mdash; Click a badge in EQUIPMENT to toggle power on/off.
               </li>
             </ol>
           </div>
         )}
-
-        {/* View mode toggle */}
-        <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5">
-          <Layers className="size-3.5 text-neon-purple" />
-          <span className="text-xs font-bold text-neon-purple tracking-widest mr-1">VIEW</span>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant={viewMode === 'cabinet' ? 'default' : 'ghost'}
-                size="xs"
-                onClick={() => setViewMode('cabinet')}
-                className={`font-mono text-xs transition-all ${
-                  viewMode === 'cabinet'
-                    ? 'bg-neon-green/20 text-neon-green border border-neon-green/40'
-                    : 'text-muted-foreground hover:text-neon-green'
-                }`}
-              >
-                <Eye className="size-3 mr-1" />
-                Cabinet
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              Floor level — servers and racks are solid, overhead switches shown as outlines
-            </TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant={viewMode === 'above_cabinet' ? 'default' : 'ghost'}
-                size="xs"
-                onClick={() => setViewMode('above_cabinet')}
-                className={`font-mono text-xs transition-all ${
-                  viewMode === 'above_cabinet'
-                    ? 'bg-neon-cyan/20 text-neon-cyan border border-neon-cyan/40'
-                    : 'text-muted-foreground hover:text-neon-cyan'
-                }`}
-              >
-                <Eye className="size-3 mr-1" />
-                Above Cabinet
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              Overhead level — switches and cabling are solid, cabinets shown as outlines
-            </TooltipContent>
-          </Tooltip>
-        </div>
 
         {/* Layer filters */}
         <div className="rounded-lg border border-border bg-card p-3 glow-green">
@@ -253,19 +202,19 @@ export function HUD() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => addRack('server')}
-                    disabled={money < RACK_COST.server}
+                    onClick={() => addCabinet()}
+                    disabled={money < RACK_COST.cabinet || cabinets.length >= MAX_CABINETS}
                     className="justify-between font-mono text-xs border-neon-green/20 hover:border-neon-green/50 hover:bg-neon-green/10 hover:text-neon-green transition-all"
                   >
                     <span className="flex items-center gap-1.5">
-                      <Server className="size-3" />
-                      Server
+                      <HardDrive className="size-3" />
+                      New Cabinet
                     </span>
-                    <span className="text-muted-foreground">${RACK_COST.server.toLocaleString()}</span>
+                    <span className="text-muted-foreground">${RACK_COST.cabinet.toLocaleString()}</span>
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom">
-                  Compute node &mdash; handles workloads (450W)
+                  Place a new cabinet with 1 server ({cabinets.length}/{MAX_CABINETS} slots used)
                 </TooltipContent>
               </Tooltip>
               <Tooltip>
@@ -273,8 +222,29 @@ export function HUD() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => addRack('leaf_switch')}
-                    disabled={money < RACK_COST.leaf_switch}
+                    onClick={() => upgradeNextCabinet()}
+                    disabled={money < RACK_COST.server || !canUpgrade}
+                    className="justify-between font-mono text-xs border-neon-green/20 hover:border-neon-green/50 hover:bg-neon-green/10 hover:text-neon-green transition-all"
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <Plus className="size-3" />
+                      <Server className="size-3" />
+                      Add Server
+                    </span>
+                    <span className="text-muted-foreground">${RACK_COST.server.toLocaleString()}</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  Add a server to the next cabinet with space (max {MAX_SERVERS_PER_CABINET} per cabinet, 450W)
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => addLeafToNextCabinet()}
+                    disabled={money < RACK_COST.leaf_switch || !canAddLeaf}
                     className="justify-between font-mono text-xs border-neon-cyan/20 hover:border-neon-cyan/50 hover:bg-neon-cyan/10 hover:text-neon-cyan transition-all"
                   >
                     <span className="flex items-center gap-1.5">
@@ -285,7 +255,7 @@ export function HUD() {
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom">
-                  Connects servers to the network fabric (150W)
+                  Mount a ToR leaf switch on the next cabinet without one (150W)
                 </TooltipContent>
               </Tooltip>
               <Tooltip>
@@ -293,8 +263,8 @@ export function HUD() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => addRack('spine_switch')}
-                    disabled={money < RACK_COST.spine_switch}
+                    onClick={() => addSpineSwitch()}
+                    disabled={money < RACK_COST.spine_switch || spineSwitches.length >= MAX_SPINES}
                     className="justify-between font-mono text-xs border-neon-orange/20 hover:border-neon-orange/50 hover:bg-neon-orange/10 hover:text-neon-orange transition-all"
                   >
                     <span className="flex items-center gap-1.5">
@@ -305,7 +275,7 @@ export function HUD() {
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom">
-                  Backbone switch &mdash; links leaf switches together (250W)
+                  Backbone switch in elevated row &mdash; links leaf switches ({spineSwitches.length}/{MAX_SPINES}, 250W)
                 </TooltipContent>
               </Tooltip>
             </div>
@@ -325,53 +295,80 @@ export function HUD() {
             </div>
             <div className="w-full mt-3 pt-2 border-t border-border">
               <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Nodes</span>
-                <span className="text-foreground">{racks.length}</span>
+                <span className="text-muted-foreground">Cabinets</span>
+                <span className="text-foreground">{cabinets.length}</span>
+              </div>
+              <div className="flex justify-between text-xs mt-1">
+                <span className="text-muted-foreground">Spines</span>
+                <span className="text-neon-orange">{spineSwitches.length}</span>
               </div>
               <div className="flex justify-between text-xs mt-1">
                 <span className="text-muted-foreground">Active</span>
-                <span className="text-neon-green">{racks.filter((r) => r.powerStatus).length}</span>
+                <span className="text-neon-green">
+                  {cabinets.filter((c) => c.powerStatus).length + spineSwitches.filter((s) => s.powerStatus).length}
+                </span>
               </div>
             </div>
           </div>
 
-          {/* NODES panel */}
+          {/* EQUIPMENT panel */}
           <div className="rounded-lg border border-border bg-card p-3 glow-green">
             <div className="flex items-center gap-2 mb-3">
               <Server className="size-3.5 text-neon-green" />
-              <span className="text-xs font-bold text-neon-green tracking-widest">NODES</span>
-              {racks.length > 0 && (
-                <span className="text-xs text-muted-foreground ml-auto">{racks.length} deployed</span>
+              <span className="text-xs font-bold text-neon-green tracking-widest">EQUIPMENT</span>
+              {(cabinets.length + spineSwitches.length) > 0 && (
+                <span className="text-xs text-muted-foreground ml-auto">
+                  {cabinets.length} cab + {spineSwitches.length} spine
+                </span>
               )}
             </div>
-            {racks.length === 0 ? (
-              <p className="text-xs text-muted-foreground italic">No nodes deployed yet. Use BUILD to add equipment.</p>
+            {cabinets.length === 0 && spineSwitches.length === 0 ? (
+              <p className="text-xs text-muted-foreground italic">No equipment deployed yet. Use BUILD to add cabinets.</p>
             ) : (
               <div className="flex gap-1.5 flex-wrap max-h-28 overflow-y-auto">
-                {racks.map((r) => {
-                  const label =
-                    r.type === 'server' ? 'SRV' : r.type === 'leaf_switch' ? 'LEAF' : 'SPINE'
-                  const colorClass =
-                    r.type === 'server'
-                      ? 'bg-neon-green/20 text-neon-green border-neon-green/30 hover:bg-neon-green/30'
-                      : r.type === 'leaf_switch'
-                        ? 'bg-neon-cyan/20 text-neon-cyan border-neon-cyan/30 hover:bg-neon-cyan/30'
-                        : 'bg-neon-orange/20 text-neon-orange border-neon-orange/30 hover:bg-neon-orange/30'
-                  const offClass = 'bg-muted text-muted-foreground border-border hover:bg-muted/80'
+                {cabinets.map((c) => {
+                  const leafTag = c.hasLeafSwitch ? '+L' : ''
+                  const label = `C${c.id.replace('cab-', '')} ×${c.serverCount}${leafTag}`
+                  const colorClass = c.powerStatus
+                    ? 'bg-neon-green/20 text-neon-green border-neon-green/30 hover:bg-neon-green/30'
+                    : 'bg-muted text-muted-foreground border-border hover:bg-muted/80'
 
                   return (
-                    <Tooltip key={r.id}>
+                    <Tooltip key={c.id}>
                       <TooltipTrigger asChild>
                         <Badge
-                          className={`cursor-pointer font-mono text-xs border transition-all ${r.powerStatus ? colorClass : offClass}`}
-                          onClick={() => togglePower(r.id)}
+                          className={`cursor-pointer font-mono text-xs border transition-all ${colorClass}`}
+                          onClick={() => toggleCabinetPower(c.id)}
                         >
                           {label}
-                          {!r.powerStatus && ' OFF'}
+                          {!c.powerStatus && ' OFF'}
                         </Badge>
                       </TooltipTrigger>
                       <TooltipContent side="top">
-                        Click to toggle power {r.powerStatus ? 'off' : 'on'}
+                        Cabinet: {c.serverCount} server{c.serverCount > 1 ? 's' : ''}
+                        {c.hasLeafSwitch ? ' + leaf switch' : ''} &mdash; click to toggle power
+                      </TooltipContent>
+                    </Tooltip>
+                  )
+                })}
+                {spineSwitches.map((s) => {
+                  const colorClass = s.powerStatus
+                    ? 'bg-neon-orange/20 text-neon-orange border-neon-orange/30 hover:bg-neon-orange/30'
+                    : 'bg-muted text-muted-foreground border-border hover:bg-muted/80'
+
+                  return (
+                    <Tooltip key={s.id}>
+                      <TooltipTrigger asChild>
+                        <Badge
+                          className={`cursor-pointer font-mono text-xs border transition-all ${colorClass}`}
+                          onClick={() => toggleSpinePower(s.id)}
+                        >
+                          SPINE
+                          {!s.powerStatus && ' OFF'}
+                        </Badge>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">
+                        Spine switch &mdash; click to toggle power
                       </TooltipContent>
                     </Tooltip>
                   )

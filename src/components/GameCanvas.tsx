@@ -5,10 +5,11 @@ import { useGameStore } from '@/stores/gameStore'
 
 export function GameCanvas() {
   const gameRef = useRef<Phaser.Game | null>(null)
-  const prevRackCount = useRef(0)
+  const prevCabCount = useRef(0)
+  const prevSpineCount = useRef(0)
 
-  const racks = useGameStore((s) => s.racks)
-  const viewMode = useGameStore((s) => s.viewMode)
+  const cabinets = useGameStore((s) => s.cabinets)
+  const spineSwitches = useGameStore((s) => s.spineSwitches)
   const layerVisibility = useGameStore((s) => s.layerVisibility)
   const layerOpacity = useGameStore((s) => s.layerOpacity)
   const layerColors = useGameStore((s) => s.layerColors)
@@ -24,30 +25,42 @@ export function GameCanvas() {
     }
   }, [])
 
+  // Sync cabinets to Phaser
   useEffect(() => {
     if (!gameRef.current) return
     const scene = getScene(gameRef.current)
     if (!scene) return
 
-    // Add new racks to the scene
-    for (let i = prevRackCount.current; i < racks.length; i++) {
-      scene.addRackToScene(racks[i].id, racks[i].type)
+    // Add new cabinets
+    for (let i = prevCabCount.current; i < cabinets.length; i++) {
+      const cab = cabinets[i]
+      scene.addCabinetToScene(cab.id, cab.serverCount, cab.hasLeafSwitch)
     }
-    prevRackCount.current = racks.length
+    prevCabCount.current = cabinets.length
 
-    // Sync power status
-    for (const rack of racks) {
-      scene.toggleRackPower(rack.id, rack.powerStatus)
+    // Update all existing cabinets (server count, leaf switch, power may have changed)
+    for (const cab of cabinets) {
+      scene.updateCabinet(cab.id, cab.serverCount, cab.hasLeafSwitch, cab.powerStatus)
     }
-  }, [racks])
+  }, [cabinets])
 
-  // Sync view mode to Phaser
+  // Sync spine switches to Phaser
   useEffect(() => {
     if (!gameRef.current) return
     const scene = getScene(gameRef.current)
     if (!scene) return
-    scene.setViewMode(viewMode)
-  }, [viewMode])
+
+    // Add new spines
+    for (let i = prevSpineCount.current; i < spineSwitches.length; i++) {
+      scene.addSpineToScene(spineSwitches[i].id)
+    }
+    prevSpineCount.current = spineSwitches.length
+
+    // Update power status
+    for (const spine of spineSwitches) {
+      scene.updateSpine(spine.id, spine.powerStatus)
+    }
+  }, [spineSwitches])
 
   // Sync layer visibility to Phaser
   useEffect(() => {
