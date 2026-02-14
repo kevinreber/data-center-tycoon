@@ -1,11 +1,11 @@
 # Fabric Tycoon — Feature Backlog
 
 ## Current PR: Cabinet View + Above-Cabinet View
-- [ ] Add `viewMode` state to Zustand store (`cabinet` | `above_cabinet`)
-- [ ] Cabinet View: solid cabinets/servers, dashed overhead infrastructure
-- [ ] Above-Cabinet View: solid switches/cable trays/cabling, dashed cabinet outlines
-- [ ] View toggle UI in HUD
-- [ ] Architectural dashed-line rendering for "other plane" objects
+- [x] Add `viewMode` state to Zustand store (`cabinet` | `above_cabinet`)
+- [x] Cabinet View: solid cabinets/servers, dashed overhead infrastructure
+- [x] Above-Cabinet View: solid switches/cable trays/cabling, dashed cabinet outlines
+- [x] View toggle UI in HUD
+- [x] Architectural dashed-line rendering for "other plane" objects
 
 ## Next PR: Layer Filters
 - [ ] Toggle visibility of individual layers within a view (cables, switches, servers, power)

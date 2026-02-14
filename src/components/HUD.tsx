@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useGameStore } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Server, Network, Power, Cpu } from 'lucide-react'
+import { Server, Network, Power, Cpu, Layers, Eye } from 'lucide-react'
 import {
   Tooltip,
   TooltipContent,
@@ -17,7 +17,7 @@ const RACK_COST: Record<string, number> = {
 }
 
 export function HUD() {
-  const { racks, totalPower, money, addRack, togglePower } = useGameStore()
+  const { racks, totalPower, money, viewMode, addRack, togglePower, setViewMode } = useGameStore()
   const [showGuide, setShowGuide] = useState(true)
 
   return (
@@ -61,6 +61,52 @@ export function HUD() {
             </ol>
           </div>
         )}
+
+        {/* View mode toggle */}
+        <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5">
+          <Layers className="size-3.5 text-neon-purple" />
+          <span className="text-xs font-bold text-neon-purple tracking-widest mr-1">VIEW</span>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={viewMode === 'cabinet' ? 'default' : 'ghost'}
+                size="xs"
+                onClick={() => setViewMode('cabinet')}
+                className={`font-mono text-xs transition-all ${
+                  viewMode === 'cabinet'
+                    ? 'bg-neon-green/20 text-neon-green border border-neon-green/40'
+                    : 'text-muted-foreground hover:text-neon-green'
+                }`}
+              >
+                <Eye className="size-3 mr-1" />
+                Cabinet
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              Floor level — servers and racks are solid, overhead switches shown as outlines
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={viewMode === 'above_cabinet' ? 'default' : 'ghost'}
+                size="xs"
+                onClick={() => setViewMode('above_cabinet')}
+                className={`font-mono text-xs transition-all ${
+                  viewMode === 'above_cabinet'
+                    ? 'bg-neon-cyan/20 text-neon-cyan border border-neon-cyan/40'
+                    : 'text-muted-foreground hover:text-neon-cyan'
+                }`}
+              >
+                <Eye className="size-3 mr-1" />
+                Above Cabinet
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              Overhead level — switches and cabling are solid, cabinets shown as outlines
+            </TooltipContent>
+          </Tooltip>
+        </div>
 
         <div className="grid grid-cols-[1fr_auto_1fr] gap-3">
           {/* BUILD panel */}
