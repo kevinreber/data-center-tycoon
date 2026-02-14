@@ -3,6 +3,125 @@ import { create } from 'zustand'
 export type NodeType = 'server' | 'leaf_switch' | 'spine_switch'
 export type GameSpeed = 0 | 1 | 2 | 3
 export type CabinetEnvironment = 'production' | 'lab' | 'management'
+export type CoolingType = 'air' | 'water'
+
+// ── Cooling System Constants ────────────────────────────────────
+
+export const COOLING_CONFIG: Record<CoolingType, {
+  label: string
+  upgradeCost: number
+  coolingRate: number         // °C removed per tick per cabinet
+  operatingCostMult: number   // multiplier on cooling portion of expenses
+  overheadReduction: number   // fraction reduction to cooling overhead factor (0 = none, 0.35 = 35% less)
+  color: string
+  description: string
+}> = {
+  air: {
+    label: 'AIR',
+    upgradeCost: 0,
+    coolingRate: 2.0,
+    operatingCostMult: 1.0,
+    overheadReduction: 0,
+    color: '#88ccff',
+    description: 'Basic air cooling. Cheap to run but limited capacity at high temperatures.',
+  },
+  water: {
+    label: 'WATER',
+    upgradeCost: 25000,
+    coolingRate: 3.5,
+    operatingCostMult: 1.4,
+    overheadReduction: 0.35,
+    color: '#00ccff',
+    description: 'Chilled water cooling. Higher operating cost but dramatically better heat removal and lower PUE.',
+  },
+}
+
+// ── Loan System Types ───────────────────────────────────────────
+
+export interface Loan {
+  id: string
+  principal: number           // original amount borrowed
+  remaining: number           // amount still owed
+  interestRate: number        // per-tick interest rate (e.g. 0.001 = 0.1% per tick)
+  paymentPerTick: number      // fixed payment per tick
+  ticksRemaining: number      // ticks until fully repaid
+  label: string               // display name
+}
+
+export const LOAN_OPTIONS: { label: string; principal: number; interestRate: number; termTicks: number }[] = [
+  { label: 'Small Loan', principal: 10000, interestRate: 0.0008, termTicks: 200 },
+  { label: 'Medium Loan', principal: 30000, interestRate: 0.0012, termTicks: 400 },
+  { label: 'Large Loan', principal: 75000, interestRate: 0.0018, termTicks: 600 },
+]
+
+// ── Incident System Types ───────────────────────────────────────
+
+export type IncidentSeverity = 'minor' | 'major' | 'critical'
+
+export interface IncidentDef {
+  type: string
+  label: string
+  severity: IncidentSeverity
+  description: string
+  durationTicks: number       // how long the incident lasts if unresolved
+  resolveCost: number         // $ to resolve immediately
+  effect: 'heat_spike' | 'revenue_penalty' | 'power_surge' | 'traffic_drop' | 'cooling_failure'
+  effectMagnitude: number     // severity-dependent multiplier
+}
+
+export interface ActiveIncident {
+  id: string
+  def: IncidentDef
+  ticksRemaining: number
+  resolved: boolean
+}
+
+export const INCIDENT_CATALOG: IncidentDef[] = [
+  { type: 'fiber_cut', label: 'Fiber Cut', severity: 'major', description: 'A backhoe severed a fiber trunk line. Traffic capacity reduced.', durationTicks: 15, resolveCost: 5000, effect: 'traffic_drop', effectMagnitude: 0.5 },
+  { type: 'power_surge', label: 'Power Surge', severity: 'major', description: 'Grid voltage spike detected. Equipment drawing extra power.', durationTicks: 10, resolveCost: 3000, effect: 'power_surge', effectMagnitude: 1.3 },
+  { type: 'cooling_failure', label: 'CRAC Unit Failure', severity: 'critical', description: 'A cooling unit has failed. Heat levels rising across the facility.', durationTicks: 12, resolveCost: 8000, effect: 'cooling_failure', effectMagnitude: 0.4 },
+  { type: 'ddos', label: 'DDoS Attack', severity: 'minor', description: 'Distributed denial of service attack detected. Revenue impacted while mitigating.', durationTicks: 8, resolveCost: 2000, effect: 'revenue_penalty', effectMagnitude: 0.7 },
+  { type: 'heat_wave', label: 'Heat Wave', severity: 'major', description: 'Record high temperatures outside. Ambient temperature spiking.', durationTicks: 20, resolveCost: 4000, effect: 'heat_spike', effectMagnitude: 8 },
+  { type: 'squirrel', label: 'Squirrel in Transformer', severity: 'minor', description: 'A squirrel got into the power transformer. Brief power disruption.', durationTicks: 5, resolveCost: 500, effect: 'power_surge', effectMagnitude: 1.15 },
+  { type: 'pipe_leak', label: 'Water Pipe Leak', severity: 'major', description: 'A chilled water pipe is leaking. Cooling efficiency reduced.', durationTicks: 10, resolveCost: 6000, effect: 'cooling_failure', effectMagnitude: 0.3 },
+  { type: 'ransomware', label: 'Ransomware Attempt', severity: 'critical', description: 'Ransomware detected on management network. Revenue halted until contained.', durationTicks: 15, resolveCost: 12000, effect: 'revenue_penalty', effectMagnitude: 0.3 },
+]
+
+/** Chance per tick of an incident occurring (when fewer than max active) */
+const INCIDENT_CHANCE = 0.02
+const MAX_ACTIVE_INCIDENTS = 3
+
+// ── Achievement System Types ────────────────────────────────────
+
+export interface AchievementDef {
+  id: string
+  label: string
+  description: string
+  icon: string                // emoji for display
+}
+
+export interface Achievement {
+  def: AchievementDef
+  unlockedAtTick: number
+}
+
+export const ACHIEVEMENT_CATALOG: AchievementDef[] = [
+  { id: 'first_cabinet', label: 'Hello World', description: 'Place your first cabinet.', icon: '📦' },
+  { id: 'first_spine', label: 'Backbone', description: 'Deploy your first spine switch.', icon: '🔗' },
+  { id: 'full_rack', label: 'Fully Loaded', description: 'Fill a cabinet with 4 servers and a leaf switch.', icon: '🖥️' },
+  { id: 'ten_cabinets', label: 'Scaling Up', description: 'Deploy 10 cabinets.', icon: '🏗️' },
+  { id: 'water_cooling', label: 'Liquid Assets', description: 'Upgrade to water cooling.', icon: '💧' },
+  { id: 'first_loan', label: 'Leveraged', description: 'Take out your first loan.', icon: '🏦' },
+  { id: 'debt_free', label: 'Debt Free', description: 'Pay off all outstanding loans.', icon: '✅' },
+  { id: 'survive_incident', label: 'Crisis Manager', description: 'Resolve your first incident.', icon: '🛡️' },
+  { id: 'hundred_k', label: 'Six Figures', description: 'Accumulate $100,000.', icon: '💰' },
+  { id: 'million', label: 'Millionaire', description: 'Accumulate $1,000,000.', icon: '🤑' },
+  { id: 'low_pue', label: 'Green Machine', description: 'Achieve a PUE of 1.30 or lower.', icon: '🌱' },
+  { id: 'max_spines', label: 'Full Fabric', description: 'Deploy all 6 spine switches.', icon: '🕸️' },
+  { id: 'thermal_crisis', label: 'Feeling the Heat', description: 'Have a cabinet reach critical temperature (95°C).', icon: '🔥' },
+  { id: 'five_incidents', label: 'Veteran Operator', description: 'Resolve 5 incidents.', icon: '⭐' },
+  { id: 'full_grid', label: 'No Vacancy', description: 'Fill all 32 cabinet slots.', icon: '🏢' },
+]
 
 export interface EnvironmentConfig {
   label: string           // Short display label (e.g. "PROD")
@@ -370,6 +489,22 @@ interface GameState {
   powerCost: number       // power portion of expenses
   coolingCost: number     // cooling portion of expenses
 
+  // Cooling
+  coolingType: CoolingType
+
+  // Loans
+  loans: Loan[]
+  loanPayments: number    // total loan payments last tick
+
+  // Incidents
+  activeIncidents: ActiveIncident[]
+  incidentLog: string[]   // recent incident messages
+  resolvedCount: number   // total incidents resolved (for achievements)
+
+  // Achievements
+  achievements: Achievement[]
+  newAchievement: Achievement | null  // most recently unlocked (for toast)
+
   // Visual
   layerVisibility: LayerVisibility
   layerOpacity: LayerOpacity
@@ -398,11 +533,17 @@ interface GameState {
   setLayerColor: (type: NodeType, colors: LayerColors | null) => void
   setGameSpeed: (speed: GameSpeed) => void
   toggleTrafficVisible: () => void
+  upgradeCooling: (type: CoolingType) => void
+  takeLoan: (optionIndex: number) => void
+  resolveIncident: (id: string) => void
+  dismissAchievement: () => void
   tick: () => void
 }
 
 let nextCabId = 1
 let nextSpineId = 1
+let nextLoanId = 1
+let nextIncidentId = 1
 
 export const useGameStore = create<GameState>((set) => ({
   cabinets: [],
@@ -421,6 +562,22 @@ export const useGameStore = create<GameState>((set) => ({
   expenses: 0,
   powerCost: 0,
   coolingCost: 0,
+
+  // Cooling
+  coolingType: 'air',
+
+  // Loans
+  loans: [],
+  loanPayments: 0,
+
+  // Incidents
+  activeIncidents: [],
+  incidentLog: [],
+  resolvedCount: 0,
+
+  // Achievements
+  achievements: [],
+  newAchievement: null,
 
   // Visual
   layerVisibility: { server: true, leaf_switch: true, spine_switch: true },
@@ -570,8 +727,62 @@ export const useGameStore = create<GameState>((set) => ({
   toggleTrafficVisible: () =>
     set((state) => ({ trafficVisible: !state.trafficVisible })),
 
+  upgradeCooling: (type: CoolingType) =>
+    set((state) => {
+      if (state.coolingType === type) return state
+      const config = COOLING_CONFIG[type]
+      if (state.money < config.upgradeCost) return state
+      return {
+        coolingType: type,
+        money: state.money - config.upgradeCost,
+        ...calcStats(state.cabinets, state.spineSwitches),
+      }
+    }),
+
+  takeLoan: (optionIndex: number) =>
+    set((state) => {
+      const opt = LOAN_OPTIONS[optionIndex]
+      if (!opt) return state
+      // Max 3 active loans
+      if (state.loans.length >= 3) return state
+      const totalPayment = opt.principal * (1 + opt.interestRate * opt.termTicks)
+      const paymentPerTick = totalPayment / opt.termTicks
+      const loan: Loan = {
+        id: `loan-${nextLoanId++}`,
+        principal: opt.principal,
+        remaining: totalPayment,
+        interestRate: opt.interestRate,
+        paymentPerTick: +paymentPerTick.toFixed(2),
+        ticksRemaining: opt.termTicks,
+        label: opt.label,
+      }
+      return {
+        loans: [...state.loans, loan],
+        money: state.money + opt.principal,
+      }
+    }),
+
+  resolveIncident: (id: string) =>
+    set((state) => {
+      const incident = state.activeIncidents.find((i) => i.id === id)
+      if (!incident || incident.resolved) return state
+      if (state.money < incident.def.resolveCost) return state
+      return {
+        activeIncidents: state.activeIncidents.map((i) =>
+          i.id === id ? { ...i, resolved: true, ticksRemaining: 0 } : i
+        ),
+        money: state.money - incident.def.resolveCost,
+        resolvedCount: state.resolvedCount + 1,
+        incidentLog: [`Resolved: ${incident.def.label}`, ...state.incidentLog].slice(0, 10),
+      }
+    }),
+
+  dismissAchievement: () => set({ newAchievement: null }),
+
   tick: () =>
     set((state) => {
+      const newTickCount = state.tickCount + 1
+
       // Advance in-game clock (wraps at 24)
       const newHour = (state.gameHour + MINUTES_PER_TICK / 60) % 24
 
@@ -599,14 +810,95 @@ export const useGameStore = create<GameState>((set) => ({
 
       const demandMultiplier = +(base + (spikeActive ? spikeMagnitude : 0)).toFixed(2)
 
+      // ── Incident system ────────────────────────────────────
+      let activeIncidents = [...state.activeIncidents]
+      let incidentLog = [...state.incidentLog]
+      let resolvedCount = state.resolvedCount
+
+      // Tick down active incidents
+      activeIncidents = activeIncidents
+        .map((i) => {
+          if (i.resolved) return i
+          const remaining = i.ticksRemaining - 1
+          if (remaining <= 0) {
+            incidentLog = [`Expired: ${i.def.label}`, ...incidentLog].slice(0, 10)
+            return { ...i, ticksRemaining: 0, resolved: true }
+          }
+          return { ...i, ticksRemaining: remaining }
+        })
+
+      // Clean up resolved incidents (keep for 1 tick for UI display, then remove)
+      activeIncidents = activeIncidents.filter((i) => !i.resolved || i.ticksRemaining >= 0)
+      // Actually remove fully resolved ones after this tick
+      const justResolved = activeIncidents.filter((i) => i.resolved)
+      activeIncidents = activeIncidents.filter((i) => !i.resolved)
+
+      // Spawn new incidents (only if we have equipment and fewer than max active)
+      if (state.cabinets.length > 0 && activeIncidents.length < MAX_ACTIVE_INCIDENTS) {
+        // Scale chance with facility size
+        const sizeMultiplier = Math.min(2, state.cabinets.length / 8)
+        if (Math.random() < INCIDENT_CHANCE * sizeMultiplier) {
+          const def = INCIDENT_CATALOG[Math.floor(Math.random() * INCIDENT_CATALOG.length)]
+          const incident: ActiveIncident = {
+            id: `inc-${nextIncidentId++}`,
+            def,
+            ticksRemaining: def.durationTicks,
+            resolved: false,
+          }
+          activeIncidents.push(incident)
+          incidentLog = [`New: ${def.label} — ${def.description}`, ...incidentLog].slice(0, 10)
+        }
+      }
+
+      // Calculate incident effects
+      let incidentRevenueMult = 1
+      let incidentPowerMult = 1
+      let incidentCoolingMult = 1
+      let incidentHeatAdd = 0
+      let incidentTrafficMult = 1
+
+      for (const inc of activeIncidents) {
+        if (inc.resolved) continue
+        switch (inc.def.effect) {
+          case 'revenue_penalty': incidentRevenueMult *= inc.def.effectMagnitude; break
+          case 'power_surge': incidentPowerMult *= inc.def.effectMagnitude; break
+          case 'cooling_failure': incidentCoolingMult *= inc.def.effectMagnitude; break
+          case 'heat_spike': incidentHeatAdd += inc.def.effectMagnitude; break
+          case 'traffic_drop': incidentTrafficMult *= inc.def.effectMagnitude; break
+        }
+      }
+
+      // ── Main simulation ────────────────────────────────────
+      const coolingConfig = COOLING_CONFIG[state.coolingType]
+
       if (state.cabinets.length === 0 && state.spineSwitches.length === 0) {
+        // Process loan payments even with no equipment
+        let loanPayments = 0
+        const updatedLoans = state.loans
+          .map((loan) => {
+            const payment = Math.min(loan.paymentPerTick, loan.remaining)
+            loanPayments += payment
+            return {
+              ...loan,
+              remaining: +(loan.remaining - payment).toFixed(2),
+              ticksRemaining: loan.ticksRemaining - 1,
+            }
+          })
+          .filter((loan) => loan.remaining > 0.01)
+
         return {
-          tickCount: state.tickCount + 1,
+          tickCount: newTickCount,
           gameHour: newHour,
           demandMultiplier,
           spikeActive,
           spikeTicks,
           spikeMagnitude,
+          loans: updatedLoans,
+          loanPayments: +loanPayments.toFixed(2),
+          money: Math.round((state.money - loanPayments) * 100) / 100,
+          activeIncidents,
+          incidentLog,
+          resolvedCount,
         }
       }
 
@@ -621,8 +913,11 @@ export const useGameStore = create<GameState>((set) => ({
           if (cab.hasLeafSwitch) heat += SIM.heatPerLeaf
         }
 
-        // Air cooling dissipation (always active, even for powered-off cabs)
-        heat -= SIM.airCoolingRate
+        // Cooling dissipation (based on cooling type; reduced by incident effects)
+        heat -= coolingConfig.coolingRate * incidentCoolingMult
+
+        // Incident heat spike
+        heat += incidentHeatAdd
 
         // Clamp to ambient minimum and 100 max
         heat = Math.max(SIM.ambientTemp, Math.min(100, heat))
@@ -633,7 +928,12 @@ export const useGameStore = create<GameState>((set) => ({
       // 2. Calculate stats with updated heat
       const stats = calcStats(newCabinets, state.spineSwitches)
 
-      // 3. Calculate revenue (scaled by environment and demand)
+      // Apply cooling type overhead reduction
+      const adjustedCoolingPower = Math.round(
+        stats.coolingPower * (1 - coolingConfig.overheadReduction) * coolingConfig.operatingCostMult
+      )
+
+      // 3. Calculate revenue (scaled by environment and demand, modified by incidents)
       let revenue = 0
       for (const cab of newCabinets) {
         if (cab.powerStatus) {
@@ -644,22 +944,70 @@ export const useGameStore = create<GameState>((set) => ({
           revenue += throttled ? baseRevenue * 0.5 : baseRevenue
         }
       }
+      revenue *= incidentRevenueMult
 
-      // 4. Calculate expenses
-      const powerCost = +(stats.totalPower / 1000 * SIM.powerCostPerKW).toFixed(2)
-      const coolingCost = +(stats.coolingPower / 1000 * SIM.powerCostPerKW).toFixed(2)
+      // 4. Calculate expenses (with incident power surge effect)
+      const effectivePower = Math.round(stats.totalPower * incidentPowerMult)
+      const powerCost = +(effectivePower / 1000 * SIM.powerCostPerKW).toFixed(2)
+      const coolingCost = +(adjustedCoolingPower / 1000 * SIM.powerCostPerKW).toFixed(2)
       const expenses = +(powerCost + coolingCost).toFixed(2)
 
-      // 5. Update money
-      const netIncome = revenue - expenses
+      // 5. Process loan payments
+      let loanPayments = 0
+      const updatedLoans = state.loans
+        .map((loan) => {
+          const payment = Math.min(loan.paymentPerTick, loan.remaining)
+          loanPayments += payment
+          return {
+            ...loan,
+            remaining: +(loan.remaining - payment).toFixed(2),
+            ticksRemaining: loan.ticksRemaining - 1,
+          }
+        })
+        .filter((loan) => loan.remaining > 0.01)
+
+      // 6. Update money
+      const netIncome = revenue - expenses - loanPayments
       const newMoney = Math.round((state.money + netIncome) * 100) / 100
 
-      // 6. Calculate traffic flows (scaled by demand multiplier)
-      const trafficStats = calcTraffic(newCabinets, state.spineSwitches, demandMultiplier)
+      // 7. Calculate traffic flows (scaled by demand multiplier, modified by incidents)
+      const effectiveDemand = demandMultiplier * incidentTrafficMult
+      const trafficStats = calcTraffic(newCabinets, state.spineSwitches, effectiveDemand)
+
+      // ── Achievement checks ─────────────────────────────────
+      const unlockedIds = new Set(state.achievements.map((a) => a.def.id))
+      let newAchievement = state.newAchievement
+      const newAchievements = [...state.achievements]
+
+      const unlock = (id: string) => {
+        if (unlockedIds.has(id)) return
+        const def = ACHIEVEMENT_CATALOG.find((a) => a.id === id)
+        if (!def) return
+        const ach: Achievement = { def, unlockedAtTick: newTickCount }
+        newAchievements.push(ach)
+        unlockedIds.add(id)
+        newAchievement = ach
+      }
+
+      if (newCabinets.length >= 1) unlock('first_cabinet')
+      if (newCabinets.length >= 10) unlock('ten_cabinets')
+      if (newCabinets.length >= MAX_CABINETS) unlock('full_grid')
+      if (state.spineSwitches.length >= 1) unlock('first_spine')
+      if (state.spineSwitches.length >= MAX_SPINES) unlock('max_spines')
+      if (newCabinets.some((c) => c.serverCount >= MAX_SERVERS_PER_CABINET && c.hasLeafSwitch)) unlock('full_rack')
+      if (state.coolingType === 'water') unlock('water_cooling')
+      if (state.loans.length > 0 || updatedLoans.length > 0) unlock('first_loan')
+      if (state.loans.length > 0 && updatedLoans.length === 0) unlock('debt_free')
+      if (resolvedCount > state.resolvedCount || justResolved.length > 0) unlock('survive_incident')
+      if (resolvedCount >= 5) unlock('five_incidents')
+      if (newMoney >= 100000) unlock('hundred_k')
+      if (newMoney >= 1000000) unlock('million')
+      if (stats.pue > 0 && stats.pue <= 1.30) unlock('low_pue')
+      if (newCabinets.some((c) => c.heatLevel >= SIM.criticalTemp)) unlock('thermal_crisis')
 
       return {
         cabinets: newCabinets,
-        tickCount: state.tickCount + 1,
+        tickCount: newTickCount,
         revenue: +revenue.toFixed(2),
         expenses,
         powerCost,
@@ -671,7 +1019,15 @@ export const useGameStore = create<GameState>((set) => ({
         spikeActive,
         spikeTicks,
         spikeMagnitude,
+        loans: updatedLoans,
+        loanPayments: +loanPayments.toFixed(2),
+        activeIncidents,
+        incidentLog,
+        resolvedCount,
+        achievements: newAchievements,
+        newAchievement,
         ...stats,
+        coolingPower: adjustedCoolingPower,
       }
     }),
 }))

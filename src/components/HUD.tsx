@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { useGameStore, DEFAULT_COLORS, RACK_COST, MAX_SERVERS_PER_CABINET, MAX_CABINETS, MAX_SPINES, SIM, ENVIRONMENT_CONFIG, formatGameTime } from '@/stores/gameStore'
+import { useGameStore, DEFAULT_COLORS, RACK_COST, MAX_SERVERS_PER_CABINET, MAX_CABINETS, MAX_SPINES, SIM, ENVIRONMENT_CONFIG, formatGameTime, COOLING_CONFIG, LOAN_OPTIONS, ACHIEVEMENT_CATALOG } from '@/stores/gameStore'
 import type { NodeType, LayerColors, CabinetEnvironment } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Server, Network, Power, Cpu, Eye, SlidersHorizontal, EyeOff, RotateCcw, HardDrive, Plus, TrendingUp, TrendingDown, DollarSign, ArrowRightLeft, AlertTriangle, Radio, Info, Shield, Clock, Zap } from 'lucide-react'
+import { Server, Network, Power, Cpu, Eye, SlidersHorizontal, EyeOff, RotateCcw, HardDrive, Plus, TrendingUp, TrendingDown, DollarSign, ArrowRightLeft, AlertTriangle, Radio, Info, Shield, Clock, Zap, Droplets, Landmark, Siren, Trophy, Wrench } from 'lucide-react'
 import {
   Tooltip,
   TooltipContent,
@@ -47,6 +47,10 @@ export function HUD() {
     revenue, expenses, powerCost, coolingCost, avgHeat, mgmtBonus,
     trafficStats, trafficVisible, toggleTrafficVisible,
     gameHour, demandMultiplier, spikeActive,
+    coolingType, upgradeCooling,
+    loans, loanPayments, takeLoan,
+    activeIncidents, resolveIncident,
+    achievements,
   } = useGameStore()
   const [showGuide, setShowGuide] = useState(true)
   const [selectedEnv, setSelectedEnv] = useState<CabinetEnvironment>('production')
@@ -58,7 +62,7 @@ export function HUD() {
 
   const canUpgrade = cabinets.some((c) => c.serverCount < MAX_SERVERS_PER_CABINET)
   const canAddLeaf = cabinets.some((c) => !c.hasLeafSwitch)
-  const netIncome = revenue - expenses
+  const netIncome = revenue - expenses - loanPayments
   const activeServers = cabinets.filter((c) => c.powerStatus).reduce((sum, c) => sum + c.serverCount, 0)
   const throttledCount = cabinets.filter((c) => c.powerStatus && c.heatLevel >= SIM.throttleTemp).reduce((sum, c) => sum + c.serverCount, 0)
 
@@ -453,6 +457,12 @@ export function HUD() {
                 <span className="text-muted-foreground ml-4">Cooling</span>
                 <span className="text-muted-foreground tabular-nums">${coolingCost.toFixed(2)}</span>
               </div>
+              {loanPayments > 0 && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground ml-4">Loans</span>
+                  <span className="text-muted-foreground tabular-nums">${loanPayments.toFixed(2)}</span>
+                </div>
+              )}
               <div className="border-t border-border my-0.5" />
               <div className="flex justify-between text-xs font-bold">
                 <span className={netIncome >= 0 ? 'text-neon-green' : 'text-neon-red'}>
@@ -693,6 +703,226 @@ export function HUD() {
             )}
           </div>
         </div>
+
+        {/* Second row: Cooling, Loans, Incidents, Achievements */}
+        <div className="grid grid-cols-[1fr_1fr_1fr_1fr] gap-3">
+          {/* COOLING panel */}
+          <div className="rounded-lg border border-border bg-card p-3 glow-green">
+            <div className="flex items-center gap-2 mb-2">
+              <Droplets className="size-3.5 text-neon-cyan" />
+              <span className="text-xs font-bold text-neon-cyan tracking-widest">COOLING</span>
+              <Badge
+                className="ml-auto font-mono text-xs border"
+                style={{
+                  backgroundColor: `${COOLING_CONFIG[coolingType].color}20`,
+                  color: COOLING_CONFIG[coolingType].color,
+                  borderColor: `${COOLING_CONFIG[coolingType].color}40`,
+                }}
+              >
+                {COOLING_CONFIG[coolingType].label}
+              </Badge>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Rate</span>
+                <span className="text-neon-cyan tabular-nums">{COOLING_CONFIG[coolingType].coolingRate}°C/tick</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Overhead</span>
+                <span className="text-neon-cyan tabular-nums">-{Math.round(COOLING_CONFIG[coolingType].overheadReduction * 100)}%</span>
+              </div>
+              {coolingType === 'air' && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => upgradeCooling('water')}
+                      disabled={money < COOLING_CONFIG.water.upgradeCost}
+                      className="justify-between font-mono text-xs border-neon-cyan/20 hover:border-neon-cyan/50 hover:bg-neon-cyan/10 hover:text-neon-cyan transition-all mt-1"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <Droplets className="size-3" />
+                        Water Cooling
+                      </span>
+                      <span className="text-muted-foreground">${COOLING_CONFIG.water.upgradeCost.toLocaleString()}</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-52">
+                    {COOLING_CONFIG.water.description}
+                  </TooltipContent>
+                </Tooltip>
+              )}
+              {coolingType === 'water' && (
+                <p className="text-xs text-neon-cyan/60 mt-1 italic">
+                  Chilled water system active. PUE improved.
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* LOANS panel */}
+          <div className="rounded-lg border border-border bg-card p-3 glow-green">
+            <div className="flex items-center gap-2 mb-2">
+              <Landmark className="size-3.5 text-neon-yellow" />
+              <span className="text-xs font-bold text-neon-yellow tracking-widest">LOANS</span>
+              {loans.length > 0 && (
+                <span className="ml-auto text-xs text-neon-red tabular-nums">
+                  -{loanPayments.toFixed(2)}/t
+                </span>
+              )}
+            </div>
+            {loans.length > 0 && (
+              <div className="flex flex-col gap-1 mb-2">
+                {loans.map((loan) => (
+                  <div key={loan.id} className="flex justify-between text-xs">
+                    <span className="text-muted-foreground truncate">{loan.label}</span>
+                    <span className="text-neon-red tabular-nums">${loan.remaining.toFixed(0)}</span>
+                  </div>
+                ))}
+                <div className="border-t border-border my-0.5" />
+                <div className="flex justify-between text-xs font-bold">
+                  <span className="text-muted-foreground">Total Debt</span>
+                  <span className="text-neon-red tabular-nums">
+                    ${loans.reduce((sum, l) => sum + l.remaining, 0).toFixed(0)}
+                  </span>
+                </div>
+              </div>
+            )}
+            <div className="flex flex-col gap-1">
+              {LOAN_OPTIONS.map((opt, i) => (
+                <Tooltip key={opt.label}>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => takeLoan(i)}
+                      disabled={loans.length >= 3}
+                      className="justify-between font-mono text-xs border-neon-yellow/20 hover:border-neon-yellow/50 hover:bg-neon-yellow/10 hover:text-neon-yellow transition-all"
+                    >
+                      <span className="truncate">{opt.label}</span>
+                      <span className="text-neon-green">+${opt.principal.toLocaleString()}</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-52">
+                    Borrow ${opt.principal.toLocaleString()} at {(opt.interestRate * 100).toFixed(2)}%/tick over {opt.termTicks} ticks.
+                    Total repayment: ${Math.round(opt.principal * (1 + opt.interestRate * opt.termTicks)).toLocaleString()}
+                  </TooltipContent>
+                </Tooltip>
+              ))}
+              {loans.length >= 3 && (
+                <p className="text-xs text-neon-red/60 italic">Max 3 active loans</p>
+              )}
+            </div>
+          </div>
+
+          {/* INCIDENTS panel */}
+          <div className="rounded-lg border border-border bg-card p-3 glow-green">
+            <div className="flex items-center gap-2 mb-2">
+              <Siren className="size-3.5 text-neon-red" />
+              <span className="text-xs font-bold text-neon-red tracking-widest">INCIDENTS</span>
+              {activeIncidents.length > 0 && (
+                <Badge className="ml-auto bg-neon-red/20 text-neon-red border-neon-red/30 animate-pulse font-mono text-xs">
+                  {activeIncidents.length} ACTIVE
+                </Badge>
+              )}
+            </div>
+            {activeIncidents.length === 0 ? (
+              <p className="text-xs text-muted-foreground italic">
+                No active incidents. Stay vigilant.
+              </p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {activeIncidents.map((inc) => (
+                  <div
+                    key={inc.id}
+                    className={`rounded border p-2 ${
+                      inc.def.severity === 'critical'
+                        ? 'border-neon-red/40 bg-neon-red/10'
+                        : inc.def.severity === 'major'
+                          ? 'border-neon-orange/40 bg-neon-orange/10'
+                          : 'border-neon-yellow/40 bg-neon-yellow/10'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className={`text-xs font-bold ${
+                        inc.def.severity === 'critical' ? 'text-neon-red' :
+                        inc.def.severity === 'major' ? 'text-neon-orange' : 'text-neon-yellow'
+                      }`}>
+                        {inc.def.label}
+                      </span>
+                      <span className="text-xs text-muted-foreground tabular-nums">
+                        {inc.ticksRemaining}t
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mb-1.5 leading-relaxed">
+                      {inc.def.description}
+                    </p>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => resolveIncident(inc.id)}
+                          disabled={money < inc.def.resolveCost}
+                          className="w-full justify-between font-mono text-xs border-neon-green/20 hover:border-neon-green/50 hover:bg-neon-green/10 hover:text-neon-green"
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <Wrench className="size-3" />
+                            Resolve
+                          </span>
+                          <span className="text-muted-foreground">${inc.def.resolveCost.toLocaleString()}</span>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">
+                        Pay to immediately resolve this incident
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* ACHIEVEMENTS panel */}
+          <div className="rounded-lg border border-border bg-card p-3 glow-green">
+            <div className="flex items-center gap-2 mb-2">
+              <Trophy className="size-3.5 text-neon-yellow" />
+              <span className="text-xs font-bold text-neon-yellow tracking-widest">ACHIEVEMENTS</span>
+              <span className="ml-auto text-xs text-muted-foreground tabular-nums">
+                {achievements.length}/{ACHIEVEMENT_CATALOG.length}
+              </span>
+            </div>
+            <div className="flex flex-col gap-1 max-h-32 overflow-y-auto">
+              {ACHIEVEMENT_CATALOG.map((def) => {
+                const unlocked = achievements.find((a) => a.def.id === def.id)
+                return (
+                  <div
+                    key={def.id}
+                    className={`flex items-center gap-2 text-xs rounded px-1.5 py-0.5 ${
+                      unlocked ? 'text-neon-yellow' : 'text-muted-foreground/40'
+                    }`}
+                  >
+                    <span className="text-sm">{unlocked ? def.icon : '🔒'}</span>
+                    <div className="flex-1 min-w-0">
+                      <span className={`font-bold ${unlocked ? '' : 'line-through'}`}>{def.label}</span>
+                      {unlocked && (
+                        <span className="text-muted-foreground ml-1.5">— {def.description}</span>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Loan payments in finance summary */}
+        {loanPayments > 0 && expenses > 0 && (
+          <div className="text-xs text-neon-red/60 text-center">
+            Loan payments: -${loanPayments.toFixed(2)}/tick (not included in FINANCE panel above)
+          </div>
+        )}
 
         {!showGuide && (
           <Button

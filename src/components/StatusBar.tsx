@@ -1,4 +1,4 @@
-import { useGameStore, formatGameTime } from '@/stores/gameStore'
+import { useGameStore, formatGameTime, COOLING_CONFIG } from '@/stores/gameStore'
 
 interface StatusBarProps {
   activeNodes: number
@@ -8,16 +8,16 @@ interface StatusBarProps {
 const SPEED_LABELS = ['PAUSED', '1x', '2x', '3x']
 
 export function StatusBar({ activeNodes, totalNodes }: StatusBarProps) {
-  const { gameSpeed, tickCount, gameHour, demandMultiplier, spikeActive } = useGameStore()
+  const { gameSpeed, tickCount, gameHour, demandMultiplier, spikeActive, coolingType, activeIncidents, loans } = useGameStore()
 
   return (
     <footer className="flex items-center justify-between px-4 py-1.5 border-t border-border bg-card text-xs text-muted-foreground">
       <div className="flex items-center gap-4">
         <span className="flex items-center gap-1.5">
           <span className={`inline-block w-1.5 h-1.5 rounded-full ${
-            gameSpeed === 0 ? 'bg-neon-red' : 'bg-neon-green animate-pulse-glow'
+            gameSpeed === 0 ? 'bg-neon-red' : activeIncidents.length > 0 ? 'bg-neon-orange animate-pulse' : 'bg-neon-green animate-pulse-glow'
           }`} />
-          {gameSpeed === 0 ? 'PAUSED' : 'SYSTEM ONLINE'}
+          {gameSpeed === 0 ? 'PAUSED' : activeIncidents.length > 0 ? `${activeIncidents.length} INCIDENT${activeIncidents.length > 1 ? 'S' : ''}` : 'SYSTEM ONLINE'}
         </span>
         <span>
           NODES: {activeNodes}/{totalNodes}
@@ -37,8 +37,15 @@ export function StatusBar({ activeNodes, totalNodes }: StatusBarProps) {
       <div className="flex items-center gap-4">
         <span>SPEED: {SPEED_LABELS[gameSpeed]}</span>
         <span>TIER: SOLAR</span>
-        <span>COOLING: AIR</span>
-        <span className="text-muted-foreground/50">v0.2.0</span>
+        <span style={{ color: COOLING_CONFIG[coolingType].color }}>
+          COOLING: {COOLING_CONFIG[coolingType].label}
+        </span>
+        {loans.length > 0 && (
+          <span className="text-neon-red">
+            DEBT: ${loans.reduce((s, l) => s + l.remaining, 0).toFixed(0)}
+          </span>
+        )}
+        <span className="text-muted-foreground/50">v0.3.0</span>
       </div>
     </footer>
   )

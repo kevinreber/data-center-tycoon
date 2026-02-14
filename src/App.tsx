@@ -4,7 +4,7 @@ import { HUD } from '@/components/HUD'
 import { StatusBar } from '@/components/StatusBar'
 import { useGameStore } from '@/stores/gameStore'
 import type { GameSpeed } from '@/stores/gameStore'
-import { Zap, DollarSign, Thermometer, Activity, Pause, Play, FastForward } from 'lucide-react'
+import { Zap, DollarSign, Thermometer, Activity, Pause, Play, FastForward, Trophy, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Tooltip,
@@ -31,10 +31,11 @@ function App() {
   const {
     totalPower, money, pue, avgHeat, cabinets, spineSwitches,
     gameSpeed, setGameSpeed, tick, revenue, expenses,
+    newAchievement, dismissAchievement, loanPayments,
   } = useGameStore()
   const totalNodes = cabinets.length + spineSwitches.length
   const activeNodes = cabinets.filter((c) => c.powerStatus).length + spineSwitches.filter((s) => s.powerStatus).length
-  const netIncome = revenue - expenses
+  const netIncome = revenue - expenses - loanPayments
   const tickRef = useRef(tick)
   tickRef.current = tick
 
@@ -142,6 +143,31 @@ function App() {
 
         {/* Bottom status bar */}
         <StatusBar activeNodes={activeNodes} totalNodes={totalNodes} />
+
+        {/* Achievement toast */}
+        {newAchievement && (
+          <div className="fixed bottom-16 right-4 z-50 animate-in slide-in-from-right duration-300">
+            <div className="rounded-lg border border-neon-yellow/40 bg-card p-3 shadow-lg glow-green flex items-center gap-3 min-w-64">
+              <span className="text-2xl">{newAchievement.def.icon}</span>
+              <div className="flex-1">
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  <Trophy className="size-3 text-neon-yellow" />
+                  <span className="text-xs font-bold text-neon-yellow tracking-wider">ACHIEVEMENT UNLOCKED</span>
+                </div>
+                <p className="text-sm font-bold text-foreground">{newAchievement.def.label}</p>
+                <p className="text-xs text-muted-foreground">{newAchievement.def.description}</p>
+              </div>
+              <Button
+                variant="ghost"
+                size="xs"
+                onClick={() => dismissAchievement()}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <X className="size-3.5" />
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </TooltipProvider>
   )
