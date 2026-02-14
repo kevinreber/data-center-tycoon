@@ -1,13 +1,14 @@
 import { create } from 'zustand'
 
 export type NodeType = 'server' | 'leaf_switch' | 'spine_switch'
+export type GameSpeed = 0 | 1 | 2 | 3
 
 export interface Cabinet {
   id: string
   serverCount: number     // 1–4 servers per cabinet
   hasLeafSwitch: boolean  // ToR switch mounted on top
   powerStatus: boolean
-  heatLevel: number
+  heatLevel: number       // °C, dynamic per tick
 }
 
 export interface SpineSwitch {
@@ -25,26 +26,31 @@ export type LayerVisibility = Record<NodeType, boolean>
 export type LayerOpacity = Record<NodeType, number>
 export type LayerColorOverrides = Record<NodeType, LayerColors | null>
 
-interface GameState {
-  cabinets: Cabinet[]
-  spineSwitches: SpineSwitch[]
-  totalPower: number
-  money: number
-  pue: number
-  avgHeat: number
-  layerVisibility: LayerVisibility
-  layerOpacity: LayerOpacity
-  layerColors: LayerColorOverrides
-  addCabinet: () => void
-  upgradeNextCabinet: () => void
-  addLeafToNextCabinet: () => void
-  addSpineSwitch: () => void
-  toggleCabinetPower: (id: string) => void
-  toggleSpinePower: (id: string) => void
-  toggleLayerVisibility: (type: NodeType) => void
-  setLayerOpacity: (type: NodeType, opacity: number) => void
-  setLayerColor: (type: NodeType, colors: LayerColors | null) => void
+// ── Simulation Constants ──────────────────────────────────────────
+
+export const SIM = {
+  revenuePerServer: 12,       // $ per tick per active server
+  powerCostPerKW: 0.50,       // $ per tick per kW of IT power draw
+  heatPerServer: 1.5,         // °C per tick per active server in a cabinet
+  heatPerLeaf: 0.3,           // °C per tick per active leaf switch
+  airCoolingRate: 2.0,        // °C removed per tick per cabinet by air cooling
+  ambientTemp: 22,            // minimum temperature (room ambient °C)
+  throttleTemp: 80,           // servers produce half revenue above this
+  criticalTemp: 95,           // equipment takes damage above this
 }
+
+/** Cooling overhead as a fraction of IT power, based on average heat */
+export function coolingOverheadFactor(avgHeat: number): number {
+  if (avgHeat <= 30) return 0.15
+  if (avgHeat <= 40) return 0.20
+  if (avgHeat <= 50) return 0.30
+  if (avgHeat <= 60) return 0.45
+  if (avgHeat <= 70) return 0.65
+  if (avgHeat <= 80) return 0.90
+  return 1.2 + (avgHeat - 80) * 0.05
+}
+
+// ── Existing Constants ────────────────────────────────────────────
 
 export const DEFAULT_COLORS: Record<NodeType, LayerColors> = {
   server: { top: 0x00ff88, side: 0x00cc66, front: 0x009944 },
@@ -76,15 +82,19 @@ const POWER_DRAW = {
   spine_switch: 250,
 }
 
+export { POWER_DRAW }
+
+// ── Stats Calculation ─────────────────────────────────────────────
+
 function calcStats(cabinets: Cabinet[], spines: SpineSwitch[]) {
-  let totalPower = 0
+  let itPower = 0
   let heatSum = 0
   let activeCabs = 0
 
   for (const cab of cabinets) {
     if (cab.powerStatus) {
-      totalPower += cab.serverCount * POWER_DRAW.server
-      if (cab.hasLeafSwitch) totalPower += POWER_DRAW.leaf_switch
+      itPower += cab.serverCount * POWER_DRAW.server
+      if (cab.hasLeafSwitch) itPower += POWER_DRAW.leaf_switch
       heatSum += cab.heatLevel
       activeCabs++
     }
@@ -92,15 +102,56 @@ function calcStats(cabinets: Cabinet[], spines: SpineSwitch[]) {
 
   for (const spine of spines) {
     if (spine.powerStatus) {
-      totalPower += POWER_DRAW.spine_switch
+      itPower += POWER_DRAW.spine_switch
     }
   }
 
-  const avgHeat = activeCabs > 0 ? Math.round(heatSum / activeCabs) : 0
-  const totalNodes = cabinets.length + spines.length
-  const pue = totalNodes > 0 ? +(1.2 + totalNodes * 0.02).toFixed(2) : 0
+  const avgHeat = activeCabs > 0 ? Math.round(heatSum / activeCabs) : SIM.ambientTemp
+  const overhead = coolingOverheadFactor(avgHeat)
+  const coolingPower = Math.round(itPower * overhead)
+  const pue = itPower > 0 ? +((itPower + coolingPower) / itPower).toFixed(2) : 0
 
-  return { totalPower, avgHeat, pue }
+  return { totalPower: itPower, coolingPower, avgHeat, pue }
+}
+
+// ── State Interface ───────────────────────────────────────────────
+
+interface GameState {
+  cabinets: Cabinet[]
+  spineSwitches: SpineSwitch[]
+
+  // Computed stats
+  totalPower: number      // IT equipment watts
+  coolingPower: number    // Cooling system watts
+  money: number
+  pue: number
+  avgHeat: number
+
+  // Simulation
+  gameSpeed: GameSpeed
+  tickCount: number
+  revenue: number         // revenue earned last tick
+  expenses: number        // total expenses last tick
+  powerCost: number       // power portion of expenses
+  coolingCost: number     // cooling portion of expenses
+
+  // Visual
+  layerVisibility: LayerVisibility
+  layerOpacity: LayerOpacity
+  layerColors: LayerColorOverrides
+
+  // Actions
+  addCabinet: () => void
+  upgradeNextCabinet: () => void
+  addLeafToNextCabinet: () => void
+  addSpineSwitch: () => void
+  toggleCabinetPower: (id: string) => void
+  toggleSpinePower: (id: string) => void
+  toggleLayerVisibility: (type: NodeType) => void
+  setLayerOpacity: (type: NodeType, opacity: number) => void
+  setLayerColor: (type: NodeType, colors: LayerColors | null) => void
+  setGameSpeed: (speed: GameSpeed) => void
+  tick: () => void
 }
 
 let nextCabId = 1
@@ -110,12 +161,25 @@ export const useGameStore = create<GameState>((set) => ({
   cabinets: [],
   spineSwitches: [],
   totalPower: 0,
+  coolingPower: 0,
   money: 50000,
   pue: 0,
-  avgHeat: 0,
+  avgHeat: SIM.ambientTemp,
+
+  // Simulation
+  gameSpeed: 1,
+  tickCount: 0,
+  revenue: 0,
+  expenses: 0,
+  powerCost: 0,
+  coolingCost: 0,
+
+  // Visual
   layerVisibility: { server: true, leaf_switch: true, spine_switch: true },
   layerOpacity: { server: 1, leaf_switch: 1, spine_switch: 1 },
   layerColors: { server: null, leaf_switch: null, spine_switch: null },
+
+  // ── Build Actions ───────────────────────────────────────────
 
   addCabinet: () =>
     set((state) => {
@@ -126,7 +190,7 @@ export const useGameStore = create<GameState>((set) => ({
         serverCount: 1,
         hasLeafSwitch: false,
         powerStatus: true,
-        heatLevel: Math.floor(Math.random() * 40) + 30,
+        heatLevel: SIM.ambientTemp,
       }
       const newCabinets = [...state.cabinets, cab]
       return {
@@ -142,9 +206,7 @@ export const useGameStore = create<GameState>((set) => ({
       const idx = state.cabinets.findIndex((c) => c.serverCount < MAX_SERVERS_PER_CABINET)
       if (idx === -1) return state
       const newCabinets = state.cabinets.map((c, i) =>
-        i === idx
-          ? { ...c, serverCount: c.serverCount + 1, heatLevel: Math.min(90, c.heatLevel + 10) }
-          : c
+        i === idx ? { ...c, serverCount: c.serverCount + 1 } : c
       )
       return {
         cabinets: newCabinets,
@@ -200,6 +262,8 @@ export const useGameStore = create<GameState>((set) => ({
       return { spineSwitches: newSpines, ...calcStats(state.cabinets, newSpines) }
     }),
 
+  // ── Visual Actions ──────────────────────────────────────────
+
   toggleLayerVisibility: (type) =>
     set((state) => ({
       layerVisibility: {
@@ -223,4 +287,73 @@ export const useGameStore = create<GameState>((set) => ({
         [type]: colors,
       },
     })),
+
+  // ── Simulation Actions ──────────────────────────────────────
+
+  setGameSpeed: (speed) => set({ gameSpeed: speed }),
+
+  tick: () =>
+    set((state) => {
+      if (state.cabinets.length === 0 && state.spineSwitches.length === 0) {
+        return { tickCount: state.tickCount + 1 }
+      }
+
+      // 1. Update heat per cabinet
+      const newCabinets = state.cabinets.map((cab) => {
+        let heat = cab.heatLevel
+
+        if (cab.powerStatus) {
+          // Heat generation from active equipment
+          heat += cab.serverCount * SIM.heatPerServer
+          if (cab.hasLeafSwitch) heat += SIM.heatPerLeaf
+        }
+
+        // Air cooling dissipation (always active, even for powered-off cabs)
+        heat -= SIM.airCoolingRate
+
+        // Clamp to ambient minimum and 100 max
+        heat = Math.max(SIM.ambientTemp, Math.min(100, heat))
+
+        return { ...cab, heatLevel: Math.round(heat * 10) / 10 }
+      })
+
+      // 2. Calculate stats with updated heat
+      const stats = calcStats(newCabinets, state.spineSwitches)
+
+      // 3. Calculate revenue
+      let activeServers = 0
+      let throttledServers = 0
+      for (const cab of newCabinets) {
+        if (cab.powerStatus) {
+          if (cab.heatLevel >= SIM.throttleTemp) {
+            throttledServers += cab.serverCount
+          } else {
+            activeServers += cab.serverCount
+          }
+        }
+      }
+      // Throttled servers earn half revenue
+      const revenue = activeServers * SIM.revenuePerServer +
+        throttledServers * SIM.revenuePerServer * 0.5
+
+      // 4. Calculate expenses
+      const powerCost = +(stats.totalPower / 1000 * SIM.powerCostPerKW).toFixed(2)
+      const coolingCost = +(stats.coolingPower / 1000 * SIM.powerCostPerKW).toFixed(2)
+      const expenses = +(powerCost + coolingCost).toFixed(2)
+
+      // 5. Update money
+      const netIncome = revenue - expenses
+      const newMoney = Math.round((state.money + netIncome) * 100) / 100
+
+      return {
+        cabinets: newCabinets,
+        tickCount: state.tickCount + 1,
+        revenue: +revenue.toFixed(2),
+        expenses,
+        powerCost,
+        coolingCost,
+        money: newMoney,
+        ...stats,
+      }
+    }),
 }))

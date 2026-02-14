@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { useGameStore, DEFAULT_COLORS, RACK_COST, MAX_SERVERS_PER_CABINET, MAX_CABINETS, MAX_SPINES } from '@/stores/gameStore'
+import { useGameStore, DEFAULT_COLORS, RACK_COST, MAX_SERVERS_PER_CABINET, MAX_CABINETS, MAX_SPINES, SIM } from '@/stores/gameStore'
 import type { NodeType, LayerColors } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Server, Network, Power, Cpu, Eye, SlidersHorizontal, EyeOff, RotateCcw, HardDrive, Plus } from 'lucide-react'
+import { Server, Network, Power, Cpu, Eye, SlidersHorizontal, EyeOff, RotateCcw, HardDrive, Plus, TrendingUp, TrendingDown, DollarSign } from 'lucide-react'
 import {
   Tooltip,
   TooltipContent,
@@ -39,16 +39,20 @@ function deriveColors(topHex: number): LayerColors {
 
 export function HUD() {
   const {
-    cabinets, spineSwitches, totalPower, money,
+    cabinets, spineSwitches, totalPower, coolingPower, money,
     layerVisibility, layerOpacity, layerColors,
     addCabinet, upgradeNextCabinet, addLeafToNextCabinet, addSpineSwitch,
     toggleCabinetPower, toggleSpinePower,
     toggleLayerVisibility, setLayerOpacity, setLayerColor,
+    revenue, expenses, powerCost, coolingCost, avgHeat,
   } = useGameStore()
   const [showGuide, setShowGuide] = useState(true)
 
   const canUpgrade = cabinets.some((c) => c.serverCount < MAX_SERVERS_PER_CABINET)
   const canAddLeaf = cabinets.some((c) => !c.hasLeafSwitch)
+  const netIncome = revenue - expenses
+  const activeServers = cabinets.filter((c) => c.powerStatus).reduce((sum, c) => sum + c.serverCount, 0)
+  const throttledCount = cabinets.filter((c) => c.powerStatus && c.heatLevel >= SIM.throttleTemp).reduce((sum, c) => sum + c.serverCount, 0)
 
   return (
     <TooltipProvider>
@@ -82,8 +86,9 @@ export function HUD() {
                 elevated row above to link leaf switches together.
               </li>
               <li>
-                <strong className="text-foreground">Manage power</strong>
-                {' '}&mdash; Click a badge in EQUIPMENT to toggle power on/off.
+                <strong className="text-foreground">Earn revenue</strong>
+                {' '}&mdash; Active servers generate <span className="text-neon-yellow">${SIM.revenuePerServer}/tick</span>.
+                Watch your heat &mdash; overheating throttles income!
               </li>
             </ol>
           </div>
@@ -189,7 +194,7 @@ export function HUD() {
           </div>
         </div>
 
-        <div className="grid grid-cols-[1fr_auto_1fr] gap-3">
+        <div className="grid grid-cols-[1fr_auto_auto_1fr] gap-3">
           {/* BUILD panel */}
           <div className="rounded-lg border border-border bg-card p-3 glow-green">
             <div className="flex items-center gap-2 mb-3">
@@ -291,16 +296,16 @@ export function HUD() {
               <p className="text-3xl font-bold text-neon-green text-glow-green tabular-nums">
                 {totalPower.toLocaleString()}
               </p>
-              <p className="text-xs text-muted-foreground mt-0.5">WATTS</p>
+              <p className="text-xs text-muted-foreground mt-0.5">IT WATTS</p>
             </div>
             <div className="w-full mt-3 pt-2 border-t border-border">
               <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Cabinets</span>
-                <span className="text-foreground">{cabinets.length}</span>
+                <span className="text-muted-foreground">Cooling</span>
+                <span className="text-neon-cyan">{coolingPower.toLocaleString()}W</span>
               </div>
               <div className="flex justify-between text-xs mt-1">
-                <span className="text-muted-foreground">Spines</span>
-                <span className="text-neon-orange">{spineSwitches.length}</span>
+                <span className="text-muted-foreground">Total Draw</span>
+                <span className="text-foreground">{(totalPower + coolingPower).toLocaleString()}W</span>
               </div>
               <div className="flex justify-between text-xs mt-1">
                 <span className="text-muted-foreground">Active</span>
@@ -309,6 +314,66 @@ export function HUD() {
                 </span>
               </div>
             </div>
+          </div>
+
+          {/* FINANCE panel */}
+          <div className="rounded-lg border border-border bg-card p-3 w-48 glow-green">
+            <div className="flex items-center gap-2 mb-2">
+              <DollarSign className="size-3.5 text-neon-yellow" />
+              <span className="text-xs font-bold text-neon-yellow tracking-widest">FINANCE</span>
+              <span className="text-xs text-muted-foreground ml-auto">/tick</span>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <div className="flex justify-between text-xs">
+                <span className="flex items-center gap-1 text-neon-green">
+                  <TrendingUp className="size-3" />
+                  Revenue
+                </span>
+                <span className="text-neon-green tabular-nums">+${revenue.toFixed(0)}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground ml-4">Servers ({activeServers})</span>
+                <span className="text-muted-foreground tabular-nums">${(activeServers * SIM.revenuePerServer).toFixed(0)}</span>
+              </div>
+              {throttledCount > 0 && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-neon-red ml-4">Throttled ({throttledCount})</span>
+                  <span className="text-neon-red tabular-nums">-50%</span>
+                </div>
+              )}
+              <div className="border-t border-border my-0.5" />
+              <div className="flex justify-between text-xs">
+                <span className="flex items-center gap-1 text-neon-red">
+                  <TrendingDown className="size-3" />
+                  Expenses
+                </span>
+                <span className="text-neon-red tabular-nums">-${expenses.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground ml-4">Power</span>
+                <span className="text-muted-foreground tabular-nums">${powerCost.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground ml-4">Cooling</span>
+                <span className="text-muted-foreground tabular-nums">${coolingCost.toFixed(2)}</span>
+              </div>
+              <div className="border-t border-border my-0.5" />
+              <div className="flex justify-between text-xs font-bold">
+                <span className={netIncome >= 0 ? 'text-neon-green' : 'text-neon-red'}>
+                  Net
+                </span>
+                <span className={`tabular-nums ${netIncome >= 0 ? 'text-neon-green' : 'text-neon-red'}`}>
+                  {netIncome >= 0 ? '+' : ''}{netIncome.toFixed(2)}
+                </span>
+              </div>
+            </div>
+            {avgHeat >= SIM.throttleTemp && (
+              <div className="mt-2 pt-2 border-t border-neon-red/30">
+                <p className="text-xs text-neon-red font-bold animate-pulse">
+                  THERMAL THROTTLE &gt;{SIM.throttleTemp}°C
+                </p>
+              </div>
+            )}
           </div>
 
           {/* EQUIPMENT panel */}
@@ -328,10 +393,13 @@ export function HUD() {
               <div className="flex gap-1.5 flex-wrap max-h-28 overflow-y-auto">
                 {cabinets.map((c) => {
                   const leafTag = c.hasLeafSwitch ? '+L' : ''
+                  const isThrottled = c.powerStatus && c.heatLevel >= SIM.throttleTemp
                   const label = `C${c.id.replace('cab-', '')} ×${c.serverCount}${leafTag}`
-                  const colorClass = c.powerStatus
-                    ? 'bg-neon-green/20 text-neon-green border-neon-green/30 hover:bg-neon-green/30'
-                    : 'bg-muted text-muted-foreground border-border hover:bg-muted/80'
+                  const colorClass = isThrottled
+                    ? 'bg-neon-red/20 text-neon-red border-neon-red/30 hover:bg-neon-red/30'
+                    : c.powerStatus
+                      ? 'bg-neon-green/20 text-neon-green border-neon-green/30 hover:bg-neon-green/30'
+                      : 'bg-muted text-muted-foreground border-border hover:bg-muted/80'
 
                   return (
                     <Tooltip key={c.id}>
@@ -342,11 +410,15 @@ export function HUD() {
                         >
                           {label}
                           {!c.powerStatus && ' OFF'}
+                          {isThrottled && ' HOT'}
                         </Badge>
                       </TooltipTrigger>
                       <TooltipContent side="top">
-                        Cabinet: {c.serverCount} server{c.serverCount > 1 ? 's' : ''}
-                        {c.hasLeafSwitch ? ' + leaf switch' : ''} &mdash; click to toggle power
+                        {c.serverCount} server{c.serverCount > 1 ? 's' : ''}
+                        {c.hasLeafSwitch ? ' + leaf' : ''}
+                        {' — '}{Math.round(c.heatLevel)}°C
+                        {isThrottled ? ' (THROTTLED)' : ''}
+                        {' — click to toggle power'}
                       </TooltipContent>
                     </Tooltip>
                   )

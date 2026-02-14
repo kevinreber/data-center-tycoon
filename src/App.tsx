@@ -1,71 +1,149 @@
+import { useEffect, useRef } from 'react'
 import { GameCanvas } from '@/components/GameCanvas'
 import { HUD } from '@/components/HUD'
 import { StatusBar } from '@/components/StatusBar'
 import { useGameStore } from '@/stores/gameStore'
-import { Zap, DollarSign, Thermometer, Activity } from 'lucide-react'
+import type { GameSpeed } from '@/stores/gameStore'
+import { Zap, DollarSign, Thermometer, Activity, Pause, Play, FastForward } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+
+const SPEED_LABELS: Record<GameSpeed, string> = {
+  0: 'PAUSED',
+  1: '1x',
+  2: '2x',
+  3: '3x',
+}
+
+const TICK_INTERVALS: Record<GameSpeed, number> = {
+  0: 0,
+  1: 1000,
+  2: 500,
+  3: 250,
+}
 
 function App() {
-  const { totalPower, money, pue, avgHeat, cabinets, spineSwitches } = useGameStore()
+  const {
+    totalPower, money, pue, avgHeat, cabinets, spineSwitches,
+    gameSpeed, setGameSpeed, tick, revenue, expenses,
+  } = useGameStore()
   const totalNodes = cabinets.length + spineSwitches.length
   const activeNodes = cabinets.filter((c) => c.powerStatus).length + spineSwitches.filter((s) => s.powerStatus).length
+  const netIncome = revenue - expenses
+  const tickRef = useRef(tick)
+  tickRef.current = tick
+
+  // Game tick loop
+  useEffect(() => {
+    if (gameSpeed === 0) return
+    const interval = setInterval(() => tickRef.current(), TICK_INTERVALS[gameSpeed])
+    return () => clearInterval(interval)
+  }, [gameSpeed])
+
+  const cycleSpeed = () => {
+    const next = ((gameSpeed + 1) % 4) as GameSpeed
+    setGameSpeed(next)
+  }
 
   return (
-    <div className="h-screen flex flex-col bg-background text-foreground font-mono overflow-hidden">
-      {/* Top bar */}
-      <header className="flex items-center justify-between px-4 py-2 border-b border-border bg-card">
-        <div className="flex items-center gap-3">
-          <h1 className="text-lg font-bold text-neon-green text-glow-green tracking-wider">
-            FABRIC TYCOON
-          </h1>
-          <span className="text-xs text-muted-foreground hidden sm:inline">
-            Build cabinets, design network fabrics, and manage power to scale your data center.
-          </span>
-          <span className="inline-block w-2 h-4 bg-neon-green animate-blink ml-1" />
-        </div>
-
-        {/* Top-bar stats */}
-        <div className="flex items-center gap-5 text-xs">
-          <div className="flex items-center gap-1.5">
-            <DollarSign className="size-3.5 text-neon-yellow" />
-            <span className="text-neon-yellow text-glow-orange font-bold">
-              ${money.toLocaleString()}
+    <TooltipProvider>
+      <div className="h-screen flex flex-col bg-background text-foreground font-mono overflow-hidden">
+        {/* Top bar */}
+        <header className="flex items-center justify-between px-4 py-2 border-b border-border bg-card">
+          <div className="flex items-center gap-3">
+            <h1 className="text-lg font-bold text-neon-green text-glow-green tracking-wider">
+              FABRIC TYCOON
+            </h1>
+            <span className="text-xs text-muted-foreground hidden sm:inline">
+              Build cabinets, design network fabrics, and manage power to scale your data center.
             </span>
+            <span className="inline-block w-2 h-4 bg-neon-green animate-blink ml-1" />
           </div>
-          <div className="flex items-center gap-1.5">
-            <Zap className="size-3.5 text-neon-green" />
-            <span className="text-neon-green">
-              {totalPower.toLocaleString()}W
-            </span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <Thermometer className="size-3.5 text-neon-orange" />
-            <span className={avgHeat > 60 ? 'text-neon-red text-glow-red' : 'text-neon-orange'}>
-              {avgHeat}°C
-            </span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <Activity className="size-3.5 text-neon-cyan" />
-            <span className="text-neon-cyan">
-              PUE {pue || '—'}
-            </span>
-          </div>
-        </div>
-      </header>
 
-      {/* Main content area */}
-      <main className="flex-1 flex flex-col min-h-0 p-3 gap-3">
-        {/* Phaser canvas */}
-        <div className="flex-1 min-h-0">
-          <GameCanvas />
-        </div>
+          {/* Top-bar stats */}
+          <div className="flex items-center gap-5 text-xs">
+            {/* Game speed control */}
+            <div className="flex items-center gap-1.5 border-r border-border pr-4 mr-1">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    onClick={cycleSpeed}
+                    className={`font-mono text-xs px-2 gap-1.5 ${
+                      gameSpeed === 0
+                        ? 'text-neon-red'
+                        : 'text-neon-green'
+                    }`}
+                  >
+                    {gameSpeed === 0 ? (
+                      <Pause className="size-3" />
+                    ) : gameSpeed >= 2 ? (
+                      <FastForward className="size-3" />
+                    ) : (
+                      <Play className="size-3" />
+                    )}
+                    {SPEED_LABELS[gameSpeed]}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  Click to cycle: Pause → 1x → 2x → 3x
+                </TooltipContent>
+              </Tooltip>
+            </div>
 
-        {/* HUD controls */}
-        <HUD />
-      </main>
+            <div className="flex items-center gap-1.5">
+              <DollarSign className="size-3.5 text-neon-yellow" />
+              <span className="text-neon-yellow text-glow-orange font-bold">
+                ${Math.floor(money).toLocaleString()}
+              </span>
+              {(revenue > 0 || expenses > 0) && (
+                <span className={`text-xs ${netIncome >= 0 ? 'text-neon-green' : 'text-neon-red'}`}>
+                  {netIncome >= 0 ? '+' : ''}{netIncome.toFixed(0)}/t
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Zap className="size-3.5 text-neon-green" />
+              <span className="text-neon-green">
+                {totalPower.toLocaleString()}W
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Thermometer className="size-3.5 text-neon-orange" />
+              <span className={avgHeat > 60 ? 'text-neon-red text-glow-red' : 'text-neon-orange'}>
+                {avgHeat}°C
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Activity className="size-3.5 text-neon-cyan" />
+              <span className="text-neon-cyan">
+                PUE {pue || '—'}
+              </span>
+            </div>
+          </div>
+        </header>
 
-      {/* Bottom status bar */}
-      <StatusBar activeNodes={activeNodes} totalNodes={totalNodes} />
-    </div>
+        {/* Main content area */}
+        <main className="flex-1 flex flex-col min-h-0 p-3 gap-3">
+          {/* Phaser canvas */}
+          <div className="flex-1 min-h-0">
+            <GameCanvas />
+          </div>
+
+          {/* HUD controls */}
+          <HUD />
+        </main>
+
+        {/* Bottom status bar */}
+        <StatusBar activeNodes={activeNodes} totalNodes={totalNodes} />
+      </div>
+    </TooltipProvider>
   )
 }
 
