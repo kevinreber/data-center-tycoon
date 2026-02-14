@@ -43,84 +43,162 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  /* Custom neon colors */
+  --color-neon-green: #00ff88;
+  --color-neon-cyan: #00aaff;
+  --color-neon-red: #ff4444;
+  --color-neon-orange: #ff6644;
+  --color-neon-yellow: #ffaa00;
+  --color-neon-purple: #aa44ff;
 }
 
+/* Dark terminal theme — always active */
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --radius: 0.5rem;
+  --background: #060a10;
+  --foreground: #c8d6e5;
+  --card: #0c1220;
+  --card-foreground: #c8d6e5;
+  --popover: #0c1220;
+  --popover-foreground: #c8d6e5;
+  --primary: #00ff88;
+  --primary-foreground: #060a10;
+  --secondary: #112030;
+  --secondary-foreground: #7faacc;
+  --muted: #0e1825;
+  --muted-foreground: #556677;
+  --accent: #0e2a1e;
+  --accent-foreground: #00ff88;
+  --destructive: #ff4444;
+  --border: #1a2a3a;
+  --input: #1a2a3a;
+  --ring: #00ff8855;
+  --chart-1: #00ff88;
+  --chart-2: #00aaff;
+  --chart-3: #ff6644;
+  --chart-4: #ffaa00;
+  --chart-5: #aa44ff;
+  --sidebar: #0c1220;
+  --sidebar-foreground: #c8d6e5;
+  --sidebar-primary: #00ff88;
+  --sidebar-primary-foreground: #060a10;
+  --sidebar-accent: #0e2a1e;
+  --sidebar-accent-foreground: #00ff88;
+  --sidebar-border: #1a2a3a;
+  --sidebar-ring: #00ff8855;
 }
 
+/* Keep dark variant for shadcn components that use it */
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --background: #060a10;
+  --foreground: #c8d6e5;
+  --card: #0c1220;
+  --card-foreground: #c8d6e5;
+  --popover: #0c1220;
+  --popover-foreground: #c8d6e5;
+  --primary: #00ff88;
+  --primary-foreground: #060a10;
+  --secondary: #112030;
+  --secondary-foreground: #7faacc;
+  --muted: #0e1825;
+  --muted-foreground: #556677;
+  --accent: #0e2a1e;
+  --accent-foreground: #00ff88;
+  --destructive: #ff4444;
+  --border: #1a2a3a;
+  --input: #1a2a3a;
+  --ring: #00ff8855;
+  --chart-1: #00ff88;
+  --chart-2: #00aaff;
+  --chart-3: #ff6644;
+  --chart-4: #ffaa00;
+  --chart-5: #aa44ff;
+  --sidebar: #0c1220;
+  --sidebar-foreground: #c8d6e5;
+  --sidebar-primary: #00ff88;
+  --sidebar-primary-foreground: #060a10;
+  --sidebar-accent: #0e2a1e;
+  --sidebar-accent-foreground: #00ff88;
+  --sidebar-border: #1a2a3a;
+  --sidebar-ring: #00ff8855;
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
-    @apply border-border outline-ring/50;
   }
   body {
     @apply bg-background text-foreground;
-    @apply bg-background text-foreground;
   }
+}
+
+/* Terminal glow effects */
+@layer utilities {
+  .glow-green {
+    box-shadow: 0 0 10px #00ff8833, 0 0 20px #00ff8811, inset 0 1px 0 #00ff8815;
+  }
+  .glow-green-strong {
+    box-shadow: 0 0 15px #00ff8844, 0 0 30px #00ff8822, inset 0 1px 0 #00ff8820;
+  }
+  .glow-cyan {
+    box-shadow: 0 0 10px #00aaff33, 0 0 20px #00aaff11, inset 0 1px 0 #00aaff15;
+  }
+  .glow-red {
+    box-shadow: 0 0 10px #ff444433, 0 0 20px #ff444411;
+  }
+  .glow-orange {
+    box-shadow: 0 0 10px #ff664433, 0 0 20px #ff664411;
+  }
+  .text-glow-green {
+    text-shadow: 0 0 8px #00ff8866, 0 0 16px #00ff8833;
+  }
+  .text-glow-cyan {
+    text-shadow: 0 0 8px #00aaff66, 0 0 16px #00aaff33;
+  }
+  .text-glow-red {
+    text-shadow: 0 0 8px #ff444466, 0 0 16px #ff444433;
+  }
+  .text-glow-orange {
+    text-shadow: 0 0 8px #ff664466, 0 0 16px #ff664433;
+  }
+  .border-glow-green {
+    border-color: #00ff8844;
+  }
+  .border-glow-cyan {
+    border-color: #00aaff44;
+  }
+}
+
+/* Scanline overlay effect */
+.scanlines::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.08) 2px,
+    rgba(0, 0, 0, 0.08) 4px
+  );
+  z-index: 50;
+}
+
+/* Animated pulse for active indicators */
+@keyframes pulse-glow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Blinking cursor for terminal feel */
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+.animate-blink {
+  animation: blink 1s step-end infinite;
 }
