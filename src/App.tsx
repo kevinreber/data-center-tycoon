@@ -17,7 +17,7 @@ function App() {
             FABRIC TYCOON
           </h1>
           <span className="text-xs text-muted-foreground hidden sm:inline">
-            DATA CENTER SIMULATOR
+            Build servers, design network fabrics, and manage power to scale your data center.
           </span>
           <span className="inline-block w-2 h-4 bg-neon-green animate-blink ml-1" />
         </div>
