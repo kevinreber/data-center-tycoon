@@ -13,6 +13,8 @@ export function GameCanvas() {
   const layerVisibility = useGameStore((s) => s.layerVisibility)
   const layerOpacity = useGameStore((s) => s.layerOpacity)
   const layerColors = useGameStore((s) => s.layerColors)
+  const trafficStats = useGameStore((s) => s.trafficStats)
+  const trafficVisible = useGameStore((s) => s.trafficVisible)
 
   useEffect(() => {
     if (!gameRef.current) {
@@ -85,6 +87,22 @@ export function GameCanvas() {
     if (!scene) return
     scene.setLayerColors(layerColors)
   }, [layerColors])
+
+  // Sync traffic data to Phaser
+  useEffect(() => {
+    if (!gameRef.current) return
+    const scene = getScene(gameRef.current)
+    if (!scene) return
+    scene.setTrafficLinks(trafficStats.links)
+  }, [trafficStats])
+
+  // Sync traffic visibility to Phaser
+  useEffect(() => {
+    if (!gameRef.current) return
+    const scene = getScene(gameRef.current)
+    if (!scene) return
+    scene.setTrafficVisible(trafficVisible)
+  }, [trafficVisible])
 
   return (
     <div

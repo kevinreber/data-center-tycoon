@@ -3,7 +3,7 @@ import { useGameStore, DEFAULT_COLORS, RACK_COST, MAX_SERVERS_PER_CABINET, MAX_C
 import type { NodeType, LayerColors } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Server, Network, Power, Cpu, Eye, SlidersHorizontal, EyeOff, RotateCcw, HardDrive, Plus, TrendingUp, TrendingDown, DollarSign } from 'lucide-react'
+import { Server, Network, Power, Cpu, Eye, SlidersHorizontal, EyeOff, RotateCcw, HardDrive, Plus, TrendingUp, TrendingDown, DollarSign, ArrowRightLeft, AlertTriangle, Radio } from 'lucide-react'
 import {
   Tooltip,
   TooltipContent,
@@ -45,6 +45,7 @@ export function HUD() {
     toggleCabinetPower, toggleSpinePower,
     toggleLayerVisibility, setLayerOpacity, setLayerColor,
     revenue, expenses, powerCost, coolingCost, avgHeat,
+    trafficStats, trafficVisible, toggleTrafficVisible,
   } = useGameStore()
   const [showGuide, setShowGuide] = useState(true)
 
@@ -191,10 +192,39 @@ export function HUD() {
                 </div>
               )
             })}
+            {/* Traffic visibility toggle */}
+            <div className="flex items-center gap-2 mt-1 pt-2 border-t border-border/50">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    onClick={() => toggleTrafficVisible()}
+                    className={`font-mono text-xs transition-all min-w-[120px] justify-start gap-1.5 ${
+                      trafficVisible
+                        ? 'bg-neon-yellow/20 text-neon-yellow border border-neon-yellow/40'
+                        : 'text-muted-foreground line-through opacity-50'
+                    }`}
+                  >
+                    {trafficVisible ? <Eye className="size-3" /> : <EyeOff className="size-3" />}
+                    Traffic
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  {trafficVisible ? 'Hide' : 'Show'} traffic flow visualization
+                </TooltipContent>
+              </Tooltip>
+              {trafficStats.redirectedFlows > 0 && (
+                <span className="flex items-center gap-1 text-xs text-neon-orange animate-pulse">
+                  <AlertTriangle className="size-3" />
+                  REDIRECT
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-[1fr_auto_auto_1fr] gap-3">
+        <div className="grid grid-cols-[1fr_auto_auto_auto_1fr] gap-3">
           {/* BUILD panel */}
           <div className="rounded-lg border border-border bg-card p-3 glow-green">
             <div className="flex items-center gap-2 mb-3">
@@ -372,6 +402,92 @@ export function HUD() {
                 <p className="text-xs text-neon-red font-bold animate-pulse">
                   THERMAL THROTTLE &gt;{SIM.throttleTemp}°C
                 </p>
+              </div>
+            )}
+          </div>
+
+          {/* TRAFFIC panel */}
+          <div className="rounded-lg border border-border bg-card p-3 w-48 glow-green">
+            <div className="flex items-center gap-2 mb-2">
+              <Radio className="size-3.5 text-neon-cyan" />
+              <span className="text-xs font-bold text-neon-cyan tracking-widest">TRAFFIC</span>
+            </div>
+            {trafficStats.totalFlows === 0 ? (
+              <p className="text-xs text-muted-foreground italic">
+                No traffic flows. Add leaf &amp; spine switches to see traffic.
+              </p>
+            ) : (
+              <div className="flex flex-col gap-1.5">
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">Flows</span>
+                  <span className="text-neon-cyan tabular-nums">{trafficStats.totalFlows}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">Bandwidth</span>
+                  <span className="text-neon-green tabular-nums">{trafficStats.totalBandwidthGbps} Gbps</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">Capacity</span>
+                  <span className="text-foreground tabular-nums">{trafficStats.totalCapacityGbps} Gbps</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">Utilization</span>
+                  <span className={`tabular-nums ${
+                    trafficStats.totalCapacityGbps > 0 && trafficStats.totalBandwidthGbps / trafficStats.totalCapacityGbps > 0.8
+                      ? 'text-neon-red'
+                      : trafficStats.totalCapacityGbps > 0 && trafficStats.totalBandwidthGbps / trafficStats.totalCapacityGbps > 0.5
+                        ? 'text-neon-yellow'
+                        : 'text-neon-green'
+                  }`}>
+                    {trafficStats.totalCapacityGbps > 0
+                      ? Math.round((trafficStats.totalBandwidthGbps / trafficStats.totalCapacityGbps) * 100)
+                      : 0}%
+                  </span>
+                </div>
+                {trafficStats.redirectedFlows > 0 && (
+                  <>
+                    <div className="border-t border-neon-orange/30 my-0.5" />
+                    <div className="flex justify-between text-xs">
+                      <span className="flex items-center gap-1 text-neon-orange">
+                        <ArrowRightLeft className="size-3" />
+                        Redirected
+                      </span>
+                      <span className="text-neon-orange tabular-nums animate-pulse">
+                        {trafficStats.redirectedFlows}
+                      </span>
+                    </div>
+                    <p className="text-xs text-neon-orange/80 font-bold animate-pulse mt-0.5">
+                      SPINE DOWN &mdash; TRAFFIC REROUTED
+                    </p>
+                  </>
+                )}
+                {Object.keys(trafficStats.spineUtilization).length > 0 && (
+                  <>
+                    <div className="border-t border-border my-0.5" />
+                    <span className="text-xs text-muted-foreground">Per-Spine Load</span>
+                    {Object.entries(trafficStats.spineUtilization).map(([spineId, util]) => (
+                      <div key={spineId} className="flex items-center gap-2 text-xs">
+                        <span className="text-muted-foreground truncate flex-1">
+                          {spineId.replace('spine-', 'S')}
+                        </span>
+                        <div className="w-16 h-1.5 bg-border rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all"
+                            style={{
+                              width: `${Math.round(util * 100)}%`,
+                              backgroundColor: util > 0.8 ? '#ff4444' : util > 0.5 ? '#ffaa00' : '#00ff88',
+                            }}
+                          />
+                        </div>
+                        <span className={`tabular-nums w-8 text-right ${
+                          util > 0.8 ? 'text-neon-red' : util > 0.5 ? 'text-neon-yellow' : 'text-neon-green'
+                        }`}>
+                          {Math.round(util * 100)}%
+                        </span>
+                      </div>
+                    ))}
+                  </>
+                )}
               </div>
             )}
           </div>
