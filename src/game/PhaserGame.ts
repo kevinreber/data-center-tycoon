@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import type { LayerVisibility, LayerOpacity, LayerColors, LayerColorOverrides } from '@/stores/gameStore'
+import type { LayerVisibility, LayerOpacity, LayerColors, LayerColorOverrides, TrafficLink } from '@/stores/gameStore'
 import { DEFAULT_COLORS } from '@/stores/gameStore'
 
 const COLORS = DEFAULT_COLORS
@@ -62,6 +62,13 @@ class DataCenterScene extends Phaser.Scene {
   private layerVisibility: LayerVisibility = { server: true, leaf_switch: true, spine_switch: true }
   private layerOpacity: LayerOpacity = { server: 1, leaf_switch: 1, spine_switch: 1 }
   private layerColors: LayerColorOverrides = { server: null, leaf_switch: null, spine_switch: null }
+
+  // Traffic visualization
+  private trafficGraphics: Phaser.GameObjects.Graphics | null = null
+  private packetGraphics: Phaser.GameObjects.Graphics | null = null
+  private trafficLinks: TrafficLink[] = []
+  private trafficVisible = true
+  private packetPhase = 0
 
   constructor() {
     super({ key: 'DataCenterScene' })
@@ -394,6 +401,114 @@ class DataCenterScene extends Phaser.Scene {
     for (const entry of this.spineEntries.values()) {
       this.renderSpine(entry)
     }
+    this.renderTraffic()
+  }
+
+  /** Phaser update loop — animate packet dots */
+  update(_time: number, delta: number) {
+    if (!this.trafficVisible || this.trafficLinks.length === 0) return
+    this.packetPhase = (this.packetPhase + delta * 0.001) % 1
+    this.renderPackets()
+  }
+
+  /** Get the screen position of a leaf switch on top of a cabinet */
+  private getLeafScreenPos(cabId: string): { x: number; y: number } | null {
+    const entry = this.cabEntries.get(cabId)
+    if (!entry) return null
+    const { x, y } = this.isoToScreen(entry.col, entry.row)
+    // Position at the top of the cabinet stack (above leaf switch)
+    const topY = y + TILE_H / 2 - BASE_DEPTH -
+      entry.serverCount * (SERVER_DEPTH + SECTION_GAP) -
+      (entry.hasLeafSwitch ? LEAF_DEPTH + SECTION_GAP : 0)
+    return { x, y: topY }
+  }
+
+  /** Get the screen position of a spine switch */
+  private getSpineScreenPos(spineId: string): { x: number; y: number } | null {
+    const entry = this.spineEntries.get(spineId)
+    if (!entry) return null
+    const { x, y } = this.spineToScreen(entry.slot)
+    return { x, y: y + SPINE_H / 2 + SPINE_DEPTH / 2 }
+  }
+
+  /** Map utilization 0–1 to a color: green → yellow → red */
+  private utilizationColor(util: number, redirected: boolean): number {
+    if (redirected) {
+      // Amber/yellow for redirected traffic
+      const intensity = 0.5 + util * 0.5
+      const r = Math.round(255 * intensity)
+      const g = Math.round(180 * intensity)
+      const b = Math.round(30 * (1 - util))
+      return (r << 16) | (g << 8) | b
+    }
+    // Green → Yellow → Red gradient based on utilization
+    if (util < 0.5) {
+      // Green to Yellow
+      const t = util / 0.5
+      const r = Math.round(t * 255)
+      const g = 255
+      const b = Math.round(80 * (1 - t))
+      return (r << 16) | (g << 8) | b
+    }
+    // Yellow to Red
+    const t = (util - 0.5) / 0.5
+    const r = 255
+    const g = Math.round(255 * (1 - t))
+    const b = 0
+    return (r << 16) | (g << 8) | b
+  }
+
+  /** Render traffic connection lines between leaf and spine switches */
+  private renderTraffic() {
+    if (this.trafficGraphics) this.trafficGraphics.destroy()
+    this.trafficGraphics = this.add.graphics()
+    this.trafficGraphics.setDepth(4) // between floor and spine layer
+
+    if (!this.trafficVisible || this.trafficLinks.length === 0) return
+
+    for (const link of this.trafficLinks) {
+      const leafPos = this.getLeafScreenPos(link.leafCabinetId)
+      const spinePos = this.getSpineScreenPos(link.spineId)
+      if (!leafPos || !spinePos) continue
+
+      const color = this.utilizationColor(link.utilization, link.redirected)
+      const alpha = 0.15 + link.utilization * 0.45
+      const lineWidth = link.redirected ? 2 : 1.5
+
+      this.trafficGraphics.lineStyle(lineWidth, color, alpha)
+      this.trafficGraphics.lineBetween(leafPos.x, leafPos.y, spinePos.x, spinePos.y)
+    }
+  }
+
+  /** Render animated packet dots moving along traffic lines */
+  private renderPackets() {
+    if (this.packetGraphics) this.packetGraphics.destroy()
+    this.packetGraphics = this.add.graphics()
+    this.packetGraphics.setDepth(7) // above everything
+
+    if (!this.trafficVisible || this.trafficLinks.length === 0) return
+
+    for (let i = 0; i < this.trafficLinks.length; i++) {
+      const link = this.trafficLinks[i]
+      const leafPos = this.getLeafScreenPos(link.leafCabinetId)
+      const spinePos = this.getSpineScreenPos(link.spineId)
+      if (!leafPos || !spinePos) continue
+
+      const color = this.utilizationColor(link.utilization, link.redirected)
+
+      // Number of packets proportional to utilization (1–3 dots)
+      const packetCount = Math.max(1, Math.ceil(link.utilization * 3))
+      for (let p = 0; p < packetCount; p++) {
+        // Stagger packets along the line, offset by link index for variety
+        const t = ((this.packetPhase + p / packetCount + i * 0.17) % 1)
+        const px = leafPos.x + (spinePos.x - leafPos.x) * t
+        const py = leafPos.y + (spinePos.y - leafPos.y) * t
+        const size = link.redirected ? 2.5 : 2
+
+        this.packetGraphics.fillStyle(color, 0.8)
+        this.packetGraphics.fillCircle(px, py, size)
+      }
+    }
   }
 
   // ── Public API ──────────────────────────────────────────
@@ -444,6 +559,23 @@ class DataCenterScene extends Phaser.Scene {
   setLayerColors(colors: LayerColorOverrides) {
     this.layerColors = colors
     this.rerenderAll()
+  }
+
+  /** Update traffic link data and re-render lines */
+  setTrafficLinks(links: TrafficLink[]) {
+    this.trafficLinks = links
+    this.renderTraffic()
+  }
+
+  /** Toggle traffic visualization on/off */
+  setTrafficVisible(visible: boolean) {
+    this.trafficVisible = visible
+    if (!visible) {
+      if (this.trafficGraphics) { this.trafficGraphics.destroy(); this.trafficGraphics = null }
+      if (this.packetGraphics) { this.packetGraphics.destroy(); this.packetGraphics = null }
+    } else {
+      this.renderTraffic()
+    }
   }
 }
 

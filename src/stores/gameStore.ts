@@ -16,6 +16,27 @@ export interface SpineSwitch {
   powerStatus: boolean
 }
 
+// ── Traffic / Network Types ─────────────────────────────────────
+
+/** A single leaf-to-spine connection carrying traffic */
+export interface TrafficLink {
+  leafCabinetId: string
+  spineId: string
+  bandwidthGbps: number     // current traffic on this link
+  capacityGbps: number      // max capacity of this link
+  utilization: number       // 0–1
+  redirected: boolean       // true if this link is carrying extra load due to a spine going down
+}
+
+export interface TrafficStats {
+  totalFlows: number
+  totalBandwidthGbps: number
+  totalCapacityGbps: number
+  redirectedFlows: number
+  links: TrafficLink[]
+  spineUtilization: Record<string, number>  // spineId → 0–1
+}
+
 export interface LayerColors {
   top: number
   side: number
@@ -84,6 +105,96 @@ const POWER_DRAW = {
 
 export { POWER_DRAW }
 
+// ── Traffic Constants ────────────────────────────────────────────
+
+const TRAFFIC = {
+  gbpsPerServer: 1,         // each active server generates 1 Gbps of east-west traffic
+  linkCapacityGbps: 10,     // each leaf→spine uplink is 10 Gbps
+}
+
+export { TRAFFIC }
+
+/** Calculate traffic flows across the leaf-spine fabric */
+function calcTraffic(cabinets: Cabinet[], spines: SpineSwitch[]): TrafficStats {
+  const emptyStats: TrafficStats = {
+    totalFlows: 0,
+    totalBandwidthGbps: 0,
+    totalCapacityGbps: 0,
+    redirectedFlows: 0,
+    links: [],
+    spineUtilization: {},
+  }
+
+  const activeSpines = spines.filter((s) => s.powerStatus)
+  const leafCabinets = cabinets.filter((c) => c.hasLeafSwitch && c.powerStatus)
+
+  if (activeSpines.length === 0 || leafCabinets.length === 0) return emptyStats
+
+  // Each leaf cabinet distributes its server traffic evenly across all active spines (ECMP)
+  const links: TrafficLink[] = []
+  const spineLoad: Record<string, number> = {}
+  const spineCapacity: Record<string, number> = {}
+
+  for (const spine of activeSpines) {
+    spineLoad[spine.id] = 0
+    spineCapacity[spine.id] = 0
+  }
+
+  // Detect if redirection is happening: are there powered-off spines while traffic exists?
+  const totalSpines = spines.length
+  const downSpines = totalSpines - activeSpines.length
+  const isRedirecting = downSpines > 0 && leafCabinets.length > 0
+
+  let totalFlows = 0
+  let totalBw = 0
+  let totalCap = 0
+  let redirectedFlows = 0
+
+  for (const cab of leafCabinets) {
+    const cabTraffic = cab.serverCount * TRAFFIC.gbpsPerServer
+    const perSpineBw = cabTraffic / activeSpines.length
+
+    for (const spine of activeSpines) {
+      const capacity = TRAFFIC.linkCapacityGbps
+      const bandwidth = Math.min(perSpineBw, capacity)
+      const utilization = bandwidth / capacity
+      const redirected = isRedirecting
+
+      links.push({
+        leafCabinetId: cab.id,
+        spineId: spine.id,
+        bandwidthGbps: +bandwidth.toFixed(2),
+        capacityGbps: capacity,
+        utilization: +utilization.toFixed(3),
+        redirected,
+      })
+
+      spineLoad[spine.id] += bandwidth
+      spineCapacity[spine.id] += capacity
+      totalFlows++
+      totalBw += bandwidth
+      totalCap += capacity
+      if (redirected) redirectedFlows++
+    }
+  }
+
+  // Calculate per-spine utilization
+  const spineUtilization: Record<string, number> = {}
+  for (const spine of activeSpines) {
+    const cap = spineCapacity[spine.id]
+    spineUtilization[spine.id] = cap > 0 ? +(spineLoad[spine.id] / cap).toFixed(3) : 0
+  }
+
+  return {
+    totalFlows,
+    totalBandwidthGbps: +totalBw.toFixed(2),
+    totalCapacityGbps: +totalCap.toFixed(2),
+    redirectedFlows,
+    links,
+    spineUtilization,
+  }
+}
+
 // ── Stats Calculation ─────────────────────────────────────────────
 
 function calcStats(cabinets: Cabinet[], spines: SpineSwitch[]) {
@@ -140,6 +251,10 @@ interface GameState {
   layerOpacity: LayerOpacity
   layerColors: LayerColorOverrides
 
+  // Traffic
+  trafficStats: TrafficStats
+  trafficVisible: boolean
+
   // Actions
   addCabinet: () => void
   upgradeNextCabinet: () => void
@@ -151,6 +266,7 @@ interface GameState {
   setLayerOpacity: (type: NodeType, opacity: number) => void
   setLayerColor: (type: NodeType, colors: LayerColors | null) => void
   setGameSpeed: (speed: GameSpeed) => void
+  toggleTrafficVisible: () => void
   tick: () => void
 }
 
@@ -178,6 +294,17 @@ export const useGameStore = create<GameState>((set) => ({
   layerVisibility: { server: true, leaf_switch: true, spine_switch: true },
   layerOpacity: { server: 1, leaf_switch: 1, spine_switch: 1 },
   layerColors: { server: null, leaf_switch: null, spine_switch: null },
+
+  // Traffic
+  trafficStats: {
+    totalFlows: 0,
+    totalBandwidthGbps: 0,
+    totalCapacityGbps: 0,
+    redirectedFlows: 0,
+    links: [],
+    spineUtilization: {},
+  },
+  trafficVisible: true,
 
   // ── Build Actions ───────────────────────────────────────────
 
@@ -251,7 +378,11 @@ export const useGameStore = create<GameState>((set) => ({
       const newCabinets = state.cabinets.map((c) =>
         c.id === id ? { ...c, powerStatus: !c.powerStatus } : c
       )
-      return { cabinets: newCabinets, ...calcStats(newCabinets, state.spineSwitches) }
+      return {
+        cabinets: newCabinets,
+        ...calcStats(newCabinets, state.spineSwitches),
+        trafficStats: calcTraffic(newCabinets, state.spineSwitches),
+      }
     }),
 
   toggleSpinePower: (id) =>
@@ -259,7 +390,11 @@ export const useGameStore = create<GameState>((set) => ({
       const newSpines = state.spineSwitches.map((s) =>
         s.id === id ? { ...s, powerStatus: !s.powerStatus } : s
       )
-      return { spineSwitches: newSpines, ...calcStats(state.cabinets, newSpines) }
+      return {
+        spineSwitches: newSpines,
+        ...calcStats(state.cabinets, newSpines),
+        trafficStats: calcTraffic(state.cabinets, newSpines),
+      }
     }),
 
   // ── Visual Actions ──────────────────────────────────────────
@@ -291,6 +426,9 @@ export const useGameStore = create<GameState>((set) => ({
   // ── Simulation Actions ──────────────────────────────────────
 
   setGameSpeed: (speed) => set({ gameSpeed: speed }),
+
+  toggleTrafficVisible: () =>
+    set((state) => ({ trafficVisible: !state.trafficVisible })),
 
   tick: () =>
     set((state) => {
@@ -345,6 +483,9 @@ export const useGameStore = create<GameState>((set) => ({
       const netIncome = revenue - expenses
       const newMoney = Math.round((state.money + netIncome) * 100) / 100
 
+      // 6. Calculate traffic flows
+      const trafficStats = calcTraffic(newCabinets, state.spineSwitches)
+
       return {
         cabinets: newCabinets,
         tickCount: state.tickCount + 1,
@@ -353,6 +494,7 @@ export const useGameStore = create<GameState>((set) => ({
         powerCost,
         coolingCost,
         money: newMoney,
+        trafficStats,
         ...stats,
       }
     }),
