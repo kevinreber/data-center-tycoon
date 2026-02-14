@@ -40,7 +40,8 @@ export function GameCanvas() {
   return (
     <div
       id="phaser-container"
-      className="rounded-lg border border-border overflow-hidden"
+      className="w-full h-full rounded-lg border border-border overflow-hidden relative scanlines glow-green"
+      style={{ background: 'linear-gradient(180deg, #060a10 0%, #0a1018 50%, #060a10 100%)' }}
     />
   )
 }

@@ -1,81 +1,130 @@
 import { useGameStore } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Server, Network, Power, Cpu } from 'lucide-react'
+
+const RACK_COST: Record<string, number> = {
+  server: 2000,
+  leaf_switch: 5000,
+  spine_switch: 12000,
+}
 
 export function HUD() {
-  const { racks, totalPower, addRack, togglePower } = useGameStore()
+  const { racks, totalPower, money, addRack, togglePower } = useGameStore()
 
   return (
-    <div className="flex gap-4 mt-4">
-      <Card className="flex-1">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-mono">BUILD</CardTitle>
-        </CardHeader>
-        <CardContent className="flex gap-2 flex-wrap">
+    <div className="grid grid-cols-[1fr_auto_1fr] gap-3">
+      {/* BUILD panel */}
+      <div className="rounded-lg border border-border bg-card p-3 glow-green">
+        <div className="flex items-center gap-2 mb-3">
+          <Cpu className="size-3.5 text-neon-green" />
+          <span className="text-xs font-bold text-neon-green tracking-widest">BUILD</span>
+        </div>
+        <div className="flex flex-col gap-2">
           <Button
             variant="outline"
             size="sm"
             onClick={() => addRack('server')}
-            className="font-mono text-xs"
+            disabled={money < RACK_COST.server}
+            className="justify-between font-mono text-xs border-neon-green/20 hover:border-neon-green/50 hover:bg-neon-green/10 hover:text-neon-green transition-all"
           >
-            + Server
+            <span className="flex items-center gap-1.5">
+              <Server className="size-3" />
+              Server
+            </span>
+            <span className="text-muted-foreground">${RACK_COST.server.toLocaleString()}</span>
           </Button>
           <Button
             variant="outline"
             size="sm"
             onClick={() => addRack('leaf_switch')}
-            className="font-mono text-xs"
+            disabled={money < RACK_COST.leaf_switch}
+            className="justify-between font-mono text-xs border-neon-cyan/20 hover:border-neon-cyan/50 hover:bg-neon-cyan/10 hover:text-neon-cyan transition-all"
           >
-            + Leaf Switch
+            <span className="flex items-center gap-1.5">
+              <Network className="size-3" />
+              Leaf Switch
+            </span>
+            <span className="text-muted-foreground">${RACK_COST.leaf_switch.toLocaleString()}</span>
           </Button>
           <Button
             variant="outline"
             size="sm"
             onClick={() => addRack('spine_switch')}
-            className="font-mono text-xs"
+            disabled={money < RACK_COST.spine_switch}
+            className="justify-between font-mono text-xs border-neon-orange/20 hover:border-neon-orange/50 hover:bg-neon-orange/10 hover:text-neon-orange transition-all"
           >
-            + Spine Switch
+            <span className="flex items-center gap-1.5">
+              <Network className="size-3" />
+              Spine Switch
+            </span>
+            <span className="text-muted-foreground">${RACK_COST.spine_switch.toLocaleString()}</span>
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
-      <Card className="w-48">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-mono">POWER</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-2xl font-mono font-bold">{totalPower}W</p>
-          <p className="text-xs text-muted-foreground font-mono">
-            {racks.length} nodes deployed
+      {/* POWER panel */}
+      <div className="rounded-lg border border-border bg-card p-3 w-44 glow-green flex flex-col items-center justify-center">
+        <div className="flex items-center gap-2 mb-2">
+          <Power className="size-3.5 text-neon-green" />
+          <span className="text-xs font-bold text-neon-green tracking-widest">POWER</span>
+        </div>
+        <div className="text-center">
+          <p className="text-3xl font-bold text-neon-green text-glow-green tabular-nums">
+            {totalPower.toLocaleString()}
           </p>
-        </CardContent>
-      </Card>
+          <p className="text-xs text-muted-foreground mt-0.5">WATTS</p>
+        </div>
+        <div className="w-full mt-3 pt-2 border-t border-border">
+          <div className="flex justify-between text-xs">
+            <span className="text-muted-foreground">Nodes</span>
+            <span className="text-foreground">{racks.length}</span>
+          </div>
+          <div className="flex justify-between text-xs mt-1">
+            <span className="text-muted-foreground">Active</span>
+            <span className="text-neon-green">{racks.filter((r) => r.powerStatus).length}</span>
+          </div>
+        </div>
+      </div>
 
-      {racks.length > 0 && (
-        <Card className="flex-1 max-w-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-mono">NODES</CardTitle>
-          </CardHeader>
-          <CardContent className="flex gap-1 flex-wrap max-h-24 overflow-y-auto">
-            {racks.map((r) => (
-              <Badge
-                key={r.id}
-                variant={r.powerStatus ? 'default' : 'secondary'}
-                className="cursor-pointer font-mono text-xs"
-                onClick={() => togglePower(r.id)}
-              >
-                {r.type === 'server'
-                  ? 'SRV'
+      {/* NODES panel */}
+      <div className="rounded-lg border border-border bg-card p-3 glow-green">
+        <div className="flex items-center gap-2 mb-3">
+          <Server className="size-3.5 text-neon-green" />
+          <span className="text-xs font-bold text-neon-green tracking-widest">NODES</span>
+          {racks.length > 0 && (
+            <span className="text-xs text-muted-foreground ml-auto">{racks.length} deployed</span>
+          )}
+        </div>
+        {racks.length === 0 ? (
+          <p className="text-xs text-muted-foreground italic">No nodes deployed yet. Use BUILD to add equipment.</p>
+        ) : (
+          <div className="flex gap-1.5 flex-wrap max-h-28 overflow-y-auto">
+            {racks.map((r) => {
+              const label =
+                r.type === 'server' ? 'SRV' : r.type === 'leaf_switch' ? 'LEAF' : 'SPINE'
+              const colorClass =
+                r.type === 'server'
+                  ? 'bg-neon-green/20 text-neon-green border-neon-green/30 hover:bg-neon-green/30'
                   : r.type === 'leaf_switch'
-                    ? 'LEAF'
-                    : 'SPINE'}
-                {r.powerStatus ? '' : ' OFF'}
-              </Badge>
-            ))}
-          </CardContent>
-        </Card>
-      )}
+                    ? 'bg-neon-cyan/20 text-neon-cyan border-neon-cyan/30 hover:bg-neon-cyan/30'
+                    : 'bg-neon-orange/20 text-neon-orange border-neon-orange/30 hover:bg-neon-orange/30'
+              const offClass = 'bg-muted text-muted-foreground border-border hover:bg-muted/80'
+
+              return (
+                <Badge
+                  key={r.id}
+                  className={`cursor-pointer font-mono text-xs border transition-all ${r.powerStatus ? colorClass : offClass}`}
+                  onClick={() => togglePower(r.id)}
+                >
+                  {label}
+                  {!r.powerStatus && ' OFF'}
+                </Badge>
+              )
+            })}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
