@@ -43,6 +43,14 @@ function App() {
   const tickRef = useRef(tick)
   tickRef.current = tick
 
+  // Auto-load demo from URL parameter (?demo=true)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('demo') === 'true' && !isDemo && cabinets.length === 0) {
+      loadDemoState()
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Game tick loop
   useEffect(() => {
     if (gameSpeed === 0) return
