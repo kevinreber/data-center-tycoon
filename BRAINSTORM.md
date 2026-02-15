@@ -67,6 +67,15 @@ These features add significant depth and replayability. They're not strictly req
 | Loan system | Take loans for rapid expansion; interest payments eat into profit margins | Medium | Low | Simple to implement, adds meaningful early-game strategy: bootstrap slowly or leverage up and risk debt. |
 | Insurance policies | Insure against specific disaster types; cheaper premiums with good safety records | Low | Low | Nice flavor and risk management layer, but not core to the experience. |
 
+### Physical Infrastructure Layout
+
+| Feature | Description | Impact | Effort | Why it matters |
+|---------|-------------|--------|--------|----------------|
+| Power Distribution Units (PDUs) | Place PDUs on the grid to provide power to nearby cabinets. Each PDU has a max circuit capacity (kW). Cabinets must be connected to a PDU within range. Overloading a PDU triggers breaker trips and outages. | Medium | High | Adds a real constraint to cabinet placement — you can't just build anywhere without power infrastructure. Creates circuit planning puzzles. |
+| Structured Cabling | Run network cables from leaf switches to spine switches via cable trays. Cable runs have length limits and capacity constraints. Messy cabling increases incident risk (fiber cuts, accidental disconnects). | Medium | High | Makes the physical topology visible and strategic. Long or tangled cable runs are a real DC headache — modeling this adds authenticity. |
+| Cable Tray System | Place overhead or under-floor cable trays as pathways for network cables. Cables must follow tray routes. Tray capacity limits force players to plan pathways and avoid bottlenecks. | Low | Medium | Visual and strategic infrastructure layer. Connects naturally to the manual cabinet placement system. |
+| Hot/Cold Aisle Enforcement | Cabinets facing the same direction share a hot aisle (exhaust) or cold aisle (intake). Proper aisle separation reduces cooling costs; violations increase heat. Incentivizes row-based placement patterns. | Medium | Medium | Ties cabinet placement directly to cooling efficiency. Rewards players who plan their layout like real DC operators. |
+
 ### Workload Simulation
 
 | Feature | Description | Impact | Effort | Why it matters |
@@ -169,6 +178,7 @@ A suggested sequencing that layers features for maximum impact at each stage:
 11. Spot power pricing and hardware depreciation
 12. Reputation score affecting customer quality
 13. Loan system for early expansion
+14. Power distribution and structured cabling (builds on manual cabinet placement)
 
 ### Phase 4 — Add World (make it immersive)
 14. Staff & HR with skill levels
@@ -201,10 +211,11 @@ A suggested sequencing that layers features for maximum impact at each stage:
                    │  Sandbox mode    │  Depreciation    │  Competitor AI   │
                    │  DR drills       │  Traffic patterns│  Workload        │
                    │  Insurance       │  Reputation      │   migration      │
-                   │  Training progs  │  Backup gens     │                  │
-                   │                  │  Fire suppress   │                  │
-                   │                  │  Carbon tracker  │                  │
-                   │                  │  Security tiers  │                  │
+                   │  Training progs  │  Backup gens     │  PDUs & Power    │
+                   │                  │  Fire suppress   │   distribution   │
+                   │                  │  Carbon tracker  │  Structured      │
+                   │                  │  Security tiers  │   cabling        │
+                   │                  │  Hot/cold aisle  │                  │
                    ├──────────────────┼──────────────────┼──────────────────┤
                    │                  │                  │                  │
     LOW IMPACT     │  E-waste         │  Zoning/permits  │  Inter-site      │

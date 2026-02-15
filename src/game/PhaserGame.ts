@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import type { LayerVisibility, LayerOpacity, LayerColors, LayerColorOverrides, TrafficLink, CabinetEnvironment } from '@/stores/gameStore'
+import type { LayerVisibility, LayerOpacity, LayerColors, LayerColorOverrides, TrafficLink, CabinetEnvironment, PlacementHint } from '@/stores/gameStore'
 import { DEFAULT_COLORS, ENVIRONMENT_CONFIG } from '@/stores/gameStore'
 
 const COLORS = DEFAULT_COLORS
@@ -75,6 +75,16 @@ class DataCenterScene extends Phaser.Scene {
   private trafficVisible = true
   private packetPhase = 0
 
+  // Placement mode
+  private placementActive = false
+  private placementHighlight: Phaser.GameObjects.Graphics | null = null
+  private placementHintText: Phaser.GameObjects.Text | null = null
+  private placementModeLabel: Phaser.GameObjects.Text | null = null
+  private hoveredTile: { col: number; row: number } | null = null
+  private occupiedTiles: Set<string> = new Set()
+  private onTileClick: ((col: number, row: number) => void) | null = null
+  private onTileHover: ((col: number, row: number) => PlacementHint[]) | null = null
+
   constructor() {
     super({ key: 'DataCenterScene' })
   }
@@ -90,6 +100,128 @@ class DataCenterScene extends Phaser.Scene {
     this.drawSpineFloor()
     this.drawFloor()
     this.drawGrid()
+
+    // Set up pointer events for placement mode
+    this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+      if (!this.placementActive) {
+        if (this.placementHighlight) {
+          this.placementHighlight.clear()
+        }
+        if (this.placementHintText) {
+          this.placementHintText.setVisible(false)
+        }
+        this.hoveredTile = null
+        return
+      }
+      const tile = this.screenToIso(pointer.x, pointer.y)
+      if (tile && tile.col >= 0 && tile.col < this.cabCols && tile.row >= 0 && tile.row < this.cabRows) {
+        this.hoveredTile = tile
+        this.drawPlacementHighlight(tile.col, tile.row)
+      } else {
+        this.hoveredTile = null
+        if (this.placementHighlight) this.placementHighlight.clear()
+        if (this.placementHintText) this.placementHintText.setVisible(false)
+      }
+    })
+
+    this.input.on('pointerdown', () => {
+      if (!this.placementActive || !this.hoveredTile) return
+      const { col, row } = this.hoveredTile
+      const key = `${col},${row}`
+      if (this.occupiedTiles.has(key)) return
+      if (this.onTileClick) {
+        this.onTileClick(col, row)
+      }
+    })
+  }
+
+  /** Convert screen coordinates back to isometric grid cell */
+  private screenToIso(screenX: number, screenY: number): { col: number; row: number } | null {
+    const dx = screenX - this.offsetX
+    const dy = screenY - this.offsetY
+    const col = (dx / (TILE_W / 2) + dy / (TILE_H / 2)) / 2
+    const row = (dy / (TILE_H / 2) - dx / (TILE_W / 2)) / 2
+    const roundCol = Math.floor(col)
+    const roundRow = Math.floor(row)
+    if (roundCol < 0 || roundCol >= this.cabCols || roundRow < 0 || roundRow >= this.cabRows) return null
+    return { col: roundCol, row: roundRow }
+  }
+
+  /** Draw hover highlight on grid tile during placement mode */
+  private drawPlacementHighlight(col: number, row: number) {
+    if (!this.placementHighlight) {
+      this.placementHighlight = this.add.graphics()
+      this.placementHighlight.setDepth(3)
+    }
+    this.placementHighlight.clear()
+
+    const { x, y } = this.isoToScreen(col, row)
+    const occupied = this.occupiedTiles.has(`${col},${row}`)
+
+    // Highlight color: green for valid, red for occupied
+    const color = occupied ? 0xff4444 : 0x00ff88
+    const alpha = occupied ? 0.3 : 0.25
+
+    this.placementHighlight.fillStyle(color, alpha)
+    this.placementHighlight.beginPath()
+    this.placementHighlight.moveTo(x, y)
+    this.placementHighlight.lineTo(x + TILE_W / 2, y + TILE_H / 2)
+    this.placementHighlight.lineTo(x, y + TILE_H)
+    this.placementHighlight.lineTo(x - TILE_W / 2, y + TILE_H / 2)
+    this.placementHighlight.closePath()
+    this.placementHighlight.fillPath()
+
+    // Border glow
+    this.placementHighlight.lineStyle(2, color, occupied ? 0.5 : 0.7)
+    this.placementHighlight.beginPath()
+    this.placementHighlight.moveTo(x, y)
+    this.placementHighlight.lineTo(x + TILE_W / 2, y + TILE_H / 2)
+    this.placementHighlight.lineTo(x, y + TILE_H)
+    this.placementHighlight.lineTo(x - TILE_W / 2, y + TILE_H / 2)
+    this.placementHighlight.closePath()
+    this.placementHighlight.strokePath()
+
+    // Show hint text
+    if (this.onTileHover && !occupied) {
+      const hints = this.onTileHover(col, row)
+      if (hints.length > 0) {
+        const hintMsg = hints.map((h) => {
+          const prefix = h.type === 'warning' ? '!' : h.type === 'tip' ? '*' : '-'
+          return `${prefix} ${h.message}`
+        }).join('\n')
+
+        if (!this.placementHintText) {
+          this.placementHintText = this.add.text(0, 0, '', {
+            fontFamily: 'monospace',
+            fontSize: '8px',
+            color: '#aacccc',
+            backgroundColor: '#0a1520ee',
+            padding: { x: 6, y: 4 },
+            wordWrap: { width: 240 },
+          }).setDepth(100)
+        }
+        this.placementHintText.setText(hintMsg)
+        this.placementHintText.setPosition(x + TILE_W / 2 + 8, y - 10)
+        this.placementHintText.setVisible(true)
+      } else {
+        if (this.placementHintText) this.placementHintText.setVisible(false)
+      }
+    } else if (occupied) {
+      if (!this.placementHintText) {
+        this.placementHintText = this.add.text(0, 0, '', {
+          fontFamily: 'monospace',
+          fontSize: '8px',
+          color: '#ff6666',
+          backgroundColor: '#0a1520ee',
+          padding: { x: 6, y: 4 },
+        }).setDepth(100)
+      }
+      this.placementHintText.setText('Tile occupied')
+      this.placementHintText.setPosition(x + TILE_W / 2 + 8, y - 10)
+      this.placementHintText.setVisible(true)
+    } else {
+      if (this.placementHintText) this.placementHintText.setVisible(false)
+    }
   }
 
   private isoToScreen(col: number, row: number): { x: number; y: number } {
@@ -532,13 +664,12 @@ class DataCenterScene extends Phaser.Scene {
 
   // ── Public API ──────────────────────────────────────────
 
-  addCabinetToScene(id: string, serverCount: number, hasLeafSwitch: boolean, environment: CabinetEnvironment = 'production') {
-    const col = this.cabCount % this.cabCols
-    const row = Math.floor(this.cabCount / this.cabCols) % this.cabRows
+  addCabinetToScene(id: string, col: number, row: number, serverCount: number, hasLeafSwitch: boolean, environment: CabinetEnvironment = 'production') {
     this.cabCount++
 
     const entry: CabinetEntry = { id, col, row, serverCount, hasLeafSwitch, powerOn: true, environment }
     this.cabEntries.set(id, entry)
+    this.occupiedTiles.add(`${col},${row}`)
     this.renderCabinet(entry)
   }
 
@@ -612,12 +743,10 @@ class DataCenterScene extends Phaser.Scene {
     this.drawFloor()
     this.drawGrid()
 
-    // Reposition all existing cabinets on the new grid
-    let idx = 0
+    // Rebuild occupied tiles set (positions are preserved — grid only grows)
+    this.occupiedTiles.clear()
     for (const entry of this.cabEntries.values()) {
-      entry.col = idx % this.cabCols
-      entry.row = Math.floor(idx / this.cabCols) % this.cabRows
-      idx++
+      this.occupiedTiles.add(`${entry.col},${entry.row}`)
     }
 
     // Reposition existing spines on new spine slots
@@ -640,6 +769,53 @@ class DataCenterScene extends Phaser.Scene {
     } else {
       this.renderTraffic()
     }
+  }
+
+  // ── Placement Mode API ──────────────────────────────────────
+
+  /** Enter placement mode — shows hover highlights and accepts tile clicks */
+  setPlacementMode(active: boolean) {
+    this.placementActive = active
+    if (!active) {
+      this.hoveredTile = null
+      if (this.placementHighlight) {
+        this.placementHighlight.clear()
+      }
+      if (this.placementHintText) {
+        this.placementHintText.setVisible(false)
+      }
+      if (this.placementModeLabel) {
+        this.placementModeLabel.destroy()
+        this.placementModeLabel = null
+      }
+    } else {
+      // Show placement mode indicator
+      const w = this.scale.width
+      this.placementModeLabel = this.add
+        .text(w / 2, this.offsetY + (this.cabRows + 1) * TILE_H, 'CLICK A TILE TO PLACE CABINET', {
+          fontFamily: 'monospace',
+          fontSize: '10px',
+          color: '#00ff88',
+        })
+        .setOrigin(0.5)
+        .setAlpha(0.8)
+        .setDepth(100)
+    }
+  }
+
+  /** Register callback for tile clicks during placement mode */
+  setOnTileClick(callback: ((col: number, row: number) => void) | null) {
+    this.onTileClick = callback
+  }
+
+  /** Register callback for tile hover hints during placement mode */
+  setOnTileHover(callback: ((col: number, row: number) => PlacementHint[]) | null) {
+    this.onTileHover = callback
+  }
+
+  /** Update the set of occupied tiles (called when cabinet state changes) */
+  syncOccupiedTiles(occupied: Set<string>) {
+    this.occupiedTiles = occupied
   }
 }
 

@@ -46,6 +46,20 @@ function App() {
     return () => clearInterval(interval)
   }, [gameSpeed])
 
+  // Escape key exits placement mode
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        const state = useGameStore.getState()
+        if (state.placementMode) {
+          state.exitPlacementMode()
+        }
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
   const cycleSpeed = () => {
     const next = ((gameSpeed + 1) % 4) as GameSpeed
     setGameSpeed(next)
