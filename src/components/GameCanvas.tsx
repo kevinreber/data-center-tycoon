@@ -196,7 +196,7 @@ export function GameCanvas() {
     >
       <button
         onClick={handleCenterGrid}
-        className="absolute top-2 right-2 z-10 p-1.5 rounded bg-black/60 border border-neon-green/30 text-neon-green/70 hover:text-neon-green hover:border-neon-green/60 transition-colors cursor-pointer"
+        className="absolute top-3 right-[7rem] z-10 p-1.5 rounded bg-black/60 border border-neon-green/30 text-neon-green/70 hover:text-neon-green hover:border-neon-green/60 transition-colors cursor-pointer"
         title="Center grid (reset pan & zoom)"
       >
         <Crosshair size={14} />
