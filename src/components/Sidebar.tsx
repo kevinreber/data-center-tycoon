@@ -12,6 +12,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { useGameStore } from '@/stores/gameStore'
 
 import { BuildPanel } from '@/components/sidebar/BuildPanel'
 import { EquipmentPanel } from '@/components/sidebar/EquipmentPanel'
@@ -89,6 +90,7 @@ function PanelContent({ panelId }: { panelId: PanelId }) {
 
 export function Sidebar() {
   const [activePanel, setActivePanel] = useState<PanelId | null>(null)
+  const incidentCount = useGameStore((s) => s.activeIncidents.filter((i) => !i.resolved).length)
 
   const togglePanel = (id: PanelId) => {
     setActivePanel(prev => prev === id ? null : id)
@@ -128,6 +130,7 @@ export function Sidebar() {
                 item={item}
                 isActive={activePanel === item.id}
                 onClick={() => togglePanel(item.id)}
+                badgeCount={item.id === 'incidents' ? incidentCount : undefined}
               />
             ))}
           </div>
@@ -187,17 +190,19 @@ function SidebarIcon({
   item,
   isActive,
   onClick,
+  badgeCount,
 }: {
   item: SidebarItem
   isActive: boolean
   onClick: () => void
+  badgeCount?: number
 }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <button
           onClick={onClick}
-          className={`w-8 h-8 rounded-md flex items-center justify-center transition-all ${
+          className={`relative w-8 h-8 rounded-md flex items-center justify-center transition-all ${
             isActive
               ? 'bg-opacity-20'
               : 'text-muted-foreground hover:text-foreground'
@@ -213,6 +218,11 @@ function SidebarIcon({
           }
         >
           <item.icon className="size-4" />
+          {badgeCount != null && badgeCount > 0 && (
+            <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-neon-red text-[9px] font-bold text-black flex items-center justify-center leading-none animate-pulse">
+              {badgeCount}
+            </span>
+          )}
         </button>
       </TooltipTrigger>
       <TooltipContent side="right" className="font-mono">

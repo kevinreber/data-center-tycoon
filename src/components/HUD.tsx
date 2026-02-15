@@ -65,9 +65,10 @@ export function HUD() {
     staff, shiftPattern, trainingQueue, staffCostPerTick, staffIncidentsResolved, staffBurnouts,
     hireStaff, fireStaff, setShiftPattern, startTraining,
     // Save / Load
-    saveGame, loadGame, resetGame,
+    saveGame, loadGame, resetGame, activeSlotId,
   } = useGameStore()
   const [showGuide, setShowGuide] = useState(true)
+  const [showTrafficLegend, setShowTrafficLegend] = useState(false)
   const [selectedEnv, setSelectedEnv] = useState<CabinetEnvironment>('production')
   const [selectedCustomerType, setSelectedCustomerType] = useState<CustomerType>('general')
   const [selectedFacing, setSelectedFacing] = useState<CabinetFacing>('north')
@@ -657,6 +658,87 @@ export function HUD() {
                 )}
               </div>
             )}
+            {/* Traffic visualization legend */}
+            <div className="mt-2 pt-2 border-t border-border/50">
+              <button
+                onClick={() => setShowTrafficLegend(!showTrafficLegend)}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors w-full"
+              >
+                <Info className="size-3" />
+                <span>Traffic Legend</span>
+                <span className="ml-auto text-xs">{showTrafficLegend ? '\u25B2' : '\u25BC'}</span>
+              </button>
+              {showTrafficLegend && (
+                <div className="mt-2 flex flex-col gap-2 text-xs">
+                  {/* Color key */}
+                  <div className="flex flex-col gap-1">
+                    <span className="text-muted-foreground font-bold">Link Colors</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="inline-block w-4 h-0.5 rounded" style={{ backgroundColor: '#00ff50' }} />
+                      <span className="text-neon-green">Healthy</span>
+                      <span className="text-muted-foreground ml-auto">&lt;50%</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="inline-block w-4 h-0.5 rounded" style={{ backgroundColor: '#ffff00' }} />
+                      <span className="text-neon-yellow">Moderate</span>
+                      <span className="text-muted-foreground ml-auto">50-80%</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="inline-block w-4 h-0.5 rounded" style={{ backgroundColor: '#ff4444' }} />
+                      <span className="text-neon-red">Congested</span>
+                      <span className="text-muted-foreground ml-auto">&gt;80%</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="inline-block w-4 h-0.5 rounded" style={{ backgroundColor: '#ffaa22' }} />
+                      <span className="text-neon-orange">Redirected</span>
+                      <span className="text-muted-foreground ml-auto">spine down</span>
+                    </div>
+                  </div>
+                  {/* Packet behavior key */}
+                  <div className="flex flex-col gap-1">
+                    <span className="text-muted-foreground font-bold">Packet Behavior</span>
+                    <div className="flex items-start gap-1.5">
+                      <span className="text-neon-green mt-0.5">&#x25CF;</span>
+                      <span className="text-muted-foreground">Fast dots = high throughput</span>
+                    </div>
+                    <div className="flex items-start gap-1.5">
+                      <span className="text-neon-green/40 mt-0.5">&#x25CF;</span>
+                      <span className="text-muted-foreground">Slow dim dots = low traffic</span>
+                    </div>
+                    <div className="flex items-start gap-1.5">
+                      <span className="text-neon-red mt-0.5">&#x25CF;</span>
+                      <span className="text-muted-foreground">Falling red dots = packet loss</span>
+                    </div>
+                    <div className="flex items-start gap-1.5">
+                      <span className="text-muted-foreground mt-0.5">---</span>
+                      <span className="text-muted-foreground">Dashed line = near-zero traffic</span>
+                    </div>
+                  </div>
+                  {/* Actionable advice */}
+                  <div className="flex flex-col gap-1">
+                    <span className="text-muted-foreground font-bold">What To Do</span>
+                    <div className="flex flex-col gap-1.5 text-muted-foreground">
+                      <div className="flex items-start gap-1">
+                        <Wrench className="size-3 text-neon-red mt-0.5 shrink-0" />
+                        <span><span className="text-neon-red">Congested/Drops:</span> Add more spine switches to spread load via ECMP</span>
+                      </div>
+                      <div className="flex items-start gap-1">
+                        <Wrench className="size-3 text-neon-orange mt-0.5 shrink-0" />
+                        <span><span className="text-neon-orange">Redirected:</span> Power on or replace the downed spine switch</span>
+                      </div>
+                      <div className="flex items-start gap-1">
+                        <Wrench className="size-3 text-neon-yellow mt-0.5 shrink-0" />
+                        <span><span className="text-neon-yellow">Moderate:</span> Monitor closely; consider adding a spine before it hits 80%</span>
+                      </div>
+                      <div className="flex items-start gap-1">
+                        <Wrench className="size-3 text-neon-cyan mt-0.5 shrink-0" />
+                        <span><span className="text-neon-cyan">Low/Dashed:</span> Normal for light workloads; no action needed</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* EQUIPMENT panel */}
@@ -1064,8 +1146,11 @@ export function HUD() {
                       }`}>
                         {inc.def.label}
                       </span>
-                      <span className="text-xs text-muted-foreground tabular-nums">
-                        {inc.ticksRemaining}t
+                      <span className={`text-[10px] font-bold uppercase tracking-wider ${
+                        inc.def.severity === 'critical' ? 'text-neon-red/70' :
+                        inc.def.severity === 'major' ? 'text-neon-orange/70' : 'text-neon-yellow/70'
+                      }`}>
+                        {inc.def.severity}
                       </span>
                     </div>
                     <p className="text-xs text-muted-foreground mb-1.5 leading-relaxed">
@@ -2287,14 +2372,14 @@ export function HUD() {
         {/* Save/Load & Sandbox bar */}
         <div className="flex items-center justify-between rounded-lg border border-border bg-card p-2">
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="xs" className="text-[10px] gap-1" onClick={() => saveGame()}>
+            <Button variant="outline" size="xs" className="text-[10px] gap-1" onClick={() => saveGame(activeSlotId ?? 1)}>
               <Save className="size-3" />Save
             </Button>
-            <Button variant="outline" size="xs" className="text-[10px] gap-1" onClick={() => loadGame()}>
+            <Button variant="outline" size="xs" className="text-[10px] gap-1" onClick={() => { if (confirm('Load last save? Unsaved progress will be lost.')) loadGame(activeSlotId ?? 1) }}>
               <Upload className="size-3" />Load
             </Button>
-            <Button variant="outline" size="xs" className="text-[10px] gap-1 text-neon-red" onClick={() => { if (confirm('Reset all progress?')) resetGame() }}>
-              <RotateCw className="size-3" />Reset
+            <Button variant="outline" size="xs" className="text-[10px] gap-1 text-neon-red" onClick={() => { if (confirm('Start a new game? Unsaved progress will be lost.')) resetGame() }}>
+              <RotateCw className="size-3" />New
             </Button>
           </div>
           <div className="flex items-center gap-2">

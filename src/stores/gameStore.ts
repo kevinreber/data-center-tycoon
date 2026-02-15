@@ -13,6 +13,35 @@ export type StaffRole = 'network_engineer' | 'electrician' | 'cooling_specialist
 export type StaffSkillLevel = 1 | 2 | 3
 export type ShiftPattern = 'day_only' | 'day_night' | 'round_the_clock'
 
+// ── Save Slot Types ──────────────────────────────────────────
+
+export const MAX_SAVE_SLOTS = 3
+const SAVE_INDEX_KEY = 'fabric-tycoon-saves-index'
+const SAVE_SLOT_PREFIX = 'fabric-tycoon-save-slot-'
+
+export interface SaveSlotMeta {
+  slotId: number
+  name: string
+  timestamp: number
+  money: number
+  tickCount: number
+  suiteTier: SuiteTier
+  cabinetCount: number
+}
+
+function getSaveIndex(): SaveSlotMeta[] {
+  try {
+    const raw = localStorage.getItem(SAVE_INDEX_KEY)
+    return raw ? JSON.parse(raw) : []
+  } catch {
+    return []
+  }
+}
+
+function setSaveIndex(index: SaveSlotMeta[]) {
+  localStorage.setItem(SAVE_INDEX_KEY, JSON.stringify(index))
+}
+
 // ── Customer Type Config ──────────────────────────────────────
 
 export interface CustomerTypeConfig {
@@ -1578,6 +1607,8 @@ interface GameState {
 
   // Save / Load
   hasSaved: boolean
+  activeSlotId: number | null
+  saveSlots: SaveSlotMeta[]
 
   // Actions
   addCabinet: (col: number, row: number, environment: CabinetEnvironment, customerType?: CustomerType, facing?: CabinetFacing) => void
@@ -1635,9 +1666,11 @@ interface GameState {
   // Heat map
   toggleHeatMap: () => void
   // Save / Load
-  saveGame: () => void
-  loadGame: () => boolean
+  saveGame: (slotId: number, name?: string) => void
+  loadGame: (slotId: number) => boolean
+  deleteGame: (slotId: number) => void
   resetGame: () => void
+  refreshSaveSlots: () => void
   tick: () => void
 }
 
@@ -1648,6 +1681,28 @@ let nextIncidentId = 1
 let nextContractId = 1
 let nextGeneratorId = 1
 let nextStaffId = 1
+
+function maxIdNum(items: { id: string }[], prefix: string): number {
+  let max = 0
+  for (const item of items) {
+    const n = parseInt(item.id.replace(prefix, ''), 10)
+    if (n > max) max = n
+  }
+  return max
+}
+
+function restoreIdCounters(data: Record<string, unknown>) {
+  const cabinets = (data.cabinets ?? []) as { id: string }[]
+  const spines = (data.spineSwitches ?? []) as { id: string }[]
+  const loans = (data.loans ?? []) as { id: string }[]
+  const generators = (data.generators ?? []) as { id: string }[]
+  nextCabId = maxIdNum(cabinets, 'cab-') + 1
+  nextSpineId = maxIdNum(spines, 'spine-') + 1
+  nextLoanId = maxIdNum(loans, 'loan-') + 1
+  nextGeneratorId = maxIdNum(generators, 'gen-') + 1
+  nextIncidentId = 1
+  nextContractId = 1
+}
 
 export const useGameStore = create<GameState>((set) => ({
   cabinets: [],
@@ -1816,6 +1871,8 @@ export const useGameStore = create<GameState>((set) => ({
 
   // Save / Load
   hasSaved: false,
+  activeSlotId: null,
+  saveSlots: getSaveIndex(),
 
   // ── Build Actions ───────────────────────────────────────────
 
@@ -2517,7 +2574,7 @@ export const useGameStore = create<GameState>((set) => ({
 
   // ── Save / Load ────────────────────────────────────────────────
 
-  saveGame: () =>
+  saveGame: (slotId: number, name?: string) =>
     set((state) => {
       const saveData = {
         version: 'v0.3.0',
@@ -2569,16 +2626,37 @@ export const useGameStore = create<GameState>((set) => ({
         staffBurnouts: state.staffBurnouts,
       }
       try {
-        localStorage.setItem('fabric-tycoon-save', JSON.stringify(saveData))
-      } catch { /* storage full — ignore */ }
-      return { hasSaved: true }
+        localStorage.setItem(SAVE_SLOT_PREFIX + slotId, JSON.stringify(saveData))
+
+        // Update save index
+        const index = getSaveIndex()
+        const existing = index.find((s) => s.slotId === slotId)
+        const meta: SaveSlotMeta = {
+          slotId,
+          name: name ?? existing?.name ?? `Save ${slotId}`,
+          timestamp: Date.now(),
+          money: state.money,
+          tickCount: state.tickCount,
+          suiteTier: state.suiteTier,
+          cabinetCount: state.cabinets.length,
+        }
+        const newIndex = existing
+          ? index.map((s) => (s.slotId === slotId ? meta : s))
+          : [...index, meta]
+        setSaveIndex(newIndex)
+
+        return { hasSaved: true, activeSlotId: slotId, saveSlots: newIndex }
+      } catch {
+        return {}
+      }
     }),
 
-  loadGame: () => {
+  loadGame: (slotId: number) => {
     try {
-      const raw = localStorage.getItem('fabric-tycoon-save')
+      const raw = localStorage.getItem(SAVE_SLOT_PREFIX + slotId)
       if (!raw) return false
       const data = JSON.parse(raw)
+      restoreIdCounters(data)
       set((state) => ({
         ...state,
         cabinets: data.cabinets ?? state.cabinets,
@@ -2626,6 +2704,8 @@ export const useGameStore = create<GameState>((set) => ({
         trainingQueue: data.trainingQueue ?? state.trainingQueue,
         staffIncidentsResolved: data.staffIncidentsResolved ?? state.staffIncidentsResolved,
         staffBurnouts: data.staffBurnouts ?? state.staffBurnouts,
+        activeSlotId: slotId,
+        hasSaved: true,
         ...calcStats(data.cabinets ?? state.cabinets, data.spineSwitches ?? state.spineSwitches),
       }))
       return true
@@ -2634,7 +2714,23 @@ export const useGameStore = create<GameState>((set) => ({
     }
   },
 
-  resetGame: () =>
+  deleteGame: (slotId: number) => {
+    localStorage.removeItem(SAVE_SLOT_PREFIX + slotId)
+    const newIndex = getSaveIndex().filter((s) => s.slotId !== slotId)
+    setSaveIndex(newIndex)
+    set((state) => ({
+      saveSlots: newIndex,
+      activeSlotId: state.activeSlotId === slotId ? null : state.activeSlotId,
+    }))
+  },
+
+  resetGame: () => {
+    nextCabId = 1
+    nextSpineId = 1
+    nextLoanId = 1
+    nextIncidentId = 1
+    nextContractId = 1
+    nextGeneratorId = 1
     set({
       cabinets: [],
       spineSwitches: [],
@@ -2723,7 +2819,12 @@ export const useGameStore = create<GameState>((set) => ({
       staffCostPerTick: 0,
       staffIncidentsResolved: 0,
       staffBurnouts: 0,
-    }),
+      activeSlotId: null,
+    })
+  },
+
+  refreshSaveSlots: () =>
+    set({ saveSlots: getSaveIndex() }),
 
   tick: () =>
     set((state) => {
@@ -2761,21 +2862,7 @@ export const useGameStore = create<GameState>((set) => ({
       let incidentLog = [...state.incidentLog]
       const resolvedCount = state.resolvedCount
 
-      // Tick down active incidents
-      activeIncidents = activeIncidents
-        .map((i) => {
-          if (i.resolved) return i
-          const remaining = i.ticksRemaining - 1
-          if (remaining <= 0) {
-            incidentLog = [`Expired: ${i.def.label}`, ...incidentLog].slice(0, 10)
-            return { ...i, ticksRemaining: 0, resolved: true }
-          }
-          return { ...i, ticksRemaining: remaining }
-        })
-
-      // Clean up resolved incidents (keep for 1 tick for UI display, then remove)
-      activeIncidents = activeIncidents.filter((i) => !i.resolved || i.ticksRemaining >= 0)
-      // Actually remove fully resolved ones after this tick
+      // Clean up manually resolved incidents
       const justResolved = activeIncidents.filter((i) => i.resolved)
       activeIncidents = activeIncidents.filter((i) => !i.resolved)
 
@@ -2822,7 +2909,6 @@ export const useGameStore = create<GameState>((set) => ({
       const techRevenueBonus = hasTech('high_density') ? 0.15 : 0
       const techAiBonus = hasTech('gpu_clusters') ? 0.30 : 0
       const techLinkCapacity = hasTech('optical_interconnect') ? TRAFFIC.linkCapacityGbps * 2 : TRAFFIC.linkCapacityGbps
-      const techIncidentSpeedMult = hasTech('auto_failover') ? 0.7 : 1.0
       const techCoolingFailureReduction = hasTech('redundant_cooling') ? 0.5 : 0
 
       // ── Staff & HR system ──────────────────────────────────
@@ -3107,20 +3193,6 @@ export const useGameStore = create<GameState>((set) => ({
           drillCooldown: Math.max(0, state.drillCooldown - 1),
           rfpOffers: state.rfpOffers.map((r) => ({ ...r, bidWindowTicks: r.bidWindowTicks - 1 })).filter((r) => r.bidWindowTicks > 0),
         }
-      }
-
-      // Reduce incident durations faster with auto_failover tech
-      if (techIncidentSpeedMult < 1.0) {
-        activeIncidents = activeIncidents.map((i) => {
-          if (i.resolved) return i
-          const extraReduction = Math.random() < (1 - techIncidentSpeedMult) ? 1 : 0
-          const remaining = i.ticksRemaining - extraReduction
-          if (remaining <= 0) {
-            incidentLog = [`Auto-resolved: ${i.def.label}`, ...incidentLog].slice(0, 10)
-            return { ...i, ticksRemaining: 0, resolved: true }
-          }
-          return { ...i, ticksRemaining: remaining }
-        })
       }
 
       // Reduce cooling failure effect with redundant cooling tech

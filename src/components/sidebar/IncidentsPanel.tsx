@@ -46,7 +46,12 @@ export function IncidentsPanel() {
                   }`}>
                     {inc.def.label}
                   </span>
-                  <span className="text-xs text-muted-foreground tabular-nums">{inc.ticksRemaining}t</span>
+                  <span className={`text-[10px] font-bold uppercase tracking-wider ${
+                    inc.def.severity === 'critical' ? 'text-neon-red/70' :
+                    inc.def.severity === 'major' ? 'text-neon-orange/70' : 'text-neon-yellow/70'
+                  }`}>
+                    {inc.def.severity}
+                  </span>
                 </div>
                 <p className="text-xs text-muted-foreground mb-1.5 leading-relaxed">{inc.def.description}</p>
                 <Tooltip>
