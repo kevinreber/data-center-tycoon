@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { useGameStore, DEFAULT_COLORS, RACK_COST, MAX_SERVERS_PER_CABINET, MAX_CABINETS, MAX_SPINES, SIM, ENVIRONMENT_CONFIG, formatGameTime, COOLING_CONFIG, LOAN_OPTIONS, ACHIEVEMENT_CATALOG, CONTRACT_TIER_COLORS, CUSTOMER_TYPE_CONFIG, GENERATOR_OPTIONS, SUPPRESSION_CONFIG, TECH_TREE, TECH_BRANCH_COLORS, DEPRECIATION, getReputationTier, POWER_MARKET } from '@/stores/gameStore'
+import { useGameStore, DEFAULT_COLORS, RACK_COST, MAX_SERVERS_PER_CABINET, SIM, ENVIRONMENT_CONFIG, formatGameTime, COOLING_CONFIG, LOAN_OPTIONS, ACHIEVEMENT_CATALOG, CONTRACT_TIER_COLORS, CUSTOMER_TYPE_CONFIG, GENERATOR_OPTIONS, SUPPRESSION_CONFIG, TECH_TREE, TECH_BRANCH_COLORS, DEPRECIATION, getReputationTier, POWER_MARKET, SUITE_TIERS, SUITE_TIER_ORDER, getSuiteLimits } from '@/stores/gameStore'
 import type { NodeType, LayerColors, CabinetEnvironment, CustomerType, SuppressionType, TechBranch } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Server, Network, Power, Cpu, Eye, SlidersHorizontal, EyeOff, RotateCcw, HardDrive, Plus, TrendingUp, TrendingDown, DollarSign, ArrowRightLeft, AlertTriangle, Radio, Info, Shield, Clock, Zap, Droplets, Landmark, Siren, Trophy, Wrench, FileText, Check, Fuel, Flame, FlaskConical, Star, RefreshCw, Lock } from 'lucide-react'
+import { Server, Network, Power, Cpu, Eye, SlidersHorizontal, EyeOff, RotateCcw, HardDrive, Plus, TrendingUp, TrendingDown, DollarSign, ArrowRightLeft, AlertTriangle, Radio, Info, Shield, Clock, Zap, Droplets, Landmark, Siren, Trophy, Wrench, FileText, Check, Fuel, Flame, FlaskConical, Star, RefreshCw, Lock, Building } from 'lucide-react'
 import {
   Tooltip,
   TooltipContent,
@@ -60,10 +60,17 @@ export function HUD() {
     reputationScore, uptimeTicks, totalOperatingTicks,
     powerPriceMultiplier, powerPriceSpikeActive,
     refreshServers, totalRefreshes,
+    suiteTier, upgradeSuite,
   } = useGameStore()
   const [showGuide, setShowGuide] = useState(true)
   const [selectedEnv, setSelectedEnv] = useState<CabinetEnvironment>('production')
   const [selectedCustomerType, setSelectedCustomerType] = useState<CustomerType>('general')
+
+  const suiteLimits = getSuiteLimits(suiteTier)
+  const suiteConfig = SUITE_TIERS[suiteTier]
+  const currentTierIdx = SUITE_TIER_ORDER.indexOf(suiteTier)
+  const nextTier = currentTierIdx < SUITE_TIER_ORDER.length - 1 ? SUITE_TIER_ORDER[currentTierIdx + 1] : null
+  const nextSuiteConfig = nextTier ? SUITE_TIERS[nextTier] : null
 
   const envEntries = Object.entries(ENVIRONMENT_CONFIG) as [CabinetEnvironment, typeof ENVIRONMENT_CONFIG['production']][]
   const prodCount = cabinets.filter((c) => c.environment === 'production').length
@@ -113,6 +120,11 @@ export function HUD() {
                 <strong className="text-foreground">Scale smart</strong>
                 {' '}&mdash; Servers generate <span className="text-neon-yellow">${SIM.revenuePerServer}/tick</span>.
                 As you grow, add Management cabinets to control rising cooling costs.
+              </li>
+              <li>
+                <strong className="text-foreground">Upgrade facility</strong>
+                {' '}&mdash; Start in a small suite and migrate to bigger ones in the
+                {' '}<span className="text-neon-cyan">FACILITY</span> panel when you need more space.
               </li>
             </ol>
           </div>
@@ -329,7 +341,7 @@ export function HUD() {
                     variant="outline"
                     size="sm"
                     onClick={() => addCabinet(selectedEnv, selectedCustomerType)}
-                    disabled={money < RACK_COST.cabinet || cabinets.length >= MAX_CABINETS}
+                    disabled={money < RACK_COST.cabinet || cabinets.length >= suiteLimits.maxCabinets}
                     className="justify-between font-mono text-xs transition-all"
                     style={{
                       borderColor: `${ENVIRONMENT_CONFIG[selectedEnv].color}33`,
@@ -346,7 +358,7 @@ export function HUD() {
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom">
-                  Place a new {ENVIRONMENT_CONFIG[selectedEnv].name.toLowerCase()} cabinet with {CUSTOMER_TYPE_CONFIG[selectedCustomerType].label} workload ({cabinets.length}/{MAX_CABINETS} slots used)
+                  Place a new {ENVIRONMENT_CONFIG[selectedEnv].name.toLowerCase()} cabinet with {CUSTOMER_TYPE_CONFIG[selectedCustomerType].label} workload ({cabinets.length}/{suiteLimits.maxCabinets} slots used)
                 </TooltipContent>
               </Tooltip>
               <Tooltip>
@@ -396,7 +408,7 @@ export function HUD() {
                     variant="outline"
                     size="sm"
                     onClick={() => addSpineSwitch()}
-                    disabled={money < RACK_COST.spine_switch || spineSwitches.length >= MAX_SPINES}
+                    disabled={money < RACK_COST.spine_switch || spineSwitches.length >= suiteLimits.maxSpines}
                     className="justify-between font-mono text-xs border-neon-orange/20 hover:border-neon-orange/50 hover:bg-neon-orange/10 hover:text-neon-orange transition-all"
                   >
                     <span className="flex items-center gap-1.5">
@@ -407,7 +419,7 @@ export function HUD() {
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom">
-                  Backbone switch in elevated row &mdash; links leaf switches ({spineSwitches.length}/{MAX_SPINES}, 250W)
+                  Backbone switch in elevated row &mdash; links leaf switches ({spineSwitches.length}/{suiteLimits.maxSpines}, 250W)
                 </TooltipContent>
               </Tooltip>
             </div>
@@ -561,6 +573,15 @@ export function HUD() {
               <div className="mt-2 pt-2 border-t border-neon-red/30">
                 <p className="text-xs text-neon-red font-bold animate-pulse">
                   THERMAL THROTTLE &gt;{SIM.throttleTemp}°C
+                </p>
+              </div>
+            )}
+            {/* Suite upgrade prompt when nearing capacity */}
+            {nextTier && cabinets.length >= suiteLimits.maxCabinets - 2 && (
+              <div className="mt-2 pt-2 border-t" style={{ borderColor: `${nextSuiteConfig!.color}30` }}>
+                <p className="text-xs flex items-start gap-1" style={{ color: nextSuiteConfig!.color }}>
+                  <Building className="size-3 mt-0.5 shrink-0" />
+                  Running out of space. Upgrade to {nextSuiteConfig!.label} for {nextSuiteConfig!.maxCabinets} cabinet slots.
                 </p>
               </div>
             )}
@@ -1176,8 +1197,94 @@ export function HUD() {
           </div>
         </div>
 
-        {/* Third row: Generators, Tech Tree, Reputation */}
-        <div className="grid grid-cols-[1fr_1fr_1fr] gap-3">
+        {/* Third row: Facility, Generators, Tech Tree, Reputation */}
+        <div className="grid grid-cols-[1fr_1fr_1fr_1fr] gap-3">
+          {/* FACILITY panel */}
+          <div className="rounded-lg border border-border bg-card p-3 glow-green">
+            <div className="flex items-center gap-2 mb-2">
+              <Building className="size-3.5" style={{ color: suiteConfig.color }} />
+              <span className="text-xs font-bold tracking-widest" style={{ color: suiteConfig.color }}>FACILITY</span>
+              <Badge
+                className="ml-auto font-mono text-xs border"
+                style={{
+                  backgroundColor: `${suiteConfig.color}20`,
+                  color: suiteConfig.color,
+                  borderColor: `${suiteConfig.color}40`,
+                }}
+              >
+                {suiteConfig.label.split(' ')[0].toUpperCase()}
+              </Badge>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Cabinets</span>
+                <span className="text-foreground tabular-nums">{cabinets.length}/{suiteLimits.maxCabinets}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Spines</span>
+                <span className="text-foreground tabular-nums">{spineSwitches.length}/{suiteLimits.maxSpines}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Grid</span>
+                <span className="text-foreground tabular-nums">{suiteLimits.cols}&times;{suiteLimits.rows}</span>
+              </div>
+              {/* Suite progression */}
+              {nextSuiteConfig && nextTier && (
+                <>
+                  <div className="border-t border-border my-0.5" />
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => upgradeSuite(nextTier)}
+                        disabled={money < nextSuiteConfig.upgradeCost}
+                        className="justify-between font-mono text-xs transition-all"
+                        style={{
+                          borderColor: `${nextSuiteConfig.color}33`,
+                        }}
+                      >
+                        <span className="flex items-center gap-1.5 truncate">
+                          <Building className="size-3" />
+                          {nextSuiteConfig.label}
+                        </span>
+                        <span className="text-muted-foreground">${nextSuiteConfig.upgradeCost.toLocaleString()}</span>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="max-w-60">
+                      <p className="font-bold" style={{ color: nextSuiteConfig.color }}>{nextSuiteConfig.label}</p>
+                      <p className="text-xs mt-1">{nextSuiteConfig.description}</p>
+                      <p className="text-xs mt-1">Grid: {nextSuiteConfig.cols}&times;{nextSuiteConfig.rows} ({nextSuiteConfig.maxCabinets} cabinets, {nextSuiteConfig.maxSpines} spines)</p>
+                      <p className="text-xs mt-1">All existing equipment is preserved during migration.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </>
+              )}
+              {/* Show remaining upgrade path */}
+              {SUITE_TIER_ORDER.slice(currentTierIdx + 2).length > 0 && (
+                <div className="flex flex-col gap-0.5 mt-0.5">
+                  {SUITE_TIER_ORDER.slice(currentTierIdx + 2).map((tier) => {
+                    const cfg = SUITE_TIERS[tier]
+                    return (
+                      <div key={tier} className="flex items-center justify-between text-xs text-muted-foreground/40">
+                        <span className="flex items-center gap-1">
+                          <Lock className="size-3" />
+                          {cfg.label}
+                        </span>
+                        <span className="tabular-nums">${cfg.upgradeCost.toLocaleString()}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+              {!nextTier && (
+                <p className="text-xs italic mt-1" style={{ color: `${suiteConfig.color}80` }}>
+                  Maximum facility tier reached.
+                </p>
+              )}
+            </div>
+          </div>
+
           {/* GENERATORS & SUPPRESSION panel */}
           <div className="rounded-lg border border-border bg-card p-3 glow-green">
             <div className="flex items-center gap-2 mb-2">

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import type Phaser from 'phaser'
 import { createGame, getScene } from '@/game/PhaserGame'
-import { useGameStore } from '@/stores/gameStore'
+import { useGameStore, getSuiteLimits } from '@/stores/gameStore'
 
 export function GameCanvas() {
   const gameRef = useRef<Phaser.Game | null>(null)
@@ -15,6 +15,7 @@ export function GameCanvas() {
   const layerColors = useGameStore((s) => s.layerColors)
   const trafficStats = useGameStore((s) => s.trafficStats)
   const trafficVisible = useGameStore((s) => s.trafficVisible)
+  const suiteTier = useGameStore((s) => s.suiteTier)
 
   useEffect(() => {
     if (!gameRef.current) {
@@ -26,6 +27,15 @@ export function GameCanvas() {
       gameRef.current = null
     }
   }, [])
+
+  // Sync suite tier (grid dimensions) to Phaser
+  useEffect(() => {
+    if (!gameRef.current) return
+    const scene = getScene(gameRef.current)
+    if (!scene) return
+    const limits = getSuiteLimits(suiteTier)
+    scene.setGridSize(limits.cols, limits.rows, limits.maxSpines)
+  }, [suiteTier])
 
   // Sync cabinets to Phaser
   useEffect(() => {

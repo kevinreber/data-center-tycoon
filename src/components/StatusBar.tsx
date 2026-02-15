@@ -1,4 +1,4 @@
-import { useGameStore, formatGameTime, COOLING_CONFIG } from '@/stores/gameStore'
+import { useGameStore, formatGameTime, COOLING_CONFIG, SUITE_TIERS } from '@/stores/gameStore'
 
 interface StatusBarProps {
   activeNodes: number
@@ -8,7 +8,7 @@ interface StatusBarProps {
 const SPEED_LABELS = ['PAUSED', '1x', '2x', '3x']
 
 export function StatusBar({ activeNodes, totalNodes }: StatusBarProps) {
-  const { gameSpeed, tickCount, gameHour, demandMultiplier, spikeActive, coolingType, activeIncidents, loans } = useGameStore()
+  const { gameSpeed, tickCount, gameHour, demandMultiplier, spikeActive, coolingType, activeIncidents, loans, suiteTier } = useGameStore()
 
   return (
     <footer className="flex items-center justify-between px-4 py-1.5 border-t border-border bg-card text-xs text-muted-foreground">
@@ -36,7 +36,9 @@ export function StatusBar({ activeNodes, totalNodes }: StatusBarProps) {
       </div>
       <div className="flex items-center gap-4">
         <span>SPEED: {SPEED_LABELS[gameSpeed]}</span>
-        <span>TIER: SOLAR</span>
+        <span style={{ color: SUITE_TIERS[suiteTier].color }}>
+          SUITE: {SUITE_TIERS[suiteTier].label.split(' ')[0].toUpperCase()}
+        </span>
         <span style={{ color: COOLING_CONFIG[coolingType].color }}>
           COOLING: {COOLING_CONFIG[coolingType].label}
         </span>

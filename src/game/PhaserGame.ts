@@ -7,9 +7,10 @@ const COLORS = DEFAULT_COLORS
 // Cabinet grid dimensions
 const TILE_W = 64
 const TILE_H = 32
-const CAB_COLS = 8
-const CAB_ROWS = 4
-const SPINE_SLOTS = 6
+// Default grid size — overridden dynamically by suite tier
+const DEFAULT_CAB_COLS = 4
+const DEFAULT_CAB_ROWS = 2
+const DEFAULT_SPINE_SLOTS = 2
 
 // Cabinet visual dimensions
 const CUBE_W = 44
@@ -45,7 +46,7 @@ class DataCenterScene extends Phaser.Scene {
   private gridGraphics: Phaser.GameObjects.Graphics | null = null
   private floorGraphics: Phaser.GameObjects.Graphics | null = null
   private spineFloorGraphics: Phaser.GameObjects.Graphics | null = null
-  /* spineLabel is stored on the scene display list, no field needed */
+  private spineLabel: Phaser.GameObjects.Text | null = null
   private cabinetGraphics: Map<string, Phaser.GameObjects.Graphics> = new Map()
   private cabinetLabels: Map<string, Phaser.GameObjects.Text[]> = new Map()
   private spineGraphics: Map<string, Phaser.GameObjects.Graphics> = new Map()
@@ -61,6 +62,11 @@ class DataCenterScene extends Phaser.Scene {
   private layerVisibility: LayerVisibility = { server: true, leaf_switch: true, spine_switch: true }
   private layerOpacity: LayerOpacity = { server: 1, leaf_switch: 1, spine_switch: 1 }
   private layerColors: LayerColorOverrides = { server: null, leaf_switch: null, spine_switch: null }
+
+  // Dynamic grid dimensions (set by suite tier)
+  private cabCols = DEFAULT_CAB_COLS
+  private cabRows = DEFAULT_CAB_ROWS
+  private spineSlots = DEFAULT_SPINE_SLOTS
 
   // Traffic visualization
   private trafficGraphics: Phaser.GameObjects.Graphics | null = null
@@ -94,7 +100,7 @@ class DataCenterScene extends Phaser.Scene {
   }
 
   private spineToScreen(slot: number): { x: number; y: number } {
-    const totalW = SPINE_SLOTS * 60
+    const totalW = this.spineSlots * 60
     const startX = this.spineOffsetX - totalW / 2
     return {
       x: startX + slot * 60 + 30,
@@ -105,8 +111,8 @@ class DataCenterScene extends Phaser.Scene {
   private drawFloor() {
     this.floorGraphics = this.add.graphics()
 
-    for (let r = 0; r < CAB_ROWS; r++) {
-      for (let c = 0; c < CAB_COLS; c++) {
+    for (let r = 0; r < this.cabRows; r++) {
+      for (let c = 0; c < this.cabCols; c++) {
         const { x, y } = this.isoToScreen(c, r)
         const isAlternate = (r + c) % 2 === 0
         const fillColor = isAlternate ? 0x0a1520 : 0x0c1825
@@ -128,24 +134,24 @@ class DataCenterScene extends Phaser.Scene {
     this.gridGraphics = this.add.graphics()
     this.gridGraphics.lineStyle(1, 0x00ff88, 0.12)
 
-    for (let row = 0; row <= CAB_ROWS; row++) {
+    for (let row = 0; row <= this.cabRows; row++) {
       const start = this.isoToScreen(0, row)
-      const end = this.isoToScreen(CAB_COLS, row)
+      const end = this.isoToScreen(this.cabCols, row)
       this.gridGraphics.lineBetween(start.x, start.y, end.x, end.y)
     }
 
-    for (let col = 0; col <= CAB_COLS; col++) {
+    for (let col = 0; col <= this.cabCols; col++) {
       const start = this.isoToScreen(col, 0)
-      const end = this.isoToScreen(col, CAB_ROWS)
+      const end = this.isoToScreen(col, this.cabRows)
       this.gridGraphics.lineBetween(start.x, start.y, end.x, end.y)
     }
 
     // Outer border glow
     this.gridGraphics.lineStyle(1.5, 0x00ff88, 0.25)
     const tl = this.isoToScreen(0, 0)
-    const tr = this.isoToScreen(CAB_COLS, 0)
-    const br = this.isoToScreen(CAB_COLS, CAB_ROWS)
-    const bl = this.isoToScreen(0, CAB_ROWS)
+    const tr = this.isoToScreen(this.cabCols, 0)
+    const br = this.isoToScreen(this.cabCols, this.cabRows)
+    const bl = this.isoToScreen(0, this.cabRows)
     this.gridGraphics.lineBetween(tl.x, tl.y, tr.x, tr.y)
     this.gridGraphics.lineBetween(tr.x, tr.y, br.x, br.y)
     this.gridGraphics.lineBetween(br.x, br.y, bl.x, bl.y)
@@ -158,12 +164,12 @@ class DataCenterScene extends Phaser.Scene {
     this.spineFloorGraphics = this.add.graphics()
 
     // Draw a subtle platform for spine switches
-    const totalW = SPINE_SLOTS * 60
+    const totalW = this.spineSlots * 60
     const startX = this.spineOffsetX - totalW / 2
     const y = this.spineOffsetY
 
     // Draw slot markers
-    for (let i = 0; i < SPINE_SLOTS; i++) {
+    for (let i = 0; i < this.spineSlots; i++) {
       const sx = startX + i * 60 + 30
       const hw = SPINE_W / 2 + 4
       const hh = SPINE_H / 2 + 2
@@ -189,7 +195,7 @@ class DataCenterScene extends Phaser.Scene {
     this.spineFloorGraphics.setDepth(0)
 
     // Label
-    this.add
+    this.spineLabel = this.add
       .text(this.spineOffsetX, y - 16, 'SPINE SWITCHES', {
         fontFamily: 'monospace',
         fontSize: '9px',
@@ -266,7 +272,7 @@ class DataCenterScene extends Phaser.Scene {
 
     const g = this.add.graphics()
     const labels: Phaser.GameObjects.Text[] = []
-    const baseDepth = 10 + entry.row * CAB_COLS + entry.col
+    const baseDepth = 10 + entry.row * this.cabCols + entry.col
 
     const serverColors: LayerColors = this.layerColors.server ?? COLORS.server
     const leafColors: LayerColors = this.layerColors.leaf_switch ?? COLORS.leaf_switch
@@ -527,8 +533,8 @@ class DataCenterScene extends Phaser.Scene {
   // ── Public API ──────────────────────────────────────────
 
   addCabinetToScene(id: string, serverCount: number, hasLeafSwitch: boolean, environment: CabinetEnvironment = 'production') {
-    const col = this.cabCount % CAB_COLS
-    const row = Math.floor(this.cabCount / CAB_COLS) % CAB_ROWS
+    const col = this.cabCount % this.cabCols
+    const row = Math.floor(this.cabCount / this.cabCols) % this.cabRows
     this.cabCount++
 
     const entry: CabinetEntry = { id, col, row, serverCount, hasLeafSwitch, powerOn: true, environment }
@@ -579,6 +585,50 @@ class DataCenterScene extends Phaser.Scene {
   setTrafficLinks(links: TrafficLink[]) {
     this.trafficLinks = links
     this.renderTraffic()
+  }
+
+  /** Update grid dimensions (on suite upgrade) and rebuild the scene layout */
+  setGridSize(cols: number, rows: number, spineSlots: number) {
+    if (cols === this.cabCols && rows === this.cabRows && spineSlots === this.spineSlots) return
+
+    this.cabCols = cols
+    this.cabRows = rows
+    this.spineSlots = spineSlots
+
+    // Recalculate offsets
+    const w = this.scale.width
+    this.offsetX = w / 2
+    this.offsetY = 150
+    this.spineOffsetX = w / 2
+    this.spineOffsetY = 40
+
+    // Clear and redraw floor/grid
+    if (this.floorGraphics) { this.floorGraphics.destroy(); this.floorGraphics = null }
+    if (this.gridGraphics) { this.gridGraphics.destroy(); this.gridGraphics = null }
+    if (this.spineFloorGraphics) { this.spineFloorGraphics.destroy(); this.spineFloorGraphics = null }
+    if (this.spineLabel) { this.spineLabel.destroy(); this.spineLabel = null }
+
+    this.drawSpineFloor()
+    this.drawFloor()
+    this.drawGrid()
+
+    // Reposition all existing cabinets on the new grid
+    let idx = 0
+    for (const entry of this.cabEntries.values()) {
+      entry.col = idx % this.cabCols
+      entry.row = Math.floor(idx / this.cabCols) % this.cabRows
+      idx++
+    }
+
+    // Reposition existing spines on new spine slots
+    let spineIdx = 0
+    for (const entry of this.spineEntries.values()) {
+      entry.slot = spineIdx
+      spineIdx++
+    }
+
+    // Re-render everything at new positions
+    this.rerenderAll()
   }
 
   /** Toggle traffic visualization on/off */

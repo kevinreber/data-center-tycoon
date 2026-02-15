@@ -8,6 +8,7 @@ export type CustomerType = 'general' | 'ai_training' | 'streaming' | 'crypto' | 
 export type GeneratorStatus = 'standby' | 'running' | 'cooldown'
 export type SuppressionType = 'none' | 'water_suppression' | 'gas_suppression'
 export type TechBranch = 'efficiency' | 'performance' | 'resilience'
+export type SuiteTier = 'starter' | 'standard' | 'professional' | 'enterprise'
 
 // ── Customer Type Config ──────────────────────────────────────
 
@@ -196,6 +197,70 @@ export const DEPRECIATION = {
   revenueDecayStart: 0.3,     // efficiency starts declining after 30% of lifespan
 }
 
+// ── Suite Tier Config ──────────────────────────────────────────
+
+export interface SuiteConfig {
+  tier: SuiteTier
+  label: string
+  description: string
+  cols: number              // cabinet grid columns
+  rows: number              // cabinet grid rows
+  maxCabinets: number       // cols * rows
+  maxSpines: number         // spine switch slots
+  upgradeCost: number       // cost to upgrade to this tier (0 for starter)
+  color: string
+}
+
+export const SUITE_TIERS: Record<SuiteTier, SuiteConfig> = {
+  starter: {
+    tier: 'starter',
+    label: 'Starter Suite',
+    description: 'A small colocation closet. Enough room to get started.',
+    cols: 4,
+    rows: 2,
+    maxCabinets: 8,
+    maxSpines: 2,
+    upgradeCost: 0,
+    color: '#88aacc',
+  },
+  standard: {
+    tier: 'standard',
+    label: 'Standard Suite',
+    description: 'A proper server room with room to grow.',
+    cols: 6,
+    rows: 3,
+    maxCabinets: 18,
+    maxSpines: 4,
+    upgradeCost: 40000,
+    color: '#00ff88',
+  },
+  professional: {
+    tier: 'professional',
+    label: 'Professional Suite',
+    description: 'A full-size data hall with enterprise-grade capacity.',
+    cols: 8,
+    rows: 4,
+    maxCabinets: 32,
+    maxSpines: 6,
+    upgradeCost: 120000,
+    color: '#00aaff',
+  },
+  enterprise: {
+    tier: 'enterprise',
+    label: 'Enterprise Suite',
+    description: 'A massive hyperscale facility. Maximum capacity.',
+    cols: 10,
+    rows: 5,
+    maxCabinets: 50,
+    maxSpines: 8,
+    upgradeCost: 350000,
+    color: '#ff66ff',
+  },
+}
+
+/** Ordered list of suite tiers for progression */
+export const SUITE_TIER_ORDER: SuiteTier[] = ['starter', 'standard', 'professional', 'enterprise']
+
 // ── Cooling System Constants ────────────────────────────────────
 
 export const COOLING_CONFIG: Record<CoolingType, {
@@ -380,6 +445,8 @@ export const ACHIEVEMENT_CATALOG: AchievementDef[] = [
   { id: 'tech_savvy', label: 'Tech Savvy', description: 'Unlock 6 technologies.', icon: '🧪' },
   { id: 'excellent_rep', label: 'Excellent Reputation', description: 'Reach Excellent reputation tier.', icon: '⭐' },
   { id: 'hardware_refresh', label: 'Fresh Hardware', description: 'Refresh aging server hardware.', icon: '♻️' },
+  { id: 'suite_upgrade', label: 'Moving Up', description: 'Upgrade your facility to a bigger suite.', icon: '🏢' },
+  { id: 'enterprise_suite', label: 'Hyperscale', description: 'Reach Enterprise suite tier.', icon: '🏗️' },
 ]
 
 export interface EnvironmentConfig {
@@ -520,8 +587,15 @@ export const DEFAULT_COLORS: Record<NodeType, LayerColors> = {
 }
 
 export const MAX_SERVERS_PER_CABINET = 4
-export const MAX_CABINETS = 32  // 8x4 grid
-export const MAX_SPINES = 6
+// These are the absolute max (enterprise tier). Per-suite limits enforced via getSuiteConfig().
+export const MAX_CABINETS = 50
+export const MAX_SPINES = 8
+
+/** Get the effective limits for a given suite tier */
+export function getSuiteLimits(tier: SuiteTier) {
+  const config = SUITE_TIERS[tier]
+  return { maxCabinets: config.maxCabinets, maxSpines: config.maxSpines, cols: config.cols, rows: config.rows }
+}
 
 const COSTS = {
   cabinet: 2000,
@@ -821,6 +895,9 @@ interface GameState {
   // Hardware Depreciation
   totalRefreshes: number         // total server refreshes done
 
+  // Suite / Facility
+  suiteTier: SuiteTier           // current facility tier
+
   // Actions
   addCabinet: (environment: CabinetEnvironment, customerType?: CustomerType) => void
   upgradeNextCabinet: () => void
@@ -843,6 +920,7 @@ interface GameState {
   upgradeSuppression: (type: SuppressionType) => void
   startResearch: (techId: string) => void
   refreshServers: (cabinetId: string) => void
+  upgradeSuite: (tier: SuiteTier) => void
   tick: () => void
 }
 
@@ -947,12 +1025,16 @@ export const useGameStore = create<GameState>((set) => ({
   // Hardware Depreciation
   totalRefreshes: 0,
 
+  // Suite / Facility
+  suiteTier: 'starter' as SuiteTier,
+
   // ── Build Actions ───────────────────────────────────────────
 
   addCabinet: (environment: CabinetEnvironment, customerType: CustomerType = 'general') =>
     set((state) => {
       if (state.money < COSTS.cabinet) return state
-      if (state.cabinets.length >= MAX_CABINETS) return state
+      const suiteLimits = getSuiteLimits(state.suiteTier)
+      if (state.cabinets.length >= suiteLimits.maxCabinets) return state
       const cab: Cabinet = {
         id: `cab-${nextCabId++}`,
         environment,
@@ -1004,7 +1086,8 @@ export const useGameStore = create<GameState>((set) => ({
   addSpineSwitch: () =>
     set((state) => {
       if (state.money < COSTS.spine_switch) return state
-      if (state.spineSwitches.length >= MAX_SPINES) return state
+      const suiteLimits = getSuiteLimits(state.suiteTier)
+      if (state.spineSwitches.length >= suiteLimits.maxSpines) return state
       const spine: SpineSwitch = {
         id: `spine-${nextSpineId++}`,
         powerStatus: true,
@@ -1216,6 +1299,20 @@ export const useGameStore = create<GameState>((set) => ({
         ),
         money: state.money - cost,
         totalRefreshes: state.totalRefreshes + 1,
+      }
+    }),
+
+  upgradeSuite: (tier: SuiteTier) =>
+    set((state) => {
+      const currentIdx = SUITE_TIER_ORDER.indexOf(state.suiteTier)
+      const targetIdx = SUITE_TIER_ORDER.indexOf(tier)
+      // Can only upgrade, not downgrade
+      if (targetIdx <= currentIdx) return state
+      const config = SUITE_TIERS[tier]
+      if (state.money < config.upgradeCost) return state
+      return {
+        suiteTier: tier,
+        money: state.money - config.upgradeCost,
       }
     }),
 
@@ -1786,9 +1883,9 @@ export const useGameStore = create<GameState>((set) => ({
 
       if (newCabinets.length >= 1) unlock('first_cabinet')
       if (newCabinets.length >= 10) unlock('ten_cabinets')
-      if (newCabinets.length >= MAX_CABINETS) unlock('full_grid')
+      if (newCabinets.length >= getSuiteLimits(state.suiteTier).maxCabinets) unlock('full_grid')
       if (state.spineSwitches.length >= 1) unlock('first_spine')
-      if (state.spineSwitches.length >= MAX_SPINES) unlock('max_spines')
+      if (state.spineSwitches.length >= getSuiteLimits(state.suiteTier).maxSpines) unlock('max_spines')
       if (newCabinets.some((c) => c.serverCount >= MAX_SERVERS_PER_CABINET && c.hasLeafSwitch)) unlock('full_rack')
       if (state.coolingType === 'water') unlock('water_cooling')
       if (state.loans.length > 0 || updatedLoans.length > 0) unlock('first_loan')
@@ -1810,6 +1907,8 @@ export const useGameStore = create<GameState>((set) => ({
       if (unlockedTech.length >= 6) unlock('tech_savvy')
       if (reputationScore >= 75) unlock('excellent_rep')
       if (state.totalRefreshes >= 1) unlock('hardware_refresh')
+      if (state.suiteTier !== 'starter') unlock('suite_upgrade')
+      if (state.suiteTier === 'enterprise') unlock('enterprise_suite')
 
       return {
         cabinets: newCabinets,
