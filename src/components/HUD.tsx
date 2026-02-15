@@ -62,7 +62,7 @@ export function HUD() {
     // Heat map
     heatMapVisible, toggleHeatMap,
     // Save / Load
-    saveGame, loadGame, resetGame,
+    saveGame, loadGame, resetGame, activeSlotId,
   } = useGameStore()
   const [showGuide, setShowGuide] = useState(true)
   const [selectedEnv, setSelectedEnv] = useState<CabinetEnvironment>('production')
@@ -2042,14 +2042,14 @@ export function HUD() {
         {/* Save/Load & Sandbox bar */}
         <div className="flex items-center justify-between rounded-lg border border-border bg-card p-2">
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="xs" className="text-[10px] gap-1" onClick={() => saveGame()}>
+            <Button variant="outline" size="xs" className="text-[10px] gap-1" onClick={() => saveGame(activeSlotId ?? 1)}>
               <Save className="size-3" />Save
             </Button>
-            <Button variant="outline" size="xs" className="text-[10px] gap-1" onClick={() => loadGame()}>
+            <Button variant="outline" size="xs" className="text-[10px] gap-1" onClick={() => { if (confirm('Load last save? Unsaved progress will be lost.')) loadGame(activeSlotId ?? 1) }}>
               <Upload className="size-3" />Load
             </Button>
-            <Button variant="outline" size="xs" className="text-[10px] gap-1 text-neon-red" onClick={() => { if (confirm('Reset all progress?')) resetGame() }}>
-              <RotateCw className="size-3" />Reset
+            <Button variant="outline" size="xs" className="text-[10px] gap-1 text-neon-red" onClick={() => { if (confirm('Start a new game? Unsaved progress will be lost.')) resetGame() }}>
+              <RotateCw className="size-3" />New
             </Button>
           </div>
           <div className="flex items-center gap-2">
