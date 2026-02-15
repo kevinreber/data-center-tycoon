@@ -1,31 +1,55 @@
-# Fabric Tycoon — Feature Backlog
+# Fabric Tycoon — Consolidated Feature Tracker
 
-## Current PR: Cabinet View + Above-Cabinet View
-- [x] Add `viewMode` state to Zustand store (`cabinet` | `above_cabinet`)
-- [x] Cabinet View: solid cabinets/servers, dashed overhead infrastructure
-- [x] Above-Cabinet View: solid switches/cable trays/cabling, dashed cabinet outlines
-- [x] View toggle UI in HUD
-- [x] Architectural dashed-line rendering for "other plane" objects
+> Single source of truth for all features — completed, in progress, and pending.
+> Last audited: 2026-02-15
 
-## Next PR: Layer Filters
-- [x] Toggle visibility of individual layers within a view (cables, switches, servers, power)
-- [x] Filter UI (checkboxes or toggle chips in HUD)
-- [x] Per-layer opacity/color controls
+---
 
-## Phase 2/3 Systems (Complete)
-- [x] Customer types with differentiated power/heat/revenue/bandwidth profiles
-- [x] Backup generators (3 tiers) with fuel system and auto-start on outage
+## Phase 1 — Close the Loop (Playable Tycoon) ✅
+
+All complete. Core economic loop works.
+
+- [x] Revenue generation from running servers ($12/tick per server)
+- [x] Operating cost simulation (power bills, cooling costs)
+- [x] Heat simulation (dynamic, load-based, per-tick updates)
+- [x] Cooling mechanics (air vs. water trade-offs)
+- [x] Basic tenant contracts (SLA + income, bronze/silver/gold tiers)
+- [x] Game tick system with speed controls (Pause, 1x, 2x, 3x)
+- [x] Thermal throttling (servers above 80°C earn half revenue)
+- [x] Finance panel (revenue/expense breakdown per tick)
+
+## Phase 2 — Add Challenge (Engaging) ✅
+
+All complete. Incidents and variety make the game engaging.
+
+- [x] Timer-based random incident system (20+ incident types)
+- [x] Real-world incidents: fiber cuts, squirrels, DDoS, pipe leaks
+- [x] Creative incidents: sentient AI, solar flares, quantum decoherence
+- [x] Incident notification UI and resolution mechanics
+- [x] Backup generators (3 tiers: Small Diesel, Large Diesel, Natural Gas) with fuel and auto-start
 - [x] Fire suppression (water vs. gas) with equipment damage trade-offs
-- [x] Power outage system triggered by power surge incidents
+- [x] Customer types (general, ai_training, streaming, crypto, enterprise) with different demands
+- [x] Day/night traffic patterns with peak hours and demand curves
+
+## Phase 3 — Add Depth (Strategic) ✅
+
+All complete. Tech tree, economy, and infrastructure provide strategic depth.
+
 - [x] Tech tree with 9 technologies across 3 branches (efficiency/performance/resilience)
-- [x] Spot power pricing with market fluctuations and price spikes
-- [x] Hardware depreciation and server refresh cycle
-- [x] Reputation score affecting contract quality and revenue bonuses
-- [x] 6 new achievements for Phase 2/3 features
+- [x] Spot power pricing with market fluctuations, mean reversion, and price spikes
+- [x] Hardware depreciation and server refresh cycle (800-tick lifespan)
+- [x] Reputation score (0–100) affecting contract quality and revenue bonuses
+- [x] Loan system — Small/Medium/Large with interest rates, max 3 active
+- [x] PDU (Power Distribution Unit) — 3 tiers with capacity limits and overload detection
+- [x] Structured cabling — auto-routed cable runs with length/capacity constraints
+- [x] Cable tray / ladder rack entity — pathway system reducing messy cable incident risk
+- [x] Hot/Cold Aisle Enforcement — cabinet facing direction affects cooling efficiency
 
-## Phase 4: Add World (Next Up)
+## Phase 4 — Add World (Immersive) ✅
 
-### 4A. Staff & HR System
+All complete. Staff, environment, security, and competitors create a living world.
+
+### 4A. Staff & HR System ✅
 - [x] `StaffMember` type with role, skill level, salary, fatigue, certifications
 - [x] 4 staff roles: network_engineer, electrician, cooling_specialist, security_officer
 - [x] 3 skill levels (junior/mid/senior) with hire costs and salary scaling
@@ -39,8 +63,8 @@
 - [x] Suite tier gates on max staff count (starter=2, standard=4, professional=8, enterprise=16)
 - [x] 4 achievements: First Hire, Full Staff, Zero Fatigue, Certified Team
 
-### 4B. Carbon Footprint & Environmental
-- [x] `EnergySource` type: grid_mixed, grid_green, onsite_solar, onsite_wind
+### 4B. Carbon Footprint & Environmental ✅
+- [x] Energy source types: grid_mixed, grid_green, onsite_solar, onsite_wind
 - [x] Energy source configs with cost multiplier, carbon per kW, reliability
 - [x] Carbon emissions tracking per tick and lifetime cumulative
 - [x] Carbon tax escalation over game time ($0→$2→$5→$10 per ton)
@@ -51,13 +75,13 @@
 - [x] Drought incident type — water prices spike or force switch to air cooling
 - [x] E-waste stockpile from server refreshes — proper vs improper disposal
 - [x] E-waste reputation penalty when stockpile > 10 items
-- [x] Energy source selector panel in HUD (Carbon sidebar panel)
+- [x] Energy source selector panel (Carbon sidebar panel)
 - [x] Carbon tracker display (emissions, tax, certifications)
 - [x] 4 achievements: Green Power, Carbon Neutral, Water Wise, Clean Sweep
 
-### 4C. Security Tiers & Compliance
-- [x] `SecurityTier` type: basic, enhanced, high_security, maximum
-- [x] Security feature installs: CCTV, badge_access, biometric, mantrap, cage_isolation, encrypted_network, security_noc
+### 4C. Security Tiers & Compliance ✅
+- [x] Security tiers: basic, enhanced, high_security, maximum
+- [x] 7 security features: CCTV, badge_access, biometric, mantrap, cage_isolation, encrypted_network, security_noc
 - [x] Security tier progression with install costs and maintenance/tick
 - [x] Compliance certifications: SOC 2 Type I/II, HIPAA, PCI-DSS, FedRAMP
 - [x] Certification requirements (security tier, features, reputation, staff)
@@ -65,40 +89,136 @@
 - [x] Certification expiry if not re-audited within interval
 - [x] 3 new intrusion incident types: tailgating, social_engineering, break_in
 - [x] Security features reduce intrusion chance (stacking defense bonuses)
-- [x] 4 new premium contract types gated by compliance (healthcare, finance, government)
-- [x] Security panel in HUD with tier, features, and compliance status
+- [x] 4 premium contract types gated by compliance (healthcare, finance, government)
+- [x] Security panel with tier, features, and compliance status
 - [x] 4 achievements: Locked Down, Fully Compliant, Fort Knox, Government Contractor
 
-### 4D. Competitor AI
-- [x] `Competitor` type with name, personality, strength, specialization, reputation
+### 4D. Competitor AI ✅
+- [x] Competitor type with name, personality, strength, specialization, reputation
 - [x] 5 competitor personalities: budget, premium, green, aggressive, steady
-- [x] Competitor scaling — 1 competitor at start, up to 3 by mid-game
+- [x] Competitor scaling — 1 competitor at tick 100, up to 3 by tick 600
 - [x] Rubber-banding: competitors grow faster when player is strong, slower when weak
-- [x] Contract competition — competitors bid on the same contracts with timer pressure
+- [x] Contract competition — competitors bid on same contracts with timer pressure
 - [x] Competitor bid UI showing who else is bidding and their win chance
 - [x] Competitor events: price wars, staff poaching, competitor outages
 - [x] Market share tracking (player vs competitors)
-- [x] Market panel in HUD showing competitor status and market share
+- [x] Market panel showing competitor status and market share
 - [x] 4 achievements: Market Leader, Monopoly, Underdog, Rivalry
 
-## Future: Sub-Floor View (Plane 1)
-- [ ] Third view mode: raised floor plenum
-- [ ] Cooling pipes, chilled air flow visualization
-- [ ] Power conduit routing
-- [ ] Dashed cabinet outlines from below
+## Phase 5 — Add Longevity (Replayable) ✅
 
-## Infrastructure & Entities
-- [x] PDU (Power Distribution Unit) — 3 tiers with capacity limits, range, and overload detection
-- [x] Structured Cabling — auto-routed cable runs with length/capacity constraints
-- [x] Cable tray / ladder rack entity — pathway system reducing messy cable incident risk
-- [x] Hot/Cold Aisle Enforcement — cabinet facing direction affects cooling efficiency
-- [ ] Overhead busway (power distribution) entity
-- [ ] Cross-connect / patch panel entity
-- [ ] Proper Rack model with 42U slots (per SPEC.md)
-- [ ] ToR leaf switch placement inside rack vs. spine switches overhead
-- [ ] In-row cooling unit entity
+All Phase 5 store/tick systems are implemented.
 
-## Network / CLOS Fabric
+### 5A. Supply Chain & Procurement ✅
+- [x] Hardware orders with lead times and bulk discounts
+- [x] Supply shortage events (chip shortage) with price multipliers and extended lead times
+- [x] Inventory management (server, leaf_switch, spine_switch, cabinet)
+- [x] Procurement panel in sidebar
+- [x] 4 achievements: Bulk Buyer, Stockpile, Shortage Survivor, Just In Time
+
+### 5B. Weather System ✅
+- [x] 4 seasons (spring → summer → autumn → winter) with cyclical rotation
+- [x] 6 weather conditions (clear, cloudy, rain, storm, heatwave, cold_snap)
+- [x] Ambient temperature modifiers affecting cooling requirements
+- [x] Solar/wind efficiency varies with weather
+- [x] Storm events can trigger power-related incidents
+- [x] 3 achievements: Four Seasons, Heatwave Survivor, Free Cooling
+
+### 5C. Interconnection / Meet-Me Room ✅
+- [x] Meet-me rooms (3 tiers: basic, standard, premium) with port capacity limits
+- [x] 3 interconnect port types (copper_1g, fiber_10g, fiber_100g) generating passive revenue
+- [x] Network effects — revenue per port increases with more active ports
+- [x] Requires Standard suite tier or higher
+- [x] 3 achievements: Peering Point, Network Hub, Interconnection Revenue
+
+### 5D. Custom Server Configurations ✅
+- [x] 5 server types: balanced, cpu_optimized, gpu_accelerated, storage_dense, memory_optimized
+- [x] Each type has cost/power/heat/revenue multipliers
+- [x] Customer type matching yields bonus revenue
+- [x] Server config selector in Equipment panel
+- [x] 3 achievements: Custom Build, GPU Farm, Optimized Fleet
+
+### 5E. Network Peering & Transit ✅
+- [x] 4 agreement types: budget_transit, premium_transit, public_peering, private_peering
+- [x] Each with bandwidth, latency, and cost-per-tick trade-offs
+- [x] Maximum 4 concurrent agreements
+- [x] 3 achievements: Connected, IX Member, Zero Latency
+
+### 5F. Maintenance Windows ✅
+- [x] Schedule preventive maintenance on cabinets, spines, cooling, or power systems
+- [x] Each type has configurable duration and cost
+- [x] Maximum 3 concurrent maintenance windows
+- [x] Cooling/reliability benefits on completion
+- [x] 2 achievements: Preventive Care, Night Owl
+
+### 5G. Power Redundancy Tiers ✅
+- [x] 3 levels: N (none), N+1, 2N
+- [x] Higher levels provide power resilience at increased cost
+- [x] Upgrade path: N → N+1 → 2N (no downgrades)
+- [x] 3 achievements: Redundant, Belt and Suspenders, Bulletproof
+
+### 5H. Noise & Community Relations ✅
+- [x] Noise generated by server/cooling activity and generators
+- [x] Noise complaints escalate to fines if threshold exceeded
+- [x] Sound barriers reduce noise (configurable max count)
+- [x] Zoning restrictions triggered by persistent noise violations
+- [x] 2 achievements: Good Neighbor, Sound Barrier
+
+### 5I. Dynamic Pricing / Spot Compute Market ✅
+- [x] Allocate spare server capacity to dynamic spot market
+- [x] Price fluctuates with mean reversion and volatility
+- [x] Revenue based on allocated capacity × current spot price
+- [x] 2 achievements: Spot Trader, Market Timer
+
+### 5J. Event Log / History ✅
+- [x] Structured event log with category, severity, timestamps
+- [x] Filterable by category (incident, finance, contract, achievement, etc.)
+- [x] Capped at 200 entries
+- [x] 2 achievements: Historian, Clean Record
+
+### 5K. Statistics Dashboard ✅
+- [x] Lifetime stats: revenue, expenses, peak temp, uptime streaks, fires, etc.
+- [x] Per-tick snapshot capacity history (capped at 100 entries)
+- [x] Progress panel in sidebar
+- [x] 3 achievements: Statistician, Ironman, Big Spender
+
+### 5L. Tooltip Tutorial System ✅
+- [x] 27 contextual tips triggered during gameplay
+- [x] Dismissible toast notifications, never repeat
+- [x] Can be disabled entirely in settings
+- [x] Covers carbon, security, and market tips
+- [x] 2 achievements: Student, Graduate
+
+### 5M. Additional Economy Systems ✅
+- [x] Insurance policies — 4 types (fire, power, cyber, equipment) with premiums
+- [x] DR Drills — periodic failover tests, affects reputation
+- [x] Patent system — patent unlocked technologies for ongoing royalty income
+- [x] RFP Bidding — compete for contract wins via bid mechanic
+- [x] Stock price / valuation — live ticker with 15 valuation milestones
+- [x] Scenario challenges — 5 predefined challenges with objectives and special rules
+- [x] Sandbox mode — unlimited funds for creative building
+- [x] Demo mode — pre-populated professional-tier state (?demo=true)
+
+### 5N. Infrastructure Entities ✅
+- [x] Busway — overhead power distribution (3 tiers: Light/Medium/Heavy)
+- [x] Cross-connect — direct physical cable connections between equipment
+- [x] In-row cooling — additional cooling units placed on grid (3 options)
+
+## Rendering & Views
+
+### Cabinet View + Above-Cabinet View ✅
+- [x] `viewMode` state (`cabinet` | `above_cabinet`)
+- [x] Cabinet View: solid cabinets/servers, dashed overhead infrastructure
+- [x] Above-Cabinet View: solid switches/cable trays/cabling, dashed cabinet outlines
+- [x] View toggle UI
+- [x] Architectural dashed-line rendering for "other plane" objects
+
+### Layer Filters ✅
+- [x] Toggle visibility of individual layers within a view
+- [x] Filter UI (checkboxes or toggle chips)
+- [x] Per-layer opacity/color controls
+
+### Network / CLOS Fabric Rendering ✅
 - [x] Network topology data model (connections between nodes)
 - [x] Cabling visualization (lines between connected switches)
 - [x] Spine-leaf wiring validation (over-subscription ratio)
@@ -106,112 +226,156 @@
 - [x] Shortest-path routing with failover when a node goes down
 - [x] Bandwidth capacity and current traffic tracking
 
-## Simulation
-- [x] Heat simulation (heat levels update over time based on load/cooling)
-- [x] Realistic PUE calculation (based on cooling type, load, ambient temp)
-- [x] Revenue generation from running servers
-- [x] Operating cost simulation (power bills, cooling costs)
-- [x] Cooling mechanics — air cooling implemented; water cooling TBD
-- [x] Game tick system with speed controls (Pause, 1x, 2x, 3x)
-- [x] Thermal throttling (servers above 80°C earn half revenue)
-- [x] Finance panel (revenue/expense breakdown per tick)
-- [x] Water cooling upgrade (higher efficiency, different trade-offs)
-
-## Incident System
-- [x] Timer-based random event roller
-- [x] Real-world incidents: fiber cuts, squirrels, DDoS, pipe leaks
-- [x] Creative incidents: sentient AI, solar flares, quantum decoherence
-- [x] Incident notification UI and resolution mechanics
-
-## Loan System
-- [x] Small/Medium/Large loan options with interest rates
-- [x] Per-tick loan repayment deducted from income
-- [x] Max 3 active loans, finance panel integration
-- [x] Spot pricing for power (market rate fluctuations with random walk and spikes)
-
-## Achievement System
-- [x] 45 achievements tracking milestones (Phase 1, Phase 2/3, infrastructure, and new features)
-- [x] Achievement unlock toast notifications
-- [x] Full achievements panel in HUD
-- [x] Sandbox mode (unlimited budget, all tech unlocked)
-
-## Scaling Tiers
-- [ ] Tier 1: Solar/Grid Power + Air Cooling
-- [ ] Tier 2: Modular Nuclear (SMR) + Water Cooling
-- [ ] Tier 3: Fusion/Kugelblitz + Alien Cryo-Fluid
-- [ ] Tier unlock progression and costs
-
-## UX / Camera
-- [ ] Pan and zoom controls for isometric view
-- [ ] Click-to-select cabinets/switches
-- [ ] Drag-and-drop placement on grid
-- [ ] Cabinet detail panel (open a rack to see 42U slots)
-- [ ] Heat map overlay toggle
-
-## Polish
-- [x] Save/load game state (localStorage)
-- [ ] Sound effects
-- [ ] Placement animations
-- [ ] Tutorial / guided first-time experience
+### UX / Camera ✅ (mostly)
+- [x] Pan controls (mouse drag, middle/right-click drag)
+- [x] Zoom controls (scroll wheel, 0.3x–2.5x range)
+- [x] Camera reset to default
+- [x] Click-to-select cabinets with floating detail panel
+- [x] Tile-based click-to-place placement mode (cabinets, PDUs, cable trays)
+- [x] Heat map overlay toggle
 
 ---
 
-## Brainstorm: Additional Features
+## PENDING FEATURES
 
-### Customer & Contract System
-- [x] Tenant contracts — Companies rent capacity with SLA requirements (uptime %, latency, bandwidth); missing SLAs means penalties or lost contracts
-- [x] Customer types — AI training (GPU-heavy), streaming (high bandwidth), crypto (cheap power), enterprise (high security); each with different demands and revenue
-- [ ] RFP bidding — Compete against rival data centers for large contracts by offering better pricing, uptime, or green certifications
+Everything below is **not yet implemented**. Organized by priority/effort.
 
-### Staff & HR
-- [ ] Hire technicians — Network engineers, electricians, cooling specialists with skill levels affecting repair speed and incident prevention
-- [ ] Training programs — Send staff to certifications (CCNA, DCIM) to unlock advanced infrastructure options
-- [ ] Shift management — Night shift staff cheaper but slower; understaffing during incidents causes cascading failures
+---
 
-### Research & Tech Tree
-- [x] R&D lab — Invest to unlock technologies: immersion cooling, optical interconnects, GPU clusters, UPS upgrades
-- [x] Tech tree progression — 3 branches: efficiency (lower PUE), performance (higher density), resilience (better failover)
-- [ ] Patent system — Developed tech can be patented for passive income or license others' tech
+### Sub-Floor View (Rendering)
 
-### Reputation & Market
-- [x] Reputation score — Uptime history and incident response build reputation affecting contract quality and revenue bonuses
-- [ ] Stock price / company valuation — Live ticker reflecting performance, unlocking investor funding for expansion
-- [ ] Competitor AI — Rival data center companies bid on same contracts, race to adopt tech, and poach your staff
+A third view mode showing the space below the raised floor.
 
-### Environmental & Regulatory
-- [ ] Carbon footprint tracker — Government carbon taxes scale with fossil fuel usage; green certifications (LEED, Energy Star) attract premium tenants
-- [ ] Zoning & permits — Expanding requires city permits; community opposition if facility is too noisy or power-hungry
-- [ ] Water usage management — Water-cooled systems draw from local supply; droughts force switches to air cooling
-- [ ] E-waste disposal — Decommissioned hardware must be recycled properly with cost and reputation implications
+- [ ] Third view mode: raised floor plenum
+- [ ] Cooling pipes and chilled air flow visualization
+- [ ] Power conduit routing
+- [ ] Dashed cabinet outlines from below
 
-### Physical Security & Compliance
-- [ ] Security tiers — Biometric access, mantrap entries, CCTV; higher security unlocks government and finance contracts
-- [ ] Compliance certifications — SOC 2, HIPAA, PCI-DSS; each requires specific infrastructure (isolated cages, encrypted networking)
-- [ ] Physical intrusion events — Social engineering attempts, tailgating, break-ins that test your security setup
+**Effort:** Medium | **Impact:** Medium — Adds visual depth but not critical for gameplay.
+
+---
+
+### 42U Rack Model
+
+Replace the simple server-count cabinet with a detailed rack unit model.
+
+- [ ] Proper Rack model with 42U slots (per SPEC.md)
+- [ ] ToR leaf switch placement inside rack vs. spine switches overhead
+- [ ] Per-U slot equipment placement (servers, switches, patch panels)
+- [ ] Cabinet detail panel showing 42U slot layout
+
+**Effort:** High | **Impact:** Medium — Significant data model change. Adds realism but current 4-server model works fine for gameplay.
+
+---
+
+### Advanced Scaling Tiers
+
+Late-game sci-fi progression beyond the current 4 suite tiers.
+
+- [ ] Tier 1: Solar/Grid Power + Air Cooling (current ceiling)
+- [ ] Tier 2: Modular Nuclear (SMR) + Water Cooling
+- [ ] Tier 3: Fusion/Kugelblitz + Alien Cryo-Fluid
+- [ ] Tier unlock progression and costs
+- [ ] New equipment and cooling types per tier
+
+**Effort:** High | **Impact:** High — Extends endgame significantly. Requires new constants, rendering, and balance work.
+
+---
+
+### Workload Simulation (Advanced)
+
+Deeper workload mechanics beyond the current traffic/server model.
+
+- [ ] AI training jobs — long-running GPU workloads generating massive heat; completion earns big payouts, failure means starting over
+- [ ] Workload migration — manually or automatically migrate VMs when racks overheat or switches fail
+
+**Effort:** Medium-High | **Impact:** Medium — AI training jobs would add high-risk/high-reward gameplay. Migration adds active management during incidents.
+
+---
 
 ### Multi-Site Expansion
-- [ ] Multiple locations — Build data centers in different regions (US-East, EU-West, Asia-Pacific) with different costs, weather, and regulations
-- [ ] Inter-site networking — Connect sites via dark fiber or leased lines; latency matters for multi-region workloads
-- [ ] Edge deployments — Small edge PoPs in cities for low-latency delivery, feeding into main facilities
 
-### Workload Simulation
-- [ ] AI training jobs — Long-running GPU workloads generating massive heat, needing uninterrupted power; completion earns big payouts
-- [x] Traffic patterns — Day/night cycles with peak hours; streaming spikes in evening, batch processing runs overnight
-- [ ] Workload migration — Manually or automatically migrate VMs when racks overheat or switches fail
+Expand from a single data center to a global operation.
 
-### Disaster & Recovery
-- [x] Backup generators — Diesel, large diesel, and natural gas with finite fuel; auto-start on power outages
-- [x] Fire suppression systems — Gas-based (FM-200, electronics-safe) vs. water-based (cheap, destructive); fires from critical temps
-- [ ] Disaster recovery drills — Periodic failover tests; passing boosts reputation, failing reveals weaknesses
+- [ ] Multiple locations (US-East, EU-West, Asia-Pacific) with different power costs, climate, and regulations
+- [ ] Inter-site networking via dark fiber or leased lines; latency matters for multi-region workloads
+- [ ] Edge deployments — small edge PoPs in cities for low-latency content delivery
 
-### Economy & Finance
-- [x] Loan system — Take loans for rapid expansion; interest payments eat into margins
-- [x] Spot pricing for power — Electricity costs fluctuate with random walk, mean reversion, and price spikes
-- [x] Hardware depreciation — Servers lose efficiency over time; refresh cycles restore performance at a cost
-- [ ] Insurance policies — Insure against specific disasters; cheaper premiums with good safety records
+**Effort:** Very High | **Impact:** High — Essentially a "game 2" on top of the core. Best saved for a major update.
 
-### Social & Meta
-- [ ] Leaderboards — Compare PUE, uptime, revenue, or green energy % with other players
-- [x] Achievement system — "365 days without downtime", "Reached Tier 3 in under 1 hour", "Zero carbon footprint"
-- [x] Sandbox mode — Unlimited budget, all tech unlocked for creative building
-- [ ] Scenario challenges — "Recover from catastrophic flood", "Build zero-emission facility", "Handle Black Friday traffic surge"
+---
+
+### Capacity Planning Dashboard
+
+Forecasting tools for proactive management.
+
+- [ ] Projected power/cooling/space exhaustion with trend analysis
+- [ ] Utilization bar charts with trend arrows per metric
+- [ ] Alerts when any metric exceeds 80% utilization
+- [ ] Historical sparkline charts
+- [ ] Financial runway projection (ticks until money runs out)
+- [ ] Server lifespan overview (oldest servers, refresh scheduling)
+
+**Effort:** Medium | **Impact:** Medium — Data already exists in `capacityHistory`. This is primarily a UI/visualization task.
+
+> Note: The store already tracks `capacityHistory` (per-tick snapshots, capped at 100). This feature would add a dedicated dashboard UI with charts and projections on top of existing data.
+
+---
+
+### Sound Effects & Audio
+
+Audio feedback for game events.
+
+- [ ] Placement sounds (cabinet, server, switch)
+- [ ] Incident alert sounds
+- [ ] Achievement unlock chime
+- [ ] Ambient data center hum
+- [ ] UI interaction sounds (clicks, toggles)
+- [ ] Volume controls in settings
+
+**Effort:** Medium | **Impact:** Low-Medium — Polish feature. Adds atmosphere but not gameplay depth.
+
+---
+
+### Placement Animations
+
+Visual feedback when placing or building equipment.
+
+- [ ] Build/place animation for cabinets
+- [ ] Server install animation
+- [ ] Equipment removal animation
+- [ ] Construction progress indicator
+
+**Effort:** Low-Medium | **Impact:** Low — Pure polish. Nice-to-have visual feedback.
+
+---
+
+### Leaderboards
+
+Compare performance metrics with other players.
+
+- [ ] PUE comparison
+- [ ] Uptime percentage ranking
+- [ ] Revenue leaderboard
+- [ ] Green energy percentage ranking
+- [ ] Requires backend infrastructure
+
+**Effort:** High | **Impact:** Low — Requires server infrastructure. Only meaningful with an active player base.
+
+---
+
+## Summary
+
+| Category | Total | Done | Pending |
+|----------|-------|------|---------|
+| Phase 1 (Core Loop) | 8 | 8 | 0 |
+| Phase 2 (Challenge) | 8 | 8 | 0 |
+| Phase 3 (Depth) | 9 | 9 | 0 |
+| Phase 4 (World) | 44 | 44 | 0 |
+| Phase 5 (Longevity) | 60+ | 60+ | 0 |
+| Rendering & Views | 17 | 17 | 0 |
+| UX / Camera | 6 | 6 | 0 |
+| **Pending Features** | **~25** | **0** | **~25** |
+
+**Implemented features:** 150+ items across Phases 1–5, rendering, and UX.
+**Remaining features:** ~25 items, mostly high-effort late-game content (multi-site, scaling tiers, 42U racks), visualization (sub-floor view, capacity dashboard, sound), and advanced simulation (workload migration, AI training jobs, leaderboards).
