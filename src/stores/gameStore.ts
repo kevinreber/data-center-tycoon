@@ -1610,6 +1610,9 @@ interface GameState {
   activeSlotId: number | null
   saveSlots: SaveSlotMeta[]
 
+  // Demo mode
+  isDemo: boolean
+
   // Actions
   addCabinet: (col: number, row: number, environment: CabinetEnvironment, customerType?: CustomerType, facing?: CabinetFacing) => void
   enterPlacementMode: (environment: CabinetEnvironment, customerType: CustomerType, facing?: CabinetFacing) => void
@@ -1665,6 +1668,9 @@ interface GameState {
   startTraining: (staffId: string, certId: string) => void
   // Heat map
   toggleHeatMap: () => void
+  // Demo
+  loadDemoState: () => void
+  exitDemo: () => void
   // Save / Load
   saveGame: (slotId: number, name?: string) => void
   loadGame: (slotId: number) => boolean
@@ -1868,6 +1874,9 @@ export const useGameStore = create<GameState>((set) => ({
 
   // Heat Map
   heatMapVisible: false,
+
+  // Demo mode
+  isDemo: false,
 
   // Save / Load
   hasSaved: false,
@@ -2571,6 +2580,246 @@ export const useGameStore = create<GameState>((set) => ({
 
   toggleHeatMap: () =>
     set((state) => ({ heatMapVisible: !state.heatMapVisible })),
+
+  // ── Demo Mode ─────────────────────────────────────────────────
+
+  loadDemoState: () => {
+    // Build a professional-tier data center with a diverse set of cabinets
+    const demoCabinets: Cabinet[] = []
+    const customerTypes: CustomerType[] = ['general', 'ai_training', 'streaming', 'crypto', 'enterprise']
+    const environments: CabinetEnvironment[] = ['production', 'production', 'production', 'lab', 'management']
+    let cabId = 1
+
+    // Professional tier: 8 cols x 4 rows
+    const positions: [number, number][] = [
+      [0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],
+      [0,1],[1,1],[2,1],[3,1],[4,1],[5,1],[6,1],[7,1],
+      [0,2],[1,2],[2,2],[3,2],[4,2],
+      [0,3],[1,3],[2,3],
+    ]
+
+    for (let i = 0; i < positions.length; i++) {
+      const [col, row] = positions[i]
+      const env = environments[i % environments.length]
+      const cust = env === 'management' ? 'general' : customerTypes[i % customerTypes.length]
+      const serverCount = env === 'management' ? 2 : 4
+      demoCabinets.push({
+        id: `cab-${cabId++}`,
+        col,
+        row,
+        environment: env,
+        customerType: cust as CustomerType,
+        serverCount,
+        hasLeafSwitch: env !== 'management' && i < 20,
+        powerStatus: true,
+        heatLevel: 35 + Math.floor(i * 1.3),
+        serverAge: Math.floor(i * 20),
+        facing: row % 2 === 0 ? 'north' as CabinetFacing : 'south' as CabinetFacing,
+      })
+    }
+
+    const demoSpines: SpineSwitch[] = [
+      { id: 'spine-1', powerStatus: true },
+      { id: 'spine-2', powerStatus: true },
+      { id: 'spine-3', powerStatus: true },
+      { id: 'spine-4', powerStatus: true },
+      { id: 'spine-5', powerStatus: true },
+    ]
+
+    const demoGenerators: Generator[] = [
+      {
+        id: 'gen-1',
+        config: GENERATOR_OPTIONS[1],
+        status: 'standby' as GeneratorStatus,
+        fuelRemaining: 50,
+        ticksUntilReady: 0,
+      },
+    ]
+
+    const demoAchievements: Achievement[] = [
+      'first_cabinet', 'first_spine', 'full_rack', 'ten_cabinets',
+      'water_cooling', 'hundred_k', 'suite_upgrade', 'first_generator',
+      'fire_ready', 'first_research', 'survive_incident',
+    ].map((id, i) => ({
+      def: ACHIEVEMENT_CATALOG.find((a) => a.id === id)!,
+      unlockedAtTick: (i + 1) * 50,
+    })).filter((a) => a.def)
+
+    const demoUnlockedTech = ['hot_aisle', 'variable_fans', 'high_density', 'ups_upgrade', 'redundant_cooling']
+
+    // Set module-level ID counters
+    nextCabId = cabId
+    nextSpineId = 6
+    nextLoanId = 1
+    nextIncidentId = 1
+    nextContractId = 1
+    nextGeneratorId = 2
+    nextStaffId = 1
+
+    set({
+      isDemo: true,
+      cabinets: demoCabinets,
+      spineSwitches: demoSpines,
+      money: 487250,
+      tickCount: 1200,
+      gameHour: 14,
+      gameSpeed: 0 as GameSpeed,  // start paused so user can explore
+      coolingType: 'water' as CoolingType,
+      suiteTier: 'professional' as SuiteTier,
+      generators: demoGenerators,
+      suppressionType: 'gas_suppression' as SuppressionType,
+      unlockedTech: demoUnlockedTech,
+      activeResearch: null,
+      rdSpent: 75000,
+      reputationScore: 72,
+      uptimeTicks: 950,
+      totalOperatingTicks: 1200,
+      totalRefreshes: 3,
+      achievements: demoAchievements,
+      newAchievement: null,
+      loans: [],
+      loanPayments: 0,
+      activeIncidents: [],
+      incidentLog: ['Cooling sensor alarm cleared', 'Power fluctuation resolved', 'Network loop detected and resolved'],
+      resolvedCount: 8,
+      contractOffers: [],
+      activeContracts: [],
+      contractLog: [],
+      contractRevenue: 0,
+      contractPenalties: 0,
+      completedContracts: 4,
+      insurancePolicies: ['fire_insurance' as InsurancePolicyType, 'power_insurance' as InsurancePolicyType],
+      insurancePayouts: 15000,
+      stockPrice: 85,
+      stockHistory: Array.from({ length: 50 }, (_, i) => 30 + i + Math.floor(Math.random() * 10)),
+      drillsCompleted: 2,
+      drillsPassed: 2,
+      pdus: [],
+      cableTrays: [],
+      cableRuns: [],
+      busways: [],
+      crossConnects: [],
+      inRowCoolers: [],
+      sandboxMode: false,
+      fireActive: false,
+      fireDamageTaken: 0,
+      powerOutage: false,
+      outageTicksRemaining: 0,
+      powerPriceMultiplier: 1.0,
+      powerPriceSpikeActive: false,
+      powerPriceSpikeTicks: 0,
+      placementMode: false,
+      heatMapVisible: false,
+      hasSaved: false,
+      activeSlotId: null,
+      staff: [],
+      shiftPattern: 'day_night' as ShiftPattern,
+      trainingQueue: [],
+      staffCostPerTick: 0,
+      ...calcStats(demoCabinets, demoSpines),
+    })
+  },
+
+  exitDemo: () => {
+    // Reset everything back to fresh game state
+    nextCabId = 1
+    nextSpineId = 1
+    nextLoanId = 1
+    nextIncidentId = 1
+    nextContractId = 1
+    nextGeneratorId = 1
+    nextStaffId = 1
+    set({
+      isDemo: false,
+      cabinets: [],
+      spineSwitches: [],
+      totalPower: 0,
+      coolingPower: 0,
+      money: 50000,
+      pue: 0,
+      avgHeat: SIM.ambientTemp,
+      mgmtBonus: 0,
+      gameSpeed: 1 as GameSpeed,
+      tickCount: 0,
+      revenue: 0,
+      expenses: 0,
+      powerCost: 0,
+      coolingCost: 0,
+      coolingType: 'air' as CoolingType,
+      loans: [],
+      loanPayments: 0,
+      activeIncidents: [],
+      incidentLog: [],
+      resolvedCount: 0,
+      achievements: [],
+      newAchievement: null,
+      contractOffers: [],
+      activeContracts: [],
+      contractLog: [],
+      contractRevenue: 0,
+      contractPenalties: 0,
+      completedContracts: 0,
+      generators: [],
+      generatorFuelCost: 0,
+      powerOutage: false,
+      outageTicksRemaining: 0,
+      suppressionType: 'none' as SuppressionType,
+      fireActive: false,
+      fireDamageTaken: 0,
+      unlockedTech: [],
+      activeResearch: null,
+      rdSpent: 0,
+      reputationScore: 20,
+      uptimeTicks: 0,
+      totalOperatingTicks: 0,
+      powerPriceMultiplier: 1.0,
+      powerPriceSpikeActive: false,
+      powerPriceSpikeTicks: 0,
+      totalRefreshes: 0,
+      suiteTier: 'starter' as SuiteTier,
+      pdus: [],
+      cableTrays: [],
+      cableRuns: [],
+      aisleBonus: 0,
+      aisleViolations: 0,
+      messyCableCount: 0,
+      pduOverloaded: false,
+      infraIncidentBonus: 0,
+      placementMode: false,
+      insurancePolicies: [],
+      insuranceCost: 0,
+      insurancePayouts: 0,
+      drillCooldown: 0,
+      lastDrillResult: null,
+      drillsCompleted: 0,
+      drillsPassed: 0,
+      stockPrice: 10,
+      stockHistory: [10],
+      valuationMilestonesReached: [],
+      patents: [],
+      patentIncome: 0,
+      rfpOffers: [],
+      rfpsWon: 0,
+      rfpsLost: 0,
+      busways: [],
+      crossConnects: [],
+      inRowCoolers: [],
+      sandboxMode: false,
+      activeScenario: null,
+      scenarioProgress: {},
+      scenariosCompleted: [],
+      networkTopology: { totalLinks: 0, healthyLinks: 0, oversubscriptionRatio: 0, avgUtilization: 0, redundancyLevel: 0 },
+      heatMapVisible: false,
+      hasSaved: false,
+      staff: [],
+      shiftPattern: 'day_only' as ShiftPattern,
+      trainingQueue: [],
+      staffCostPerTick: 0,
+      staffIncidentsResolved: 0,
+      staffBurnouts: 0,
+      activeSlotId: null,
+    })
+  },
 
   // ── Save / Load ────────────────────────────────────────────────
 
