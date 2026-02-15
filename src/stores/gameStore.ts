@@ -4,6 +4,197 @@ export type NodeType = 'server' | 'leaf_switch' | 'spine_switch'
 export type GameSpeed = 0 | 1 | 2 | 3
 export type CabinetEnvironment = 'production' | 'lab' | 'management'
 export type CoolingType = 'air' | 'water'
+export type CustomerType = 'general' | 'ai_training' | 'streaming' | 'crypto' | 'enterprise'
+export type GeneratorStatus = 'standby' | 'running' | 'cooldown'
+export type SuppressionType = 'none' | 'water_suppression' | 'gas_suppression'
+export type TechBranch = 'efficiency' | 'performance' | 'resilience'
+
+// ── Customer Type Config ──────────────────────────────────────
+
+export interface CustomerTypeConfig {
+  label: string
+  description: string
+  color: string
+  powerMultiplier: number    // multiplier on base server power draw
+  heatMultiplier: number     // multiplier on heat generation
+  revenueMultiplier: number  // multiplier on base revenue
+  bandwidthMultiplier: number // multiplier on traffic generated
+}
+
+export const CUSTOMER_TYPE_CONFIG: Record<CustomerType, CustomerTypeConfig> = {
+  general: {
+    label: 'General',
+    description: 'Standard mixed workloads. Balanced resource usage.',
+    color: '#88aacc',
+    powerMultiplier: 1.0,
+    heatMultiplier: 1.0,
+    revenueMultiplier: 1.0,
+    bandwidthMultiplier: 1.0,
+  },
+  ai_training: {
+    label: 'AI Training',
+    description: 'GPU-heavy deep learning jobs. Massive power and heat, huge payouts.',
+    color: '#ff66ff',
+    powerMultiplier: 1.8,
+    heatMultiplier: 2.0,
+    revenueMultiplier: 2.5,
+    bandwidthMultiplier: 0.6,
+  },
+  streaming: {
+    label: 'Streaming',
+    description: 'Video CDN workloads. High bandwidth, moderate compute.',
+    color: '#66ffcc',
+    powerMultiplier: 0.9,
+    heatMultiplier: 0.8,
+    revenueMultiplier: 1.3,
+    bandwidthMultiplier: 2.0,
+  },
+  crypto: {
+    label: 'Crypto',
+    description: 'Mining and blockchain nodes. Extreme power draw, low bandwidth.',
+    color: '#ffcc00',
+    powerMultiplier: 2.0,
+    heatMultiplier: 1.8,
+    revenueMultiplier: 1.6,
+    bandwidthMultiplier: 0.3,
+  },
+  enterprise: {
+    label: 'Enterprise',
+    description: 'Secure business workloads. Premium revenue, strict SLA expectations.',
+    color: '#4488ff',
+    powerMultiplier: 1.1,
+    heatMultiplier: 1.0,
+    revenueMultiplier: 1.8,
+    bandwidthMultiplier: 1.2,
+  },
+}
+
+// ── Backup Generator Config ───────────────────────────────────
+
+export interface GeneratorConfig {
+  label: string
+  cost: number
+  fuelCapacity: number       // ticks of runtime at full load
+  fuelCostPerTick: number    // $ per tick while running
+  powerCapacityW: number     // max watts this generator can supply
+  startupTicks: number       // ticks to spin up from standby
+  cooldownTicks: number      // ticks needed to cool down after running
+  description: string
+}
+
+export const GENERATOR_OPTIONS: GeneratorConfig[] = [
+  { label: 'Small Diesel', cost: 15000, fuelCapacity: 30, fuelCostPerTick: 8, powerCapacityW: 50000, startupTicks: 2, cooldownTicks: 5, description: 'Small diesel generator. Covers a few cabinets during short outages.' },
+  { label: 'Large Diesel', cost: 40000, fuelCapacity: 50, fuelCostPerTick: 15, powerCapacityW: 150000, startupTicks: 3, cooldownTicks: 8, description: 'Industrial diesel generator. Covers most medium facilities.' },
+  { label: 'Natural Gas', cost: 75000, fuelCapacity: 100, fuelCostPerTick: 10, powerCapacityW: 300000, startupTicks: 4, cooldownTicks: 10, description: 'Natural gas turbine. Long runtime, high capacity, but slow to start.' },
+]
+
+export interface Generator {
+  id: string
+  config: GeneratorConfig
+  status: GeneratorStatus
+  fuelRemaining: number
+  ticksUntilReady: number    // countdown for startup or cooldown
+}
+
+// ── Fire Suppression Config ───────────────────────────────────
+
+export interface SuppressionConfig {
+  label: string
+  cost: number
+  effectiveness: number      // 0-1, chance of preventing equipment damage during fire
+  equipmentDamage: boolean   // whether activation damages equipment
+  description: string
+  color: string
+}
+
+export const SUPPRESSION_CONFIG: Record<SuppressionType, SuppressionConfig> = {
+  none: { label: 'None', cost: 0, effectiveness: 0, equipmentDamage: false, description: 'No fire suppression. Fires will cause maximum damage.', color: '#666666' },
+  water_suppression: { label: 'Water Sprinkler', cost: 8000, effectiveness: 0.85, equipmentDamage: true, description: 'Cheap and effective at stopping fires, but water destroys server equipment. Expect losses.', color: '#4488ff' },
+  gas_suppression: { label: 'Inert Gas (FM-200)', cost: 35000, effectiveness: 0.95, equipmentDamage: false, description: 'Premium gas-based suppression. Electronics-safe — stops fires without equipment damage.', color: '#44ff88' },
+}
+
+// ── Tech Tree Types ───────────────────────────────────────────
+
+export interface TechDef {
+  id: string
+  branch: TechBranch
+  label: string
+  description: string
+  cost: number               // R&D investment cost
+  researchTicks: number      // ticks to complete research
+  prereqId: string | null    // tech that must be unlocked first
+  effect: string             // description of gameplay effect
+}
+
+export interface ActiveResearch {
+  techId: string
+  ticksRemaining: number
+}
+
+export const TECH_TREE: TechDef[] = [
+  // Efficiency branch — lower PUE
+  { id: 'hot_aisle', branch: 'efficiency', label: 'Hot Aisle Containment', description: 'Separate hot and cold air streams for better cooling efficiency.', cost: 10000, researchTicks: 40, prereqId: null, effect: 'Cooling rate +0.5°C/tick' },
+  { id: 'variable_fans', branch: 'efficiency', label: 'Variable Speed Fans', description: 'Dynamically adjust fan speed based on load.', cost: 20000, researchTicks: 60, prereqId: 'hot_aisle', effect: 'Cooling overhead reduced by 15%' },
+  { id: 'immersion_cooling', branch: 'efficiency', label: 'Immersion Cooling', description: 'Submerge servers in dielectric fluid for maximum heat transfer.', cost: 50000, researchTicks: 100, prereqId: 'variable_fans', effect: 'Cooling rate +1.5°C/tick, overhead -25%' },
+  // Performance branch — higher density/revenue
+  { id: 'high_density', branch: 'performance', label: 'High-Density Racks', description: 'Redesigned airflow allows more compute per rack unit.', cost: 12000, researchTicks: 45, prereqId: null, effect: 'Server revenue +15%' },
+  { id: 'gpu_clusters', branch: 'performance', label: 'GPU Cluster Support', description: 'Specialized power and cooling for GPU-heavy workloads.', cost: 30000, researchTicks: 70, prereqId: 'high_density', effect: 'AI Training revenue +30%' },
+  { id: 'optical_interconnect', branch: 'performance', label: 'Optical Interconnects', description: 'Fiber-optic leaf-spine links with 4x bandwidth.', cost: 60000, researchTicks: 90, prereqId: 'gpu_clusters', effect: 'Link capacity doubled to 20 Gbps' },
+  // Resilience branch — better uptime
+  { id: 'ups_upgrade', branch: 'resilience', label: 'UPS Battery Upgrade', description: 'Extended battery backup provides 5 ticks of bridge power during outages.', cost: 8000, researchTicks: 30, prereqId: null, effect: 'Auto-bridge 5 ticks during power outages' },
+  { id: 'redundant_cooling', branch: 'resilience', label: 'Redundant Cooling', description: 'N+1 cooling redundancy prevents total cooling failure.', cost: 25000, researchTicks: 60, prereqId: 'ups_upgrade', effect: 'Cooling failures reduced by 50%' },
+  { id: 'auto_failover', branch: 'resilience', label: 'Auto Failover', description: 'Automated workload migration during incidents.', cost: 45000, researchTicks: 80, prereqId: 'redundant_cooling', effect: 'Incidents resolve 30% faster' },
+]
+
+export const TECH_BRANCH_COLORS: Record<TechBranch, string> = {
+  efficiency: '#00ccff',
+  performance: '#ff6644',
+  resilience: '#44ff88',
+}
+
+// ── Reputation System Types ───────────────────────────────────
+
+export type ReputationTier = 'unknown' | 'poor' | 'average' | 'good' | 'excellent' | 'legendary'
+
+export const REPUTATION_TIERS: { tier: ReputationTier; minScore: number; label: string; color: string; contractBonus: number }[] = [
+  { tier: 'unknown', minScore: 0, label: 'Unknown', color: '#666666', contractBonus: 0 },
+  { tier: 'poor', minScore: 10, label: 'Poor', color: '#ff4444', contractBonus: -0.2 },
+  { tier: 'average', minScore: 30, label: 'Average', color: '#ffaa00', contractBonus: 0 },
+  { tier: 'good', minScore: 50, label: 'Good', color: '#88cc44', contractBonus: 0.15 },
+  { tier: 'excellent', minScore: 75, label: 'Excellent', color: '#00ff88', contractBonus: 0.3 },
+  { tier: 'legendary', minScore: 95, label: 'Legendary', color: '#ff66ff', contractBonus: 0.5 },
+]
+
+export function getReputationTier(score: number): typeof REPUTATION_TIERS[number] {
+  let result = REPUTATION_TIERS[0]
+  for (const tier of REPUTATION_TIERS) {
+    if (score >= tier.minScore) result = tier
+  }
+  return result
+}
+
+// ── Spot Power Pricing Types ──────────────────────────────────
+
+/** Power market cycles through phases affecting $/kW */
+export const POWER_MARKET = {
+  baseCost: 0.50,
+  minMultiplier: 0.6,        // cheapest power can get (60% of base)
+  maxMultiplier: 2.0,         // most expensive (200% of base)
+  volatility: 0.08,           // max change per tick
+  meanReversion: 0.02,        // tendency to return to 1.0
+  spikeChance: 0.03,          // chance per tick of a price spike
+  spikeMultiplier: 1.5,       // additional multiplier during spike
+  spikeDuration: 8,           // ticks a spike lasts
+}
+
+// ── Hardware Depreciation Types ───────────────────────────────
+
+export const DEPRECIATION = {
+  serverLifespanTicks: 800,   // server reaches end-of-life after this many ticks
+  efficiencyFloor: 0.5,       // minimum efficiency (50% at end of life)
+  refreshCost: 1500,          // cost to refresh a server back to 100%
+  revenueDecayStart: 0.3,     // efficiency starts declining after 30% of lifespan
+}
 
 // ── Cooling System Constants ────────────────────────────────────
 
@@ -182,6 +373,13 @@ export const ACHIEVEMENT_CATALOG: AchievementDef[] = [
   { id: 'contract_complete', label: 'Delivered', description: 'Successfully complete a tenant contract.', icon: '🤝' },
   { id: 'gold_contract', label: 'Enterprise Grade', description: 'Accept a Gold tier contract.', icon: '👑' },
   { id: 'three_contracts', label: 'Full House', description: 'Have 3 active contracts simultaneously.', icon: '🏆' },
+  // Phase 2/3 achievements
+  { id: 'first_generator', label: 'Backup Plan', description: 'Purchase your first backup generator.', icon: '⚡' },
+  { id: 'fire_ready', label: 'Fire Ready', description: 'Install a fire suppression system.', icon: '🧯' },
+  { id: 'first_research', label: 'R&D Pioneer', description: 'Complete your first technology research.', icon: '🔬' },
+  { id: 'tech_savvy', label: 'Tech Savvy', description: 'Unlock 6 technologies.', icon: '🧪' },
+  { id: 'excellent_rep', label: 'Excellent Reputation', description: 'Reach Excellent reputation tier.', icon: '⭐' },
+  { id: 'hardware_refresh', label: 'Fresh Hardware', description: 'Refresh aging server hardware.', icon: '♻️' },
 ]
 
 export interface EnvironmentConfig {
@@ -231,10 +429,12 @@ export const ENVIRONMENT_CONFIG: Record<CabinetEnvironment, EnvironmentConfig> =
 export interface Cabinet {
   id: string
   environment: CabinetEnvironment
+  customerType: CustomerType  // workload type affecting power/heat/revenue
   serverCount: number     // 1–4 servers per cabinet
   hasLeafSwitch: boolean  // ToR switch mounted on top
   powerStatus: boolean
   heatLevel: number       // °C, dynamic per tick
+  serverAge: number       // ticks since last server refresh (for depreciation)
 }
 
 export interface SpineSwitch {
@@ -453,7 +653,8 @@ function calcTraffic(cabinets: Cabinet[], spines: SpineSwitch[], demandMultiplie
   let redirectedFlows = 0
 
   for (const cab of leafCabinets) {
-    const cabTraffic = cab.serverCount * TRAFFIC.gbpsPerServer * demandMultiplier
+    const custConfig = CUSTOMER_TYPE_CONFIG[cab.customerType]
+    const cabTraffic = cab.serverCount * TRAFFIC.gbpsPerServer * demandMultiplier * custConfig.bandwidthMultiplier
     const perSpineBw = cabTraffic / activeSpines.length
 
     for (const spine of activeSpines) {
@@ -506,7 +707,8 @@ function calcStats(cabinets: Cabinet[], spines: SpineSwitch[]) {
 
   for (const cab of cabinets) {
     if (cab.powerStatus) {
-      itPower += cab.serverCount * POWER_DRAW.server
+      const custConfig = CUSTOMER_TYPE_CONFIG[cab.customerType]
+      itPower += cab.serverCount * POWER_DRAW.server * custConfig.powerMultiplier
       if (cab.hasLeafSwitch) itPower += POWER_DRAW.leaf_switch
       heatSum += cab.heatLevel
       activeCabs++
@@ -590,8 +792,37 @@ interface GameState {
   spikeTicks: number            // ticks remaining on current spike
   spikeMagnitude: number        // additive demand from current spike
 
+  // Backup Generators
+  generators: Generator[]
+  generatorFuelCost: number     // fuel cost last tick
+  powerOutage: boolean          // whether a grid power outage is active
+  outageTicksRemaining: number  // ticks remaining on current outage
+
+  // Fire Suppression
+  suppressionType: SuppressionType
+  fireActive: boolean           // whether a fire event is in progress
+  fireDamageTaken: number       // total $ of equipment damage from fires
+
+  // Tech Tree
+  unlockedTech: string[]         // IDs of researched technologies
+  activeResearch: ActiveResearch | null
+  rdSpent: number                // total R&D investment for stats
+
+  // Reputation
+  reputationScore: number        // 0–100
+  uptimeTicks: number            // ticks with all SLAs met
+  totalOperatingTicks: number    // total ticks with equipment running
+
+  // Spot Power Pricing
+  powerPriceMultiplier: number   // current market rate multiplier (around 1.0)
+  powerPriceSpikeActive: boolean
+  powerPriceSpikeTicks: number
+
+  // Hardware Depreciation
+  totalRefreshes: number         // total server refreshes done
+
   // Actions
-  addCabinet: (environment: CabinetEnvironment) => void
+  addCabinet: (environment: CabinetEnvironment, customerType?: CustomerType) => void
   upgradeNextCabinet: () => void
   addLeafToNextCabinet: () => void
   addSpineSwitch: () => void
@@ -607,6 +838,11 @@ interface GameState {
   resolveIncident: (id: string) => void
   acceptContract: (index: number) => void
   dismissAchievement: () => void
+  buyGenerator: (optionIndex: number) => void
+  activateGenerator: (id: string) => void
+  upgradeSuppression: (type: SuppressionType) => void
+  startResearch: (techId: string) => void
+  refreshServers: (cabinetId: string) => void
   tick: () => void
 }
 
@@ -615,6 +851,7 @@ let nextSpineId = 1
 let nextLoanId = 1
 let nextIncidentId = 1
 let nextContractId = 1
+let nextGeneratorId = 1
 
 export const useGameStore = create<GameState>((set) => ({
   cabinets: [],
@@ -681,19 +918,50 @@ export const useGameStore = create<GameState>((set) => ({
   spikeTicks: 0,
   spikeMagnitude: 0,
 
+  // Backup Generators
+  generators: [],
+  generatorFuelCost: 0,
+  powerOutage: false,
+  outageTicksRemaining: 0,
+
+  // Fire Suppression
+  suppressionType: 'none' as SuppressionType,
+  fireActive: false,
+  fireDamageTaken: 0,
+
+  // Tech Tree
+  unlockedTech: [],
+  activeResearch: null,
+  rdSpent: 0,
+
+  // Reputation
+  reputationScore: 20,         // start as "unknown" tier
+  uptimeTicks: 0,
+  totalOperatingTicks: 0,
+
+  // Spot Power Pricing
+  powerPriceMultiplier: 1.0,
+  powerPriceSpikeActive: false,
+  powerPriceSpikeTicks: 0,
+
+  // Hardware Depreciation
+  totalRefreshes: 0,
+
   // ── Build Actions ───────────────────────────────────────────
 
-  addCabinet: (environment: CabinetEnvironment) =>
+  addCabinet: (environment: CabinetEnvironment, customerType: CustomerType = 'general') =>
     set((state) => {
       if (state.money < COSTS.cabinet) return state
       if (state.cabinets.length >= MAX_CABINETS) return state
       const cab: Cabinet = {
         id: `cab-${nextCabId++}`,
         environment,
+        customerType,
         serverCount: 1,
         hasLeafSwitch: false,
         powerStatus: true,
         heatLevel: SIM.ambientTemp,
+        serverAge: 0,
       }
       const newCabinets = [...state.cabinets, cab]
       return {
@@ -880,6 +1148,77 @@ export const useGameStore = create<GameState>((set) => ({
 
   dismissAchievement: () => set({ newAchievement: null }),
 
+  buyGenerator: (optionIndex: number) =>
+    set((state) => {
+      const config = GENERATOR_OPTIONS[optionIndex]
+      if (!config) return state
+      if (state.money < config.cost) return state
+      if (state.generators.length >= 3) return state
+      const gen: Generator = {
+        id: `gen-${nextGeneratorId++}`,
+        config,
+        status: 'standby',
+        fuelRemaining: config.fuelCapacity,
+        ticksUntilReady: 0,
+      }
+      return {
+        generators: [...state.generators, gen],
+        money: state.money - config.cost,
+      }
+    }),
+
+  activateGenerator: (id: string) =>
+    set((state) => {
+      return {
+        generators: state.generators.map((g) =>
+          g.id === id && g.status === 'standby' && g.fuelRemaining > 0
+            ? { ...g, status: 'running' as GeneratorStatus, ticksUntilReady: 0 }
+            : g
+        ),
+      }
+    }),
+
+  upgradeSuppression: (type: SuppressionType) =>
+    set((state) => {
+      const config = SUPPRESSION_CONFIG[type]
+      if (state.money < config.cost) return state
+      if (state.suppressionType === type) return state
+      return {
+        suppressionType: type,
+        money: state.money - config.cost,
+      }
+    }),
+
+  startResearch: (techId: string) =>
+    set((state) => {
+      if (state.activeResearch) return state
+      const tech = TECH_TREE.find((t) => t.id === techId)
+      if (!tech) return state
+      if (state.unlockedTech.includes(techId)) return state
+      if (tech.prereqId && !state.unlockedTech.includes(tech.prereqId)) return state
+      if (state.money < tech.cost) return state
+      return {
+        activeResearch: { techId, ticksRemaining: tech.researchTicks },
+        money: state.money - tech.cost,
+        rdSpent: state.rdSpent + tech.cost,
+      }
+    }),
+
+  refreshServers: (cabinetId: string) =>
+    set((state) => {
+      const cab = state.cabinets.find((c) => c.id === cabinetId)
+      if (!cab) return state
+      const cost = DEPRECIATION.refreshCost * cab.serverCount
+      if (state.money < cost) return state
+      return {
+        cabinets: state.cabinets.map((c) =>
+          c.id === cabinetId ? { ...c, serverAge: 0 } : c
+        ),
+        money: state.money - cost,
+        totalRefreshes: state.totalRefreshes + 1,
+      }
+    }),
+
   tick: () =>
     set((state) => {
       const newTickCount = state.tickCount + 1
@@ -969,6 +1308,123 @@ export const useGameStore = create<GameState>((set) => ({
         }
       }
 
+      // ── Tech tree effect helpers ──────────────────────────
+      const hasTech = (id: string) => state.unlockedTech.includes(id)
+      const techCoolingBonus = (hasTech('hot_aisle') ? 0.5 : 0) + (hasTech('immersion_cooling') ? 1.5 : 0)
+      const techOverheadReduction = (hasTech('variable_fans') ? 0.15 : 0) + (hasTech('immersion_cooling') ? 0.25 : 0)
+      const techRevenueBonus = hasTech('high_density') ? 0.15 : 0
+      const techAiBonus = hasTech('gpu_clusters') ? 0.30 : 0
+      const techLinkCapacity = hasTech('optical_interconnect') ? TRAFFIC.linkCapacityGbps * 2 : TRAFFIC.linkCapacityGbps
+      const techIncidentSpeedMult = hasTech('auto_failover') ? 0.7 : 1.0
+      const techCoolingFailureReduction = hasTech('redundant_cooling') ? 0.5 : 0
+
+      // ── Spot power pricing ───────────────────────────────
+      let powerPriceMultiplier = state.powerPriceMultiplier
+      let powerPriceSpikeActive = state.powerPriceSpikeActive
+      let powerPriceSpikeTicks = state.powerPriceSpikeTicks
+
+      if (powerPriceSpikeActive) {
+        powerPriceSpikeTicks--
+        if (powerPriceSpikeTicks <= 0) {
+          powerPriceSpikeActive = false
+          powerPriceSpikeTicks = 0
+        }
+      } else if (Math.random() < POWER_MARKET.spikeChance) {
+        powerPriceSpikeActive = true
+        powerPriceSpikeTicks = POWER_MARKET.spikeDuration
+      }
+
+      // Random walk with mean reversion
+      const priceChange = (Math.random() - 0.5) * 2 * POWER_MARKET.volatility
+      const reversion = (1.0 - powerPriceMultiplier) * POWER_MARKET.meanReversion
+      powerPriceMultiplier = Math.max(
+        POWER_MARKET.minMultiplier,
+        Math.min(POWER_MARKET.maxMultiplier,
+          +(powerPriceMultiplier + priceChange + reversion).toFixed(3)
+        )
+      )
+      const effectivePowerPrice = powerPriceSpikeActive
+        ? +(powerPriceMultiplier * POWER_MARKET.spikeMultiplier).toFixed(3)
+        : powerPriceMultiplier
+
+      // ── Power outage system ──────────────────────────────
+      let powerOutage = state.powerOutage
+      let outageTicksRemaining = state.outageTicksRemaining
+
+      if (powerOutage) {
+        outageTicksRemaining--
+        if (outageTicksRemaining <= 0) {
+          powerOutage = false
+          outageTicksRemaining = 0
+          incidentLog = ['Grid power restored.', ...incidentLog].slice(0, 10)
+        }
+      }
+
+      // Power outages triggered by power_surge incidents (10% chance per tick while active)
+      const hasPowerSurge = activeIncidents.some((i) => !i.resolved && i.def.effect === 'power_surge')
+      if (!powerOutage && hasPowerSurge && Math.random() < 0.10) {
+        powerOutage = true
+        outageTicksRemaining = 5 + Math.floor(Math.random() * 8)
+        incidentLog = ['GRID POWER OUTAGE! Generators needed!', ...incidentLog].slice(0, 10)
+      }
+
+      // ── Generator system ─────────────────────────────────
+      let generatorFuelCost = 0
+      let generatorPowerAvailable = 0
+
+      const updatedGenerators = state.generators.map((gen) => {
+        const g = { ...gen }
+        if (g.status === 'running') {
+          if (g.fuelRemaining <= 0) {
+            g.status = 'cooldown'
+            g.ticksUntilReady = g.config.cooldownTicks
+          } else {
+            g.fuelRemaining--
+            generatorFuelCost += g.config.fuelCostPerTick
+            generatorPowerAvailable += g.config.powerCapacityW
+          }
+        } else if (g.status === 'cooldown') {
+          g.ticksUntilReady--
+          if (g.ticksUntilReady <= 0) {
+            g.status = 'standby'
+            g.ticksUntilReady = 0
+          }
+        }
+        // Auto-start generators during outage if on standby
+        if (powerOutage && g.status === 'standby' && g.fuelRemaining > 0) {
+          g.status = 'running'
+          g.ticksUntilReady = 0
+        }
+        return g
+      })
+
+      // During outage: if generators can't cover total power, reduce revenue
+      let outagePenalty = 1.0
+      if (powerOutage) {
+        // UPS bridge from tech tree
+        const hasUpsBridge = hasTech('ups_upgrade')
+        if (hasUpsBridge && outageTicksRemaining > (state.outageTicksRemaining - 5)) {
+          // UPS covers first 5 ticks
+          outagePenalty = 1.0
+        } else if (generatorPowerAvailable <= 0) {
+          outagePenalty = 0 // total blackout — no revenue
+        } else {
+          const totalDraw = (state.totalPower + state.coolingPower) || 1
+          outagePenalty = Math.min(1.0, generatorPowerAvailable / totalDraw)
+        }
+      }
+
+      // ── Fire system ──────────────────────────────────────
+      let fireActive = state.fireActive
+      let fireDamageTaken = state.fireDamageTaken
+
+      // Fires triggered by critical temps or heat_spike incidents (3% per tick)
+      const hasCriticalTemp = state.cabinets.some((c) => c.heatLevel >= SIM.criticalTemp)
+      if (!fireActive && hasCriticalTemp && Math.random() < 0.03) {
+        fireActive = true
+        incidentLog = ['FIRE DETECTED! Suppression system activating...', ...incidentLog].slice(0, 10)
+      }
+
       // ── Main simulation ────────────────────────────────────
       const coolingConfig = COOLING_CONFIG[state.coolingType]
 
@@ -987,6 +1443,20 @@ export const useGameStore = create<GameState>((set) => ({
           })
           .filter((loan) => loan.remaining > 0.01)
 
+        // Progress research even with no equipment
+        let activeResearch = state.activeResearch
+        let unlockedTech = [...state.unlockedTech]
+        if (activeResearch) {
+          const remaining = activeResearch.ticksRemaining - 1
+          if (remaining <= 0) {
+            unlockedTech = [...unlockedTech, activeResearch.techId]
+            incidentLog = [`Research complete: ${TECH_TREE.find((t) => t.id === activeResearch!.techId)?.label}`, ...incidentLog].slice(0, 10)
+            activeResearch = null
+          } else {
+            activeResearch = { ...activeResearch, ticksRemaining: remaining }
+          }
+        }
+
         return {
           tickCount: newTickCount,
           gameHour: newHour,
@@ -1000,58 +1470,157 @@ export const useGameStore = create<GameState>((set) => ({
           activeIncidents,
           incidentLog,
           resolvedCount,
+          powerPriceMultiplier,
+          powerPriceSpikeActive,
+          powerPriceSpikeTicks,
+          generators: updatedGenerators,
+          generatorFuelCost: 0,
+          powerOutage,
+          outageTicksRemaining,
+          activeResearch,
+          unlockedTech,
         }
       }
 
-      // 1. Update heat per cabinet
+      // Reduce incident durations faster with auto_failover tech
+      if (techIncidentSpeedMult < 1.0) {
+        activeIncidents = activeIncidents.map((i) => {
+          if (i.resolved) return i
+          const extraReduction = Math.random() < (1 - techIncidentSpeedMult) ? 1 : 0
+          const remaining = i.ticksRemaining - extraReduction
+          if (remaining <= 0) {
+            incidentLog = [`Auto-resolved: ${i.def.label}`, ...incidentLog].slice(0, 10)
+            return { ...i, ticksRemaining: 0, resolved: true }
+          }
+          return { ...i, ticksRemaining: remaining }
+        })
+      }
+
+      // Reduce cooling failure effect with redundant cooling tech
+      if (techCoolingFailureReduction > 0) {
+        incidentCoolingMult = 1 - (1 - incidentCoolingMult) * (1 - techCoolingFailureReduction)
+      }
+
+      // 1. Update heat per cabinet (with customer type and tech modifiers)
       const newCabinets = state.cabinets.map((cab) => {
         let heat = cab.heatLevel
         const envConfig = ENVIRONMENT_CONFIG[cab.environment]
+        const custConfig = CUSTOMER_TYPE_CONFIG[cab.customerType]
 
         if (cab.powerStatus) {
-          // Heat generation from active equipment (scaled by environment)
-          heat += cab.serverCount * SIM.heatPerServer * envConfig.heatMultiplier
+          // Heat generation scaled by environment AND customer type
+          heat += cab.serverCount * SIM.heatPerServer * envConfig.heatMultiplier * custConfig.heatMultiplier
           if (cab.hasLeafSwitch) heat += SIM.heatPerLeaf
         }
 
-        // Cooling dissipation (based on cooling type; reduced by incident effects)
-        heat -= coolingConfig.coolingRate * incidentCoolingMult
+        // Cooling dissipation (base + tech bonus; reduced by incident effects)
+        heat -= (coolingConfig.coolingRate + techCoolingBonus) * incidentCoolingMult
 
         // Incident heat spike
         heat += incidentHeatAdd
 
+        // Fire adds extra heat
+        if (fireActive) heat += 5
+
         // Clamp to ambient minimum and 100 max
         heat = Math.max(SIM.ambientTemp, Math.min(100, heat))
 
-        return { ...cab, heatLevel: Math.round(heat * 10) / 10 }
+        // Age servers (depreciation)
+        const newAge = cab.powerStatus ? cab.serverAge + 1 : cab.serverAge
+
+        return { ...cab, heatLevel: Math.round(heat * 10) / 10, serverAge: newAge }
       })
+
+      // Handle fire suppression
+      let fireEquipmentDamage = 0
+      if (fireActive) {
+        const suppConfig = SUPPRESSION_CONFIG[state.suppressionType]
+        if (suppConfig.effectiveness > 0 && Math.random() < suppConfig.effectiveness) {
+          // Fire suppressed
+          fireActive = false
+          if (suppConfig.equipmentDamage) {
+            // Water suppression damages equipment — lose ~25% of a random cabinet's servers
+            const targetIdx = Math.floor(Math.random() * newCabinets.length)
+            const target = newCabinets[targetIdx]
+            if (target && target.serverCount > 1) {
+              const lost = Math.ceil(target.serverCount * 0.25)
+              newCabinets[targetIdx] = { ...target, serverCount: Math.max(1, target.serverCount - lost) }
+              fireEquipmentDamage = lost * COSTS.server
+              fireDamageTaken += fireEquipmentDamage
+              incidentLog = [`Fire suppressed (water) — ${lost} server(s) destroyed`, ...incidentLog].slice(0, 10)
+            } else {
+              incidentLog = ['Fire suppressed (water) — minimal damage', ...incidentLog].slice(0, 10)
+            }
+          } else {
+            incidentLog = ['Fire suppressed (gas) — no equipment damage', ...incidentLog].slice(0, 10)
+          }
+        } else if (state.suppressionType === 'none') {
+          // No suppression — fire burns for longer and causes damage
+          const targetIdx = Math.floor(Math.random() * newCabinets.length)
+          const target = newCabinets[targetIdx]
+          if (target && Math.random() < 0.15) {
+            newCabinets[targetIdx] = { ...target, serverCount: Math.max(1, target.serverCount - 1) }
+            fireEquipmentDamage = COSTS.server
+            fireDamageTaken += fireEquipmentDamage
+            incidentLog = ['Fire damage — server destroyed!', ...incidentLog].slice(0, 10)
+          }
+          // Fire burns out eventually (20% chance per tick)
+          if (Math.random() < 0.20) {
+            fireActive = false
+            incidentLog = ['Fire burned out on its own.', ...incidentLog].slice(0, 10)
+          }
+        }
+      }
 
       // 2. Calculate stats with updated heat
       const stats = calcStats(newCabinets, state.spineSwitches)
 
-      // Apply cooling type overhead reduction
+      // Apply cooling type overhead reduction + tech overhead reduction
+      const totalOverheadReduction = Math.min(0.9, coolingConfig.overheadReduction + techOverheadReduction)
       const adjustedCoolingPower = Math.round(
-        stats.coolingPower * (1 - coolingConfig.overheadReduction) * coolingConfig.operatingCostMult
+        stats.coolingPower * (1 - totalOverheadReduction) * coolingConfig.operatingCostMult
       )
 
-      // 3. Calculate revenue (scaled by environment and demand, modified by incidents)
+      // 3. Calculate revenue (with customer type, depreciation, tech bonuses, outage penalty)
       let revenue = 0
       for (const cab of newCabinets) {
         if (cab.powerStatus) {
           const envConfig = ENVIRONMENT_CONFIG[cab.environment]
-          const baseRevenue = cab.serverCount * SIM.revenuePerServer * envConfig.revenueMultiplier
+          const custConfig = CUSTOMER_TYPE_CONFIG[cab.customerType]
+
+          // Depreciation efficiency: decays after revenueDecayStart of lifespan
+          let depreciationEff = 1.0
+          const lifeProgress = cab.serverAge / DEPRECIATION.serverLifespanTicks
+          if (lifeProgress > DEPRECIATION.revenueDecayStart) {
+            const decayProgress = (lifeProgress - DEPRECIATION.revenueDecayStart) / (1 - DEPRECIATION.revenueDecayStart)
+            depreciationEff = Math.max(DEPRECIATION.efficiencyFloor, 1 - decayProgress * (1 - DEPRECIATION.efficiencyFloor))
+          }
+
+          let baseRevenue = cab.serverCount * SIM.revenuePerServer
+            * envConfig.revenueMultiplier
+            * custConfig.revenueMultiplier
+            * depreciationEff
+
+          // Tech bonuses
+          baseRevenue *= (1 + techRevenueBonus)
+          if (cab.customerType === 'ai_training') baseRevenue *= (1 + techAiBonus)
+
           // Throttled servers earn half revenue
           const throttled = cab.heatLevel >= SIM.throttleTemp
           revenue += throttled ? baseRevenue * 0.5 : baseRevenue
         }
       }
-      revenue *= incidentRevenueMult
+      revenue *= incidentRevenueMult * outagePenalty
 
-      // 4. Calculate expenses (with incident power surge effect)
+      // Reputation bonus on contract revenue
+      const repTier = getReputationTier(state.reputationScore)
+
+      // 4. Calculate expenses (with spot pricing, incident power surge, customer type power draw)
       const effectivePower = Math.round(stats.totalPower * incidentPowerMult)
-      const powerCost = +(effectivePower / 1000 * SIM.powerCostPerKW).toFixed(2)
-      const coolingCost = +(adjustedCoolingPower / 1000 * SIM.powerCostPerKW).toFixed(2)
-      const expenses = +(powerCost + coolingCost).toFixed(2)
+      const spotPowerCost = SIM.powerCostPerKW * effectivePowerPrice
+      const powerCost = +(effectivePower / 1000 * spotPowerCost).toFixed(2)
+      const coolingCost = +(adjustedCoolingPower / 1000 * spotPowerCost).toFixed(2)
+      const expenses = +(powerCost + coolingCost + generatorFuelCost).toFixed(2)
 
       // 5. Process loan payments
       let loanPayments = 0
@@ -1093,8 +1662,9 @@ export const useGameStore = create<GameState>((set) => ({
 
           if (slaMet) {
             consecutiveViolations = 0
-            contractRevenue += contract.def.revenuePerTick
-            totalEarned += contract.def.revenuePerTick
+            const tickRev = contract.def.revenuePerTick * (1 + repTier.contractBonus)
+            contractRevenue += tickRev
+            totalEarned += tickRev
           } else {
             consecutiveViolations++
             totalViolationTicks++
@@ -1114,7 +1684,6 @@ export const useGameStore = create<GameState>((set) => ({
           if (ticksRemaining <= 0) {
             status = 'completed'
             completedContracts++
-            // Completion bonus added to contract revenue
             contractRevenue += contract.def.completionBonus
             totalEarned += contract.def.completionBonus
             contractLog = [`COMPLETED: ${contract.def.company} — Bonus $${contract.def.completionBonus.toLocaleString()}!`, ...contractLog].slice(0, 10)
@@ -1125,19 +1694,19 @@ export const useGameStore = create<GameState>((set) => ({
         })
         .filter((c) => c.status === 'active') // Remove completed/terminated
 
-      // Generate new contract offers periodically
+      // Generate new contract offers periodically (reputation affects quality)
       let contractOffers = state.contractOffers
       if (newTickCount % CONTRACT_OFFER_INTERVAL === 0 || (state.contractOffers.length === 0 && newCabinets.length >= 2)) {
-        // Filter eligible contracts based on facility size
         const eligible = CONTRACT_CATALOG.filter((def) => {
-          // Only offer contracts the player could plausibly fulfill
           const totalProdServers = newCabinets
             .filter((c) => c.environment === 'production')
             .reduce((sum, c) => sum + c.serverCount, 0)
-          return totalProdServers >= Math.ceil(def.minServers * 0.5) // Offer if player has at least half the required servers
+          // Reputation gates higher-tier contracts
+          if (def.tier === 'gold' && state.reputationScore < 50) return false
+          if (def.tier === 'silver' && state.reputationScore < 25) return false
+          return totalProdServers >= Math.ceil(def.minServers * 0.5)
         })
         if (eligible.length > 0) {
-          // Pick random offers (no duplicates of active contracts)
           const activeTypes = new Set(updatedContracts.map((c) => c.def.type))
           const available = eligible.filter((d) => !activeTypes.has(d.type))
           const shuffled = [...available].sort(() => Math.random() - 0.5)
@@ -1149,9 +1718,56 @@ export const useGameStore = create<GameState>((set) => ({
       const netIncome = revenue + contractRevenue - expenses - loanPayments - contractPenalties
       const newMoney = Math.round((state.money + netIncome) * 100) / 100
 
-      // 8. Calculate traffic flows (scaled by demand multiplier, modified by incidents)
+      // 8. Calculate traffic flows (with tech link capacity override)
       const effectiveDemand = demandMultiplier * incidentTrafficMult
-      const trafficStats = calcTraffic(newCabinets, state.spineSwitches, effectiveDemand)
+      const trafficStats = hasTech('optical_interconnect')
+        ? calcTrafficWithCapacity(newCabinets, state.spineSwitches, effectiveDemand, techLinkCapacity)
+        : calcTraffic(newCabinets, state.spineSwitches, effectiveDemand)
+
+      // 9. Progress tech research
+      let activeResearch = state.activeResearch
+      let unlockedTech = [...state.unlockedTech]
+      if (activeResearch) {
+        const remaining = activeResearch.ticksRemaining - 1
+        if (remaining <= 0) {
+          unlockedTech = [...unlockedTech, activeResearch.techId]
+          const techDef = TECH_TREE.find((t) => t.id === activeResearch!.techId)
+          incidentLog = [`Research complete: ${techDef?.label}`, ...incidentLog].slice(0, 10)
+          activeResearch = null
+        } else {
+          activeResearch = { ...activeResearch, ticksRemaining: remaining }
+        }
+      }
+
+      // 10. Update reputation score
+      const totalOperatingTicks = state.totalOperatingTicks + 1
+      let reputationScore = state.reputationScore
+      let uptimeTicks = state.uptimeTicks
+
+      // Reputation increases with good operations, decreases with problems
+      const allContractsSlasMet = updatedContracts.every((c) => c.consecutiveViolations === 0)
+      if (allContractsSlasMet && !powerOutage && !fireActive) {
+        uptimeTicks++
+        // Slowly increase reputation
+        if (reputationScore < 100) {
+          reputationScore = Math.min(100, +(reputationScore + 0.05).toFixed(2))
+        }
+      } else {
+        // Decrease reputation for problems
+        if (powerOutage) reputationScore = Math.max(0, +(reputationScore - 0.3).toFixed(2))
+        if (fireActive) reputationScore = Math.max(0, +(reputationScore - 0.5).toFixed(2))
+        if (!allContractsSlasMet) reputationScore = Math.max(0, +(reputationScore - 0.15).toFixed(2))
+      }
+      // Bonus for completed contracts
+      if (completedContracts > state.completedContracts) {
+        reputationScore = Math.min(100, +(reputationScore + 2).toFixed(2))
+      }
+      // Penalty for terminated contracts
+      const terminatedThisTick = state.activeContracts.length - updatedContracts.length -
+        (completedContracts - state.completedContracts)
+      if (terminatedThisTick > 0) {
+        reputationScore = Math.max(0, +(reputationScore - 5 * terminatedThisTick).toFixed(2))
+      }
 
       // ── Achievement checks ─────────────────────────────────
       const unlockedIds = new Set(state.achievements.map((a) => a.def.id))
@@ -1187,6 +1803,13 @@ export const useGameStore = create<GameState>((set) => ({
       if (completedContracts > 0) unlock('contract_complete')
       if (state.activeContracts.some((c) => c.def.tier === 'gold') || updatedContracts.some((c) => c.def.tier === 'gold')) unlock('gold_contract')
       if (updatedContracts.length >= 3) unlock('three_contracts')
+      // New achievements for Phase 2/3 features
+      if (updatedGenerators.length >= 1) unlock('first_generator')
+      if (state.suppressionType !== 'none') unlock('fire_ready')
+      if (unlockedTech.length >= 1) unlock('first_research')
+      if (unlockedTech.length >= 6) unlock('tech_savvy')
+      if (reputationScore >= 75) unlock('excellent_rep')
+      if (state.totalRefreshes >= 1) unlock('hardware_refresh')
 
       return {
         cabinets: newCabinets,
@@ -1215,8 +1838,64 @@ export const useGameStore = create<GameState>((set) => ({
         completedContracts,
         achievements: newAchievements,
         newAchievement,
+        // New system states
+        generators: updatedGenerators,
+        generatorFuelCost: +generatorFuelCost.toFixed(2),
+        powerOutage,
+        outageTicksRemaining,
+        fireActive,
+        fireDamageTaken,
+        unlockedTech,
+        activeResearch,
+        reputationScore,
+        uptimeTicks,
+        totalOperatingTicks,
+        powerPriceMultiplier,
+        powerPriceSpikeActive,
+        powerPriceSpikeTicks,
         ...stats,
         coolingPower: adjustedCoolingPower,
       }
     }),
 }))
+
+/** Variant of calcTraffic that uses a custom link capacity (for optical interconnect tech) */
+function calcTrafficWithCapacity(cabinets: Cabinet[], spines: SpineSwitch[], demandMultiplier: number, linkCapacity: number): TrafficStats {
+  const emptyStats: TrafficStats = {
+    totalFlows: 0, totalBandwidthGbps: 0, totalCapacityGbps: 0,
+    redirectedFlows: 0, links: [], spineUtilization: {},
+  }
+  const activeSpines = spines.filter((s) => s.powerStatus)
+  const leafCabinets = cabinets.filter((c) => c.hasLeafSwitch && c.powerStatus)
+  if (activeSpines.length === 0 || leafCabinets.length === 0) return emptyStats
+
+  const links: TrafficLink[] = []
+  const spineLoad: Record<string, number> = {}
+  const spineCapacity: Record<string, number> = {}
+  for (const spine of activeSpines) { spineLoad[spine.id] = 0; spineCapacity[spine.id] = 0 }
+
+  const downSpines = spines.length - activeSpines.length
+  const isRedirecting = downSpines > 0 && leafCabinets.length > 0
+  let totalFlows = 0, totalBw = 0, totalCap = 0, redirectedFlows = 0
+
+  for (const cab of leafCabinets) {
+    const custConfig = CUSTOMER_TYPE_CONFIG[cab.customerType]
+    const cabTraffic = cab.serverCount * TRAFFIC.gbpsPerServer * demandMultiplier * custConfig.bandwidthMultiplier
+    const perSpineBw = cabTraffic / activeSpines.length
+    for (const spine of activeSpines) {
+      const bandwidth = Math.min(perSpineBw, linkCapacity)
+      const utilization = bandwidth / linkCapacity
+      const redirected = isRedirecting
+      links.push({ leafCabinetId: cab.id, spineId: spine.id, bandwidthGbps: +bandwidth.toFixed(2), capacityGbps: linkCapacity, utilization: +utilization.toFixed(3), redirected })
+      spineLoad[spine.id] += bandwidth; spineCapacity[spine.id] += linkCapacity
+      totalFlows++; totalBw += bandwidth; totalCap += linkCapacity
+      if (redirected) redirectedFlows++
+    }
+  }
+  const spineUtilization: Record<string, number> = {}
+  for (const spine of activeSpines) {
+    const cap = spineCapacity[spine.id]
+    spineUtilization[spine.id] = cap > 0 ? +(spineLoad[spine.id] / cap).toFixed(3) : 0
+  }
+  return { totalFlows, totalBandwidthGbps: +totalBw.toFixed(2), totalCapacityGbps: +totalCap.toFixed(2), redirectedFlows, links, spineUtilization }
+}
