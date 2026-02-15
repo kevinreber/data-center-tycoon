@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import type { LayerVisibility, LayerOpacity, LayerColors, LayerColorOverrides, TrafficLink, CabinetEnvironment, CabinetFacing, PlacementHint } from '@/stores/gameStore'
-import { DEFAULT_COLORS, ENVIRONMENT_CONFIG } from '@/stores/gameStore'
+import { DEFAULT_COLORS, ENVIRONMENT_CONFIG, MAX_SERVERS_PER_CABINET } from '@/stores/gameStore'
 
 const COLORS = DEFAULT_COLORS
 
@@ -655,6 +655,23 @@ class DataCenterScene extends Phaser.Scene {
       .setAlpha(powerMult * 0.5)
       .setDepth(baseDepth + 1)
     labels.push(envLabel)
+
+    // Content summary label — shows slot fill state so players know what's inside
+    const srvText = `${entry.serverCount}/${MAX_SERVERS_PER_CABINET}`
+    const leafText = entry.hasLeafSwitch ? 'leaf' : 'no leaf'
+    const isEmpty = entry.serverCount === 0 && !entry.hasLeafSwitch
+    const summaryStr = isEmpty ? 'EMPTY' : `${srvText} · ${leafText}`
+    const summaryColor = isEmpty ? '#665544' : '#556677'
+    const summaryLabel = this.add
+      .text(cx, topY + 17, summaryStr, {
+        fontFamily: 'monospace',
+        fontSize: '5px',
+        color: summaryColor,
+      })
+      .setOrigin(0.5)
+      .setAlpha(powerMult * 0.6)
+      .setDepth(baseDepth + 1)
+    labels.push(summaryLabel)
 
     // Facing direction indicator (small arrow for hot/cold aisle)
     const oldFacing = this.facingIndicators.get(entry.id)
