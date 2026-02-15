@@ -47,22 +47,18 @@ export function GameCanvas() {
     }
   }, [])
 
-  // Register callbacks on scene once it's ready
+  // Sync placement mode to Phaser and register tile callbacks
+  // Callbacks are registered here (not in a separate mount-time effect) because
+  // the Phaser scene boots asynchronously and isn't ready on initial mount.
+  // By the time the user enters placement mode, the scene is guaranteed to exist.
   useEffect(() => {
     if (!gameRef.current) return
     const scene = getScene(gameRef.current)
     if (!scene) return
     scene.setOnTileClick(handleTileClick)
     scene.setOnTileHover(handleTileHover)
-  }, [handleTileClick, handleTileHover])
-
-  // Sync placement mode to Phaser
-  useEffect(() => {
-    if (!gameRef.current) return
-    const scene = getScene(gameRef.current)
-    if (!scene) return
     scene.setPlacementMode(placementMode)
-  }, [placementMode])
+  }, [placementMode, handleTileClick, handleTileHover])
 
   // Sync suite tier (grid dimensions) to Phaser
   useEffect(() => {

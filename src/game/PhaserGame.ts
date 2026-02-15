@@ -157,7 +157,8 @@ class DataCenterScene extends Phaser.Scene {
         this.hoveredTile = null
         return
       }
-      const tile = this.screenToIso(pointer.x, pointer.y)
+      const worldPoint = this.cameras.main.getWorldPoint(pointer.x, pointer.y)
+      const tile = this.screenToIso(worldPoint.x, worldPoint.y)
       if (tile && tile.col >= 0 && tile.col < this.cabCols && tile.row >= 0 && tile.row < this.cabRows) {
         this.hoveredTile = tile
         this.drawPlacementHighlight(tile.col, tile.row)
@@ -200,7 +201,8 @@ class DataCenterScene extends Phaser.Scene {
     this.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
       // If left-click didn't become a drag, treat as cabinet selection click
       if (this.isPotentialDrag && !this.isDragging && !this.placementActive) {
-        const tile = this.screenToIso(pointer.x - this.panOffsetX, pointer.y - this.panOffsetY)
+        const wp = this.cameras.main.getWorldPoint(pointer.x, pointer.y)
+        const tile = this.screenToIso(wp.x, wp.y)
         if (tile) {
           let foundCab: string | null = null
           for (const [id, entry] of this.cabEntries) {
