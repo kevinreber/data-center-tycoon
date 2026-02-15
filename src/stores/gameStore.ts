@@ -197,6 +197,75 @@ export const DEPRECIATION = {
   revenueDecayStart: 0.3,     // efficiency starts declining after 30% of lifespan
 }
 
+// ── Infrastructure Layout Types ──────────────────────────────
+
+/** Cabinet facing direction for hot/cold aisle enforcement */
+export type CabinetFacing = 'north' | 'south'
+
+/** Power Distribution Unit placed on the grid */
+export interface PDU {
+  id: string
+  col: number                   // grid column position
+  row: number                   // grid row position (placed adjacent to cabinet rows)
+  maxCapacityKW: number         // maximum circuit capacity in kilowatts
+  label: string
+}
+
+export interface PDUConfig {
+  label: string
+  cost: number
+  maxCapacityKW: number
+  range: number                 // Manhattan distance of cabinets this PDU can serve
+  description: string
+}
+
+export const PDU_OPTIONS: PDUConfig[] = [
+  { label: 'Basic PDU', cost: 3000, maxCapacityKW: 10, range: 2, description: 'Small power distribution unit. Supports a few nearby cabinets.' },
+  { label: 'Metered PDU', cost: 8000, maxCapacityKW: 30, range: 3, description: 'Mid-range PDU with metered outputs. Covers a full row of cabinets.' },
+  { label: 'Intelligent PDU', cost: 18000, maxCapacityKW: 80, range: 4, description: 'Enterprise-grade intelligent PDU. High capacity, wide coverage radius.' },
+]
+
+/** Cable tray placed on the grid — provides pathways for network cables */
+export interface CableTray {
+  id: string
+  col: number
+  row: number
+  capacityUnits: number         // max cable runs that can pass through
+}
+
+export interface CableTrayConfig {
+  label: string
+  cost: number
+  capacityUnits: number
+  description: string
+}
+
+export const CABLE_TRAY_OPTIONS: CableTrayConfig[] = [
+  { label: 'Small Tray', cost: 500, capacityUnits: 4, description: 'Compact cable tray. Fits a few cable runs.' },
+  { label: 'Standard Tray', cost: 1200, capacityUnits: 8, description: 'Standard-width cable tray. Handles a moderate bundle.' },
+  { label: 'Heavy-Duty Tray', cost: 2500, capacityUnits: 16, description: 'Wide heavy-duty cable tray. Supports dense cabling layouts.' },
+]
+
+/** A structured cable run connecting a leaf switch to a spine switch */
+export interface CableRun {
+  id: string
+  leafCabinetId: string
+  spineId: string
+  length: number                // Manhattan distance of the cable path
+  capacityGbps: number          // bandwidth capacity of this cable
+  usesTrays: boolean            // whether this cable is routed through trays
+}
+
+/** Hot/cold aisle configuration */
+export const AISLE_CONFIG = {
+  coolingBonusPerPair: 0.08,    // 8% cooling overhead reduction per properly paired row
+  maxCoolingBonus: 0.25,        // maximum 25% reduction from aisle enforcement
+  heatPenaltyViolation: 0.5,   // extra °C/tick per cabinet violating aisle layout
+  messyCablingPenalty: 0.02,    // extra incident chance per messy (untray'd) cable run
+  maxCableLength: 8,            // max cable length before signal degradation
+  degradedCablePenalty: 0.10,   // 10% bandwidth penalty on over-length cables
+}
+
 // ── Suite Tier Config ──────────────────────────────────────────
 
 export interface SuiteConfig {
@@ -447,6 +516,11 @@ export const ACHIEVEMENT_CATALOG: AchievementDef[] = [
   { id: 'hardware_refresh', label: 'Fresh Hardware', description: 'Refresh aging server hardware.', icon: '♻️' },
   { id: 'suite_upgrade', label: 'Moving Up', description: 'Upgrade your facility to a bigger suite.', icon: '🏢' },
   { id: 'enterprise_suite', label: 'Hyperscale', description: 'Reach Enterprise suite tier.', icon: '🏗️' },
+  // Infrastructure layout achievements
+  { id: 'first_pdu', label: 'Power Planned', description: 'Place your first PDU.', icon: '🔌' },
+  { id: 'first_cable_tray', label: 'Cable Management', description: 'Place your first cable tray.', icon: '🔧' },
+  { id: 'proper_aisles', label: 'Hot/Cold Aisles', description: 'Achieve a hot/cold aisle cooling bonus.', icon: '🌡️' },
+  { id: 'clean_cabling', label: 'Clean Cabling', description: 'Route all cables through trays with zero messy runs.', icon: '✨' },
 ]
 
 export interface EnvironmentConfig {
@@ -504,6 +578,7 @@ export interface Cabinet {
   powerStatus: boolean
   heatLevel: number       // °C, dynamic per tick
   serverAge: number       // ticks since last server refresh (for depreciation)
+  facing: CabinetFacing   // direction cabinet faces (for hot/cold aisle)
 }
 
 // ── Placement Strategy Hints ────────────────────────────────────
@@ -554,6 +629,15 @@ export function getPlacementHints(
     const adjacentInRow = sameRow.filter((c) => Math.abs(c.col - col) === 1)
     if (adjacentInRow.length >= 2) {
       hints.push({ message: 'Dense row — plan cooling paths between cabinets', type: 'info' })
+    }
+  }
+
+  // Aisle facing hint (reusing rowCabs from above)
+  if (rowCabs.length > 0) {
+    const rowFacings = new Set(rowCabs.map((c) => c.facing))
+    if (rowFacings.size === 1) {
+      const facing = rowCabs[0].facing
+      hints.push({ message: `Row faces ${facing} — match this facing for aisle consistency`, type: 'info' })
     }
   }
 
@@ -632,6 +716,96 @@ export function calcManagementBonus(cabinets: Cabinet[]): number {
     }
   }
   return Math.min(MGMT_BONUS_CAP, mgmtServers * MGMT_BONUS_PER_SERVER)
+}
+
+// ── Infrastructure Layout Helpers ──────────────────────────────────
+
+/** Calculate Manhattan distance between two grid positions */
+function manhattanDist(c1: number, r1: number, c2: number, r2: number): number {
+  return Math.abs(c1 - c2) + Math.abs(r1 - r2)
+}
+
+/** Get cabinets within range of a PDU */
+export function getCabinetsInPDURange(pdu: PDU, cabinets: Cabinet[], pduConfig: PDUConfig): Cabinet[] {
+  return cabinets.filter((c) => manhattanDist(pdu.col, pdu.row, c.col, c.row) <= pduConfig.range)
+}
+
+/** Calculate current load on a PDU in kW */
+export function getPDULoad(pdu: PDU, cabinets: Cabinet[], pduConfig: PDUConfig): number {
+  const served = getCabinetsInPDURange(pdu, cabinets, pduConfig)
+  let loadW = 0
+  for (const cab of served) {
+    if (!cab.powerStatus) continue
+    const custConfig = CUSTOMER_TYPE_CONFIG[cab.customerType]
+    loadW += cab.serverCount * POWER_DRAW.server * custConfig.powerMultiplier
+    if (cab.hasLeafSwitch) loadW += POWER_DRAW.leaf_switch
+  }
+  return loadW / 1000
+}
+
+/** Check if a PDU is overloaded */
+export function isPDUOverloaded(pdu: PDU, cabinets: Cabinet[], pduConfig: PDUConfig): boolean {
+  return getPDULoad(pdu, cabinets, pduConfig) > pdu.maxCapacityKW
+}
+
+/** Calculate the cable length (Manhattan distance) between a cabinet and the spine row */
+function calcCableLength(cabCol: number, cabRow: number, _spineSlot: number, gridRows: number): number {
+  // Cable goes from cabinet to edge of grid (row 0) plus overhead distance to spine row
+  return cabRow + 1 + Math.abs(cabCol - Math.floor(gridRows / 2))
+}
+
+/** Calculate hot/cold aisle cooling bonus based on cabinet layout */
+export function calcAisleBonus(cabinets: Cabinet[]): number {
+  if (cabinets.length < 2) return 0
+
+  // Group cabinets by row
+  const rowMap = new Map<number, Cabinet[]>()
+  for (const cab of cabinets) {
+    const row = cab.row
+    const list = rowMap.get(row) ?? []
+    list.push(cab)
+    rowMap.set(row, list)
+  }
+
+  // Check for properly formed aisle pairs (adjacent rows with opposing faces)
+  let properPairs = 0
+  const rows = [...rowMap.keys()].sort((a, b) => a - b)
+  for (let i = 0; i < rows.length - 1; i++) {
+    const thisRow = rowMap.get(rows[i])!
+    const nextRow = rowMap.get(rows[i + 1])!
+    // Adjacent rows (consecutive) with cabinets facing toward each other = hot aisle
+    if (rows[i + 1] - rows[i] === 1) {
+      const thisFacingSouth = thisRow.every((c) => c.facing === 'south')
+      const nextFacingNorth = nextRow.every((c) => c.facing === 'north')
+      if (thisFacingSouth && nextFacingNorth) properPairs++
+      // Or the reverse orientation
+      const thisFacingNorth = thisRow.every((c) => c.facing === 'north')
+      const nextFacingSouth = nextRow.every((c) => c.facing === 'south')
+      if (thisFacingNorth && nextFacingSouth) properPairs++
+    }
+  }
+
+  return Math.min(AISLE_CONFIG.maxCoolingBonus, properPairs * AISLE_CONFIG.coolingBonusPerPair)
+}
+
+/** Count how many cabinets violate aisle layout (mixed facing in a row) */
+export function countAisleViolations(cabinets: Cabinet[]): number {
+  const rowMap = new Map<number, Set<CabinetFacing>>()
+  for (const cab of cabinets) {
+    const facings = rowMap.get(cab.row) ?? new Set()
+    facings.add(cab.facing)
+    rowMap.set(cab.row, facings)
+  }
+  let violations = 0
+  for (const facings of rowMap.values()) {
+    if (facings.size > 1) violations++ // mixed facings in the same row
+  }
+  return violations
+}
+
+/** Check how many cable runs are not routed through trays */
+export function countMessyCables(cableRuns: CableRun[]): number {
+  return cableRuns.filter((c) => !c.usesTrays).length
 }
 
 // ── Existing Constants ────────────────────────────────────────────
@@ -954,14 +1128,25 @@ interface GameState {
   // Suite / Facility
   suiteTier: SuiteTier           // current facility tier
 
+  // Infrastructure Layout
+  pdus: PDU[]                                 // placed power distribution units
+  cableTrays: CableTray[]                     // placed cable trays
+  cableRuns: CableRun[]                       // structured cable connections
+  aisleBonus: number                          // current hot/cold aisle cooling bonus (0–0.25)
+  aisleViolations: number                     // number of rows with mixed facings
+  messyCableCount: number                     // cables not routed through trays
+  pduOverloaded: boolean                      // whether any PDU is overloaded
+  infraIncidentBonus: number                  // extra incident chance from messy cables
+
   // Placement mode
   placementMode: boolean                      // whether user is in placement mode
   placementEnvironment: CabinetEnvironment    // selected environment for next placement
   placementCustomerType: CustomerType         // selected customer type for next placement
+  placementFacing: CabinetFacing              // selected facing for next placement
 
   // Actions
-  addCabinet: (col: number, row: number, environment: CabinetEnvironment, customerType?: CustomerType) => void
-  enterPlacementMode: (environment: CabinetEnvironment, customerType: CustomerType) => void
+  addCabinet: (col: number, row: number, environment: CabinetEnvironment, customerType?: CustomerType, facing?: CabinetFacing) => void
+  enterPlacementMode: (environment: CabinetEnvironment, customerType: CustomerType, facing?: CabinetFacing) => void
   exitPlacementMode: () => void
   upgradeNextCabinet: () => void
   addLeafToNextCabinet: () => void
@@ -984,6 +1169,11 @@ interface GameState {
   startResearch: (techId: string) => void
   refreshServers: (cabinetId: string) => void
   upgradeSuite: (tier: SuiteTier) => void
+  // Infrastructure actions
+  placePDU: (col: number, row: number, optionIndex: number) => void
+  placeCableTray: (col: number, row: number, optionIndex: number) => void
+  autoRouteCables: () => void
+  toggleCabinetFacing: (cabinetId: string) => void
   tick: () => void
 }
 
@@ -1091,21 +1281,32 @@ export const useGameStore = create<GameState>((set) => ({
   // Suite / Facility
   suiteTier: 'starter' as SuiteTier,
 
+  // Infrastructure Layout
+  pdus: [],
+  cableTrays: [],
+  cableRuns: [],
+  aisleBonus: 0,
+  aisleViolations: 0,
+  messyCableCount: 0,
+  pduOverloaded: false,
+  infraIncidentBonus: 0,
+
   // Placement mode
   placementMode: false,
   placementEnvironment: 'production' as CabinetEnvironment,
   placementCustomerType: 'general' as CustomerType,
+  placementFacing: 'north' as CabinetFacing,
 
   // ── Build Actions ───────────────────────────────────────────
 
-  addCabinet: (col: number, row: number, environment: CabinetEnvironment, customerType: CustomerType = 'general') =>
+  addCabinet: (col: number, row: number, environment: CabinetEnvironment, customerType: CustomerType = 'general', facing: CabinetFacing = 'north') =>
     set((state) => {
       if (state.money < COSTS.cabinet) return state
       const suiteLimits = getSuiteLimits(state.suiteTier)
       if (state.cabinets.length >= suiteLimits.maxCabinets) return state
       // Validate grid bounds
       if (col < 0 || col >= suiteLimits.cols || row < 0 || row >= suiteLimits.rows) return state
-      // Validate tile is not occupied
+      // Validate tile is not occupied (by cabinets, PDUs, or cable trays)
       if (state.cabinets.some((c) => c.col === col && c.row === row)) return state
       const cab: Cabinet = {
         id: `cab-${nextCabId++}`,
@@ -1118,18 +1319,23 @@ export const useGameStore = create<GameState>((set) => ({
         powerStatus: true,
         heatLevel: SIM.ambientTemp,
         serverAge: 0,
+        facing,
       }
       const newCabinets = [...state.cabinets, cab]
+      const newAisleBonus = calcAisleBonus(newCabinets)
+      const newAisleViolations = countAisleViolations(newCabinets)
       return {
         cabinets: newCabinets,
         money: state.money - COSTS.cabinet,
         placementMode: false,
+        aisleBonus: newAisleBonus,
+        aisleViolations: newAisleViolations,
         ...calcStats(newCabinets, state.spineSwitches),
       }
     }),
 
-  enterPlacementMode: (environment: CabinetEnvironment, customerType: CustomerType) =>
-    set({ placementMode: true, placementEnvironment: environment, placementCustomerType: customerType }),
+  enterPlacementMode: (environment: CabinetEnvironment, customerType: CustomerType, facing?: CabinetFacing) =>
+    set((state) => ({ placementMode: true, placementEnvironment: environment, placementCustomerType: customerType, placementFacing: facing ?? state.placementFacing })),
 
   exitPlacementMode: () =>
     set({ placementMode: false }),
@@ -1397,6 +1603,107 @@ export const useGameStore = create<GameState>((set) => ({
       }
     }),
 
+  // ── Infrastructure Actions ────────────────────────────────────
+
+  placePDU: (col: number, row: number, optionIndex: number) =>
+    set((state) => {
+      const config = PDU_OPTIONS[optionIndex]
+      if (!config) return state
+      if (state.money < config.cost) return state
+      // Max 6 PDUs
+      if (state.pdus.length >= 6) return state
+      // Can't place on occupied tile (cabinets)
+      if (state.cabinets.some((c) => c.col === col && c.row === row)) return state
+      if (state.pdus.some((p) => p.col === col && p.row === row)) return state
+      const pdu: PDU = {
+        id: `pdu-${state.pdus.length + 1}`,
+        col,
+        row,
+        maxCapacityKW: config.maxCapacityKW,
+        label: config.label,
+      }
+      return {
+        pdus: [...state.pdus, pdu],
+        money: state.money - config.cost,
+      }
+    }),
+
+  placeCableTray: (col: number, row: number, optionIndex: number) =>
+    set((state) => {
+      const config = CABLE_TRAY_OPTIONS[optionIndex]
+      if (!config) return state
+      if (state.money < config.cost) return state
+      // Max 20 cable trays
+      if (state.cableTrays.length >= 20) return state
+      // Can't stack on existing tray
+      if (state.cableTrays.some((t) => t.col === col && t.row === row)) return state
+      const tray: CableTray = {
+        id: `tray-${state.cableTrays.length + 1}`,
+        col,
+        row,
+        capacityUnits: config.capacityUnits,
+      }
+      return {
+        cableTrays: [...state.cableTrays, tray],
+        money: state.money - config.cost,
+      }
+    }),
+
+  autoRouteCables: () =>
+    set((state) => {
+      // Automatically create cable runs for all leaf-to-spine connections
+      const leafCabinets = state.cabinets.filter((c) => c.hasLeafSwitch)
+      const suiteLimits = getSuiteLimits(state.suiteTier)
+      const newCableRuns: CableRun[] = []
+      let cableId = 1
+
+      for (const cab of leafCabinets) {
+        for (let si = 0; si < state.spineSwitches.length; si++) {
+          const spine = state.spineSwitches[si]
+          const length = calcCableLength(cab.col, cab.row, si, suiteLimits.rows)
+
+          // Check if cable path passes through any cable tray
+          const usesTrays = state.cableTrays.some((tray) =>
+            manhattanDist(tray.col, tray.row, cab.col, cab.row) <= 2
+          )
+
+          const capacityGbps = length > AISLE_CONFIG.maxCableLength
+            ? TRAFFIC.linkCapacityGbps * (1 - AISLE_CONFIG.degradedCablePenalty)
+            : TRAFFIC.linkCapacityGbps
+
+          newCableRuns.push({
+            id: `cable-${cableId++}`,
+            leafCabinetId: cab.id,
+            spineId: spine.id,
+            length,
+            capacityGbps: +capacityGbps.toFixed(1),
+            usesTrays,
+          })
+        }
+      }
+
+      const messyCableCount = countMessyCables(newCableRuns)
+      const infraIncidentBonus = messyCableCount * AISLE_CONFIG.messyCablingPenalty
+
+      return {
+        cableRuns: newCableRuns,
+        messyCableCount,
+        infraIncidentBonus,
+      }
+    }),
+
+  toggleCabinetFacing: (cabinetId: string) =>
+    set((state) => {
+      const newCabinets = state.cabinets.map((c) =>
+        c.id === cabinetId ? { ...c, facing: (c.facing === 'north' ? 'south' : 'north') as CabinetFacing } : c
+      )
+      return {
+        cabinets: newCabinets,
+        aisleBonus: calcAisleBonus(newCabinets),
+        aisleViolations: countAisleViolations(newCabinets),
+      }
+    }),
+
   tick: () =>
     set((state) => {
       const newTickCount = state.tickCount + 1
@@ -1453,9 +1760,10 @@ export const useGameStore = create<GameState>((set) => ({
 
       // Spawn new incidents (only if we have equipment and fewer than max active)
       if (state.cabinets.length > 0 && activeIncidents.length < MAX_ACTIVE_INCIDENTS) {
-        // Scale chance with facility size
+        // Scale chance with facility size + messy cable penalty
         const sizeMultiplier = Math.min(2, state.cabinets.length / 8)
-        if (Math.random() < INCIDENT_CHANCE * sizeMultiplier) {
+        const cablingPenalty = state.infraIncidentBonus
+        if (Math.random() < INCIDENT_CHANCE * sizeMultiplier + cablingPenalty) {
           const def = INCIDENT_CATALOG[Math.floor(Math.random() * INCIDENT_CATALOG.length)]
           const incident: ActiveIncident = {
             id: `inc-${nextIncidentId++}`,
@@ -1679,6 +1987,53 @@ export const useGameStore = create<GameState>((set) => ({
         incidentCoolingMult = 1 - (1 - incidentCoolingMult) * (1 - techCoolingFailureReduction)
       }
 
+      // ── Infrastructure layout effects ──────────────────────
+      const currentAisleBonus = calcAisleBonus(state.cabinets)
+      const currentAisleViolations = countAisleViolations(state.cabinets)
+
+      // Check PDU overloads
+      let anyPDUOverloaded = false
+      for (const pdu of state.pdus) {
+        const pduConfig = PDU_OPTIONS.find((o) => o.label === pdu.label)
+        if (pduConfig && isPDUOverloaded(pdu, state.cabinets, pduConfig)) {
+          anyPDUOverloaded = true
+        }
+      }
+
+      // Auto-route cables periodically (every 10 ticks)
+      let cableRuns = state.cableRuns
+      let messyCableCount = state.messyCableCount
+      let infraIncidentBonus = state.infraIncidentBonus
+      if (newTickCount % 10 === 0) {
+        const leafCabinets = state.cabinets.filter((c) => c.hasLeafSwitch)
+        const suiteLimits = getSuiteLimits(state.suiteTier)
+        const newRuns: CableRun[] = []
+        let cid = 1
+        for (const cab of leafCabinets) {
+          for (let si = 0; si < state.spineSwitches.length; si++) {
+            const spine = state.spineSwitches[si]
+            const length = calcCableLength(cab.col, cab.row, si, suiteLimits.rows)
+            const usesTrays = state.cableTrays.some((tray) =>
+              manhattanDist(tray.col, tray.row, cab.col, cab.row) <= 2
+            )
+            const capacityGbps = length > AISLE_CONFIG.maxCableLength
+              ? TRAFFIC.linkCapacityGbps * (1 - AISLE_CONFIG.degradedCablePenalty)
+              : TRAFFIC.linkCapacityGbps
+            newRuns.push({
+              id: `cable-${cid++}`,
+              leafCabinetId: cab.id,
+              spineId: spine.id,
+              length,
+              capacityGbps: +capacityGbps.toFixed(1),
+              usesTrays,
+            })
+          }
+        }
+        cableRuns = newRuns
+        messyCableCount = countMessyCables(newRuns)
+        infraIncidentBonus = messyCableCount * AISLE_CONFIG.messyCablingPenalty
+      }
+
       // 1. Update heat per cabinet (with customer type and tech modifiers)
       const newCabinets = state.cabinets.map((cab) => {
         let heat = cab.heatLevel
@@ -1689,10 +2044,32 @@ export const useGameStore = create<GameState>((set) => ({
           // Heat generation scaled by environment AND customer type
           heat += cab.serverCount * SIM.heatPerServer * envConfig.heatMultiplier * custConfig.heatMultiplier
           if (cab.hasLeafSwitch) heat += SIM.heatPerLeaf
+
+          // Aisle violation penalty: mixed facings in a row add extra heat
+          const rowCabs = state.cabinets.filter((c) => c.row === cab.row)
+          const rowFacings = new Set(rowCabs.map((c) => c.facing))
+          if (rowFacings.size > 1) {
+            heat += AISLE_CONFIG.heatPenaltyViolation
+          }
+
+          // PDU overload: cabinets on overloaded PDUs generate extra heat
+          if (anyPDUOverloaded) {
+            const cabinetPDUs = state.pdus.filter((pdu) => {
+              const cfg = PDU_OPTIONS.find((o) => o.label === pdu.label)
+              return cfg && manhattanDist(pdu.col, pdu.row, cab.col, cab.row) <= cfg.range
+            })
+            for (const pdu of cabinetPDUs) {
+              const cfg = PDU_OPTIONS.find((o) => o.label === pdu.label)
+              if (cfg && isPDUOverloaded(pdu, state.cabinets, cfg)) {
+                heat += 2.0 // overloaded PDU adds significant heat
+              }
+            }
+          }
         }
 
-        // Cooling dissipation (base + tech bonus; reduced by incident effects)
-        heat -= (coolingConfig.coolingRate + techCoolingBonus) * incidentCoolingMult
+        // Cooling dissipation (base + tech bonus + aisle bonus; reduced by incident effects)
+        const aisleCoolingBoost = currentAisleBonus * 2 // up to +0.5°C/tick extra cooling
+        heat -= (coolingConfig.coolingRate + techCoolingBonus + aisleCoolingBoost) * incidentCoolingMult
 
         // Incident heat spike
         heat += incidentHeatAdd
@@ -1753,8 +2130,8 @@ export const useGameStore = create<GameState>((set) => ({
       // 2. Calculate stats with updated heat
       const stats = calcStats(newCabinets, state.spineSwitches)
 
-      // Apply cooling type overhead reduction + tech overhead reduction
-      const totalOverheadReduction = Math.min(0.9, coolingConfig.overheadReduction + techOverheadReduction)
+      // Apply cooling type overhead reduction + tech overhead reduction + aisle bonus
+      const totalOverheadReduction = Math.min(0.9, coolingConfig.overheadReduction + techOverheadReduction + currentAisleBonus)
       const adjustedCoolingPower = Math.round(
         stats.coolingPower * (1 - totalOverheadReduction) * coolingConfig.operatingCostMult
       )
@@ -1782,6 +2159,21 @@ export const useGameStore = create<GameState>((set) => ({
           // Tech bonuses
           baseRevenue *= (1 + techRevenueBonus)
           if (cab.customerType === 'ai_training') baseRevenue *= (1 + techAiBonus)
+
+          // PDU overload penalty: cabinets on tripped PDUs earn nothing
+          if (anyPDUOverloaded) {
+            const cabinetPDUs = state.pdus.filter((pdu) => {
+              const cfg = PDU_OPTIONS.find((o) => o.label === pdu.label)
+              return cfg && manhattanDist(pdu.col, pdu.row, cab.col, cab.row) <= cfg.range
+            })
+            const isOnOverloaded = cabinetPDUs.some((pdu) => {
+              const cfg = PDU_OPTIONS.find((o) => o.label === pdu.label)
+              return cfg && isPDUOverloaded(pdu, state.cabinets, cfg)
+            })
+            if (isOnOverloaded && cabinetPDUs.length > 0) {
+              baseRevenue *= 0.5 // 50% revenue penalty for overloaded PDU
+            }
+          }
 
           // Throttled servers earn half revenue
           const throttled = cab.heatLevel >= SIM.throttleTemp
@@ -1990,6 +2382,11 @@ export const useGameStore = create<GameState>((set) => ({
       if (state.totalRefreshes >= 1) unlock('hardware_refresh')
       if (state.suiteTier !== 'starter') unlock('suite_upgrade')
       if (state.suiteTier === 'enterprise') unlock('enterprise_suite')
+      // Infrastructure achievements
+      if (state.pdus.length >= 1) unlock('first_pdu')
+      if (state.cableTrays.length >= 1) unlock('first_cable_tray')
+      if (currentAisleBonus > 0) unlock('proper_aisles')
+      if (cableRuns.length > 0 && messyCableCount === 0) unlock('clean_cabling')
 
       return {
         cabinets: newCabinets,
@@ -2035,6 +2432,13 @@ export const useGameStore = create<GameState>((set) => ({
         powerPriceSpikeTicks,
         ...stats,
         coolingPower: adjustedCoolingPower,
+        // Infrastructure state
+        aisleBonus: currentAisleBonus,
+        aisleViolations: currentAisleViolations,
+        pduOverloaded: anyPDUOverloaded,
+        cableRuns,
+        messyCableCount,
+        infraIncidentBonus,
       }
     }),
 }))

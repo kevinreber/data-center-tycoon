@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import type { LayerVisibility, LayerOpacity, LayerColors, LayerColorOverrides, TrafficLink, CabinetEnvironment, PlacementHint } from '@/stores/gameStore'
+import type { LayerVisibility, LayerOpacity, LayerColors, LayerColorOverrides, TrafficLink, CabinetEnvironment, CabinetFacing, PlacementHint } from '@/stores/gameStore'
 import { DEFAULT_COLORS, ENVIRONMENT_CONFIG } from '@/stores/gameStore'
 
 const COLORS = DEFAULT_COLORS
@@ -34,6 +34,21 @@ interface CabinetEntry {
   hasLeafSwitch: boolean
   powerOn: boolean
   environment: CabinetEnvironment
+  facing: CabinetFacing
+}
+
+interface PDUEntry {
+  id: string
+  col: number
+  row: number
+  label: string
+  overloaded: boolean
+}
+
+interface CableTrayEntry {
+  id: string
+  col: number
+  row: number
 }
 
 interface SpineEntry {
@@ -74,6 +89,14 @@ class DataCenterScene extends Phaser.Scene {
   private trafficLinks: TrafficLink[] = []
   private trafficVisible = true
   private packetPhase = 0
+
+  // Infrastructure overlays
+  private pduGraphics: Map<string, Phaser.GameObjects.Graphics> = new Map()
+  private pduLabels: Map<string, Phaser.GameObjects.Text> = new Map()
+  private pduEntries: Map<string, PDUEntry> = new Map()
+  private cableTrayGraphics: Map<string, Phaser.GameObjects.Graphics> = new Map()
+  private cableTrayEntries: Map<string, CableTrayEntry> = new Map()
+  private facingIndicators: Map<string, Phaser.GameObjects.Text> = new Map()
 
   // Placement mode
   private placementActive = false
@@ -500,6 +523,22 @@ class DataCenterScene extends Phaser.Scene {
       .setDepth(baseDepth + 1)
     labels.push(envLabel)
 
+    // Facing direction indicator (small arrow for hot/cold aisle)
+    const oldFacing = this.facingIndicators.get(entry.id)
+    if (oldFacing) oldFacing.destroy()
+    const facingArrow = entry.facing === 'north' ? '▲' : '▼'
+    const facingColor = entry.facing === 'north' ? '#00ccff' : '#ff8844'
+    const facingLabel = this.add
+      .text(cx + CUBE_W / 2 - 2, topY + 4, facingArrow, {
+        fontFamily: 'monospace',
+        fontSize: '6px',
+        color: facingColor,
+      })
+      .setOrigin(0.5)
+      .setAlpha(powerMult * 0.6)
+      .setDepth(baseDepth + 1)
+    this.facingIndicators.set(entry.id, facingLabel)
+
     g.setDepth(baseDepth)
     this.cabinetGraphics.set(entry.id, g)
     this.cabinetLabels.set(entry.id, labels)
@@ -664,22 +703,23 @@ class DataCenterScene extends Phaser.Scene {
 
   // ── Public API ──────────────────────────────────────────
 
-  addCabinetToScene(id: string, col: number, row: number, serverCount: number, hasLeafSwitch: boolean, environment: CabinetEnvironment = 'production') {
+  addCabinetToScene(id: string, col: number, row: number, serverCount: number, hasLeafSwitch: boolean, environment: CabinetEnvironment = 'production', facing: CabinetFacing = 'north') {
     this.cabCount++
 
-    const entry: CabinetEntry = { id, col, row, serverCount, hasLeafSwitch, powerOn: true, environment }
+    const entry: CabinetEntry = { id, col, row, serverCount, hasLeafSwitch, powerOn: true, environment, facing }
     this.cabEntries.set(id, entry)
     this.occupiedTiles.add(`${col},${row}`)
     this.renderCabinet(entry)
   }
 
-  updateCabinet(id: string, serverCount: number, hasLeafSwitch: boolean, powerOn: boolean, environment: CabinetEnvironment = 'production') {
+  updateCabinet(id: string, serverCount: number, hasLeafSwitch: boolean, powerOn: boolean, environment: CabinetEnvironment = 'production', facing: CabinetFacing = 'north') {
     const entry = this.cabEntries.get(id)
     if (!entry) return
     entry.serverCount = serverCount
     entry.hasLeafSwitch = hasLeafSwitch
     entry.powerOn = powerOn
     entry.environment = environment
+    entry.facing = facing
     this.renderCabinet(entry)
   }
 
@@ -816,6 +856,115 @@ class DataCenterScene extends Phaser.Scene {
   /** Update the set of occupied tiles (called when cabinet state changes) */
   syncOccupiedTiles(occupied: Set<string>) {
     this.occupiedTiles = occupied
+  }
+
+  // ── Infrastructure Layout API ──────────────────────────────
+
+  /** Render a PDU at a grid position */
+  private renderPDU(entry: PDUEntry) {
+    const oldG = this.pduGraphics.get(entry.id)
+    if (oldG) oldG.destroy()
+    const oldLabel = this.pduLabels.get(entry.id)
+    if (oldLabel) oldLabel.destroy()
+
+    const { x, y } = this.isoToScreen(entry.col, entry.row)
+    const cx = x
+    const cy = y + TILE_H / 2
+
+    const g = this.add.graphics()
+    const baseDepth = 10 + entry.row * this.cabCols + entry.col
+
+    // PDU is a small yellow/orange box
+    const pduColor = entry.overloaded
+      ? { top: 0xff4444, side: 0xcc2222, front: 0x991111 }
+      : { top: 0xffaa00, side: 0xcc8800, front: 0x996600 }
+    this.drawIsoCube(g, cx, cy, CUBE_W * 0.6, CUBE_H * 0.6, 6, pduColor, 0.8)
+
+    g.setDepth(baseDepth)
+    this.pduGraphics.set(entry.id, g)
+
+    // Label
+    const label = this.add
+      .text(cx, cy - 14, 'PDU', {
+        fontFamily: 'monospace',
+        fontSize: '6px',
+        color: entry.overloaded ? '#ff4444' : '#ffaa00',
+      })
+      .setOrigin(0.5)
+      .setAlpha(0.7)
+      .setDepth(baseDepth + 1)
+    this.pduLabels.set(entry.id, label)
+  }
+
+  /** Add or update a PDU on the grid */
+  addPDUToScene(id: string, col: number, row: number, label: string, overloaded: boolean) {
+    const entry: PDUEntry = { id, col, row, label, overloaded }
+    this.pduEntries.set(id, entry)
+    this.renderPDU(entry)
+  }
+
+  /** Update PDU overload status */
+  updatePDU(id: string, overloaded: boolean) {
+    const entry = this.pduEntries.get(id)
+    if (!entry) return
+    entry.overloaded = overloaded
+    this.renderPDU(entry)
+  }
+
+  /** Render a cable tray at a grid position */
+  private renderCableTray(entry: CableTrayEntry) {
+    const oldG = this.cableTrayGraphics.get(entry.id)
+    if (oldG) oldG.destroy()
+
+    const { x, y } = this.isoToScreen(entry.col, entry.row)
+    const cx = x
+    const cy = y + TILE_H / 2
+
+    const g = this.add.graphics()
+    const baseDepth = 8 + entry.row * this.cabCols + entry.col
+
+    // Cable tray is a flat colored marker on the floor
+    const trayColor = 0x8866cc
+    g.fillStyle(trayColor, 0.25)
+    g.beginPath()
+    g.moveTo(cx, cy - TILE_H / 2 + 2)
+    g.lineTo(cx + TILE_W / 2 - 4, cy)
+    g.lineTo(cx, cy + TILE_H / 2 - 2)
+    g.lineTo(cx - TILE_W / 2 + 4, cy)
+    g.closePath()
+    g.fillPath()
+
+    // Dashed border
+    g.lineStyle(1, trayColor, 0.4)
+    g.beginPath()
+    g.moveTo(cx, cy - TILE_H / 2 + 2)
+    g.lineTo(cx + TILE_W / 2 - 4, cy)
+    g.lineTo(cx, cy + TILE_H / 2 - 2)
+    g.lineTo(cx - TILE_W / 2 + 4, cy)
+    g.closePath()
+    g.strokePath()
+
+    g.setDepth(baseDepth)
+    this.cableTrayGraphics.set(entry.id, g)
+  }
+
+  /** Add a cable tray to the scene */
+  addCableTrayToScene(id: string, col: number, row: number) {
+    const entry: CableTrayEntry = { id, col, row }
+    this.cableTrayEntries.set(id, entry)
+    this.renderCableTray(entry)
+  }
+
+  /** Clear all infrastructure graphics (for rebuild) */
+  clearInfrastructure() {
+    for (const g of this.pduGraphics.values()) g.destroy()
+    for (const l of this.pduLabels.values()) l.destroy()
+    for (const g of this.cableTrayGraphics.values()) g.destroy()
+    this.pduGraphics.clear()
+    this.pduLabels.clear()
+    this.pduEntries.clear()
+    this.cableTrayGraphics.clear()
+    this.cableTrayEntries.clear()
   }
 }
 

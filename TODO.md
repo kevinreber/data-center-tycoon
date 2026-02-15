@@ -30,12 +30,14 @@
 - [ ] Dashed cabinet outlines from below
 
 ## Infrastructure & Entities
-- [ ] Cable tray / ladder rack entity (overhead)
+- [x] PDU (Power Distribution Unit) — 3 tiers with capacity limits, range, and overload detection
+- [x] Structured Cabling — auto-routed cable runs with length/capacity constraints
+- [x] Cable tray / ladder rack entity — pathway system reducing messy cable incident risk
+- [x] Hot/Cold Aisle Enforcement — cabinet facing direction affects cooling efficiency
 - [ ] Overhead busway (power distribution) entity
 - [ ] Cross-connect / patch panel entity
 - [ ] Proper Rack model with 42U slots (per SPEC.md)
 - [ ] ToR leaf switch placement inside rack vs. spine switches overhead
-- [ ] PDU (Power Distribution Unit) entity
 - [ ] In-row cooling unit entity
 
 ## Network / CLOS Fabric
