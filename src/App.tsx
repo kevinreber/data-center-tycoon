@@ -75,7 +75,7 @@ function App() {
         <header className="flex items-center justify-between px-4 py-2 border-b border-border bg-card">
           <div className="flex items-center gap-3">
             <h1 className="text-lg font-bold text-neon-green text-glow-green tracking-wider">
-              FABRIC TYCOON
+              DC TYCOON
             </h1>
             <span className="text-xs text-muted-foreground hidden sm:inline">
               Build cabinets, design network fabrics, and manage power to scale your data center.
