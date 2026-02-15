@@ -40,46 +40,46 @@
 - [x] 4 achievements: First Hire, Full Staff, Zero Fatigue, Certified Team
 
 ### 4B. Carbon Footprint & Environmental
-- [ ] `EnergySource` type: grid_mixed, grid_green, onsite_solar, onsite_wind
-- [ ] Energy source configs with cost multiplier, carbon per kW, reliability
-- [ ] Carbon emissions tracking per tick and lifetime cumulative
-- [ ] Carbon tax escalation over game time ($0→$2→$5→$10 per ton)
-- [ ] Green certifications: Energy Star, LEED Silver, LEED Gold, Carbon Neutral
-- [ ] Certification requirements (PUE, energy source, consecutive ticks)
-- [ ] Green certifications unlock contract revenue bonuses (+10% to +40%)
-- [ ] Water usage system for water cooling (2 gal/tick per cabinet, $0.10/gal)
-- [ ] Drought incident type — water prices spike or force switch to air cooling
-- [ ] E-waste stockpile from server refreshes — proper vs improper disposal
-- [ ] E-waste reputation penalty when stockpile > 10 items
-- [ ] Energy source selector panel in HUD
-- [ ] Carbon tracker display (emissions, tax, certifications)
-- [ ] 4 achievements: First Solar Panel, Carbon Neutral, Water Wise, Clean Sweep
+- [x] `EnergySource` type: grid_mixed, grid_green, onsite_solar, onsite_wind
+- [x] Energy source configs with cost multiplier, carbon per kW, reliability
+- [x] Carbon emissions tracking per tick and lifetime cumulative
+- [x] Carbon tax escalation over game time ($0→$2→$5→$10 per ton)
+- [x] Green certifications: Energy Star, LEED Silver, LEED Gold, Carbon Neutral
+- [x] Certification requirements (PUE, energy source, consecutive ticks)
+- [x] Green certifications unlock contract revenue bonuses (+10% to +40%)
+- [x] Water usage system for water cooling (2 gal/tick per cabinet, $0.10/gal)
+- [x] Drought incident type — water prices spike or force switch to air cooling
+- [x] E-waste stockpile from server refreshes — proper vs improper disposal
+- [x] E-waste reputation penalty when stockpile > 10 items
+- [x] Energy source selector panel in HUD (Carbon sidebar panel)
+- [x] Carbon tracker display (emissions, tax, certifications)
+- [x] 4 achievements: Green Power, Carbon Neutral, Water Wise, Clean Sweep
 
 ### 4C. Security Tiers & Compliance
-- [ ] `SecurityTier` type: basic, enhanced, high_security, maximum
-- [ ] Security feature installs: CCTV, badge_access, biometric, mantrap, cage_isolation, encrypted_network, security_noc
-- [ ] Security tier progression with install costs and maintenance/tick
-- [ ] Compliance certifications: SOC 2 Type I/II, HIPAA, PCI-DSS, FedRAMP
-- [ ] Certification requirements (security tier, features, reputation, staff)
-- [ ] Audit mechanic — pay to audit, must maintain requirements during audit window
-- [ ] Certification expiry if not re-audited within interval
-- [ ] 3 new intrusion incident types: tailgating, social_engineering, break_in
-- [ ] Security features reduce intrusion chance (stacking defense bonuses)
-- [ ] 4 new premium contract types gated by compliance (healthcare, finance, government)
-- [ ] Security panel in HUD with tier, features, and compliance status
-- [ ] 4 achievements: Locked Down, Fully Compliant, Fort Knox, Government Contractor
+- [x] `SecurityTier` type: basic, enhanced, high_security, maximum
+- [x] Security feature installs: CCTV, badge_access, biometric, mantrap, cage_isolation, encrypted_network, security_noc
+- [x] Security tier progression with install costs and maintenance/tick
+- [x] Compliance certifications: SOC 2 Type I/II, HIPAA, PCI-DSS, FedRAMP
+- [x] Certification requirements (security tier, features, reputation, staff)
+- [x] Audit mechanic — pay to audit, must maintain requirements during audit window
+- [x] Certification expiry if not re-audited within interval
+- [x] 3 new intrusion incident types: tailgating, social_engineering, break_in
+- [x] Security features reduce intrusion chance (stacking defense bonuses)
+- [x] 4 new premium contract types gated by compliance (healthcare, finance, government)
+- [x] Security panel in HUD with tier, features, and compliance status
+- [x] 4 achievements: Locked Down, Fully Compliant, Fort Knox, Government Contractor
 
 ### 4D. Competitor AI
-- [ ] `Competitor` type with name, personality, strength, specialization, reputation
-- [ ] 5 competitor personalities: budget, premium, green, aggressive, steady
-- [ ] Competitor scaling — 1 competitor at start, up to 3 by mid-game
-- [ ] Rubber-banding: competitors grow faster when player is strong, slower when weak
-- [ ] Contract competition — competitors bid on the same contracts with timer pressure
-- [ ] Competitor bid UI showing who else is bidding and their win chance
-- [ ] Competitor events: price wars, staff poaching, competitor outages
-- [ ] Market share tracking (player vs competitors)
-- [ ] Market panel in HUD showing competitor status and market share
-- [ ] 4 achievements: Market Leader, Monopoly, Underdog, Rivalry
+- [x] `Competitor` type with name, personality, strength, specialization, reputation
+- [x] 5 competitor personalities: budget, premium, green, aggressive, steady
+- [x] Competitor scaling — 1 competitor at start, up to 3 by mid-game
+- [x] Rubber-banding: competitors grow faster when player is strong, slower when weak
+- [x] Contract competition — competitors bid on the same contracts with timer pressure
+- [x] Competitor bid UI showing who else is bidding and their win chance
+- [x] Competitor events: price wars, staff poaching, competitor outages
+- [x] Market share tracking (player vs competitors)
+- [x] Market panel in HUD showing competitor status and market share
+- [x] 4 achievements: Market Leader, Monopoly, Underdog, Rivalry
 
 ## Future: Sub-Floor View (Plane 1)
 - [ ] Third view mode: raised floor plenum

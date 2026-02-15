@@ -13,6 +13,18 @@ export type StaffRole = 'network_engineer' | 'electrician' | 'cooling_specialist
 export type StaffSkillLevel = 1 | 2 | 3
 export type ShiftPattern = 'day_only' | 'day_night' | 'round_the_clock'
 
+// ── Phase 4B: Carbon & Environmental Types ──────────────────────
+export type EnergySource = 'grid_mixed' | 'grid_green' | 'onsite_solar' | 'onsite_wind'
+export type GreenCert = 'energy_star' | 'leed_silver' | 'leed_gold' | 'carbon_neutral'
+
+// ── Phase 4C: Security & Compliance Types ───────────────────────
+export type SecurityTier = 'basic' | 'enhanced' | 'high_security' | 'maximum'
+export type SecurityFeatureId = 'cctv' | 'badge_access' | 'biometric' | 'mantrap' | 'cage_isolation' | 'encrypted_network' | 'security_noc'
+export type ComplianceCertId = 'soc2_type1' | 'soc2_type2' | 'hipaa' | 'pci_dss' | 'fedramp'
+
+// ── Phase 4D: Competitor AI Types ───────────────────────────────
+export type CompetitorPersonality = 'budget' | 'premium' | 'green' | 'aggressive' | 'steady'
+
 // ── Save Slot Types ──────────────────────────────────────────
 
 export const MAX_SAVE_SLOTS = 3
@@ -699,6 +711,239 @@ export const SPOT_COMPUTE_CONFIG = {
   baseDemandCorrelation: -0.5,    // inversely correlated with regular demand
 }
 
+// ── Phase 4B: Carbon & Environmental Config ────────────────────────
+
+export interface EnergySourceConfig {
+  source: EnergySource
+  label: string
+  description: string
+  costMultiplier: number
+  carbonPerKW: number
+  installCost: number
+  reliability: number
+  color: string
+}
+
+export const ENERGY_SOURCE_CONFIG: Record<EnergySource, EnergySourceConfig> = {
+  grid_mixed: {
+    source: 'grid_mixed', label: 'Grid (Mixed)', description: 'Default coal/gas/nuclear grid mix. Reliable but carbon-intensive.',
+    costMultiplier: 1.0, carbonPerKW: 0.0008, installCost: 0, reliability: 1.0, color: '#888888',
+  },
+  grid_green: {
+    source: 'grid_green', label: 'Grid (Green)', description: 'Contracted renewable grid power. Premium price, minimal carbon.',
+    costMultiplier: 1.4, carbonPerKW: 0.0001, installCost: 5000, reliability: 1.0, color: '#44cc44',
+  },
+  onsite_solar: {
+    source: 'onsite_solar', label: 'On-site Solar', description: 'Solar panels on-site. Free power when available (35% avg). Need grid backup.',
+    costMultiplier: 0.6, carbonPerKW: 0.0, installCost: 80000, reliability: 0.35, color: '#ffcc00',
+  },
+  onsite_wind: {
+    source: 'onsite_wind', label: 'On-site Wind', description: 'Wind turbines on-site. Better availability than solar (45%). Need grid backup.',
+    costMultiplier: 0.7, carbonPerKW: 0.0, installCost: 60000, reliability: 0.45, color: '#66aaff',
+  },
+}
+
+export interface GreenCertConfig {
+  id: GreenCert
+  label: string
+  description: string
+  requirements: {
+    maxPUE: number
+    minConsecutiveTicks: number
+    requiredSource?: EnergySource[]
+    zeroCarbonRequired?: boolean
+  }
+  cost: number
+  revenueBonus: number
+  carbonTaxReduction: number
+}
+
+export const GREEN_CERT_CONFIG: GreenCertConfig[] = [
+  { id: 'energy_star', label: 'Energy Star', description: 'PUE ≤ 1.4 for 100 consecutive ticks. +10% contract revenue.',
+    requirements: { maxPUE: 1.4, minConsecutiveTicks: 100 }, cost: 10000, revenueBonus: 0.10, carbonTaxReduction: 0 },
+  { id: 'leed_silver', label: 'LEED Silver', description: 'Energy Star + non-mixed grid. +15% contract revenue, -5% carbon tax.',
+    requirements: { maxPUE: 1.4, minConsecutiveTicks: 100, requiredSource: ['grid_green', 'onsite_solar', 'onsite_wind'] }, cost: 25000, revenueBonus: 0.15, carbonTaxReduction: 0.05 },
+  { id: 'leed_gold', label: 'LEED Gold', description: 'LEED Silver + on-site renewable. +25% contract revenue, -15% carbon tax.',
+    requirements: { maxPUE: 1.3, minConsecutiveTicks: 150, requiredSource: ['onsite_solar', 'onsite_wind'] }, cost: 50000, revenueBonus: 0.25, carbonTaxReduction: 0.15 },
+  { id: 'carbon_neutral', label: 'Carbon Neutral', description: 'Zero net carbon for 200 ticks. +40% contract revenue, carbon tax exempt.',
+    requirements: { maxPUE: 1.3, minConsecutiveTicks: 200, zeroCarbonRequired: true }, cost: 100000, revenueBonus: 0.40, carbonTaxReduction: 1.0 },
+]
+
+export const CARBON_TAX_SCHEDULE = [
+  { minTick: 0, maxTick: 200, rate: 0 },
+  { minTick: 200, maxTick: 500, rate: 2 },
+  { minTick: 500, maxTick: 1000, rate: 5 },
+  { minTick: 1000, maxTick: Infinity, rate: 10 },
+]
+
+export const WATER_USAGE_CONFIG = {
+  gallonsPerCabinetPerTick: 2,
+  costPerGallon: 0.10,
+  droughtPriceMultiplier: 3,
+}
+
+export const EWASTE_CONFIG = {
+  reputationPenaltyThreshold: 10,
+  reputationPenaltyPerTick: 0.1,
+  properDisposalCost: 500,
+  improperDisposalCost: 100,
+  improperDisposalReputationPenalty: 5,
+}
+
+// ── Phase 4C: Security & Compliance Config ──────────────────────────
+
+export interface SecurityFeatureConfig {
+  id: SecurityFeatureId
+  label: string
+  description: string
+  cost: number
+  maintenanceCost: number
+  requiredTier: SecurityTier
+  intrusionDefense: number
+}
+
+export const SECURITY_FEATURE_CONFIG: SecurityFeatureConfig[] = [
+  { id: 'badge_access', label: 'Badge Access', description: 'Electronic badge readers on all entry points.', cost: 0, maintenanceCost: 0, requiredTier: 'basic', intrusionDefense: 0.05 },
+  { id: 'cctv', label: 'CCTV', description: '24/7 camera surveillance of facility perimeter and server halls.', cost: 8000, maintenanceCost: 3, requiredTier: 'enhanced', intrusionDefense: 0.20 },
+  { id: 'biometric', label: 'Biometric Scanners', description: 'Fingerprint and retinal scanners for sensitive areas.', cost: 20000, maintenanceCost: 5, requiredTier: 'high_security', intrusionDefense: 0.25 },
+  { id: 'mantrap', label: 'Mantrap Entry', description: 'Dual-door mantrap prevents tailgating.', cost: 25000, maintenanceCost: 4, requiredTier: 'high_security', intrusionDefense: 0.30 },
+  { id: 'cage_isolation', label: 'Cage Isolation', description: 'Individual customer cages with locked access.', cost: 35000, maintenanceCost: 6, requiredTier: 'high_security', intrusionDefense: 0.15 },
+  { id: 'encrypted_network', label: 'Encrypted Network', description: 'Full network encryption at the facility level.', cost: 40000, maintenanceCost: 8, requiredTier: 'maximum', intrusionDefense: 0.10 },
+  { id: 'security_noc', label: 'Security NOC', description: '24/7 security operations center with dedicated monitoring staff.', cost: 60000, maintenanceCost: 15, requiredTier: 'maximum', intrusionDefense: 0.10 },
+]
+
+export interface SecurityTierConfig {
+  tier: SecurityTier
+  label: string
+  description: string
+  cost: number
+  maintenancePerTick: number
+  featuresIncluded: SecurityFeatureId[]
+  color: string
+}
+
+export const SECURITY_TIER_CONFIG: SecurityTierConfig[] = [
+  { tier: 'basic', label: 'Basic', description: 'Badge access only. Standard contracts available.', cost: 0, maintenancePerTick: 0, featuresIncluded: ['badge_access'], color: '#888888' },
+  { tier: 'enhanced', label: 'Enhanced', description: 'CCTV + badge access. SOC 2 eligible, enterprise contracts.', cost: 15000, maintenancePerTick: 8, featuresIncluded: ['badge_access', 'cctv'], color: '#44aaff' },
+  { tier: 'high_security', label: 'High Security', description: 'Biometric, mantrap, cages. HIPAA/PCI-DSS eligible.', cost: 50000, maintenancePerTick: 20, featuresIncluded: ['badge_access', 'cctv', 'biometric', 'mantrap', 'cage_isolation'], color: '#ff8844' },
+  { tier: 'maximum', label: 'Maximum', description: 'Full suite including encrypted network and Security NOC. FedRAMP eligible.', cost: 150000, maintenancePerTick: 45, featuresIncluded: ['badge_access', 'cctv', 'biometric', 'mantrap', 'cage_isolation', 'encrypted_network', 'security_noc'], color: '#ff4444' },
+]
+
+export interface ComplianceCertConfig {
+  id: ComplianceCertId
+  label: string
+  description: string
+  requirements: {
+    minSecurityTier: SecurityTier
+    requiredFeatures: SecurityFeatureId[]
+    minReputation: number
+    minSecurityOfficers: number
+  }
+  auditCost: number
+  auditDurationTicks: number
+  auditInterval: number
+  revenueBonus: number
+  color: string
+}
+
+export const COMPLIANCE_CERT_CONFIG: ComplianceCertConfig[] = [
+  { id: 'soc2_type1', label: 'SOC 2 Type I', description: 'Basic security audit for enterprise SaaS hosting.',
+    requirements: { minSecurityTier: 'enhanced', requiredFeatures: ['cctv', 'badge_access'], minReputation: 40, minSecurityOfficers: 0 },
+    auditCost: 8000, auditDurationTicks: 10, auditInterval: 200, revenueBonus: 0.15, color: '#44aaff' },
+  { id: 'soc2_type2', label: 'SOC 2 Type II', description: 'Extended security audit for enterprise and financial services.',
+    requirements: { minSecurityTier: 'enhanced', requiredFeatures: ['cctv', 'badge_access'], minReputation: 50, minSecurityOfficers: 1 },
+    auditCost: 15000, auditDurationTicks: 15, auditInterval: 300, revenueBonus: 0.25, color: '#4488ff' },
+  { id: 'hipaa', label: 'HIPAA', description: 'Healthcare data compliance. Requires high security with biometric and cage isolation.',
+    requirements: { minSecurityTier: 'high_security', requiredFeatures: ['biometric', 'cage_isolation'], minReputation: 60, minSecurityOfficers: 1 },
+    auditCost: 20000, auditDurationTicks: 12, auditInterval: 250, revenueBonus: 0.30, color: '#ff44aa' },
+  { id: 'pci_dss', label: 'PCI-DSS', description: 'Payment card industry compliance. Requires encrypted network and cage isolation.',
+    requirements: { minSecurityTier: 'high_security', requiredFeatures: ['encrypted_network', 'cage_isolation'], minReputation: 55, minSecurityOfficers: 1 },
+    auditCost: 18000, auditDurationTicks: 10, auditInterval: 200, revenueBonus: 0.35, color: '#ffaa00' },
+  { id: 'fedramp', label: 'FedRAMP', description: 'Federal government compliance. Maximum security with full feature set.',
+    requirements: { minSecurityTier: 'maximum', requiredFeatures: ['cctv', 'badge_access', 'biometric', 'mantrap', 'cage_isolation', 'encrypted_network', 'security_noc'], minReputation: 75, minSecurityOfficers: 2 },
+    auditCost: 50000, auditDurationTicks: 20, auditInterval: 400, revenueBonus: 0.50, color: '#ff4444' },
+]
+
+export interface ActiveComplianceCert {
+  certId: ComplianceCertId
+  grantedAtTick: number
+  expiresAtTick: number
+  auditInProgress: boolean
+  auditStartedTick: number
+}
+
+// New premium contracts gated by compliance
+export const COMPLIANCE_CONTRACT_CATALOG: ContractDef[] = [
+  { type: 'healthnet_emr', company: 'HealthNet', tier: 'gold', description: 'Electronic medical records platform. HIPAA compliance required.', minServers: 8, maxTemp: 68, revenuePerTick: 80, durationTicks: 400, penaltyPerTick: 50, terminationTicks: 5, completionBonus: 30000 },
+  { type: 'tradefast_hft', company: 'TradeFast', tier: 'gold', description: 'High-frequency trading platform. PCI-DSS compliance required.', minServers: 10, maxTemp: 65, revenuePerTick: 90, durationTicks: 350, penaltyPerTick: 60, terminationTicks: 4, completionBonus: 35000 },
+  { type: 'govsecure_cloud', company: 'GovSecure', tier: 'gold', description: 'Federal government cloud services. FedRAMP required.', minServers: 10, maxTemp: 65, revenuePerTick: 120, durationTicks: 500, penaltyPerTick: 70, terminationTicks: 5, completionBonus: 50000 },
+  { type: 'paystream', company: 'PayStream', tier: 'gold', description: 'Payment processing platform. PCI-DSS required.', minServers: 6, maxTemp: 70, revenuePerTick: 75, durationTicks: 300, penaltyPerTick: 45, terminationTicks: 5, completionBonus: 25000 },
+]
+
+// Mapping from compliance cert to unlocked contract types
+export const COMPLIANCE_CONTRACT_REQUIREMENTS: Record<string, ComplianceCertId> = {
+  healthnet_emr: 'hipaa',
+  tradefast_hft: 'pci_dss',
+  govsecure_cloud: 'fedramp',
+  paystream: 'pci_dss',
+}
+
+// ── Phase 4D: Competitor AI Config ──────────────────────────────────
+
+export interface Competitor {
+  id: string
+  name: string
+  personality: CompetitorPersonality
+  strength: number
+  specialization: CustomerType
+  reputationScore: number
+  securityTier: SecurityTier
+  greenCert: GreenCert | null
+  aggression: number
+  techLevel: number
+  marketShare: number
+}
+
+export interface CompetitorBid {
+  competitorId: string
+  competitorName: string
+  contractType: string
+  winChance: number
+  ticksRemaining: number
+}
+
+export const COMPETITOR_PERSONALITIES: Record<CompetitorPersonality, {
+  label: string
+  description: string
+  bidModifier: number
+  growthRate: number
+  color: string
+}> = {
+  budget: { label: 'Budget', description: 'Undercuts on price, wins on volume. Low quality, frequent incidents.', bidModifier: -0.25, growthRate: 0.8, color: '#888888' },
+  premium: { label: 'Premium', description: 'High quality, charges more. Invests in security and cooling.', bidModifier: 0.1, growthRate: 1.2, color: '#4488ff' },
+  green: { label: 'Green', description: 'Environmental focus. Targets eco-conscious clients.', bidModifier: 0.15, growthRate: 1.0, color: '#44cc44' },
+  aggressive: { label: 'Aggressive', description: 'Fast expansion, takes big risks. High debt, can collapse.', bidModifier: -0.1, growthRate: 1.5, color: '#ff4444' },
+  steady: { label: 'Steady', description: 'Slow and reliable growth. Never dominates but always competitive.', bidModifier: 0, growthRate: 1.0, color: '#ffaa00' },
+}
+
+const COMPETITOR_NAMES = [
+  'NexGen Data', 'CloudVault Inc', 'TerraHost', 'IronGrid Systems', 'ArcticCore',
+  'DataForge', 'SkyBridge DC', 'VoltStack', 'ByteHaven', 'CoreFlux',
+]
+
+const COMPETITOR_SCALE_CONFIG = {
+  firstCompetitorTick: 100,
+  secondCompetitorTick: 300,
+  thirdCompetitorTick: 600,
+  bidWindowTicks: 15,
+  strengthGrowthRate: 0.05,
+  rubberBandStrength: 0.02,
+  priceWarChance: 0.003,
+  poachAttemptChance: 0.002,
+  competitorOutageChance: 0.004,
+  marketReportInterval: 100,
+}
+
 // ── Event Log Types ─────────────────────────────────────────────────
 
 export type EventCategory = 'incident' | 'finance' | 'contract' | 'achievement' | 'infrastructure' | 'staff' | 'research' | 'system'
@@ -759,7 +1004,7 @@ export interface TutorialTip {
   id: string
   title: string
   message: string
-  category: 'build' | 'cooling' | 'finance' | 'network' | 'incidents' | 'contracts'
+  category: 'build' | 'cooling' | 'finance' | 'network' | 'incidents' | 'contracts' | 'carbon' | 'security' | 'market'
 }
 
 export const TUTORIAL_TIPS: TutorialTip[] = [
@@ -782,6 +1027,18 @@ export const TUTORIAL_TIPS: TutorialTip[] = [
   { id: 'spot_high', title: 'Spot Prices High!', message: 'Spot compute prices are above 1.5x — great time to allocate more servers to the spot market for extra revenue!', category: 'finance' },
   { id: 'redundancy_hint', title: 'Power Protection', message: 'Consider upgrading power redundancy to N+1 or 2N to protect against power failures and improve uptime.', category: 'build' },
   { id: 'capacity_warning', title: 'Running Out of Space', message: 'You are using over 80% of cabinet capacity. Upgrade your suite tier soon to avoid hitting the limit!', category: 'build' },
+  // Phase 4B — Carbon & Environmental tips
+  { id: 'carbon_tax_rising', title: 'Carbon Tax Rising', message: 'Carbon tax rates are increasing! Switch to green energy or on-site renewables to reduce your carbon footprint and save money.', category: 'carbon' },
+  { id: 'ewaste_piling', title: 'E-Waste Piling Up', message: 'Your e-waste stockpile is growing. Dispose of it properly to maintain reputation, or risk penalties.', category: 'carbon' },
+  { id: 'green_cert_eligible', title: 'Green Cert Available', message: 'Your facility may qualify for a green certification! Check the Carbon panel to apply for Energy Star or LEED.', category: 'carbon' },
+  // Phase 4C — Security & Compliance tips
+  { id: 'security_upgrade', title: 'Security Matters', message: 'Upgrading security unlocks premium compliance certifications and lucrative government/healthcare contracts.', category: 'security' },
+  { id: 'intrusion_detected', title: 'Intrusion Alert!', message: 'A security intrusion was detected! Higher security tiers and features reduce intrusion frequency and impact.', category: 'security' },
+  { id: 'compliance_expiring', title: 'Certification Expiring', message: 'A compliance certification is about to expire! Re-audit before the deadline to keep your premium contracts.', category: 'security' },
+  // Phase 4D — Competitor AI tips
+  { id: 'competitor_appeared', title: 'New Competitor!', message: 'A rival data center company has entered the market. They will compete for contracts — act fast to secure deals!', category: 'market' },
+  { id: 'competitor_bidding', title: 'Competition!', message: 'A competitor is bidding on a contract you may want. Accept quickly before they win it!', category: 'market' },
+  { id: 'price_war', title: 'Price War!', message: 'A competitor has started a price war! Contract revenue is temporarily reduced across the market.', category: 'market' },
 ]
 
 // ── Procedural Name Generation ──────────────────────────────────
@@ -882,6 +1139,12 @@ export const INCIDENT_CATALOG: IncidentDef[] = [
   // Hardware replacement incidents
   { type: 'spine_failure', label: 'Spine Switch Failure', severity: 'major', description: 'A spine switch has failed. Traffic is being redistributed across remaining spines.', durationTicks: 20, resolveCost: 12000, effect: 'hardware_failure', effectMagnitude: 0, hardwareTarget: 'spine' },
   { type: 'leaf_failure', label: 'Leaf Switch Failure', severity: 'major', description: 'A top-of-rack switch has failed. The affected cabinet has lost network connectivity.', durationTicks: 15, resolveCost: 5000, effect: 'hardware_failure', effectMagnitude: 0, hardwareTarget: 'leaf' },
+  // Phase 4B — Environmental incidents
+  { type: 'drought', label: 'Drought', severity: 'major', description: 'Water supply restricted. Water cooling costs tripled until resolved.', durationTicks: 25, resolveCost: 6000, effect: 'cooling_failure', effectMagnitude: 0.2 },
+  // Phase 4C — Security intrusion incidents
+  { type: 'tailgating', label: 'Tailgating', severity: 'minor', description: 'Someone followed an employee through a secure door. Security review required.', durationTicks: 5, resolveCost: 1000, effect: 'revenue_penalty', effectMagnitude: 0.95 },
+  { type: 'social_engineering', label: 'Social Engineering', severity: 'major', description: 'An attacker tricked staff into granting unauthorized access. Revenue impacted.', durationTicks: 10, resolveCost: 5000, effect: 'revenue_penalty', effectMagnitude: 0.6 },
+  { type: 'break_in', label: 'Break-in Attempt', severity: 'critical', description: 'Physical intrusion detected! Equipment at risk. Immediate security response needed.', durationTicks: 8, resolveCost: 15000, effect: 'revenue_penalty', effectMagnitude: 0.3 },
 ]
 
 /** Chance per tick of an incident occurring (when fewer than max active) */
@@ -1014,6 +1277,21 @@ export const ACHIEVEMENT_CATALOG: AchievementDef[] = [
   { id: 'full_staff', label: 'Full Staff', description: 'Reach your maximum staff capacity.', icon: '👥' },
   { id: 'zero_fatigue', label: 'Zero Fatigue', description: 'Resolve 10 incidents without any staff burnout.', icon: '💪' },
   { id: 'certified_team', label: 'Certified Team', description: 'Have all staff with at least one certification.', icon: '🎓' },
+  // Phase 4B — Carbon & Environmental achievements
+  { id: 'green_power', label: 'Green Power', description: 'Switch to a non-fossil energy source.', icon: '🌿' },
+  { id: 'carbon_neutral_cert', label: 'Carbon Neutral', description: 'Achieve Carbon Neutral green certification.', icon: '🌍' },
+  { id: 'water_wise', label: 'Water Wise', description: 'Operate for 100 ticks with no water usage.', icon: '💧' },
+  { id: 'clean_sweep', label: 'Clean Sweep', description: 'Properly dispose of 20 e-waste units total.', icon: '♻️' },
+  // Phase 4C — Security & Compliance achievements
+  { id: 'locked_down', label: 'Locked Down', description: 'Reach High Security tier.', icon: '🔒' },
+  { id: 'fully_compliant', label: 'Fully Compliant', description: 'Hold 3 or more compliance certifications simultaneously.', icon: '📋' },
+  { id: 'fort_knox', label: 'Fort Knox', description: 'Block 10 intrusion attempts with security features.', icon: '🏰' },
+  { id: 'gov_contractor', label: 'Government Contractor', description: 'Complete a FedRAMP-gated contract.', icon: '🏛️' },
+  // Phase 4D — Competitor AI achievements
+  { id: 'market_leader', label: 'Market Leader', description: 'Achieve 50% or greater market share.', icon: '📊' },
+  { id: 'monopoly', label: 'Monopoly', description: 'Win 5 contracts that competitors bid on.', icon: '🏅' },
+  { id: 'underdog', label: 'Underdog', description: 'Win a contract against a competitor with higher reputation.', icon: '💪' },
+  { id: 'rivalry', label: 'Rivalry', description: 'Outperform all competitors for 100 consecutive ticks.', icon: '🏆' },
 ]
 
 export interface EnvironmentConfig {
@@ -2018,6 +2296,39 @@ interface GameState {
   activeTip: TutorialTip | null
   tutorialEnabled: boolean
 
+  // Phase 4B — Carbon & Environmental
+  energySource: EnergySource
+  carbonEmissionsPerTick: number
+  lifetimeCarbonEmissions: number
+  carbonTaxRate: number
+  carbonTaxPerTick: number
+  greenCertifications: GreenCert[]
+  greenCertEligibleTicks: number        // consecutive ticks meeting current cert requirements
+  waterUsagePerTick: number
+  waterCostPerTick: number
+  eWasteStockpile: number
+  eWasteDisposed: number                // lifetime proper disposals
+  droughtActive: boolean
+
+  // Phase 4C — Security & Compliance
+  securityTier: SecurityTier
+  installedSecurityFeatures: SecurityFeatureId[]
+  complianceCerts: ActiveComplianceCert[]
+  securityMaintenanceCost: number
+  intrusionsBlocked: number
+  auditCooldown: number
+
+  // Phase 4D — Competitor AI
+  competitors: Competitor[]
+  competitorBids: CompetitorBid[]
+  playerMarketShare: number
+  competitorContractsWon: number        // contracts won against competitor bids
+  competitorContractsLost: number
+  competitorOutperformTicks: number     // consecutive ticks outperforming all competitors
+  priceWarActive: boolean
+  priceWarTicksRemaining: number
+  poachTarget: string | null            // staff ID being poached
+
   // Save / Load
   hasSaved: boolean
   activeSlotId: number | null
@@ -2100,6 +2411,15 @@ interface GameState {
   installSoundBarrier: () => void
   // Spot compute actions
   setSpotCapacity: (count: number) => void
+  // Phase 4B — Carbon & Environmental actions
+  setEnergySource: (source: EnergySource) => void
+  applyForGreenCert: (certId: GreenCert) => void
+  disposeEWaste: (proper: boolean) => void
+  // Phase 4C — Security & Compliance actions
+  upgradeSecurityTier: (tier: SecurityTier) => void
+  startComplianceAudit: (certId: ComplianceCertId) => void
+  // Phase 4D — Competitor AI actions
+  counterPoachOffer: () => void
   // Tutorial actions
   dismissTip: (tipId: string) => void
   toggleTutorial: () => void
@@ -2122,6 +2442,7 @@ let nextIncidentId = 1
 let nextContractId = 1
 let nextGeneratorId = 1
 let nextStaffId = 1
+let nextCompetitorId = 1
 
 function maxIdNum(items: { id: string }[], prefix: string): number {
   let max = 0
@@ -2387,6 +2708,39 @@ export const useGameStore = create<GameState>((set) => ({
   activeTip: null,
   tutorialEnabled: true,
 
+  // Phase 4B — Carbon & Environmental
+  energySource: 'grid_mixed' as EnergySource,
+  carbonEmissionsPerTick: 0,
+  lifetimeCarbonEmissions: 0,
+  carbonTaxRate: 0,
+  carbonTaxPerTick: 0,
+  greenCertifications: [] as GreenCert[],
+  greenCertEligibleTicks: 0,
+  waterUsagePerTick: 0,
+  waterCostPerTick: 0,
+  eWasteStockpile: 0,
+  eWasteDisposed: 0,
+  droughtActive: false,
+
+  // Phase 4C — Security & Compliance
+  securityTier: 'basic' as SecurityTier,
+  installedSecurityFeatures: ['badge_access'] as SecurityFeatureId[],
+  complianceCerts: [] as ActiveComplianceCert[],
+  securityMaintenanceCost: 0,
+  intrusionsBlocked: 0,
+  auditCooldown: 0,
+
+  // Phase 4D — Competitor AI
+  competitors: [] as Competitor[],
+  competitorBids: [] as CompetitorBid[],
+  playerMarketShare: 100,
+  competitorContractsWon: 0,
+  competitorContractsLost: 0,
+  competitorOutperformTicks: 0,
+  priceWarActive: false,
+  priceWarTicksRemaining: 0,
+  poachTarget: null as string | null,
+
   // Demo mode
   isDemo: false,
 
@@ -2637,10 +2991,14 @@ export const useGameStore = create<GameState>((set) => ({
         totalPenalties: 0,
         status: 'active',
       }
+      // Phase 4D: track wins against competitor bids
+      const hadCompetitorBid = state.competitorBids.some((b) => b.contractType === def.type)
       return {
         activeContracts: [...state.activeContracts, contract],
         contractOffers: state.contractOffers.filter((_, i) => i !== index),
         contractLog: [`Accepted: ${def.company} — ${def.description}`, ...state.contractLog].slice(0, 10),
+        competitorBids: state.competitorBids.filter((b) => b.contractType !== def.type),
+        competitorContractsWon: hadCompetitorBid ? state.competitorContractsWon + 1 : state.competitorContractsWon,
       }
     }),
 
@@ -2714,6 +3072,7 @@ export const useGameStore = create<GameState>((set) => ({
         ),
         money: state.money - cost,
         totalRefreshes: state.totalRefreshes + 1,
+        eWasteStockpile: state.eWasteStockpile + cab.serverCount, // Phase 4B: old hardware becomes e-waste
       }
     }),
 
@@ -3291,6 +3650,112 @@ export const useGameStore = create<GameState>((set) => ({
       return { spotCapacityAllocated: Math.max(0, Math.min(count, totalServers)) }
     }),
 
+  // ── Phase 4B: Carbon & Environmental Actions ───────────────────
+
+  setEnergySource: (source: EnergySource) =>
+    set((state) => {
+      const config = ENERGY_SOURCE_CONFIG[source]
+      if (state.money < config.installCost) return state
+      return {
+        energySource: source,
+        money: state.money - config.installCost,
+      }
+    }),
+
+  applyForGreenCert: (certId: GreenCert) =>
+    set((state) => {
+      if (state.greenCertifications.includes(certId)) return state
+      const config = GREEN_CERT_CONFIG.find((c) => c.id === certId)
+      if (!config || state.money < config.cost) return state
+      // Check prerequisites: higher certs require lower ones
+      const certOrder: GreenCert[] = ['energy_star', 'leed_silver', 'leed_gold', 'carbon_neutral']
+      const targetIdx = certOrder.indexOf(certId)
+      if (targetIdx > 0 && !state.greenCertifications.includes(certOrder[targetIdx - 1])) return state
+      // Check eligibility ticks
+      if (state.greenCertEligibleTicks < config.requirements.minConsecutiveTicks) return state
+      return {
+        greenCertifications: [...state.greenCertifications, certId],
+        money: state.money - config.cost,
+      }
+    }),
+
+  disposeEWaste: (proper: boolean) =>
+    set((state) => {
+      if (state.eWasteStockpile <= 0) return state
+      const count = state.eWasteStockpile
+      const cost = proper ? count * EWASTE_CONFIG.properDisposalCost : count * EWASTE_CONFIG.improperDisposalCost
+      if (state.money < cost) return state
+      const repChange = proper ? 1 : -EWASTE_CONFIG.improperDisposalReputationPenalty
+      return {
+        eWasteStockpile: 0,
+        eWasteDisposed: state.eWasteDisposed + (proper ? count : 0),
+        money: state.money - cost,
+        reputationScore: Math.max(0, Math.min(100, state.reputationScore + repChange)),
+      }
+    }),
+
+  // ── Phase 4C: Security & Compliance Actions ───────────────────
+
+  upgradeSecurityTier: (tier: SecurityTier) =>
+    set((state) => {
+      const tierOrder: SecurityTier[] = ['basic', 'enhanced', 'high_security', 'maximum']
+      const currentIdx = tierOrder.indexOf(state.securityTier)
+      const targetIdx = tierOrder.indexOf(tier)
+      if (targetIdx <= currentIdx) return state // can only upgrade
+      const config = SECURITY_TIER_CONFIG.find((c) => c.tier === tier)
+      if (!config || state.money < config.cost) return state
+      return {
+        securityTier: tier,
+        installedSecurityFeatures: [...config.featuresIncluded],
+        money: state.money - config.cost,
+      }
+    }),
+
+  startComplianceAudit: (certId: ComplianceCertId) =>
+    set((state) => {
+      if (state.auditCooldown > 0) return state
+      const config = COMPLIANCE_CERT_CONFIG.find((c) => c.id === certId)
+      if (!config || state.money < config.auditCost) return state
+      // Check requirements
+      const tierOrder: SecurityTier[] = ['basic', 'enhanced', 'high_security', 'maximum']
+      if (tierOrder.indexOf(state.securityTier) < tierOrder.indexOf(config.requirements.minSecurityTier)) return state
+      if (!config.requirements.requiredFeatures.every((f) => state.installedSecurityFeatures.includes(f))) return state
+      if (state.reputationScore < config.requirements.minReputation) return state
+      const secOfficers = state.staff.filter((s) => s.role === 'security_officer').length
+      if (secOfficers < config.requirements.minSecurityOfficers) return state
+      // Check if already auditing
+      if (state.complianceCerts.some((c) => c.certId === certId && c.auditInProgress)) return state
+      // Start or renew audit
+      const existing = state.complianceCerts.filter((c) => c.certId !== certId)
+      const newCert: ActiveComplianceCert = {
+        certId,
+        grantedAtTick: 0, // will be set when audit completes
+        expiresAtTick: 0,
+        auditInProgress: true,
+        auditStartedTick: state.tickCount,
+      }
+      return {
+        complianceCerts: [...existing, newCert],
+        money: state.money - config.auditCost,
+        auditCooldown: 20,
+      }
+    }),
+
+  // ── Phase 4D: Competitor AI Actions ────────────────────────────
+
+  counterPoachOffer: () =>
+    set((state) => {
+      if (!state.poachTarget) return state
+      const staff = state.staff.find((s) => s.id === state.poachTarget)
+      if (!staff) return { poachTarget: null }
+      const counterCost = staff.salaryPerTick * 40 // 2x salary for 20 ticks
+      if (state.money < counterCost) return state
+      return {
+        money: state.money - counterCost,
+        poachTarget: null,
+      }
+    }),
+
   // ── Tutorial Actions ────────────────────────────────────────────
 
   dismissTip: (tipId: string) =>
@@ -3588,6 +4053,36 @@ export const useGameStore = create<GameState>((set) => ({
       activeTip: null,
       tutorialEnabled: true,
       activeSlotId: null,
+      // Phase 4B — Carbon & Environmental
+      energySource: 'grid_mixed' as EnergySource,
+      carbonEmissionsPerTick: 0,
+      lifetimeCarbonEmissions: 0,
+      carbonTaxRate: 0,
+      carbonTaxPerTick: 0,
+      greenCertifications: [] as GreenCert[],
+      greenCertEligibleTicks: 0,
+      waterUsagePerTick: 0,
+      waterCostPerTick: 0,
+      eWasteStockpile: 0,
+      eWasteDisposed: 0,
+      droughtActive: false,
+      // Phase 4C — Security & Compliance
+      securityTier: 'basic' as SecurityTier,
+      installedSecurityFeatures: ['badge_access'] as SecurityFeatureId[],
+      complianceCerts: [] as ActiveComplianceCert[],
+      securityMaintenanceCost: 0,
+      intrusionsBlocked: 0,
+      auditCooldown: 0,
+      // Phase 4D — Competitor AI
+      competitors: [] as Competitor[],
+      competitorBids: [] as CompetitorBid[],
+      playerMarketShare: 100,
+      competitorContractsWon: 0,
+      competitorContractsLost: 0,
+      competitorOutperformTicks: 0,
+      priceWarActive: false,
+      priceWarTicksRemaining: 0,
+      poachTarget: null,
     })
   },
 
@@ -3750,6 +4245,7 @@ export const useGameStore = create<GameState>((set) => ({
     nextIncidentId = 1
     nextContractId = 1
     nextGeneratorId = 1
+    nextCompetitorId = 1
     set({
       cabinets: [],
       spineSwitches: [],
@@ -5019,6 +5515,274 @@ export const useGameStore = create<GameState>((set) => ({
         if (zoningRestricted && noiseLevel < NOISE_CONFIG.noiseLimit - 10) zoningRestricted = false
       }
 
+      // ── Phase 4B: Carbon & Environmental ──────────────────────────
+      const energyConfig = ENERGY_SOURCE_CONFIG[state.energySource]
+      const carbonTaxBracket = CARBON_TAX_SCHEDULE.find((b) => newTickCount >= b.minTick && newTickCount < b.maxTick)
+      const baseCarbonTaxRate = carbonTaxBracket?.rate ?? 0
+
+      // Calculate carbon emissions based on total power and energy source
+      const totalPowerKW = stats.totalPower / 1000
+      const carbonEmissionsPerTick = +(totalPowerKW * energyConfig.carbonPerKW).toFixed(6)
+      const lifetimeCarbonEmissions = +(state.lifetimeCarbonEmissions + carbonEmissionsPerTick).toFixed(4)
+
+      // Carbon tax (reduced by green certs)
+      const certTaxReduction = state.greenCertifications.reduce((sum, certId) => {
+        const certConfig = GREEN_CERT_CONFIG.find((c) => c.id === certId)
+        return sum + (certConfig?.carbonTaxReduction ?? 0)
+      }, 0)
+      const effectiveCarbonTaxRate = Math.max(0, baseCarbonTaxRate * (1 - Math.min(1, certTaxReduction)))
+      const carbonTaxPerTick = +(carbonEmissionsPerTick * effectiveCarbonTaxRate).toFixed(4)
+
+      // Water usage (only water cooling, affected by drought)
+      const isDrought = state.activeIncidents.some((i) => i.def.type === 'drought' && !i.resolved)
+      const waterMultiplier = isDrought ? WATER_USAGE_CONFIG.droughtPriceMultiplier : 1
+      const waterCabinets = state.coolingType === 'water' ? newCabinets.filter((c) => c.powerStatus).length : 0
+      const waterUsagePerTick = waterCabinets * WATER_USAGE_CONFIG.gallonsPerCabinetPerTick
+      const waterCostPerTick = +(waterUsagePerTick * WATER_USAGE_CONFIG.costPerGallon * waterMultiplier).toFixed(2)
+
+      // E-waste reputation penalty
+      if (state.eWasteStockpile > EWASTE_CONFIG.reputationPenaltyThreshold) {
+        reputationScore = Math.max(0, +(reputationScore - EWASTE_CONFIG.reputationPenaltyPerTick).toFixed(2))
+      }
+
+      // Green cert eligibility tracking
+      let greenCertEligibleTicks = state.greenCertEligibleTicks
+      const pueOk = stats.pue > 0 && stats.pue <= 1.4
+      const isNonMixed = state.energySource !== 'grid_mixed'
+      if (pueOk && (isNonMixed || carbonEmissionsPerTick < 0.001)) {
+        greenCertEligibleTicks++
+      } else {
+        greenCertEligibleTicks = 0
+      }
+
+      // ── Phase 4C: Security & Compliance ───────────────────────────
+      const securityTierConfig = SECURITY_TIER_CONFIG.find((c) => c.tier === state.securityTier)
+      const securityMaintenanceCost = securityTierConfig?.maintenancePerTick ?? 0
+
+      // Process compliance audits
+      let complianceCerts = state.complianceCerts.map((cert) => {
+        if (cert.auditInProgress) {
+          const auditConfig = COMPLIANCE_CERT_CONFIG.find((c) => c.id === cert.certId)
+          if (auditConfig && newTickCount - cert.auditStartedTick >= auditConfig.auditDurationTicks) {
+            // Audit complete — grant cert
+            return {
+              ...cert,
+              auditInProgress: false,
+              grantedAtTick: newTickCount,
+              expiresAtTick: newTickCount + auditConfig.auditInterval,
+            }
+          }
+        }
+        return cert
+      })
+
+      // Expire old certifications
+      complianceCerts = complianceCerts.filter((cert) => {
+        if (cert.auditInProgress) return true
+        return cert.expiresAtTick > newTickCount
+      })
+
+      // Compliance revenue bonus on contracts
+      const complianceRevenueBonus = complianceCerts
+        .filter((c) => !c.auditInProgress && c.grantedAtTick > 0)
+        .reduce((sum, cert) => {
+          const config = COMPLIANCE_CERT_CONFIG.find((c) => c.id === cert.certId)
+          return sum + (config?.revenueBonus ?? 0)
+        }, 0)
+
+      // Security intrusion chance reduction
+      const totalIntrusionDefense = state.installedSecurityFeatures.reduce((sum, fId) => {
+        const feat = SECURITY_FEATURE_CONFIG.find((f) => f.id === fId)
+        return sum + (feat?.intrusionDefense ?? 0)
+      }, 0)
+
+      // Block security intrusion incidents based on defense
+      let intrusionsBlocked = state.intrusionsBlocked
+      const securityIncidentTypes = ['tailgating', 'social_engineering', 'break_in']
+      activeIncidents = activeIncidents.map((inc) => {
+        if (securityIncidentTypes.includes(inc.def.type) && !inc.resolved) {
+          if (Math.random() < totalIntrusionDefense) {
+            intrusionsBlocked++
+            incidentLog = [`Security blocked: ${inc.def.label}`, ...incidentLog].slice(0, 10)
+            return { ...inc, resolved: true }
+          }
+        }
+        return inc
+      })
+
+      const auditCooldown = Math.max(0, state.auditCooldown - 1)
+
+      // ── Phase 4D: Competitor AI ───────────────────────────────────
+      let competitors = [...state.competitors]
+      let competitorBids = [...state.competitorBids]
+      const competitorContractsWon = state.competitorContractsWon
+      let competitorContractsLost = state.competitorContractsLost
+      let priceWarActive = state.priceWarActive
+      let priceWarTicksRemaining = state.priceWarTicksRemaining
+      let poachTarget = state.poachTarget
+
+      // Spawn competitors over time
+      const personalities: CompetitorPersonality[] = ['budget', 'premium', 'green', 'aggressive', 'steady']
+      const customerSpecs: CustomerType[] = ['general', 'ai_training', 'streaming', 'crypto', 'enterprise']
+
+      if (competitors.length < 1 && newTickCount >= COMPETITOR_SCALE_CONFIG.firstCompetitorTick) {
+        competitors.push({
+          id: `comp-${nextCompetitorId++}`,
+          name: COMPETITOR_NAMES[0],
+          personality: 'budget',
+          strength: 15,
+          specialization: customerSpecs[Math.floor(Math.random() * customerSpecs.length)],
+          reputationScore: 20,
+          securityTier: 'basic',
+          greenCert: null,
+          aggression: 0.4,
+          techLevel: 0,
+          marketShare: 0,
+        })
+        incidentLog = [`New competitor entered the market: ${COMPETITOR_NAMES[0]}`, ...incidentLog].slice(0, 10)
+      }
+      if (competitors.length < 2 && newTickCount >= COMPETITOR_SCALE_CONFIG.secondCompetitorTick) {
+        const p = personalities[1 + Math.floor(Math.random() * 4)]
+        competitors.push({
+          id: `comp-${nextCompetitorId++}`,
+          name: COMPETITOR_NAMES[competitors.length],
+          personality: p,
+          strength: 25,
+          specialization: customerSpecs[Math.floor(Math.random() * customerSpecs.length)],
+          reputationScore: 30,
+          securityTier: 'basic',
+          greenCert: null,
+          aggression: COMPETITOR_PERSONALITIES[p].bidModifier + 0.5,
+          techLevel: 1,
+          marketShare: 0,
+        })
+        incidentLog = [`New competitor: ${COMPETITOR_NAMES[competitors.length - 1]}`, ...incidentLog].slice(0, 10)
+      }
+      if (competitors.length < 3 && newTickCount >= COMPETITOR_SCALE_CONFIG.thirdCompetitorTick) {
+        const p = personalities[Math.floor(Math.random() * personalities.length)]
+        competitors.push({
+          id: `comp-${nextCompetitorId++}`,
+          name: COMPETITOR_NAMES[competitors.length],
+          personality: p,
+          strength: 35,
+          specialization: customerSpecs[Math.floor(Math.random() * customerSpecs.length)],
+          reputationScore: 40,
+          securityTier: 'enhanced',
+          greenCert: null,
+          aggression: COMPETITOR_PERSONALITIES[p].bidModifier + 0.5,
+          techLevel: 2,
+          marketShare: 0,
+        })
+        incidentLog = [`New competitor: ${COMPETITOR_NAMES[competitors.length - 1]}`, ...incidentLog].slice(0, 10)
+      }
+
+      // Grow competitors (rubber-banding)
+      const playerStrength = newCabinets.length * 2 + state.reputationScore
+      competitors = competitors.map((comp) => {
+        const personality = COMPETITOR_PERSONALITIES[comp.personality]
+        const rubberBand = playerStrength > comp.strength
+          ? COMPETITOR_SCALE_CONFIG.rubberBandStrength
+          : -COMPETITOR_SCALE_CONFIG.rubberBandStrength * 0.5
+        const growth = COMPETITOR_SCALE_CONFIG.strengthGrowthRate * personality.growthRate + rubberBand
+        const newStrength = Math.min(90, comp.strength + growth)
+        const repGrowth = comp.personality === 'budget' ? -0.01 : 0.03
+        return {
+          ...comp,
+          strength: +newStrength.toFixed(2),
+          reputationScore: Math.min(85, Math.max(5, +(comp.reputationScore + repGrowth).toFixed(2))),
+          techLevel: Math.min(9, comp.techLevel + (Math.random() < 0.005 ? 1 : 0)),
+        }
+      })
+
+      // Competitor bidding on contracts
+      if (contractOffers.length > 0 && competitors.length > 0) {
+        // Remove expired bids
+        competitorBids = competitorBids
+          .map((b) => ({ ...b, ticksRemaining: b.ticksRemaining - 1 }))
+          .filter((b) => b.ticksRemaining > 0)
+
+        // Competitors may bid on open contracts
+        for (const offer of contractOffers) {
+          if (competitorBids.some((b) => b.contractType === offer.type)) continue
+          for (const comp of competitors) {
+            if (Math.random() < comp.aggression * 0.15) {
+              const winChance = Math.min(0.8, (comp.strength + comp.reputationScore) /
+                (playerStrength + state.reputationScore + 20) * 0.5)
+              competitorBids.push({
+                competitorId: comp.id,
+                competitorName: comp.name,
+                contractType: offer.type,
+                winChance: +winChance.toFixed(2),
+                ticksRemaining: COMPETITOR_SCALE_CONFIG.bidWindowTicks,
+              })
+              break // only one competitor per contract
+            }
+          }
+        }
+
+        // Check if competitors win any bids (contracts player hasn't accepted)
+        const expiredBids = competitorBids.filter((b) => b.ticksRemaining <= 1)
+        for (const bid of expiredBids) {
+          if (Math.random() < bid.winChance) {
+            competitorContractsLost++
+            contractOffers = contractOffers.filter((o) => o.type !== bid.contractType)
+            incidentLog = [`${bid.competitorName} won the ${bid.contractType} contract!`, ...incidentLog].slice(0, 10)
+          }
+        }
+      }
+
+      // Price war events
+      if (priceWarActive) {
+        priceWarTicksRemaining--
+        if (priceWarTicksRemaining <= 0) priceWarActive = false
+      } else if (competitors.length > 0 && Math.random() < COMPETITOR_SCALE_CONFIG.priceWarChance) {
+        priceWarActive = true
+        priceWarTicksRemaining = 30
+        incidentLog = ['Price war! Competitor slashing rates — contract revenue reduced.', ...incidentLog].slice(0, 10)
+      }
+
+      // Staff poaching attempts
+      if (!poachTarget && competitors.length > 0 && updatedStaff.length > 0 && Math.random() < COMPETITOR_SCALE_CONFIG.poachAttemptChance) {
+        const target = updatedStaff[Math.floor(Math.random() * updatedStaff.length)]
+        poachTarget = target.id
+        incidentLog = [`Competitor trying to poach ${target.name}! Counter-offer or lose them.`, ...incidentLog].slice(0, 10)
+      }
+
+      // Process unresolved poach (staff leaves after 15 ticks if no counter)
+      if (poachTarget && newTickCount % 15 === 0) {
+        const targetStaff = updatedStaff.find((s) => s.id === poachTarget)
+        if (targetStaff) {
+          updatedStaff = updatedStaff.filter((s) => s.id !== poachTarget)
+          incidentLog = [`${targetStaff.name} was poached by a competitor!`, ...incidentLog].slice(0, 10)
+        }
+        poachTarget = null
+      }
+
+      // Calculate market share
+      const totalMarketStrength = competitors.reduce((sum, c) => sum + c.strength, 0) + playerStrength
+      const playerMarketShare = totalMarketStrength > 0 ? Math.round(playerStrength / totalMarketStrength * 100) : 100
+      competitors = competitors.map((comp) => ({
+        ...comp,
+        marketShare: totalMarketStrength > 0 ? Math.round(comp.strength / totalMarketStrength * 100) : 0,
+      }))
+
+      // Competitor outperform tracking
+      let competitorOutperformTicks = state.competitorOutperformTicks
+      if (competitors.length > 0 && competitors.every((c) => playerStrength > c.strength)) {
+        competitorOutperformTicks++
+      } else {
+        competitorOutperformTicks = 0
+      }
+
+      // Price war revenue penalty (applied to contract revenue)
+      const priceWarPenalty = priceWarActive ? 0.85 : 1.0
+
+      // Green cert revenue bonus on contracts
+      const greenCertRevenueBonus = state.greenCertifications.reduce((sum, certId) => {
+        const config = GREEN_CERT_CONFIG.find((c) => c.id === certId)
+        return sum + (config?.revenueBonus ?? 0)
+      }, 0)
+
       // ── Spot Compute Market ───────────────────────────────────────
       let spotPriceMultiplier = state.spotPriceMultiplier
       const spotDemand = Math.max(0, Math.min(1, 1 - demandMultiplier * 0.5 + (Math.random() - 0.5) * 0.2))
@@ -5048,6 +5812,12 @@ export const useGameStore = create<GameState>((set) => ({
       if (supplyShortageActive && !state.supplyShortageActive) logEvent('system', `Chip shortage active (${shortagePriceMultiplier}x prices)`, 'warning')
       if (completedContracts > state.completedContracts) logEvent('contract', 'Contract completed!', 'success')
       if (currentSeason !== state.currentSeason) logEvent('system', `Season changed to ${currentSeason}`, 'info')
+      // Phase 4 event logging
+      if (state.energySource !== 'grid_mixed' && carbonTaxPerTick > 0) logEvent('finance', `Carbon tax: $${carbonTaxPerTick.toFixed(2)}/tick`, 'warning')
+      if (priceWarActive && !state.priceWarActive) logEvent('system', 'Competitor price war started!', 'warning')
+      if (competitors.length > state.competitors.length) logEvent('system', 'New competitor entered the market', 'info')
+      if (intrusionsBlocked > state.intrusionsBlocked) logEvent('incident', 'Security intrusion blocked', 'success')
+      if (complianceCerts.some((c) => !c.auditInProgress && c.grantedAtTick === newTickCount)) logEvent('achievement', 'Compliance certification granted!', 'success')
 
       // ── Capacity history ──────────────────────────────────────────
       const capacityHistory = [...state.capacityHistory, {
@@ -5058,7 +5828,7 @@ export const useGameStore = create<GameState>((set) => ({
       // ── Lifetime stats ────────────────────────────────────────────
       const lifetimeStats = { ...state.lifetimeStats }
       lifetimeStats.totalRevenueEarned += revenue + contractRevenue + spotRevenue + meetMeRevenue
-      lifetimeStats.totalExpensesPaid += expenses + loanPayments + contractPenalties + insuranceCost + staffCostPerTick + peeringCostPerTick + powerRedundancyCost + meetMeMaintenanceCost
+      lifetimeStats.totalExpensesPaid += expenses + loanPayments + contractPenalties + insuranceCost + staffCostPerTick + peeringCostPerTick + powerRedundancyCost + meetMeMaintenanceCost + carbonTaxPerTick + waterCostPerTick + securityMaintenanceCost
       lifetimeStats.totalMoneyEarned += revenue + contractRevenue + spotRevenue + meetMeRevenue + patentIncome
       lifetimeStats.peakTemperatureReached = Math.max(lifetimeStats.peakTemperatureReached, stats.avgHeat)
       lifetimeStats.peakRevenueTick = Math.max(lifetimeStats.peakRevenueTick, revenue)
@@ -5098,6 +5868,18 @@ export const useGameStore = create<GameState>((set) => ({
           if (tip.id === 'spot_high' && spotPriceMultiplier > 1.5 && state.spotCapacityAllocated === 0) trigger = true
           if (tip.id === 'redundancy_hint' && state.powerRedundancy === 'N' && newCabinets.length >= 10) trigger = true
           if (tip.id === 'capacity_warning' && newCabinets.length >= getSuiteLimits(state.suiteTier).maxCabinets * 0.8) trigger = true
+          // Phase 4B — Carbon tips
+          if (tip.id === 'carbon_tax_rising' && baseCarbonTaxRate >= 5 && state.energySource === 'grid_mixed') trigger = true
+          if (tip.id === 'ewaste_piling' && state.eWasteStockpile >= 8) trigger = true
+          if (tip.id === 'green_cert_eligible' && greenCertEligibleTicks >= 100 && state.greenCertifications.length === 0) trigger = true
+          // Phase 4C — Security tips
+          if (tip.id === 'security_upgrade' && state.securityTier === 'basic' && newCabinets.length >= 8) trigger = true
+          if (tip.id === 'intrusion_detected' && activeIncidents.some((i) => securityIncidentTypes.includes(i.def.type))) trigger = true
+          if (tip.id === 'compliance_expiring' && complianceCerts.some((c) => !c.auditInProgress && c.expiresAtTick - newTickCount < 30)) trigger = true
+          // Phase 4D — Competitor tips
+          if (tip.id === 'competitor_appeared' && competitors.length === 1 && state.competitors.length === 0) trigger = true
+          if (tip.id === 'competitor_bidding' && competitorBids.length > 0 && state.competitorBids.length === 0) trigger = true
+          if (tip.id === 'price_war' && priceWarActive && !state.priceWarActive) trigger = true
           if (trigger) { activeTip = tip; break }
         }
       }
@@ -5143,13 +5925,39 @@ export const useGameStore = create<GameState>((set) => ({
       if (lifetimeStats.longestUptimeStreak >= 1000) unlock('ironman')
       if (state.seenTips.length >= 5) unlock('student')
       if (state.seenTips.length >= TUTORIAL_TIPS.length) unlock('graduate')
+      // Phase 4B — Carbon & Environmental achievements
+      if (state.energySource !== 'grid_mixed') unlock('green_power')
+      if (state.greenCertifications.includes('carbon_neutral')) unlock('carbon_neutral_cert')
+      if (state.coolingType === 'air' && newTickCount >= 100 && waterUsagePerTick === 0) unlock('water_wise')
+      if (state.eWasteDisposed >= 20) unlock('clean_sweep')
+      // Phase 4C — Security & Compliance achievements
+      if (state.securityTier === 'high_security' || state.securityTier === 'maximum') unlock('locked_down')
+      if (complianceCerts.filter((c) => !c.auditInProgress && c.grantedAtTick > 0).length >= 3) unlock('fully_compliant')
+      if (intrusionsBlocked >= 10) unlock('fort_knox')
+      // Check government contractor (completed a FedRAMP-gated contract)
+      if (completedContracts > state.completedContracts) {
+        const justCompleted = state.activeContracts.find((c) => c.status === 'active' && c.ticksRemaining <= 1)
+        if (justCompleted && COMPLIANCE_CONTRACT_REQUIREMENTS[justCompleted.def.type] === 'fedramp') {
+          unlock('gov_contractor')
+        }
+      }
+      // Phase 4D — Competitor AI achievements
+      if (playerMarketShare >= 50) unlock('market_leader')
+      if (competitorContractsWon >= 5) unlock('monopoly')
+      // Underdog: won a contract and any competitor has higher reputation
+      if (competitorContractsWon > 0 && competitors.some((c) => c.reputationScore > state.reputationScore)) unlock('underdog')
+      if (competitorOutperformTicks >= 100) unlock('rivalry')
 
-      // Recalculate final money with all new income/expenses (Phase 5 included)
+      // Apply Phase 4 bonuses to contract revenue
+      const adjustedContractRevenue = +(contractRevenue * (1 + complianceRevenueBonus + greenCertRevenueBonus) * priceWarPenalty).toFixed(2)
+
+      // Recalculate final money with all income/expenses (Phase 4 + 5 included)
       const phase5Income = spotRevenue + meetMeRevenue
       const phase5Expenses = peeringCostPerTick + powerRedundancyCost + meetMeMaintenanceCost + (noiseComplaints > state.noiseComplaints && noiseComplaints % NOISE_CONFIG.fineThreshold === 0 ? NOISE_CONFIG.fineAmount : 0)
+      const phase4Expenses = carbonTaxPerTick + waterCostPerTick + securityMaintenanceCost
       const finalNewMoney = state.sandboxMode
         ? 999999999
-        : Math.round((state.money + revenue + contractRevenue + patentIncome + milestoneMoney + phase5Income + (insurancePayouts - state.insurancePayouts) - expenses - loanPayments - contractPenalties - insuranceCost - staffCostPerTick - phase5Expenses) * 100) / 100
+        : Math.round((state.money + revenue + adjustedContractRevenue + patentIncome + milestoneMoney + phase5Income + (insurancePayouts - state.insurancePayouts) - expenses - loanPayments - contractPenalties - insuranceCost - staffCostPerTick - phase5Expenses - phase4Expenses) * 100) / 100
 
       return {
         cabinets: newCabinets,
@@ -5174,7 +5982,6 @@ export const useGameStore = create<GameState>((set) => ({
         activeContracts: updatedContracts,
         contractOffers,
         contractLog,
-        contractRevenue: +contractRevenue.toFixed(2),
         contractPenalties: +contractPenalties.toFixed(2),
         completedContracts,
         achievements: newAchievements,
@@ -5265,6 +6072,32 @@ export const useGameStore = create<GameState>((set) => ({
         lifetimeStats,
         // Phase 5 — Tutorial
         activeTip,
+        // Phase 4B — Carbon & Environmental
+        carbonEmissionsPerTick,
+        lifetimeCarbonEmissions,
+        carbonTaxRate: effectiveCarbonTaxRate,
+        carbonTaxPerTick,
+        greenCertEligibleTicks,
+        waterUsagePerTick,
+        waterCostPerTick,
+        droughtActive: isDrought,
+        // Phase 4C — Security & Compliance
+        complianceCerts,
+        securityMaintenanceCost,
+        intrusionsBlocked,
+        auditCooldown,
+        // Phase 4D — Competitor AI
+        competitors,
+        competitorBids,
+        playerMarketShare,
+        competitorContractsWon,
+        competitorContractsLost,
+        competitorOutperformTicks,
+        priceWarActive,
+        priceWarTicksRemaining,
+        poachTarget,
+        // Updated contract revenue (with Phase 4 bonuses)
+        contractRevenue: +adjustedContractRevenue.toFixed(2),
       }
     }),
 }))
