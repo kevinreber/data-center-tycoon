@@ -2552,21 +2552,7 @@ export const useGameStore = create<GameState>((set) => ({
       let incidentLog = [...state.incidentLog]
       const resolvedCount = state.resolvedCount
 
-      // Tick down active incidents
-      activeIncidents = activeIncidents
-        .map((i) => {
-          if (i.resolved) return i
-          const remaining = i.ticksRemaining - 1
-          if (remaining <= 0) {
-            incidentLog = [`Expired: ${i.def.label}`, ...incidentLog].slice(0, 10)
-            return { ...i, ticksRemaining: 0, resolved: true }
-          }
-          return { ...i, ticksRemaining: remaining }
-        })
-
-      // Clean up resolved incidents (keep for 1 tick for UI display, then remove)
-      activeIncidents = activeIncidents.filter((i) => !i.resolved || i.ticksRemaining >= 0)
-      // Actually remove fully resolved ones after this tick
+      // Clean up manually resolved incidents
       const justResolved = activeIncidents.filter((i) => i.resolved)
       activeIncidents = activeIncidents.filter((i) => !i.resolved)
 
@@ -2613,7 +2599,6 @@ export const useGameStore = create<GameState>((set) => ({
       const techRevenueBonus = hasTech('high_density') ? 0.15 : 0
       const techAiBonus = hasTech('gpu_clusters') ? 0.30 : 0
       const techLinkCapacity = hasTech('optical_interconnect') ? TRAFFIC.linkCapacityGbps * 2 : TRAFFIC.linkCapacityGbps
-      const techIncidentSpeedMult = hasTech('auto_failover') ? 0.7 : 1.0
       const techCoolingFailureReduction = hasTech('redundant_cooling') ? 0.5 : 0
 
       // ── Spot power pricing ───────────────────────────────
@@ -2780,20 +2765,6 @@ export const useGameStore = create<GameState>((set) => ({
           drillCooldown: Math.max(0, state.drillCooldown - 1),
           rfpOffers: state.rfpOffers.map((r) => ({ ...r, bidWindowTicks: r.bidWindowTicks - 1 })).filter((r) => r.bidWindowTicks > 0),
         }
-      }
-
-      // Reduce incident durations faster with auto_failover tech
-      if (techIncidentSpeedMult < 1.0) {
-        activeIncidents = activeIncidents.map((i) => {
-          if (i.resolved) return i
-          const extraReduction = Math.random() < (1 - techIncidentSpeedMult) ? 1 : 0
-          const remaining = i.ticksRemaining - extraReduction
-          if (remaining <= 0) {
-            incidentLog = [`Auto-resolved: ${i.def.label}`, ...incidentLog].slice(0, 10)
-            return { ...i, ticksRemaining: 0, resolved: true }
-          }
-          return { ...i, ticksRemaining: remaining }
-        })
       }
 
       // Reduce cooling failure effect with redundant cooling tech
