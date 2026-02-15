@@ -1,11 +1,11 @@
 import { useEffect, useRef } from 'react'
 import { GameCanvas } from '@/components/GameCanvas'
-import { HUD } from '@/components/HUD'
+import { Sidebar } from '@/components/Sidebar'
 import { LayersPopup } from '@/components/LayersPopup'
 import { StatusBar } from '@/components/StatusBar'
 import { useGameStore } from '@/stores/gameStore'
 import type { GameSpeed } from '@/stores/gameStore'
-import { Zap, DollarSign, Thermometer, Activity, Pause, Play, FastForward, Trophy, X } from 'lucide-react'
+import { Zap, DollarSign, Thermometer, Activity, Pause, Play, FastForward, Trophy, X, Flame } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Tooltip,
@@ -33,6 +33,7 @@ function App() {
     totalPower, money, pue, avgHeat, cabinets, spineSwitches,
     gameSpeed, setGameSpeed, tick, revenue, expenses,
     newAchievement, dismissAchievement, loanPayments,
+    powerOutage, outageTicksRemaining, fireActive, suppressionType,
   } = useGameStore()
   const totalNodes = cabinets.length + spineSwitches.length
   const activeNodes = cabinets.filter((c) => c.powerStatus).length + spineSwitches.filter((s) => s.powerStatus).length
@@ -145,16 +146,37 @@ function App() {
           </div>
         </header>
 
-        {/* Main content area */}
-        <main className="flex-1 flex flex-col min-h-0 p-3 gap-3">
-          {/* Phaser canvas */}
-          <div className="flex-1 min-h-0 relative">
-            <GameCanvas />
-            <LayersPopup />
-          </div>
+        {/* Main content area: sidebar + canvas */}
+        <main className="flex-1 flex min-h-0">
+          {/* Left sidebar */}
+          <Sidebar />
 
-          {/* HUD controls */}
-          <HUD />
+          {/* Canvas area */}
+          <div className="flex-1 min-h-0 flex flex-col p-3 gap-2">
+            {/* Alert banners */}
+            {powerOutage && (
+              <div className="rounded-lg border border-neon-red/40 bg-neon-red/10 p-2 flex items-center gap-2 animate-pulse shrink-0">
+                <Zap className="size-4 text-neon-red" />
+                <span className="text-xs font-bold text-neon-red tracking-widest">GRID POWER OUTAGE</span>
+                <span className="text-xs text-neon-red tabular-nums ml-auto">{outageTicksRemaining}t remaining</span>
+              </div>
+            )}
+            {fireActive && (
+              <div className="rounded-lg border border-neon-orange/40 bg-neon-orange/10 p-2 flex items-center gap-2 animate-pulse shrink-0">
+                <Flame className="size-4 text-neon-orange" />
+                <span className="text-xs font-bold text-neon-orange tracking-widest">FIRE IN PROGRESS</span>
+                <span className="text-xs text-muted-foreground ml-auto">
+                  Suppression: {suppressionType === 'none' ? 'None' : suppressionType === 'water_suppression' ? 'Water' : 'Gas'}
+                </span>
+              </div>
+            )}
+
+            {/* Phaser canvas */}
+            <div className="flex-1 min-h-0 relative">
+              <GameCanvas />
+              <LayersPopup />
+            </div>
+          </div>
         </main>
 
         {/* Bottom status bar */}
