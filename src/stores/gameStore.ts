@@ -10,6 +10,35 @@ export type SuppressionType = 'none' | 'water_suppression' | 'gas_suppression'
 export type TechBranch = 'efficiency' | 'performance' | 'resilience'
 export type SuiteTier = 'starter' | 'standard' | 'professional' | 'enterprise'
 
+// ── Save Slot Types ──────────────────────────────────────────
+
+export const MAX_SAVE_SLOTS = 3
+const SAVE_INDEX_KEY = 'fabric-tycoon-saves-index'
+const SAVE_SLOT_PREFIX = 'fabric-tycoon-save-slot-'
+
+export interface SaveSlotMeta {
+  slotId: number
+  name: string
+  timestamp: number
+  money: number
+  tickCount: number
+  suiteTier: SuiteTier
+  cabinetCount: number
+}
+
+function getSaveIndex(): SaveSlotMeta[] {
+  try {
+    const raw = localStorage.getItem(SAVE_INDEX_KEY)
+    return raw ? JSON.parse(raw) : []
+  } catch {
+    return []
+  }
+}
+
+function setSaveIndex(index: SaveSlotMeta[]) {
+  localStorage.setItem(SAVE_INDEX_KEY, JSON.stringify(index))
+}
+
 // ── Customer Type Config ──────────────────────────────────────
 
 export interface CustomerTypeConfig {
@@ -1468,6 +1497,8 @@ interface GameState {
 
   // Save / Load
   hasSaved: boolean
+  activeSlotId: number | null
+  saveSlots: SaveSlotMeta[]
 
   // Actions
   addCabinet: (col: number, row: number, environment: CabinetEnvironment, customerType?: CustomerType, facing?: CabinetFacing) => void
@@ -1520,9 +1551,11 @@ interface GameState {
   // Heat map
   toggleHeatMap: () => void
   // Save / Load
-  saveGame: () => void
-  loadGame: () => boolean
+  saveGame: (slotId: number, name?: string) => void
+  loadGame: (slotId: number) => boolean
+  deleteGame: (slotId: number) => void
   resetGame: () => void
+  refreshSaveSlots: () => void
   tick: () => void
 }
 
@@ -1532,6 +1565,28 @@ let nextLoanId = 1
 let nextIncidentId = 1
 let nextContractId = 1
 let nextGeneratorId = 1
+
+function maxIdNum(items: { id: string }[], prefix: string): number {
+  let max = 0
+  for (const item of items) {
+    const n = parseInt(item.id.replace(prefix, ''), 10)
+    if (n > max) max = n
+  }
+  return max
+}
+
+function restoreIdCounters(data: Record<string, unknown>) {
+  const cabinets = (data.cabinets ?? []) as { id: string }[]
+  const spines = (data.spineSwitches ?? []) as { id: string }[]
+  const loans = (data.loans ?? []) as { id: string }[]
+  const generators = (data.generators ?? []) as { id: string }[]
+  nextCabId = maxIdNum(cabinets, 'cab-') + 1
+  nextSpineId = maxIdNum(spines, 'spine-') + 1
+  nextLoanId = maxIdNum(loans, 'loan-') + 1
+  nextGeneratorId = maxIdNum(generators, 'gen-') + 1
+  nextIncidentId = 1
+  nextContractId = 1
+}
 
 export const useGameStore = create<GameState>((set) => ({
   cabinets: [],
@@ -1692,6 +1747,8 @@ export const useGameStore = create<GameState>((set) => ({
 
   // Save / Load
   hasSaved: false,
+  activeSlotId: null,
+  saveSlots: getSaveIndex(),
 
   // ── Build Actions ───────────────────────────────────────────
 
@@ -2327,7 +2384,7 @@ export const useGameStore = create<GameState>((set) => ({
 
   // ── Save / Load ────────────────────────────────────────────────
 
-  saveGame: () =>
+  saveGame: (slotId: number, name?: string) =>
     set((state) => {
       const saveData = {
         version: 'v0.3.0',
@@ -2373,16 +2430,37 @@ export const useGameStore = create<GameState>((set) => ({
         scenariosCompleted: state.scenariosCompleted,
       }
       try {
-        localStorage.setItem('fabric-tycoon-save', JSON.stringify(saveData))
-      } catch { /* storage full — ignore */ }
-      return { hasSaved: true }
+        localStorage.setItem(SAVE_SLOT_PREFIX + slotId, JSON.stringify(saveData))
+
+        // Update save index
+        const index = getSaveIndex()
+        const existing = index.find((s) => s.slotId === slotId)
+        const meta: SaveSlotMeta = {
+          slotId,
+          name: name ?? existing?.name ?? `Save ${slotId}`,
+          timestamp: Date.now(),
+          money: state.money,
+          tickCount: state.tickCount,
+          suiteTier: state.suiteTier,
+          cabinetCount: state.cabinets.length,
+        }
+        const newIndex = existing
+          ? index.map((s) => (s.slotId === slotId ? meta : s))
+          : [...index, meta]
+        setSaveIndex(newIndex)
+
+        return { hasSaved: true, activeSlotId: slotId, saveSlots: newIndex }
+      } catch {
+        return {}
+      }
     }),
 
-  loadGame: () => {
+  loadGame: (slotId: number) => {
     try {
-      const raw = localStorage.getItem('fabric-tycoon-save')
+      const raw = localStorage.getItem(SAVE_SLOT_PREFIX + slotId)
       if (!raw) return false
       const data = JSON.parse(raw)
+      restoreIdCounters(data)
       set((state) => ({
         ...state,
         cabinets: data.cabinets ?? state.cabinets,
@@ -2424,6 +2502,8 @@ export const useGameStore = create<GameState>((set) => ({
         drillsCompleted: data.drillsCompleted ?? state.drillsCompleted,
         drillsPassed: data.drillsPassed ?? state.drillsPassed,
         scenariosCompleted: data.scenariosCompleted ?? state.scenariosCompleted,
+        activeSlotId: slotId,
+        hasSaved: true,
         ...calcStats(data.cabinets ?? state.cabinets, data.spineSwitches ?? state.spineSwitches),
       }))
       return true
@@ -2432,7 +2512,23 @@ export const useGameStore = create<GameState>((set) => ({
     }
   },
 
-  resetGame: () =>
+  deleteGame: (slotId: number) => {
+    localStorage.removeItem(SAVE_SLOT_PREFIX + slotId)
+    const newIndex = getSaveIndex().filter((s) => s.slotId !== slotId)
+    setSaveIndex(newIndex)
+    set((state) => ({
+      saveSlots: newIndex,
+      activeSlotId: state.activeSlotId === slotId ? null : state.activeSlotId,
+    }))
+  },
+
+  resetGame: () => {
+    nextCabId = 1
+    nextSpineId = 1
+    nextLoanId = 1
+    nextIncidentId = 1
+    nextContractId = 1
+    nextGeneratorId = 1
     set({
       cabinets: [],
       spineSwitches: [],
@@ -2514,7 +2610,12 @@ export const useGameStore = create<GameState>((set) => ({
       networkTopology: { totalLinks: 0, healthyLinks: 0, oversubscriptionRatio: 0, avgUtilization: 0, redundancyLevel: 0 },
       heatMapVisible: false,
       hasSaved: false,
-    }),
+      activeSlotId: null,
+    })
+  },
+
+  refreshSaveSlots: () =>
+    set({ saveSlots: getSaveIndex() }),
 
   tick: () =>
     set((state) => {
