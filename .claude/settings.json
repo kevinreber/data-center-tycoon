@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "command": "cd /home/user/data-center-tycoon && FILE=$(echo $TOOL_INPUT | jq -r '.file_path // empty') && if [ -n \"$FILE\" ] && echo \"$FILE\" | grep -qE '\\.(ts|tsx)$'; then npx eslint --no-warn-ignored \"$FILE\" 2>&1 | tail -20; fi"
+      }
+    ],
+    "SessionStart": [
+      {
+        "command": "cd /home/user/data-center-tycoon && echo '=== Lint Check ===' && npm run lint 2>&1 | tail -20 && echo '=== TypeScript Check ===' && npx tsc -b --noEmit 2>&1 | tail -20"
+      }
+    ]
+  }
+}
