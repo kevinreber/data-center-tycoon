@@ -419,8 +419,9 @@ export interface IncidentDef {
   description: string
   durationTicks: number       // how long the incident lasts if unresolved
   resolveCost: number         // $ to resolve immediately
-  effect: 'heat_spike' | 'revenue_penalty' | 'power_surge' | 'traffic_drop' | 'cooling_failure'
+  effect: 'heat_spike' | 'revenue_penalty' | 'power_surge' | 'traffic_drop' | 'cooling_failure' | 'hardware_failure'
   effectMagnitude: number     // severity-dependent multiplier
+  hardwareTarget?: 'spine' | 'leaf'  // for hardware_failure: which type of switch to disable
 }
 
 export interface ActiveIncident {
@@ -428,6 +429,7 @@ export interface ActiveIncident {
   def: IncidentDef
   ticksRemaining: number
   resolved: boolean
+  affectedHardwareId?: string  // for hardware_failure: ID of the spine or cabinet affected
 }
 
 export const INCIDENT_CATALOG: IncidentDef[] = [
@@ -443,6 +445,9 @@ export const INCIDENT_CATALOG: IncidentDef[] = [
   { type: 'sentient_ai', label: 'Sentient AI Outbreak', severity: 'critical', description: 'An AI workload has achieved self-awareness and is consuming all available compute.', durationTicks: 18, resolveCost: 15000, effect: 'revenue_penalty', effectMagnitude: 0.2 },
   { type: 'solar_flare', label: 'Solar Flare', severity: 'critical', description: 'A massive coronal mass ejection is causing electromagnetic interference across all systems.', durationTicks: 12, resolveCost: 10000, effect: 'power_surge', effectMagnitude: 1.5 },
   { type: 'quantum_decoherence', label: 'Quantum Decoherence', severity: 'major', description: 'Quantum bit errors cascading through network fabric. Traffic integrity compromised.', durationTicks: 10, resolveCost: 7000, effect: 'traffic_drop', effectMagnitude: 0.3 },
+  // Hardware replacement incidents
+  { type: 'spine_failure', label: 'Spine Switch Failure', severity: 'major', description: 'A spine switch has failed. Traffic is being redistributed across remaining spines.', durationTicks: 20, resolveCost: 12000, effect: 'hardware_failure', effectMagnitude: 0, hardwareTarget: 'spine' },
+  { type: 'leaf_failure', label: 'Leaf Switch Failure', severity: 'major', description: 'A top-of-rack switch has failed. The affected cabinet has lost network connectivity.', durationTicks: 15, resolveCost: 5000, effect: 'hardware_failure', effectMagnitude: 0, hardwareTarget: 'leaf' },
 ]
 
 /** Chance per tick of an incident occurring (when fewer than max active) */
@@ -1854,6 +1859,11 @@ export const useGameStore = create<GameState>((set) => ({
 
   toggleSpinePower: (id) =>
     set((state) => {
+      // Prevent toggling hardware that is failed due to an incident
+      const hwIncident = state.activeIncidents.find(
+        (i) => !i.resolved && i.def.effect === 'hardware_failure' && i.affectedHardwareId === id
+      )
+      if (hwIncident) return state
       const newSpines = state.spineSwitches.map((s) =>
         s.id === id ? { ...s, powerStatus: !s.powerStatus } : s
       )
@@ -1937,13 +1947,33 @@ export const useGameStore = create<GameState>((set) => ({
       const incident = state.activeIncidents.find((i) => i.id === id)
       if (!incident || incident.resolved) return state
       if (state.money < incident.def.resolveCost) return state
+
+      // Restore hardware if this was a hardware_failure incident
+      let cabinets = state.cabinets
+      let spineSwitches = state.spineSwitches
+      if (incident.def.effect === 'hardware_failure' && incident.affectedHardwareId) {
+        if (incident.def.hardwareTarget === 'spine') {
+          spineSwitches = state.spineSwitches.map((s) =>
+            s.id === incident.affectedHardwareId ? { ...s, powerStatus: true } : s
+          )
+        } else if (incident.def.hardwareTarget === 'leaf') {
+          cabinets = state.cabinets.map((c) =>
+            c.id === incident.affectedHardwareId ? { ...c, hasLeafSwitch: true } : c
+          )
+        }
+      }
+
       return {
         activeIncidents: state.activeIncidents.map((i) =>
           i.id === id ? { ...i, resolved: true, ticksRemaining: 0 } : i
         ),
+        cabinets,
+        spineSwitches,
         money: state.money - incident.def.resolveCost,
         resolvedCount: state.resolvedCount + 1,
         incidentLog: [`Resolved: ${incident.def.label}`, ...state.incidentLog].slice(0, 10),
+        ...calcStats(cabinets, spineSwitches),
+        trafficStats: calcTraffic(cabinets, spineSwitches, state.demandMultiplier),
       }
     }),
 
@@ -2663,17 +2693,57 @@ export const useGameStore = create<GameState>((set) => ({
         const sizeMultiplier = Math.min(2, state.cabinets.length / 8)
         const cablingPenalty = state.infraIncidentBonus
         if (Math.random() < INCIDENT_CHANCE * sizeMultiplier + cablingPenalty) {
-          const def = INCIDENT_CATALOG[Math.floor(Math.random() * INCIDENT_CATALOG.length)]
+          let selectedDef = INCIDENT_CATALOG[Math.floor(Math.random() * INCIDENT_CATALOG.length)]
+          let affectedHwId: string | undefined
+
+          // Hardware failure incidents need a valid target
+          if (selectedDef.effect === 'hardware_failure') {
+            const alreadyFailedIds = new Set(
+              activeIncidents
+                .filter(i => !i.resolved && i.def.effect === 'hardware_failure' && i.affectedHardwareId)
+                .map(i => i.affectedHardwareId!)
+            )
+            if (selectedDef.hardwareTarget === 'spine') {
+              const candidates = state.spineSwitches.filter(s => s.powerStatus && !alreadyFailedIds.has(s.id))
+              if (candidates.length > 1) { // keep at least 1 spine alive
+                affectedHwId = candidates[Math.floor(Math.random() * candidates.length)].id
+              }
+            } else if (selectedDef.hardwareTarget === 'leaf') {
+              const candidates = state.cabinets.filter(c => c.hasLeafSwitch && c.powerStatus && !alreadyFailedIds.has(c.id))
+              if (candidates.length > 0) {
+                affectedHwId = candidates[Math.floor(Math.random() * candidates.length)].id
+              }
+            }
+            if (!affectedHwId) {
+              // No valid target — fall back to a non-hardware incident
+              const fallbackDefs = INCIDENT_CATALOG.filter(d => d.effect !== 'hardware_failure')
+              selectedDef = fallbackDefs[Math.floor(Math.random() * fallbackDefs.length)]
+            }
+          }
+
           const incident: ActiveIncident = {
             id: `inc-${nextIncidentId++}`,
-            def,
-            ticksRemaining: def.durationTicks,
+            def: selectedDef,
+            ticksRemaining: selectedDef.durationTicks,
             resolved: false,
+            ...(affectedHwId ? { affectedHardwareId: affectedHwId } : {}),
           }
           activeIncidents.push(incident)
-          incidentLog = [`New: ${def.label} — ${def.description}`, ...incidentLog].slice(0, 10)
+          incidentLog = [`New: ${selectedDef.label} — ${selectedDef.description}`, ...incidentLog].slice(0, 10)
         }
       }
+
+      // Apply hardware failure incidents — disable affected equipment
+      const failedSpineIds = new Set<string>()
+      const failedLeafCabIds = new Set<string>()
+      for (const inc of activeIncidents) {
+        if (inc.resolved || inc.def.effect !== 'hardware_failure' || !inc.affectedHardwareId) continue
+        if (inc.def.hardwareTarget === 'spine') failedSpineIds.add(inc.affectedHardwareId)
+        if (inc.def.hardwareTarget === 'leaf') failedLeafCabIds.add(inc.affectedHardwareId)
+      }
+      const spineSwitches = failedSpineIds.size > 0
+        ? state.spineSwitches.map(s => failedSpineIds.has(s.id) ? { ...s, powerStatus: false } : s)
+        : [...state.spineSwitches]
 
       // Calculate incident effects
       let incidentRevenueMult = 1
@@ -2978,7 +3048,9 @@ export const useGameStore = create<GameState>((set) => ({
         // Age servers (depreciation)
         const newAge = cab.powerStatus ? cab.serverAge + 1 : cab.serverAge
 
-        return { ...cab, heatLevel: Math.round(heat * 10) / 10, serverAge: newAge }
+        // Disable leaf switch if affected by hardware failure incident
+        const leafFailed = failedLeafCabIds.has(cab.id)
+        return { ...cab, heatLevel: Math.round(heat * 10) / 10, serverAge: newAge, ...(leafFailed ? { hasLeafSwitch: false } : {}) }
       })
 
       // Handle fire suppression
@@ -3023,7 +3095,7 @@ export const useGameStore = create<GameState>((set) => ({
       }
 
       // 2. Calculate stats with updated heat
-      const stats = calcStats(newCabinets, state.spineSwitches)
+      const stats = calcStats(newCabinets, spineSwitches)
 
       // Apply cooling type overhead reduction + tech overhead reduction + aisle bonus
       const totalOverheadReduction = Math.min(0.9, coolingConfig.overheadReduction + techOverheadReduction + currentAisleBonus)
@@ -3186,8 +3258,8 @@ export const useGameStore = create<GameState>((set) => ({
       // 8. Calculate traffic flows (with tech link capacity override)
       const effectiveDemand = demandMultiplier * incidentTrafficMult
       const trafficStats = hasTech('optical_interconnect')
-        ? calcTrafficWithCapacity(newCabinets, state.spineSwitches, effectiveDemand, techLinkCapacity)
-        : calcTraffic(newCabinets, state.spineSwitches, effectiveDemand)
+        ? calcTrafficWithCapacity(newCabinets, spineSwitches, effectiveDemand, techLinkCapacity)
+        : calcTraffic(newCabinets, spineSwitches, effectiveDemand)
 
       // 9. Progress tech research
       let activeResearch = state.activeResearch
@@ -3372,7 +3444,7 @@ export const useGameStore = create<GameState>((set) => ({
       // Here we just track the network topology stats
 
       // ── Network topology stats ────────────────────────────────
-      const activeSpinesForTopo = state.spineSwitches.filter((s) => s.powerStatus)
+      const activeSpinesForTopo = spineSwitches.filter((s) => s.powerStatus)
       const leafCabsForTopo = newCabinets.filter((c) => c.hasLeafSwitch && c.powerStatus)
       const topoTotalLinks = leafCabsForTopo.length * activeSpinesForTopo.length
       const topoHealthyLinks = trafficStats.links.filter((l) => l.utilization < 0.95).length
@@ -3454,6 +3526,7 @@ export const useGameStore = create<GameState>((set) => ({
 
       return {
         cabinets: newCabinets,
+        spineSwitches,
         tickCount: newTickCount,
         revenue: +revenue.toFixed(2),
         expenses,
