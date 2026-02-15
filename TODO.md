@@ -23,6 +23,64 @@
 - [x] Reputation score affecting contract quality and revenue bonuses
 - [x] 6 new achievements for Phase 2/3 features
 
+## Phase 4: Add World (Next Up)
+
+### 4A. Staff & HR System
+- [ ] `StaffMember` type with role, skill level, salary, fatigue, certifications
+- [ ] 4 staff roles: network_engineer, electrician, cooling_specialist, security_officer
+- [ ] 3 skill levels (junior/mid/senior) with hire costs and salary scaling
+- [ ] Hiring UI panel with available candidates and role filters
+- [ ] Staff roster display showing names, roles, skill, shift status, fatigue
+- [ ] Incident resolution speed bonus based on relevant staff on shift
+- [ ] Fatigue system — back-to-back incidents increase fatigue, burnout at 100
+- [ ] Shift patterns: day_only (free), day_night ($500/tick), round_the_clock ($1200/tick)
+- [ ] Night shift effectiveness penalty (-20%) when on day_night pattern
+- [ ] Training system — send staff to certifications (CCNA, DCIM, Fire Safety, etc.)
+- [ ] Suite tier gates on max staff count (starter=2, standard=4, professional=8, enterprise=16)
+- [ ] 4 achievements: First Hire, Full Staff, Zero Fatigue, Certified Team
+
+### 4B. Carbon Footprint & Environmental
+- [ ] `EnergySource` type: grid_mixed, grid_green, onsite_solar, onsite_wind
+- [ ] Energy source configs with cost multiplier, carbon per kW, reliability
+- [ ] Carbon emissions tracking per tick and lifetime cumulative
+- [ ] Carbon tax escalation over game time ($0→$2→$5→$10 per ton)
+- [ ] Green certifications: Energy Star, LEED Silver, LEED Gold, Carbon Neutral
+- [ ] Certification requirements (PUE, energy source, consecutive ticks)
+- [ ] Green certifications unlock contract revenue bonuses (+10% to +40%)
+- [ ] Water usage system for water cooling (2 gal/tick per cabinet, $0.10/gal)
+- [ ] Drought incident type — water prices spike or force switch to air cooling
+- [ ] E-waste stockpile from server refreshes — proper vs improper disposal
+- [ ] E-waste reputation penalty when stockpile > 10 items
+- [ ] Energy source selector panel in HUD
+- [ ] Carbon tracker display (emissions, tax, certifications)
+- [ ] 4 achievements: First Solar Panel, Carbon Neutral, Water Wise, Clean Sweep
+
+### 4C. Security Tiers & Compliance
+- [ ] `SecurityTier` type: basic, enhanced, high_security, maximum
+- [ ] Security feature installs: CCTV, badge_access, biometric, mantrap, cage_isolation, encrypted_network, security_noc
+- [ ] Security tier progression with install costs and maintenance/tick
+- [ ] Compliance certifications: SOC 2 Type I/II, HIPAA, PCI-DSS, FedRAMP
+- [ ] Certification requirements (security tier, features, reputation, staff)
+- [ ] Audit mechanic — pay to audit, must maintain requirements during audit window
+- [ ] Certification expiry if not re-audited within interval
+- [ ] 3 new intrusion incident types: tailgating, social_engineering, break_in
+- [ ] Security features reduce intrusion chance (stacking defense bonuses)
+- [ ] 4 new premium contract types gated by compliance (healthcare, finance, government)
+- [ ] Security panel in HUD with tier, features, and compliance status
+- [ ] 4 achievements: Locked Down, Fully Compliant, Fort Knox, Government Contractor
+
+### 4D. Competitor AI
+- [ ] `Competitor` type with name, personality, strength, specialization, reputation
+- [ ] 5 competitor personalities: budget, premium, green, aggressive, steady
+- [ ] Competitor scaling — 1 competitor at start, up to 3 by mid-game
+- [ ] Rubber-banding: competitors grow faster when player is strong, slower when weak
+- [ ] Contract competition — competitors bid on the same contracts with timer pressure
+- [ ] Competitor bid UI showing who else is bidding and their win chance
+- [ ] Competitor events: price wars, staff poaching, competitor outages
+- [ ] Market share tracking (player vs competitors)
+- [ ] Market panel in HUD showing competitor status and market share
+- [ ] 4 achievements: Market Leader, Monopoly, Underdog, Rivalry
+
 ## Future: Sub-Floor View (Plane 1)
 - [ ] Third view mode: raised floor plenum
 - [ ] Cooling pipes, chilled air flow visualization
