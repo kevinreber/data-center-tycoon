@@ -1156,6 +1156,11 @@ export function HUD() {
                     <p className="text-xs text-muted-foreground mb-1.5 leading-relaxed">
                       {inc.def.description}
                     </p>
+                    {inc.def.effect === 'hardware_failure' && inc.affectedHardwareId && (
+                      <p className="text-[10px] text-neon-cyan mb-1.5 font-mono">
+                        Affected: {inc.def.hardwareTarget === 'spine' ? `Spine ${inc.affectedHardwareId}` : `Cabinet ${inc.affectedHardwareId}`}
+                      </p>
+                    )}
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button
@@ -1167,13 +1172,15 @@ export function HUD() {
                         >
                           <span className="flex items-center gap-1.5">
                             <Wrench className="size-3" />
-                            Resolve
+                            {inc.def.effect === 'hardware_failure' ? 'Replace' : 'Resolve'}
                           </span>
                           <span className="text-muted-foreground">${inc.def.resolveCost.toLocaleString()}</span>
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent side="bottom">
-                        Pay to immediately resolve this incident
+                        {inc.def.effect === 'hardware_failure'
+                          ? 'Pay to replace the failed hardware and restore service'
+                          : 'Pay to immediately resolve this incident'}
                       </TooltipContent>
                     </Tooltip>
                   </div>
