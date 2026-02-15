@@ -305,20 +305,16 @@ Expand from a single data center to a global operation.
 
 ---
 
-### Capacity Planning Dashboard
+### Capacity Planning Dashboard ✅
 
 Forecasting tools for proactive management.
 
-- [ ] Projected power/cooling/space exhaustion with trend analysis
-- [ ] Utilization bar charts with trend arrows per metric
-- [ ] Alerts when any metric exceeds 80% utilization
-- [ ] Historical sparkline charts
-- [ ] Financial runway projection (ticks until money runs out)
-- [ ] Server lifespan overview (oldest servers, refresh scheduling)
-
-**Effort:** Medium | **Impact:** Medium — Data already exists in `capacityHistory`. This is primarily a UI/visualization task.
-
-> Note: The store already tracks `capacityHistory` (per-tick snapshots, capped at 100). This feature would add a dedicated dashboard UI with charts and projections on top of existing data.
+- [x] Projected power/cooling/space exhaustion with trend analysis
+- [x] Utilization bar charts with trend arrows per metric
+- [x] Alerts when any metric exceeds 80% utilization
+- [x] Historical sparkline charts
+- [x] Financial runway projection (ticks until money runs out)
+- [x] Server lifespan overview (oldest servers, refresh scheduling)
 
 ---
 
@@ -375,7 +371,7 @@ Compare performance metrics with other players.
 | Phase 5 (Longevity) | 60+ | 60+ | 0 |
 | Rendering & Views | 17 | 17 | 0 |
 | UX / Camera | 6 | 6 | 0 |
-| **Pending Features** | **~25** | **0** | **~25** |
+| **Pending Features** | **~25** | **6** | **~19** |
 
-**Implemented features:** 150+ items across Phases 1–5, rendering, and UX.
-**Remaining features:** ~25 items, mostly high-effort late-game content (multi-site, scaling tiers, 42U racks), visualization (sub-floor view, capacity dashboard, sound), and advanced simulation (workload migration, AI training jobs, leaderboards).
+**Implemented features:** 156+ items across Phases 1–5, rendering, UX, and capacity planning.
+**Remaining features:** ~19 items, mostly high-effort late-game content (multi-site, scaling tiers, 42U racks), visualization (sub-floor view, sound), and advanced simulation (workload migration, AI training jobs, leaderboards).

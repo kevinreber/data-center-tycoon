@@ -65,6 +65,7 @@ src/
 │       ├── CarbonPanel.tsx     # Energy source, carbon tracker, green certs, e-waste
 │       ├── SecurityPanel.tsx   # Security tier, features, compliance certs
 │       ├── MarketPanel.tsx     # Competitors, market share, bids, events
+│       ├── CapacityPanel.tsx   # Capacity planning dashboard, trends, projections, alerts
 │       ├── ProgressPanel.tsx   # Achievements, reputation, lifetime stats
 │       ├── SettingsPanel.tsx   # Save/load, sandbox mode, reset, demo
 │       └── GuidePanel.tsx      # How to play / tutorial (with Phase 4 system guides)
@@ -337,8 +338,8 @@ The `DataCenterScene` class handles all isometric graphics using Phaser's Graphi
 
 The UI uses a **sidebar-driven navigation pattern**:
 
-- **`Sidebar.tsx`** renders an icon rail on the left with 16 panel icons organized into top/middle/bottom sections. Clicking an icon slides out the corresponding panel.
-- **`sidebar/*.tsx`** — Each panel is a separate component: `BuildPanel`, `EquipmentPanel`, `FinancePanel`, `NetworkPanel`, `OperationsPanel`, `InfrastructurePanel`, `ResearchPanel`, `ContractsPanel`, `IncidentsPanel`, `FacilityPanel`, `CarbonPanel`, `SecurityPanel`, `MarketPanel`, `ProgressPanel`, `SettingsPanel`, `GuidePanel`
+- **`Sidebar.tsx`** renders an icon rail on the left with 17 panel icons organized into top/middle/bottom sections. Clicking an icon slides out the corresponding panel.
+- **`sidebar/*.tsx`** — Each panel is a separate component: `BuildPanel`, `EquipmentPanel`, `FinancePanel`, `NetworkPanel`, `OperationsPanel`, `InfrastructurePanel`, `ResearchPanel`, `ContractsPanel`, `IncidentsPanel`, `FacilityPanel`, `CarbonPanel`, `SecurityPanel`, `MarketPanel`, `CapacityPanel`, `ProgressPanel`, `SettingsPanel`, `GuidePanel`
 - **`CabinetDetailPanel.tsx`** — Floating detail panel shown when a cabinet is selected; displays hardware slots, real-time stats (power, temp, revenue, age, traffic), and actions (power toggle, flip facing, refresh servers)
 - **`LayersPopup.tsx`** — Layer controls popup for toggling visibility, opacity, and custom colors per network layer
 - **`HUD.tsx`** — Legacy monolithic control panel (still present, ~2940 lines)
