@@ -6,7 +6,7 @@ import { CabinetDetailPanel } from '@/components/CabinetDetailPanel'
 import { StatusBar } from '@/components/StatusBar'
 import { useGameStore } from '@/stores/gameStore'
 import type { GameSpeed } from '@/stores/gameStore'
-import { Zap, DollarSign, Thermometer, Activity, Pause, Play, FastForward, Trophy, X, Flame, Eye } from 'lucide-react'
+import { Zap, DollarSign, Thermometer, Activity, Pause, Play, FastForward, Trophy, X, Flame, Eye, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Tooltip,
@@ -92,21 +92,25 @@ function App() {
               Build cabinets, design network fabrics, and manage power to scale your data center.
             </span>
             <span className="inline-block w-2 h-4 bg-neon-green animate-blink ml-1" />
-            {!isDemo && cabinets.length === 0 && (
+            {!isDemo && (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
                     variant="ghost"
                     size="xs"
-                    onClick={() => loadDemoState()}
+                    onClick={() => {
+                      const demoUrl = `${window.location.origin}${import.meta.env.BASE_URL}?demo=true`
+                      window.open(demoUrl, '_blank')
+                    }}
                     className="text-xs text-neon-cyan hover:text-neon-cyan/80 gap-1 ml-2"
                   >
                     <Eye className="size-3" />
-                    Example DC
+                    Demo
+                    <ExternalLink className="size-2.5" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom">
-                  Load a pre-built data center to see what&apos;s possible
+                  Open a pre-built data center demo in a new tab
                 </TooltipContent>
               </Tooltip>
             )}
