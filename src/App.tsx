@@ -5,7 +5,7 @@ import { LayersPopup } from '@/components/LayersPopup'
 import { StatusBar } from '@/components/StatusBar'
 import { useGameStore } from '@/stores/gameStore'
 import type { GameSpeed } from '@/stores/gameStore'
-import { Zap, DollarSign, Thermometer, Activity, Pause, Play, FastForward, Trophy, X, Flame } from 'lucide-react'
+import { Zap, DollarSign, Thermometer, Activity, Pause, Play, FastForward, Trophy, X, Flame, Eye } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Tooltip,
@@ -34,6 +34,7 @@ function App() {
     gameSpeed, setGameSpeed, tick, revenue, expenses,
     newAchievement, dismissAchievement, loanPayments,
     powerOutage, outageTicksRemaining, fireActive, suppressionType,
+    isDemo, loadDemoState, exitDemo,
   } = useGameStore()
   const totalNodes = cabinets.length + spineSwitches.length
   const activeNodes = cabinets.filter((c) => c.powerStatus).length + spineSwitches.filter((s) => s.powerStatus).length
@@ -74,12 +75,30 @@ function App() {
         <header className="flex items-center justify-between px-4 py-2 border-b border-border bg-card">
           <div className="flex items-center gap-3">
             <h1 className="text-lg font-bold text-neon-green text-glow-green tracking-wider">
-              FABRIC TYCOON
+              DC TYCOON
             </h1>
             <span className="text-xs text-muted-foreground hidden sm:inline">
               Build cabinets, design network fabrics, and manage power to scale your data center.
             </span>
             <span className="inline-block w-2 h-4 bg-neon-green animate-blink ml-1" />
+            {!isDemo && cabinets.length === 0 && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    onClick={() => loadDemoState()}
+                    className="text-xs text-neon-cyan hover:text-neon-cyan/80 gap-1 ml-2"
+                  >
+                    <Eye className="size-3" />
+                    Example DC
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  Load a pre-built data center to see what&apos;s possible
+                </TooltipContent>
+              </Tooltip>
+            )}
           </div>
 
           {/* Top-bar stats */}
@@ -153,6 +172,26 @@ function App() {
 
           {/* Canvas area */}
           <div className="flex-1 min-h-0 flex flex-col p-3 gap-2">
+            {/* Demo mode banner */}
+            {isDemo && (
+              <div className="rounded-lg border border-neon-cyan/40 bg-neon-cyan/10 p-2 flex items-center gap-2 shrink-0">
+                <Eye className="size-4 text-neon-cyan" />
+                <span className="text-xs font-bold text-neon-cyan tracking-wider">DEMO MODE</span>
+                <span className="text-xs text-muted-foreground">
+                  Explore this pre-built data center. Unpause to see it run live.
+                </span>
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  onClick={() => exitDemo()}
+                  className="text-xs text-neon-cyan hover:text-foreground ml-auto gap-1"
+                >
+                  <X className="size-3" />
+                  Exit Demo
+                </Button>
+              </div>
+            )}
+
             {/* Alert banners */}
             {powerOutage && (
               <div className="rounded-lg border border-neon-red/40 bg-neon-red/10 p-2 flex items-center gap-2 animate-pulse shrink-0">
