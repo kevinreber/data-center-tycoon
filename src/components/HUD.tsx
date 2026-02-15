@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { useGameStore, DEFAULT_COLORS, RACK_COST, MAX_SERVERS_PER_CABINET, SIM, ENVIRONMENT_CONFIG, formatGameTime, COOLING_CONFIG, LOAN_OPTIONS, ACHIEVEMENT_CATALOG, CONTRACT_TIER_COLORS, CUSTOMER_TYPE_CONFIG, GENERATOR_OPTIONS, SUPPRESSION_CONFIG, TECH_TREE, TECH_BRANCH_COLORS, DEPRECIATION, getReputationTier, POWER_MARKET, SUITE_TIERS, SUITE_TIER_ORDER, getSuiteLimits } from '@/stores/gameStore'
-import type { NodeType, LayerColors, CabinetEnvironment, CustomerType, SuppressionType, TechBranch } from '@/stores/gameStore'
+import { useGameStore, DEFAULT_COLORS, RACK_COST, MAX_SERVERS_PER_CABINET, SIM, ENVIRONMENT_CONFIG, formatGameTime, COOLING_CONFIG, LOAN_OPTIONS, ACHIEVEMENT_CATALOG, CONTRACT_TIER_COLORS, CUSTOMER_TYPE_CONFIG, GENERATOR_OPTIONS, SUPPRESSION_CONFIG, TECH_TREE, TECH_BRANCH_COLORS, DEPRECIATION, getReputationTier, POWER_MARKET, SUITE_TIERS, SUITE_TIER_ORDER, getSuiteLimits, PDU_OPTIONS, CABLE_TRAY_OPTIONS, AISLE_CONFIG, getPDULoad, isPDUOverloaded } from '@/stores/gameStore'
+import type { NodeType, LayerColors, CabinetEnvironment, CustomerType, SuppressionType, TechBranch, CabinetFacing } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Server, Network, Power, Cpu, Eye, SlidersHorizontal, EyeOff, RotateCcw, Plus, TrendingUp, TrendingDown, DollarSign, ArrowRightLeft, AlertTriangle, Radio, Info, Shield, Clock, Zap, Droplets, Landmark, Siren, Trophy, Wrench, FileText, Check, Fuel, Flame, FlaskConical, Star, RefreshCw, Lock, Building, MousePointer, X } from 'lucide-react'
+import { Server, Network, Power, Cpu, Eye, SlidersHorizontal, EyeOff, RotateCcw, Plus, TrendingUp, TrendingDown, DollarSign, ArrowRightLeft, AlertTriangle, Radio, Info, Shield, Clock, Zap, Droplets, Landmark, Siren, Trophy, Wrench, FileText, Check, Fuel, Flame, FlaskConical, Star, RefreshCw, Lock, Building, MousePointer, X, Plug, Cable, ArrowUpDown, Thermometer } from 'lucide-react'
 import {
   Tooltip,
   TooltipContent,
@@ -63,10 +63,15 @@ export function HUD() {
     suiteTier, upgradeSuite,
     // Placement mode
     placementMode, enterPlacementMode, exitPlacementMode,
+    // Infrastructure
+    pdus, cableTrays, cableRuns, aisleBonus, aisleViolations,
+    messyCableCount, pduOverloaded, infraIncidentBonus,
+    placePDU, placeCableTray, autoRouteCables, toggleCabinetFacing,
   } = useGameStore()
   const [showGuide, setShowGuide] = useState(true)
   const [selectedEnv, setSelectedEnv] = useState<CabinetEnvironment>('production')
   const [selectedCustomerType, setSelectedCustomerType] = useState<CustomerType>('general')
+  const [selectedFacing, setSelectedFacing] = useState<CabinetFacing>('north')
 
   const suiteLimits = getSuiteLimits(suiteTier)
   const suiteConfig = SUITE_TIERS[suiteTier]
@@ -337,6 +342,37 @@ export function HUD() {
                   ))}
                 </div>
               </div>
+              {/* Cabinet facing selector (hot/cold aisle) */}
+              <div className="flex flex-col gap-1.5">
+                <span className="text-xs text-muted-foreground">Facing:</span>
+                <div className="flex gap-1">
+                  {(['north', 'south'] as CabinetFacing[]).map((dir) => (
+                    <Tooltip key={dir}>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="xs"
+                          onClick={() => setSelectedFacing(dir)}
+                          className={`font-mono text-xs flex-1 transition-all ${
+                            selectedFacing === dir
+                              ? 'border-2 border-neon-cyan/60 text-neon-cyan bg-neon-cyan/10'
+                              : 'border border-border/50 opacity-50 hover:opacity-80'
+                          }`}
+                        >
+                          <ArrowUpDown className="size-3 mr-1" />
+                          {dir === 'north' ? 'North' : 'South'}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="max-w-52">
+                        <p className="font-bold">Face {dir === 'north' ? 'North' : 'South'}</p>
+                        <p className="text-xs mt-1">
+                          Cabinet exhaust faces {dir}. Align adjacent rows with opposing faces to create proper hot/cold aisles for cooling efficiency.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  ))}
+                </div>
+              </div>
               {placementMode ? (
                 <div className="flex gap-1.5">
                   <div className="flex-1 rounded border border-neon-green/40 bg-neon-green/10 px-2 py-1.5 flex items-center gap-1.5">
@@ -363,7 +399,7 @@ export function HUD() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => enterPlacementMode(selectedEnv, selectedCustomerType)}
+                      onClick={() => enterPlacementMode(selectedEnv, selectedCustomerType, selectedFacing)}
                       disabled={money < RACK_COST.cabinet || cabinets.length >= suiteLimits.maxCabinets}
                       className="justify-between font-mono text-xs transition-all"
                       style={{
@@ -1570,6 +1606,310 @@ export function HUD() {
                 </>
               )
             })()}
+          </div>
+        </div>
+
+        {/* Fourth row: Infrastructure Layout */}
+        <div className="grid grid-cols-[1fr_1fr_1fr_1fr] gap-3">
+          {/* PDU panel */}
+          <div className="rounded-lg border border-border bg-card p-3 glow-green">
+            <div className="flex items-center gap-2 mb-2">
+              <Plug className="size-3.5 text-neon-yellow" />
+              <span className="text-xs font-bold text-neon-yellow tracking-widest">PDUs</span>
+              {pdus.length > 0 && (
+                <Badge className={`ml-auto font-mono text-xs border ${
+                  pduOverloaded
+                    ? 'bg-neon-red/20 text-neon-red border-neon-red/30 animate-pulse'
+                    : 'bg-neon-yellow/20 text-neon-yellow border-neon-yellow/30'
+                }`}>
+                  {pdus.length} PLACED
+                </Badge>
+              )}
+            </div>
+            {pdus.length > 0 && (
+              <div className="flex flex-col gap-1 mb-2 pb-2 border-b border-border/50">
+                {pdus.map((pdu) => {
+                  const config = PDU_OPTIONS.find((o) => o.label === pdu.label)
+                  const load = config ? getPDULoad(pdu, cabinets, config) : 0
+                  const overloaded = config ? isPDUOverloaded(pdu, cabinets, config) : false
+                  return (
+                    <div key={pdu.id} className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground truncate">{pdu.label}</span>
+                      <span className={`tabular-nums ${
+                        overloaded ? 'text-neon-red animate-pulse' : load / pdu.maxCapacityKW > 0.8 ? 'text-neon-orange' : 'text-neon-green'
+                      }`}>
+                        {load.toFixed(1)}/{pdu.maxCapacityKW}kW
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+            <div className="flex flex-col gap-1">
+              {PDU_OPTIONS.map((opt, i) => (
+                <Tooltip key={opt.label}>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        // Place PDU at first available edge position
+                        const limits = getSuiteLimits(suiteTier)
+                        for (let r = 0; r < limits.rows; r++) {
+                          for (let c = 0; c < limits.cols; c++) {
+                            const occupied = cabinets.some((cab) => cab.col === c && cab.row === r) ||
+                              pdus.some((p) => p.col === c && p.row === r)
+                            if (!occupied) {
+                              placePDU(c, r, i)
+                              return
+                            }
+                          }
+                        }
+                      }}
+                      disabled={money < opt.cost || pdus.length >= 6}
+                      className="justify-between font-mono text-xs border-neon-yellow/20 hover:border-neon-yellow/50 hover:bg-neon-yellow/10 hover:text-neon-yellow transition-all"
+                    >
+                      <span className="truncate">{opt.label}</span>
+                      <span className="text-muted-foreground">${opt.cost.toLocaleString()}</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-52">
+                    {opt.description}
+                    <br />Capacity: {opt.maxCapacityKW}kW | Range: {opt.range} tiles
+                  </TooltipContent>
+                </Tooltip>
+              ))}
+              {pdus.length >= 6 && (
+                <p className="text-xs text-neon-yellow/60 italic">Max 6 PDUs</p>
+              )}
+            </div>
+            {pduOverloaded && (
+              <div className="mt-2 pt-2 border-t border-neon-red/30">
+                <p className="text-xs text-neon-red font-bold animate-pulse flex items-center gap-1">
+                  <AlertTriangle className="size-3" />
+                  PDU OVERLOADED — breaker trip risk
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* CABLING panel */}
+          <div className="rounded-lg border border-border bg-card p-3 glow-green">
+            <div className="flex items-center gap-2 mb-2">
+              <Cable className="size-3.5 text-neon-cyan" />
+              <span className="text-xs font-bold text-neon-cyan tracking-widest">CABLING</span>
+              {cableRuns.length > 0 && (
+                <Badge className={`ml-auto font-mono text-xs border ${
+                  messyCableCount > 0
+                    ? 'bg-neon-orange/20 text-neon-orange border-neon-orange/30'
+                    : 'bg-neon-green/20 text-neon-green border-neon-green/30'
+                }`}>
+                  {cableRuns.length} RUNS
+                </Badge>
+              )}
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Cable Runs</span>
+                <span className="text-foreground tabular-nums">{cableRuns.length}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Messy (untray&apos;d)</span>
+                <span className={`tabular-nums ${messyCableCount > 0 ? 'text-neon-orange' : 'text-neon-green'}`}>
+                  {messyCableCount}
+                </span>
+              </div>
+              {messyCableCount > 0 && (
+                <div className="flex justify-between text-xs">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="flex items-center gap-1 text-neon-orange cursor-help">
+                        <AlertTriangle className="size-3" />
+                        Incident Risk
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="max-w-52">
+                      Messy cables increase incident risk by {(infraIncidentBonus * 100).toFixed(0)}%.
+                      Route cables through trays to reduce risk.
+                    </TooltipContent>
+                  </Tooltip>
+                  <span className="text-neon-orange tabular-nums">+{(infraIncidentBonus * 100).toFixed(0)}%</span>
+                </div>
+              )}
+              {cableRuns.some((c) => c.length > AISLE_CONFIG.maxCableLength) && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-neon-red flex items-center gap-1">
+                    <Info className="size-3" />
+                    Long runs
+                  </span>
+                  <span className="text-neon-red tabular-nums">
+                    {cableRuns.filter((c) => c.length > AISLE_CONFIG.maxCableLength).length} degraded
+                  </span>
+                </div>
+              )}
+              <div className="border-t border-border/50 my-0.5" />
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => autoRouteCables()}
+                    disabled={cabinets.filter((c) => c.hasLeafSwitch).length === 0 || spineSwitches.length === 0}
+                    className="justify-between font-mono text-xs border-neon-cyan/20 hover:border-neon-cyan/50 hover:bg-neon-cyan/10 hover:text-neon-cyan transition-all"
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <Cable className="size-3" />
+                      Auto-Route
+                    </span>
+                    <span className="text-muted-foreground">Free</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-52">
+                  Automatically route cables between all leaf and spine switches.
+                  Cables near trays are routed through them.
+                </TooltipContent>
+              </Tooltip>
+            </div>
+          </div>
+
+          {/* CABLE TRAYS panel */}
+          <div className="rounded-lg border border-border bg-card p-3 glow-green">
+            <div className="flex items-center gap-2 mb-2">
+              <Network className="size-3.5 text-neon-purple" />
+              <span className="text-xs font-bold text-neon-purple tracking-widest">CABLE TRAYS</span>
+              {cableTrays.length > 0 && (
+                <Badge className="ml-auto bg-neon-purple/20 text-neon-purple border-neon-purple/30 font-mono text-xs">
+                  {cableTrays.length} PLACED
+                </Badge>
+              )}
+            </div>
+            {cableTrays.length > 0 && (
+              <div className="flex flex-col gap-1 mb-2 pb-2 border-b border-border/50">
+                {cableTrays.map((tray) => (
+                  <div key={tray.id} className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground truncate">
+                      Tray ({tray.col},{tray.row})
+                    </span>
+                    <span className="text-neon-purple tabular-nums">{tray.capacityUnits}u cap</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="flex flex-col gap-1">
+              {CABLE_TRAY_OPTIONS.map((opt, i) => (
+                <Tooltip key={opt.label}>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        // Place tray at first available grid position
+                        const limits = getSuiteLimits(suiteTier)
+                        for (let r = 0; r < limits.rows; r++) {
+                          for (let c = 0; c < limits.cols; c++) {
+                            const occupied = cableTrays.some((t) => t.col === c && t.row === r)
+                            if (!occupied) {
+                              placeCableTray(c, r, i)
+                              return
+                            }
+                          }
+                        }
+                      }}
+                      disabled={money < opt.cost || cableTrays.length >= 20}
+                      className="justify-between font-mono text-xs border-neon-purple/20 hover:border-neon-purple/50 hover:bg-neon-purple/10 hover:text-neon-purple transition-all"
+                    >
+                      <span className="truncate">{opt.label}</span>
+                      <span className="text-muted-foreground">${opt.cost.toLocaleString()}</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-52">
+                    {opt.description}
+                    <br />Capacity: {opt.capacityUnits} cable runs
+                  </TooltipContent>
+                </Tooltip>
+              ))}
+              {cableTrays.length >= 20 && (
+                <p className="text-xs text-neon-purple/60 italic">Max 20 cable trays</p>
+              )}
+            </div>
+          </div>
+
+          {/* HOT/COLD AISLE panel */}
+          <div className="rounded-lg border border-border bg-card p-3 glow-green">
+            <div className="flex items-center gap-2 mb-2">
+              <Thermometer className="size-3.5 text-neon-green" />
+              <span className="text-xs font-bold text-neon-green tracking-widest">AISLES</span>
+              {aisleBonus > 0 && (
+                <Badge className="ml-auto bg-neon-green/20 text-neon-green border-neon-green/30 font-mono text-xs">
+                  -{Math.round(aisleBonus * 100)}% COOLING
+                </Badge>
+              )}
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <div className="flex justify-between text-xs">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="flex items-center gap-1 text-muted-foreground cursor-help">
+                      <Info className="size-3" />
+                      Aisle Bonus
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-52">
+                    Proper hot/cold aisle separation reduces cooling overhead.
+                    Align adjacent rows with opposing cabinet facings.
+                    Max bonus: {Math.round(AISLE_CONFIG.maxCoolingBonus * 100)}%
+                  </TooltipContent>
+                </Tooltip>
+                <span className={`tabular-nums ${aisleBonus > 0 ? 'text-neon-green' : 'text-muted-foreground'}`}>
+                  -{Math.round(aisleBonus * 100)}%
+                </span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Row Violations</span>
+                <span className={`tabular-nums ${aisleViolations > 0 ? 'text-neon-orange' : 'text-neon-green'}`}>
+                  {aisleViolations}
+                </span>
+              </div>
+              {aisleViolations > 0 && (
+                <p className="text-xs text-neon-orange/80 flex items-center gap-1">
+                  <AlertTriangle className="size-3" />
+                  Mixed facings in {aisleViolations} row{aisleViolations > 1 ? 's' : ''} — extra heat generated
+                </p>
+              )}
+              {/* Aisle layout diagram */}
+              {cabinets.length > 0 && (
+                <div className="border-t border-border/50 pt-2 mt-1">
+                  <span className="text-xs text-muted-foreground mb-1 block">Cabinet Facings:</span>
+                  <div className="flex flex-col gap-0.5 max-h-20 overflow-y-auto">
+                    {cabinets.map((c) => (
+                      <div key={c.id} className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">
+                          C{c.id.replace('cab-', '')} ({c.col},{c.row})
+                        </span>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="xs"
+                              onClick={() => toggleCabinetFacing(c.id)}
+                              className={`text-xs p-0 h-auto ${c.facing === 'north' ? 'text-neon-cyan' : 'text-neon-orange'}`}
+                            >
+                              {c.facing === 'north' ? '↑ N' : '↓ S'}
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom">Click to flip facing</TooltipContent>
+                        </Tooltip>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {cabinets.length === 0 && (
+                <p className="text-xs text-muted-foreground italic">
+                  Place cabinets with consistent facings per row for aisle bonuses.
+                </p>
+              )}
+            </div>
           </div>
         </div>
 

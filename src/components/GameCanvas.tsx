@@ -17,12 +17,15 @@ export function GameCanvas() {
   const trafficVisible = useGameStore((s) => s.trafficVisible)
   const suiteTier = useGameStore((s) => s.suiteTier)
   const placementMode = useGameStore((s) => s.placementMode)
+  const pdus = useGameStore((s) => s.pdus)
+  const cableTrays = useGameStore((s) => s.cableTrays)
+  const pduOverloaded = useGameStore((s) => s.pduOverloaded)
 
   // Tile click handler — called from Phaser when user clicks a grid tile
   const handleTileClick = useCallback((col: number, row: number) => {
     const state = useGameStore.getState()
     if (!state.placementMode) return
-    state.addCabinet(col, row, state.placementEnvironment, state.placementCustomerType)
+    state.addCabinet(col, row, state.placementEnvironment, state.placementCustomerType, state.placementFacing)
   }, [])
 
   // Tile hover handler — returns placement hints for the hovered tile
@@ -77,13 +80,13 @@ export function GameCanvas() {
     // Add new cabinets (with explicit positions)
     for (let i = prevCabCount.current; i < cabinets.length; i++) {
       const cab = cabinets[i]
-      scene.addCabinetToScene(cab.id, cab.col, cab.row, cab.serverCount, cab.hasLeafSwitch, cab.environment)
+      scene.addCabinetToScene(cab.id, cab.col, cab.row, cab.serverCount, cab.hasLeafSwitch, cab.environment, cab.facing)
     }
     prevCabCount.current = cabinets.length
 
-    // Update all existing cabinets (server count, leaf switch, power, environment may have changed)
+    // Update all existing cabinets (server count, leaf switch, power, environment, facing may have changed)
     for (const cab of cabinets) {
-      scene.updateCabinet(cab.id, cab.serverCount, cab.hasLeafSwitch, cab.powerStatus, cab.environment)
+      scene.updateCabinet(cab.id, cab.serverCount, cab.hasLeafSwitch, cab.powerStatus, cab.environment, cab.facing)
     }
 
     // Sync occupied tiles
@@ -140,6 +143,24 @@ export function GameCanvas() {
     if (!scene) return
     scene.setTrafficLinks(trafficStats.links)
   }, [trafficStats])
+
+  // Sync PDUs to Phaser
+  useEffect(() => {
+    if (!gameRef.current) return
+    const scene = getScene(gameRef.current)
+    if (!scene) return
+
+    // Re-render all PDUs (clear + add)
+    scene.clearInfrastructure()
+    for (const pdu of pdus) {
+      const state = useGameStore.getState()
+      const overloaded = state.pduOverloaded
+      scene.addPDUToScene(pdu.id, pdu.col, pdu.row, pdu.label, overloaded)
+    }
+    for (const tray of cableTrays) {
+      scene.addCableTrayToScene(tray.id, tray.col, tray.row)
+    }
+  }, [pdus, cableTrays, pduOverloaded])
 
   // Sync traffic visibility to Phaser
   useEffect(() => {
