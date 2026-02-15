@@ -771,6 +771,17 @@ export const TUTORIAL_TIPS: TutorialTip[] = [
   { id: 'first_incident', title: 'Incident!', message: 'Incidents happen! Resolve them quickly by clicking the resolve button to minimize damage.', category: 'incidents' },
   { id: 'aisle_hint', title: 'Aisle Layout', message: 'Tip: Alternate cabinet facing (N/S) in adjacent rows for a hot/cold aisle cooling bonus.', category: 'build' },
   { id: 'first_contract', title: 'Contracts', message: 'Contracts provide bonus revenue but require meeting SLA targets. Monitor your temp and server count!', category: 'contracts' },
+  { id: 'first_order_arrived', title: 'Order Delivered!', message: 'Your first supply chain order has arrived! Stock up on inventory before shortages hit to avoid price spikes.', category: 'build' },
+  { id: 'weather_hot', title: 'Heat Wave!', message: 'Hot weather is increasing ambient temperature. Your cooling systems need to work harder — consider water cooling.', category: 'cooling' },
+  { id: 'weather_cold', title: 'Cold Snap', message: 'Cold weather is reducing ambient temperature. This is a good time to run high-heat workloads!', category: 'cooling' },
+  { id: 'supply_shortage', title: 'Supply Shortage!', message: 'A supply chain shortage has hit! Equipment prices are inflated. Use your inventory stockpile or wait it out.', category: 'finance' },
+  { id: 'meet_me_room', title: 'Meet-Me Room Active', message: 'Your Meet-Me Room is generating interconnection revenue! Add more ports to attract tenants and increase passive income.', category: 'finance' },
+  { id: 'peering_active', title: 'Peering Established', message: 'You have active peering agreements reducing latency. Lower latency improves customer satisfaction and reputation.', category: 'network' },
+  { id: 'maintenance_done', title: 'Maintenance Complete', message: 'Preventive maintenance completed! Regular maintenance prevents surprise failures and gives a temporary cooling boost.', category: 'build' },
+  { id: 'noise_warning', title: 'Noise Complaint!', message: 'Your data center is too loud! Install sound barriers to reduce noise or face fines and zoning restrictions.', category: 'build' },
+  { id: 'spot_high', title: 'Spot Prices High!', message: 'Spot compute prices are above 1.5x — great time to allocate more servers to the spot market for extra revenue!', category: 'finance' },
+  { id: 'redundancy_hint', title: 'Power Protection', message: 'Consider upgrading power redundancy to N+1 or 2N to protect against power failures and improve uptime.', category: 'build' },
+  { id: 'capacity_warning', title: 'Running Out of Space', message: 'You are using over 80% of cabinet capacity. Upgrade your suite tier soon to avoid hitting the limit!', category: 'build' },
 ]
 
 // ── Procedural Name Generation ──────────────────────────────────
@@ -5076,6 +5087,17 @@ export const useGameStore = create<GameState>((set) => ({
           if (tip.id === 'first_incident' && activeIncidents.length > 0 && state.activeIncidents.length === 0) trigger = true
           if (tip.id === 'aisle_hint' && newCabinets.length >= 4 && state.aisleBonus === 0) trigger = true
           if (tip.id === 'first_contract' && state.contractOffers.length > 0 && state.activeContracts.length === 0 && completedContracts === 0) trigger = true
+          if (tip.id === 'first_order_arrived' && pendingOrders.some(o => o.status === 'delivered')) trigger = true
+          if (tip.id === 'weather_hot' && weatherAmbientModifier >= 3) trigger = true
+          if (tip.id === 'weather_cold' && weatherAmbientModifier <= -3) trigger = true
+          if (tip.id === 'supply_shortage' && supplyShortageActive) trigger = true
+          if (tip.id === 'meet_me_room' && meetMeRevenue > 0) trigger = true
+          if (tip.id === 'peering_active' && state.peeringAgreements.length > 0) trigger = true
+          if (tip.id === 'maintenance_done' && maintenanceCompletedCount > 0 && state.maintenanceCompletedCount === 0) trigger = true
+          if (tip.id === 'noise_warning' && noiseComplaints > state.noiseComplaints) trigger = true
+          if (tip.id === 'spot_high' && spotPriceMultiplier > 1.5 && state.spotCapacityAllocated === 0) trigger = true
+          if (tip.id === 'redundancy_hint' && state.powerRedundancy === 'N' && newCabinets.length >= 10) trigger = true
+          if (tip.id === 'capacity_warning' && newCabinets.length >= getSuiteLimits(state.suiteTier).maxCabinets * 0.8) trigger = true
           if (trigger) { activeTip = tip; break }
         }
       }
