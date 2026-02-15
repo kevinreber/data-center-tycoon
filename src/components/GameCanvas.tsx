@@ -1,7 +1,7 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useCallback } from 'react'
 import type Phaser from 'phaser'
 import { createGame, getScene } from '@/game/PhaserGame'
-import { useGameStore, getSuiteLimits } from '@/stores/gameStore'
+import { useGameStore, getSuiteLimits, getPlacementHints } from '@/stores/gameStore'
 
 export function GameCanvas() {
   const gameRef = useRef<Phaser.Game | null>(null)
@@ -16,6 +16,20 @@ export function GameCanvas() {
   const trafficStats = useGameStore((s) => s.trafficStats)
   const trafficVisible = useGameStore((s) => s.trafficVisible)
   const suiteTier = useGameStore((s) => s.suiteTier)
+  const placementMode = useGameStore((s) => s.placementMode)
+
+  // Tile click handler — called from Phaser when user clicks a grid tile
+  const handleTileClick = useCallback((col: number, row: number) => {
+    const state = useGameStore.getState()
+    if (!state.placementMode) return
+    state.addCabinet(col, row, state.placementEnvironment, state.placementCustomerType)
+  }, [])
+
+  // Tile hover handler — returns placement hints for the hovered tile
+  const handleTileHover = useCallback((col: number, row: number) => {
+    const state = useGameStore.getState()
+    return getPlacementHints(col, row, state.cabinets, state.suiteTier)
+  }, [])
 
   useEffect(() => {
     if (!gameRef.current) {
@@ -27,6 +41,23 @@ export function GameCanvas() {
       gameRef.current = null
     }
   }, [])
+
+  // Register callbacks on scene once it's ready
+  useEffect(() => {
+    if (!gameRef.current) return
+    const scene = getScene(gameRef.current)
+    if (!scene) return
+    scene.setOnTileClick(handleTileClick)
+    scene.setOnTileHover(handleTileHover)
+  }, [handleTileClick, handleTileHover])
+
+  // Sync placement mode to Phaser
+  useEffect(() => {
+    if (!gameRef.current) return
+    const scene = getScene(gameRef.current)
+    if (!scene) return
+    scene.setPlacementMode(placementMode)
+  }, [placementMode])
 
   // Sync suite tier (grid dimensions) to Phaser
   useEffect(() => {
@@ -43,10 +74,10 @@ export function GameCanvas() {
     const scene = getScene(gameRef.current)
     if (!scene) return
 
-    // Add new cabinets
+    // Add new cabinets (with explicit positions)
     for (let i = prevCabCount.current; i < cabinets.length; i++) {
       const cab = cabinets[i]
-      scene.addCabinetToScene(cab.id, cab.serverCount, cab.hasLeafSwitch, cab.environment)
+      scene.addCabinetToScene(cab.id, cab.col, cab.row, cab.serverCount, cab.hasLeafSwitch, cab.environment)
     }
     prevCabCount.current = cabinets.length
 
@@ -54,6 +85,10 @@ export function GameCanvas() {
     for (const cab of cabinets) {
       scene.updateCabinet(cab.id, cab.serverCount, cab.hasLeafSwitch, cab.powerStatus, cab.environment)
     }
+
+    // Sync occupied tiles
+    const occupied = new Set<string>(cabinets.map((c) => `${c.col},${c.row}`))
+    scene.syncOccupiedTiles(occupied)
   }, [cabinets])
 
   // Sync spine switches to Phaser
@@ -117,7 +152,11 @@ export function GameCanvas() {
   return (
     <div
       id="phaser-container"
-      className="w-full h-full rounded-lg border border-border overflow-hidden relative scanlines glow-green"
+      className={`w-full h-full rounded-lg border overflow-hidden relative scanlines ${
+        placementMode
+          ? 'border-neon-green/60 glow-green ring-1 ring-neon-green/30'
+          : 'border-border glow-green'
+      }`}
       style={{ background: 'linear-gradient(180deg, #060a10 0%, #0a1018 50%, #060a10 100%)' }}
     />
   )

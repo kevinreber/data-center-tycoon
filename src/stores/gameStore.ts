@@ -495,6 +495,8 @@ export const ENVIRONMENT_CONFIG: Record<CabinetEnvironment, EnvironmentConfig> =
 
 export interface Cabinet {
   id: string
+  col: number             // grid column position (0-based)
+  row: number             // grid row position (0-based)
   environment: CabinetEnvironment
   customerType: CustomerType  // workload type affecting power/heat/revenue
   serverCount: number     // 1–4 servers per cabinet
@@ -502,6 +504,60 @@ export interface Cabinet {
   powerStatus: boolean
   heatLevel: number       // °C, dynamic per tick
   serverAge: number       // ticks since last server refresh (for depreciation)
+}
+
+// ── Placement Strategy Hints ────────────────────────────────────
+
+export interface PlacementHint {
+  message: string
+  type: 'tip' | 'warning' | 'info'
+}
+
+/** Contextual strategy hints shown during placement mode */
+export function getPlacementHints(
+  col: number,
+  row: number,
+  cabinets: Cabinet[],
+  suiteTier: SuiteTier,
+): PlacementHint[] {
+  const hints: PlacementHint[] = []
+  const limits = getSuiteLimits(suiteTier)
+
+  // Check adjacent cabinets for heat warnings
+  const neighbors = cabinets.filter(
+    (c) => Math.abs(c.col - col) <= 1 && Math.abs(c.row - row) <= 1 && (c.col !== col || c.row !== row)
+  )
+  const hotNeighbors = neighbors.filter((c) => c.heatLevel >= 60)
+  const critNeighbors = neighbors.filter((c) => c.heatLevel >= SIM.throttleTemp)
+
+  if (critNeighbors.length > 0) {
+    hints.push({ message: 'Adjacent to overheating cabinets — risk of thermal throttle', type: 'warning' })
+  } else if (hotNeighbors.length > 0) {
+    hints.push({ message: 'Warm neighbors nearby — monitor cooling capacity', type: 'warning' })
+  }
+
+  if (neighbors.length === 0) {
+    hints.push({ message: 'Isolated placement — good for airflow', type: 'tip' })
+  }
+
+  // Row length guidance (real DCs typically use rows of 4-8)
+  const rowCabs = cabinets.filter((c) => c.row === row)
+  if (rowCabs.length >= limits.cols - 1) {
+    hints.push({ message: 'This row is nearly full — consider starting a new row for airflow', type: 'info' })
+  }
+
+  // Hot/cold aisle pattern hint
+  if (cabinets.length === 0) {
+    hints.push({ message: 'First cabinet — consider leaving gaps for hot/cold aisle layout', type: 'tip' })
+  } else if (cabinets.length >= 3) {
+    const sameRow = cabinets.filter((c) => c.row === row)
+    const adjacentInRow = sameRow.filter((c) => Math.abs(c.col - col) === 1)
+    if (adjacentInRow.length >= 2) {
+      hints.push({ message: 'Dense row — plan cooling paths between cabinets', type: 'info' })
+    }
+  }
+
+  return hints
 }
 
 export interface SpineSwitch {
@@ -898,8 +954,15 @@ interface GameState {
   // Suite / Facility
   suiteTier: SuiteTier           // current facility tier
 
+  // Placement mode
+  placementMode: boolean                      // whether user is in placement mode
+  placementEnvironment: CabinetEnvironment    // selected environment for next placement
+  placementCustomerType: CustomerType         // selected customer type for next placement
+
   // Actions
-  addCabinet: (environment: CabinetEnvironment, customerType?: CustomerType) => void
+  addCabinet: (col: number, row: number, environment: CabinetEnvironment, customerType?: CustomerType) => void
+  enterPlacementMode: (environment: CabinetEnvironment, customerType: CustomerType) => void
+  exitPlacementMode: () => void
   upgradeNextCabinet: () => void
   addLeafToNextCabinet: () => void
   addSpineSwitch: () => void
@@ -1028,15 +1091,26 @@ export const useGameStore = create<GameState>((set) => ({
   // Suite / Facility
   suiteTier: 'starter' as SuiteTier,
 
+  // Placement mode
+  placementMode: false,
+  placementEnvironment: 'production' as CabinetEnvironment,
+  placementCustomerType: 'general' as CustomerType,
+
   // ── Build Actions ───────────────────────────────────────────
 
-  addCabinet: (environment: CabinetEnvironment, customerType: CustomerType = 'general') =>
+  addCabinet: (col: number, row: number, environment: CabinetEnvironment, customerType: CustomerType = 'general') =>
     set((state) => {
       if (state.money < COSTS.cabinet) return state
       const suiteLimits = getSuiteLimits(state.suiteTier)
       if (state.cabinets.length >= suiteLimits.maxCabinets) return state
+      // Validate grid bounds
+      if (col < 0 || col >= suiteLimits.cols || row < 0 || row >= suiteLimits.rows) return state
+      // Validate tile is not occupied
+      if (state.cabinets.some((c) => c.col === col && c.row === row)) return state
       const cab: Cabinet = {
         id: `cab-${nextCabId++}`,
+        col,
+        row,
         environment,
         customerType,
         serverCount: 1,
@@ -1049,9 +1123,16 @@ export const useGameStore = create<GameState>((set) => ({
       return {
         cabinets: newCabinets,
         money: state.money - COSTS.cabinet,
+        placementMode: false,
         ...calcStats(newCabinets, state.spineSwitches),
       }
     }),
+
+  enterPlacementMode: (environment: CabinetEnvironment, customerType: CustomerType) =>
+    set({ placementMode: true, placementEnvironment: environment, placementCustomerType: customerType }),
+
+  exitPlacementMode: () =>
+    set({ placementMode: false }),
 
   upgradeNextCabinet: () =>
     set((state) => {

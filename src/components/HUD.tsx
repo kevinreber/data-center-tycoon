@@ -3,7 +3,7 @@ import { useGameStore, DEFAULT_COLORS, RACK_COST, MAX_SERVERS_PER_CABINET, SIM, 
 import type { NodeType, LayerColors, CabinetEnvironment, CustomerType, SuppressionType, TechBranch } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Server, Network, Power, Cpu, Eye, SlidersHorizontal, EyeOff, RotateCcw, HardDrive, Plus, TrendingUp, TrendingDown, DollarSign, ArrowRightLeft, AlertTriangle, Radio, Info, Shield, Clock, Zap, Droplets, Landmark, Siren, Trophy, Wrench, FileText, Check, Fuel, Flame, FlaskConical, Star, RefreshCw, Lock, Building } from 'lucide-react'
+import { Server, Network, Power, Cpu, Eye, SlidersHorizontal, EyeOff, RotateCcw, Plus, TrendingUp, TrendingDown, DollarSign, ArrowRightLeft, AlertTriangle, Radio, Info, Shield, Clock, Zap, Droplets, Landmark, Siren, Trophy, Wrench, FileText, Check, Fuel, Flame, FlaskConical, Star, RefreshCw, Lock, Building, MousePointer, X } from 'lucide-react'
 import {
   Tooltip,
   TooltipContent,
@@ -41,7 +41,7 @@ export function HUD() {
   const {
     cabinets, spineSwitches, totalPower, coolingPower, money,
     layerVisibility, layerOpacity, layerColors,
-    addCabinet, upgradeNextCabinet, addLeafToNextCabinet, addSpineSwitch,
+    upgradeNextCabinet, addLeafToNextCabinet, addSpineSwitch,
     toggleCabinetPower, toggleSpinePower,
     toggleLayerVisibility, setLayerOpacity, setLayerColor,
     revenue, expenses, powerCost, coolingCost, avgHeat, mgmtBonus,
@@ -61,6 +61,8 @@ export function HUD() {
     powerPriceMultiplier, powerPriceSpikeActive,
     refreshServers, totalRefreshes,
     suiteTier, upgradeSuite,
+    // Placement mode
+    placementMode, enterPlacementMode, exitPlacementMode,
   } = useGameStore()
   const [showGuide, setShowGuide] = useState(true)
   const [selectedEnv, setSelectedEnv] = useState<CabinetEnvironment>('production')
@@ -335,32 +337,54 @@ export function HUD() {
                   ))}
                 </div>
               </div>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => addCabinet(selectedEnv, selectedCustomerType)}
-                    disabled={money < RACK_COST.cabinet || cabinets.length >= suiteLimits.maxCabinets}
-                    className="justify-between font-mono text-xs transition-all"
-                    style={{
-                      borderColor: `${ENVIRONMENT_CONFIG[selectedEnv].color}33`,
-                      '--hover-border': `${ENVIRONMENT_CONFIG[selectedEnv].color}80`,
-                      '--hover-bg': `${ENVIRONMENT_CONFIG[selectedEnv].color}1a`,
-                      color: undefined,
-                    } as React.CSSProperties}
-                  >
-                    <span className="flex items-center gap-1.5">
-                      <HardDrive className="size-3" />
-                      New {ENVIRONMENT_CONFIG[selectedEnv].name}
-                    </span>
-                    <span className="text-muted-foreground">${RACK_COST.cabinet.toLocaleString()}</span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">
-                  Place a new {ENVIRONMENT_CONFIG[selectedEnv].name.toLowerCase()} cabinet with {CUSTOMER_TYPE_CONFIG[selectedCustomerType].label} workload ({cabinets.length}/{suiteLimits.maxCabinets} slots used)
-                </TooltipContent>
-              </Tooltip>
+              {placementMode ? (
+                <div className="flex gap-1.5">
+                  <div className="flex-1 rounded border border-neon-green/40 bg-neon-green/10 px-2 py-1.5 flex items-center gap-1.5">
+                    <MousePointer className="size-3 text-neon-green animate-pulse" />
+                    <span className="text-xs font-mono text-neon-green">Click grid tile to place</span>
+                  </div>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => exitPlacementMode()}
+                        className="font-mono text-xs border-neon-red/30 hover:border-neon-red/60 hover:bg-neon-red/10 text-neon-red px-2"
+                      >
+                        <X className="size-3" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">Cancel placement (Esc)</TooltipContent>
+                  </Tooltip>
+                </div>
+              ) : (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => enterPlacementMode(selectedEnv, selectedCustomerType)}
+                      disabled={money < RACK_COST.cabinet || cabinets.length >= suiteLimits.maxCabinets}
+                      className="justify-between font-mono text-xs transition-all"
+                      style={{
+                        borderColor: `${ENVIRONMENT_CONFIG[selectedEnv].color}33`,
+                        '--hover-border': `${ENVIRONMENT_CONFIG[selectedEnv].color}80`,
+                        '--hover-bg': `${ENVIRONMENT_CONFIG[selectedEnv].color}1a`,
+                        color: undefined,
+                      } as React.CSSProperties}
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <MousePointer className="size-3" />
+                        Place {ENVIRONMENT_CONFIG[selectedEnv].name}
+                      </span>
+                      <span className="text-muted-foreground">${RACK_COST.cabinet.toLocaleString()}</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    Click to enter placement mode, then click a grid tile ({cabinets.length}/{suiteLimits.maxCabinets} slots used)
+                  </TooltipContent>
+                </Tooltip>
+              )}
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
