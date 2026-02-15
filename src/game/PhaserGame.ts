@@ -16,10 +16,19 @@ const DRAG_THRESHOLD = 5  // pixels before mouse movement counts as a drag
 // Cabinet visual dimensions
 const CUBE_W = 44
 const CUBE_H = 22
-const BASE_DEPTH = 4     // dark cabinet frame base
+const BASE_DEPTH = 4     // bottom plate of cabinet
 const SERVER_DEPTH = 10  // height per server unit
 const LEAF_DEPTH = 7     // leaf switch band on top
 const SECTION_GAP = 1    // subtle gap between stacked sections
+const SERVER_INSET = 8   // servers are narrower than cabinet (inset per side = half)
+
+// Full cabinet enclosure height (fixed regardless of contents)
+const CABINET_ENCLOSURE_DEPTH = BASE_DEPTH
+  + MAX_SERVERS_PER_CABINET * (SERVER_DEPTH + SECTION_GAP)
+  + (LEAF_DEPTH + SECTION_GAP)
+
+// Light gray cabinet enclosure colors
+const CABINET_COLORS = { top: 0x667788, side: 0x4a5a6a, front: 0x3d4d5d }
 
 // Spine visual dimensions
 const SPINE_W = 50
@@ -570,24 +579,26 @@ class DataCenterScene extends Phaser.Scene {
     const leafOpacity = this.layerOpacity.leaf_switch
     const powerMult = entry.powerOn ? 1 : 0.2
 
-    let currentY = cy // bottom of the stack (floor level)
+    // 1. Full-height cabinet enclosure — light gray box (fixed height regardless of contents)
+    const cabinetAlpha = 0.6 * powerMult
+    this.drawIsoCube(g, cx, cy, CUBE_W, CUBE_H, CABINET_ENCLOSURE_DEPTH, CABINET_COLORS, cabinetAlpha)
 
-    // 1. Base frame — hollow wireframe so empty cabinets are visually distinct from servers
+    // Environment accent — thin wireframe tint on the enclosure
     const envColor = ENVIRONMENT_CONFIG[entry.environment].frameColors.top
-    this.drawIsoWireframe(g, cx, currentY, CUBE_W, CUBE_H, BASE_DEPTH, envColor, 0.8 * powerMult)
-    currentY -= BASE_DEPTH + SECTION_GAP
+    this.drawIsoWireframe(g, cx, cy, CUBE_W, CUBE_H, CABINET_ENCLOSURE_DEPTH, envColor, 0.5 * powerMult)
 
-    // 2. Server layers (green, stacked)
+    // 2. Server layers inside the cabinet (smaller, sitting inside the gray shell)
+    let slotY = cy - BASE_DEPTH - SECTION_GAP
     if (serverVis) {
       for (let i = 0; i < entry.serverCount; i++) {
-        const alpha = 0.85 * serverOpacity * powerMult
-        this.drawIsoCube(g, cx, currentY, CUBE_W - 2, CUBE_H - 1, SERVER_DEPTH, serverColors, alpha)
+        const alpha = 0.9 * serverOpacity * powerMult
+        this.drawIsoCube(g, cx, slotY, CUBE_W - SERVER_INSET, CUBE_H - SERVER_INSET / 2, SERVER_DEPTH, serverColors, alpha)
 
         // Server LED
         if (serverOpacity > 0.3) {
           const ledColor = `#${serverColors.top.toString(16).padStart(6, '0')}`
           const led = this.add
-            .text(cx + CUBE_W / 2 - 6, currentY - SERVER_DEPTH + 1, '●', {
+            .text(cx + (CUBE_W - SERVER_INSET) / 2 - 4, slotY - SERVER_DEPTH + 1, '●', {
               fontFamily: 'monospace',
               fontSize: '5px',
               color: ledColor,
@@ -598,24 +609,22 @@ class DataCenterScene extends Phaser.Scene {
           labels.push(led)
         }
 
-        currentY -= SERVER_DEPTH + SECTION_GAP
+        slotY -= SERVER_DEPTH + SECTION_GAP
       }
-    } else {
-      // Still account for height even if hidden, so leaf sits at right position
-      currentY -= entry.serverCount * (SERVER_DEPTH + SECTION_GAP)
     }
 
-    // 3. Leaf switch on top (cyan band)
+    // 3. Leaf switch at top of cabinet (also inset, cyan)
+    const leafSlotY = cy - BASE_DEPTH - SECTION_GAP - MAX_SERVERS_PER_CABINET * (SERVER_DEPTH + SECTION_GAP)
     if (entry.hasLeafSwitch) {
       if (leafVis) {
-        const alpha = 0.85 * leafOpacity * powerMult
-        this.drawIsoCube(g, cx, currentY, CUBE_W, CUBE_H, LEAF_DEPTH, leafColors, alpha)
+        const alpha = 0.9 * leafOpacity * powerMult
+        this.drawIsoCube(g, cx, leafSlotY, CUBE_W - SERVER_INSET, CUBE_H - SERVER_INSET / 2, LEAF_DEPTH, leafColors, alpha)
 
         // Leaf LED
         if (leafOpacity > 0.3) {
           const ledColor = `#${leafColors.top.toString(16).padStart(6, '0')}`
           const led = this.add
-            .text(cx, currentY - LEAF_DEPTH - 4, '●', {
+            .text(cx, leafSlotY - LEAF_DEPTH - 4, '●', {
               fontFamily: 'monospace',
               fontSize: '6px',
               color: ledColor,
@@ -626,12 +635,10 @@ class DataCenterScene extends Phaser.Scene {
           labels.push(led)
         }
       }
-      currentY -= LEAF_DEPTH + SECTION_GAP
     }
 
-    // Cabinet ID label at the top
-    const topY = cy - BASE_DEPTH - entry.serverCount * (SERVER_DEPTH + SECTION_GAP) -
-      (entry.hasLeafSwitch ? LEAF_DEPTH + SECTION_GAP : 0) - 10
+    // Cabinet ID label above the fixed-height enclosure
+    const topY = cy - CABINET_ENCLOSURE_DEPTH - 10
     const envConfig = ENVIRONMENT_CONFIG[entry.environment]
     const idLabel = this.add
       .text(cx, topY, entry.id.replace('cab-', 'C'), {
@@ -756,10 +763,8 @@ class DataCenterScene extends Phaser.Scene {
     const entry = this.cabEntries.get(cabId)
     if (!entry) return null
     const { x, y } = this.isoToScreen(entry.col, entry.row)
-    // Position at the top of the cabinet stack (above leaf switch)
-    const topY = y + TILE_H / 2 - BASE_DEPTH -
-      entry.serverCount * (SERVER_DEPTH + SECTION_GAP) -
-      (entry.hasLeafSwitch ? LEAF_DEPTH + SECTION_GAP : 0)
+    // Leaf is always at the top of the fixed-height cabinet enclosure
+    const topY = y + TILE_H / 2 - CABINET_ENCLOSURE_DEPTH
     return { x, y: topY }
   }
 
