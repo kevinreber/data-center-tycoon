@@ -105,7 +105,7 @@ export function HUD() {
             <ol className="text-xs font-mono text-muted-foreground space-y-1.5 list-decimal list-inside">
               <li>
                 <strong className="text-foreground">Build cabinets</strong>
-                {' '}&mdash; Choose an environment type, then add cabinets to the grid.
+                {' '}&mdash; Choose an environment type, then place empty cabinet frames on the grid.
               </li>
               <li>
                 <strong className="text-foreground">Choose environments</strong>
@@ -244,7 +244,7 @@ export function HUD() {
                 <div className="flex gap-1.5">
                   <div className="flex-1 rounded border border-neon-green/40 bg-neon-green/10 px-2 py-1.5 flex items-center gap-1.5">
                     <MousePointer className="size-3 text-neon-green animate-pulse" />
-                    <span className="text-xs font-mono text-neon-green">Click grid tile to place</span>
+                    <span className="text-xs font-mono text-neon-green">Click tile to place empty cabinet</span>
                   </div>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -283,8 +283,9 @@ export function HUD() {
                       <span className="text-muted-foreground">${RACK_COST.cabinet.toLocaleString()}</span>
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent side="bottom">
-                    Click to enter placement mode, then click a grid tile ({cabinets.length}/{suiteLimits.maxCabinets} slots used)
+                  <TooltipContent side="bottom" className="max-w-56">
+                    <p>Places an empty cabinet frame on the grid.</p>
+                    <p className="text-xs mt-1 text-muted-foreground">Add servers &amp; a leaf switch separately after placing. ({cabinets.length}/{suiteLimits.maxCabinets} slots used)</p>
                   </TooltipContent>
                 </Tooltip>
               )}
