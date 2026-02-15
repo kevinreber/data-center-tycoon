@@ -1552,6 +1552,9 @@ interface GameState {
   pduOverloaded: boolean                      // whether any PDU is overloaded
   infraIncidentBonus: number                  // extra incident chance from messy cables
 
+  // Cabinet selection
+  selectedCabinetId: string | null            // currently selected cabinet (clicked in canvas)
+
   // Placement mode
   placementMode: boolean                      // whether user is in placement mode
   placementEnvironment: CabinetEnvironment    // selected environment for next placement
@@ -1619,6 +1622,7 @@ interface GameState {
   isDemo: boolean
 
   // Actions
+  selectCabinet: (id: string | null) => void
   addCabinet: (col: number, row: number, environment: CabinetEnvironment, customerType?: CustomerType, facing?: CabinetFacing) => void
   enterPlacementMode: (environment: CabinetEnvironment, customerType: CustomerType, facing?: CabinetFacing) => void
   exitPlacementMode: () => void
@@ -1822,6 +1826,9 @@ export const useGameStore = create<GameState>((set) => ({
   pduOverloaded: false,
   infraIncidentBonus: 0,
 
+  // Cabinet selection
+  selectedCabinetId: null,
+
   // Placement mode
   placementMode: false,
   placementEnvironment: 'production' as CabinetEnvironment,
@@ -1887,6 +1894,11 @@ export const useGameStore = create<GameState>((set) => ({
   hasSaved: false,
   activeSlotId: null,
   saveSlots: getSaveIndex(),
+
+  // ── Cabinet Selection ────────────────────────────────────────
+
+  selectCabinet: (id: string | null) =>
+    set({ selectedCabinetId: id }),
 
   // ── Build Actions ───────────────────────────────────────────
 
@@ -3065,6 +3077,7 @@ export const useGameStore = create<GameState>((set) => ({
       messyCableCount: 0,
       pduOverloaded: false,
       infraIncidentBonus: 0,
+      selectedCabinetId: null,
       placementMode: false,
       insurancePolicies: [],
       insuranceCost: 0,

@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { GameCanvas } from '@/components/GameCanvas'
 import { Sidebar } from '@/components/Sidebar'
 import { LayersPopup } from '@/components/LayersPopup'
+import { CabinetDetailPanel } from '@/components/CabinetDetailPanel'
 import { StatusBar } from '@/components/StatusBar'
 import { useGameStore } from '@/stores/gameStore'
 import type { GameSpeed } from '@/stores/gameStore'
@@ -56,6 +57,8 @@ function App() {
         const state = useGameStore.getState()
         if (state.placementMode) {
           state.exitPlacementMode()
+        } else if (state.selectedCabinetId) {
+          state.selectCabinet(null)
         }
       }
     }
@@ -214,6 +217,7 @@ function App() {
             <div className="flex-1 min-h-0 relative">
               <GameCanvas />
               <LayersPopup />
+              <CabinetDetailPanel />
             </div>
           </div>
         </main>
