@@ -132,6 +132,13 @@
   }
 }
 
+/* Constrain Phaser canvas to its container */
+#phaser-container canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
 /* Terminal glow effects */
 @layer utilities {
   .glow-green {
