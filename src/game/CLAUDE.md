@@ -2,9 +2,9 @@
 
 Rules for working in `src/game/`.
 
-## Graphics Only — No Sprites
+## Procedural Graphics Preferred
 
-All visuals are drawn procedurally with `Phaser.GameObjects.Graphics`. Do not import image assets, spritesheets, or use `this.load.image()`. This keeps the game zero-asset and fast to load.
+Currently all visuals are drawn procedurally with `Phaser.GameObjects.Graphics` — the game has zero image assets. Prefer this approach for new features unless sprites/images are explicitly requested. If sprites are introduced, load them in `preload()` and place assets in `public/`.
 
 ## Isometric Coordinate System
 
@@ -13,9 +13,9 @@ The grid uses isometric projection with:
 - Conversion: `toIso(col, row)` maps grid positions to screen coordinates
 - All positioned elements must go through the isometric transform
 
-## Use `drawIsoCube()` for 3D Elements
+## Use `drawIsoCube()` for Procedural 3D Elements
 
-For any equipment that should look three-dimensional (cabinets, switches, PDUs), use the `drawIsoCube()` helper which draws a consistent three-face isometric cube with top, left, and right faces.
+When drawing equipment procedurally (cabinets, switches, PDUs), use the `drawIsoCube()` helper which draws a consistent three-face isometric cube with top, left, and right faces. If using sprites instead, ensure they match the isometric tile dimensions (`TILE_W`/`TILE_H`).
 
 ## Color Palette
 
