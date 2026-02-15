@@ -62,9 +62,12 @@ src/
 │       ├── ContractsPanel.tsx  # Contracts, RFP bidding
 │       ├── IncidentsPanel.tsx  # Active incidents, DR drills, insurance
 │       ├── FacilityPanel.tsx   # Suite upgrades, noise, sound barriers, power redundancy
+│       ├── CarbonPanel.tsx     # Energy source, carbon tracker, green certs, e-waste
+│       ├── SecurityPanel.tsx   # Security tier, features, compliance certs
+│       ├── MarketPanel.tsx     # Competitors, market share, bids, events
 │       ├── ProgressPanel.tsx   # Achievements, reputation, lifetime stats
 │       ├── SettingsPanel.tsx   # Save/load, sandbox mode, reset, demo
-│       └── GuidePanel.tsx      # How to play / tutorial
+│       └── GuidePanel.tsx      # How to play / tutorial (with Phase 4 system guides)
 ├── game/
 │   ├── PhaserGame.ts           # Phaser scene: isometric rendering, traffic visualization, placement mode
 │   └── CLAUDE.md               # Phaser-specific coding rules (see Sub-module Rules below)
@@ -119,7 +122,7 @@ All game state lives in a **single Zustand store** (`useGameStore`). This ~5300-
 - **Customer type configs** (`CUSTOMER_TYPE_CONFIG`): power/heat/revenue/bandwidth multipliers per customer
 - **Infrastructure configs**: PDU options, cable tray options, aisle configuration, busway options, cross-connect options, in-row cooling options
 - **Economy configs**: loan options, depreciation, power market parameters, insurance options, valuation milestones
-- **Progression configs**: tech tree (9 techs), contracts (9 contracts), achievements (45+), incidents (20+ types), scenarios (5)
+- **Progression configs**: tech tree (9 techs), contracts (9 contracts + 4 compliance-gated), achievements (57+), incidents (25+ types), scenarios (5)
 - **Staff configs** (`STAFF_ROLE_CONFIG`, `STAFF_CERT_CONFIG`, `SHIFT_PATTERN_CONFIG`): roles, certifications, shift costs
 - **Supply chain configs** (`SUPPLY_CHAIN_CONFIG`): lead times, bulk discounts, shortage mechanics
 - **Weather configs** (`SEASON_CONFIG`, `WEATHER_CONDITION_CONFIG`): seasonal/weather ambient modifiers
@@ -130,7 +133,14 @@ All game state lives in a **single Zustand store** (`useGameStore`). This ~5300-
 - **Power redundancy configs** (`POWER_REDUNDANCY_CONFIG`): N, N+1, 2N levels
 - **Noise configs** (`NOISE_CONFIG`): noise generation, complaints, fines, sound barriers
 - **Spot compute configs** (`SPOT_COMPUTE_CONFIG`): dynamic spot market pricing
-- **Tutorial tips** (`TUTORIAL_TIPS`): 18 contextual gameplay tips
+- **Tutorial tips** (`TUTORIAL_TIPS`): 27 contextual gameplay tips (including carbon, security, and market tips)
+- **Energy source configs** (`ENERGY_SOURCE_CONFIG`): 4 energy sources with cost/carbon/reliability
+- **Green cert configs** (`GREEN_CERT_CONFIG`): 4 green certifications with requirements and bonuses
+- **Carbon tax schedule** (`CARBON_TAX_SCHEDULE`): escalating carbon tax brackets
+- **Security tier configs** (`SECURITY_TIER_CONFIG`): 4 security tiers with costs and included features
+- **Security feature configs** (`SECURITY_FEATURE_CONFIG`): 7 security features with defense bonuses
+- **Compliance cert configs** (`COMPLIANCE_CERT_CONFIG`): 5 compliance certifications with audit mechanics
+- **Competitor configs** (`COMPETITOR_PERSONALITIES`): 5 AI competitor personality profiles
 - **Traffic constants** (`TRAFFIC`): bandwidth per server, link capacity
 - **Pure calculation functions**: `calcStats()`, `calcTraffic()`, `calcTrafficWithCapacity()`, `coolingOverheadFactor()`, `calcManagementBonus()`, `calcAisleBonus()`, `getPlacementHints()`, and more
 - **Store actions**: build, power, visual, simulation, finance, infrastructure, incidents, contracts, research, staff, supply chain, interconnection, peering, maintenance, save/load, and more
@@ -195,6 +205,21 @@ Maintenance types:
 - `MaintenanceStatus` = `'scheduled' | 'in_progress' | 'completed'`
 - `MaintenanceWindow` interface
 
+Carbon & environmental types:
+- `EnergySource` = `'grid_mixed' | 'grid_green' | 'onsite_solar' | 'onsite_wind'`
+- `GreenCert` = `'energy_star' | 'leed_silver' | 'leed_gold' | 'carbon_neutral'`
+- `EnergySourceConfig`, `GreenCertConfig` interfaces
+
+Security & compliance types:
+- `SecurityTier` = `'basic' | 'enhanced' | 'high_security' | 'maximum'`
+- `SecurityFeatureId` = `'cctv' | 'badge_access' | 'biometric' | 'mantrap' | 'cage_isolation' | 'encrypted_network' | 'security_noc'`
+- `ComplianceCertId` = `'soc2_type1' | 'soc2_type2' | 'hipaa' | 'pci_dss' | 'fedramp'`
+- `ActiveComplianceCert`, `SecurityFeatureConfig`, `SecurityTierConfig`, `ComplianceCertConfig` interfaces
+
+Competitor AI types:
+- `CompetitorPersonality` = `'budget' | 'premium' | 'green' | 'aggressive' | 'steady'`
+- `Competitor`, `CompetitorBid` interfaces
+
 Power & insurance types:
 - `PowerRedundancy` = `'N' | 'N+1' | '2N'`
 - `InsurancePolicyType` = `'fire_insurance' | 'power_insurance' | 'cyber_insurance' | 'equipment_insurance'`
@@ -249,6 +274,9 @@ Key interfaces (core):
 | Patents | `patentTech` |
 | RFP Bidding | `bidOnRFP` |
 | Scenarios | `startScenario`, `abandonScenario` |
+| Carbon/Environment | `setEnergySource`, `applyForGreenCert`, `disposeEWaste` |
+| Security/Compliance | `upgradeSecurityTier`, `startComplianceAudit` |
+| Competitor AI | `counterPoachOffer` |
 | Tutorial | `dismissTip`, `toggleTutorial` |
 | Save/Load | `saveGame`, `loadGame`, `deleteGame`, `resetGame`, `refreshSaveSlots` |
 | Sandbox/Demo | `toggleSandboxMode`, `loadDemoState`, `exitDemo` |
@@ -309,8 +337,8 @@ The `DataCenterScene` class handles all isometric graphics using Phaser's Graphi
 
 The UI uses a **sidebar-driven navigation pattern**:
 
-- **`Sidebar.tsx`** renders an icon rail on the left with 13 panel icons organized into top/middle/bottom sections. Clicking an icon slides out the corresponding panel.
-- **`sidebar/*.tsx`** — Each panel is a separate component: `BuildPanel`, `EquipmentPanel`, `FinancePanel`, `NetworkPanel`, `OperationsPanel`, `InfrastructurePanel`, `ResearchPanel`, `ContractsPanel`, `IncidentsPanel`, `FacilityPanel`, `ProgressPanel`, `SettingsPanel`, `GuidePanel`
+- **`Sidebar.tsx`** renders an icon rail on the left with 16 panel icons organized into top/middle/bottom sections. Clicking an icon slides out the corresponding panel.
+- **`sidebar/*.tsx`** — Each panel is a separate component: `BuildPanel`, `EquipmentPanel`, `FinancePanel`, `NetworkPanel`, `OperationsPanel`, `InfrastructurePanel`, `ResearchPanel`, `ContractsPanel`, `IncidentsPanel`, `FacilityPanel`, `CarbonPanel`, `SecurityPanel`, `MarketPanel`, `ProgressPanel`, `SettingsPanel`, `GuidePanel`
 - **`CabinetDetailPanel.tsx`** — Floating detail panel shown when a cabinet is selected; displays hardware slots, real-time stats (power, temp, revenue, age, traffic), and actions (power toggle, flip facing, refresh servers)
 - **`LayersPopup.tsx`** — Layer controls popup for toggling visibility, opacity, and custom colors per network layer
 - **`HUD.tsx`** — Legacy monolithic control panel (still present, ~2940 lines)
@@ -360,6 +388,9 @@ A `setInterval` in `App.tsx` calls `tick()` at the rate determined by `gameSpeed
 23. **Lifetime stats**: Updates running totals (revenue, expenses, peak temp, uptime streaks, etc.)
 24. **Event logging**: Records significant events (capped at 200 entries)
 25. **Tutorial**: Triggers contextual tips based on game state
+26. **Carbon/Environment**: Calculates emissions, carbon tax, water usage, e-waste penalties, green cert eligibility
+27. **Security/Compliance**: Processes audits, expires certifications, blocks intrusion incidents, calculates security maintenance
+28. **Competitor AI**: Spawns/grows competitors, processes bids, price wars, staff poaching, market share calculation
 
 ## Game Systems
 
@@ -447,11 +478,33 @@ A `setInterval` in `App.tsx` calls `tick()` at the rate determined by `gameSpeed
 - **Insurance**: 4 policy types (fire, power, cyber, equipment)
 - **DR Drills**: Test disaster readiness, affects reputation
 
+**Carbon & Environmental:**
+- **4 energy sources**: grid_mixed (default), grid_green, onsite_solar, onsite_wind with cost/carbon trade-offs
+- **Carbon tax** escalates over game time ($0/$2/$5/$10 per ton)
+- **Green certifications**: Energy Star, LEED Silver, LEED Gold, Carbon Neutral — grant revenue bonuses (+10% to +40%)
+- **Water usage**: Water cooling consumes 2 gal/tick per cabinet at $0.10/gal
+- **E-waste**: Server refreshes create e-waste; stockpile >10 items causes reputation penalty
+- **Drought incident**: Triples water costs when active
+
+**Security & Compliance:**
+- **4 security tiers**: basic → enhanced → high_security → maximum with escalating costs
+- **7 security features**: badge_access, CCTV, biometric, mantrap, cage_isolation, encrypted_network, security_noc
+- **5 compliance certs**: SOC 2 Type I/II, HIPAA, PCI-DSS, FedRAMP with audit mechanics
+- **Intrusion incidents**: tailgating, social_engineering, break_in — blocked by security features
+- **4 premium contracts** gated by compliance (HealthNet EMR, TradeFast HFT, GovSecure Cloud, PayStream)
+
+**Competitor AI:**
+- **5 personalities**: budget, premium, green, aggressive, steady with different growth/bidding behavior
+- **Scaling**: 1 competitor at tick 100, up to 3 by tick 600; rubber-banding adjusts growth rate
+- **Contract competition**: Competitors bid on open contracts with timed windows; accept before they win
+- **Events**: Price wars (15% revenue reduction), staff poaching (counter-offer or lose), competitor outages
+- **Market share**: Tracked as player vs competitor strength ratio
+
 **Additional Systems:**
 - **Patents**: Patent unlocked technologies for ongoing royalty income
 - **RFP Bidding**: Compete for contract wins/losses
 - **Scenario Challenges**: 5 predefined challenges with special rules and objectives
-- **Tutorial System**: 18 contextual tips triggered during gameplay
+- **Tutorial System**: 27 contextual tips triggered during gameplay (including carbon, security, and market tips)
 - **Event Logging**: Filterable log of significant events (capped at 200)
 - **Capacity History**: Per-tick snapshot of key metrics (capped at 100)
 - **Lifetime Statistics**: Revenue, expenses, peak temp, uptime streaks, fires survived, etc.

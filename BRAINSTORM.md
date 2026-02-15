@@ -180,11 +180,11 @@ A suggested sequencing that layers features for maximum impact at each stage:
 13. ~~Loan system for early expansion~~
 14. Power distribution and structured cabling (builds on manual cabinet placement)
 
-### Phase 4 — Add World (make it immersive) ← NEXT
-15. Staff & HR with skill levels
-16. Carbon footprint and environmental regulation
-17. Security tiers and compliance certifications
-18. Competitor AI
+### Phase 4 — Add World (make it immersive) ✅
+15. ~~Staff & HR with skill levels~~
+16. ~~Carbon footprint and environmental regulation~~
+17. ~~Security tiers and compliance certifications~~
+18. ~~Competitor AI~~
 
 ### Phase 5 — Add Longevity (make it replayable)
 19. ~~Achievement system~~ (moved earlier — already implemented)

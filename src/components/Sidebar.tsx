@@ -3,7 +3,7 @@ import type { LucideIcon } from 'lucide-react'
 import {
   Cpu, Server, DollarSign, Radio, Zap, Plug,
   FlaskConical, FileText, Siren, Building, Trophy,
-  Save, X, HelpCircle,
+  Save, X, HelpCircle, Leaf, Shield, TrendingUp,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -27,8 +27,11 @@ import { FacilityPanel } from '@/components/sidebar/FacilityPanel'
 import { ProgressPanel } from '@/components/sidebar/ProgressPanel'
 import { SettingsPanel } from '@/components/sidebar/SettingsPanel'
 import { GuidePanel } from '@/components/sidebar/GuidePanel'
+import { CarbonPanel } from '@/components/sidebar/CarbonPanel'
+import { SecurityPanel } from '@/components/sidebar/SecurityPanel'
+import { MarketPanel } from '@/components/sidebar/MarketPanel'
 
-type PanelId = 'guide' | 'build' | 'equipment' | 'finance' | 'network' | 'operations' | 'infrastructure' | 'research' | 'contracts' | 'incidents' | 'facility' | 'progress' | 'settings'
+type PanelId = 'guide' | 'build' | 'equipment' | 'finance' | 'network' | 'operations' | 'infrastructure' | 'research' | 'contracts' | 'incidents' | 'facility' | 'carbon' | 'security' | 'market' | 'progress' | 'settings'
 
 interface SidebarItem {
   id: PanelId
@@ -50,6 +53,9 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
   { id: 'contracts', icon: FileText, label: 'Contracts', color: '#aa44ff', section: 'middle' },
   { id: 'incidents', icon: Siren, label: 'Incidents', color: '#ff4444', section: 'middle' },
   { id: 'facility', icon: Building, label: 'Facility', color: '#00aaff', section: 'middle' },
+  { id: 'carbon', icon: Leaf, label: 'Carbon', color: '#44cc44', section: 'middle' },
+  { id: 'security', icon: Shield, label: 'Security', color: '#ff8844', section: 'middle' },
+  { id: 'market', icon: TrendingUp, label: 'Market', color: '#00aaff', section: 'middle' },
   { id: 'progress', icon: Trophy, label: 'Progress', color: '#ffaa00', section: 'middle' },
   { id: 'settings', icon: Save, label: 'Settings', color: '#556677', section: 'bottom' },
 ]
@@ -66,6 +72,9 @@ const PANEL_TITLES: Record<PanelId, string> = {
   contracts: 'CONTRACTS',
   incidents: 'INCIDENTS',
   facility: 'FACILITY',
+  carbon: 'CARBON & ENVIRONMENT',
+  security: 'SECURITY & COMPLIANCE',
+  market: 'MARKET & COMPETITORS',
   progress: 'PROGRESS',
   settings: 'SETTINGS',
 }
@@ -83,6 +92,9 @@ function PanelContent({ panelId }: { panelId: PanelId }) {
     case 'contracts': return <ContractsPanel />
     case 'incidents': return <IncidentsPanel />
     case 'facility': return <FacilityPanel />
+    case 'carbon': return <CarbonPanel />
+    case 'security': return <SecurityPanel />
+    case 'market': return <MarketPanel />
     case 'progress': return <ProgressPanel />
     case 'settings': return <SettingsPanel />
   }
