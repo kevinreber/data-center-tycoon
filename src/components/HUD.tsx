@@ -2393,38 +2393,68 @@ export function HUD() {
 
         {/* ── Phase 5: Weather & Supply Chain ── */}
         <div className="rounded-lg border border-border bg-card p-3">
-          <div className="flex items-center gap-2 text-xs font-bold text-neon-cyan mb-2">
-            <CloudRain className="size-3.5" />WEATHER & SUPPLY
-          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex items-center gap-2 text-xs font-bold text-neon-cyan mb-2 cursor-help">
+                <CloudRain className="size-3.5" />WEATHER & SUPPLY
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="max-w-52"><p className="text-xs">Weather affects ambient temperature and cooling costs. Supply chain shortages increase equipment prices.</p></TooltipContent>
+          </Tooltip>
           <div className="grid grid-cols-2 gap-2 text-[10px]">
-            <div>
-              <span className="text-muted-foreground">Season:</span>{' '}
-              <span style={{ color: SEASON_CONFIG.find(s => s.season === currentSeason)?.color }}>
-                {SEASON_CONFIG.find(s => s.season === currentSeason)?.label}
-              </span>
-            </div>
-            <div>
-              <span className="text-muted-foreground">Weather:</span>{' '}
-              <span style={{ color: WEATHER_CONDITION_CONFIG.find(w => w.condition === currentCondition)?.color }}>
-                {WEATHER_CONDITION_CONFIG.find(w => w.condition === currentCondition)?.label}
-              </span>
-            </div>
-            <div>
-              <span className="text-muted-foreground">Temp mod:</span>{' '}
-              <span className={weatherAmbientModifier > 0 ? 'text-neon-red' : 'text-neon-cyan'}>
-                {weatherAmbientModifier > 0 ? '+' : ''}{weatherAmbientModifier}°C
-              </span>
-            </div>
-            <div>
-              <span className="text-muted-foreground">Shortage:</span>{' '}
-              {supplyShortageActive
-                ? <span className="text-neon-red">{shortagePriceMultiplier}x prices</span>
-                : <span className="text-neon-green">Normal</span>}
-            </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="cursor-help">
+                  <span className="text-muted-foreground">Season:</span>{' '}
+                  <span style={{ color: SEASON_CONFIG.find(s => s.season === currentSeason)?.color }}>
+                    {SEASON_CONFIG.find(s => s.season === currentSeason)?.label}
+                  </span>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-52"><p className="text-xs">Seasons rotate automatically. Summer increases heat; winter decreases it.</p></TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="cursor-help">
+                  <span className="text-muted-foreground">Weather:</span>{' '}
+                  <span style={{ color: WEATHER_CONDITION_CONFIG.find(w => w.condition === currentCondition)?.color }}>
+                    {WEATHER_CONDITION_CONFIG.find(w => w.condition === currentCondition)?.label}
+                  </span>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-52"><p className="text-xs">Current weather condition. Storms and heatwaves add temporary temperature spikes.</p></TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="cursor-help">
+                  <span className="text-muted-foreground">Temp mod:</span>{' '}
+                  <span className={weatherAmbientModifier > 0 ? 'text-neon-red' : 'text-neon-cyan'}>
+                    {weatherAmbientModifier > 0 ? '+' : ''}{weatherAmbientModifier}°C
+                  </span>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-52"><p className="text-xs">Temperature modifier applied to all cabinets from weather and season effects.</p></TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="cursor-help">
+                  <span className="text-muted-foreground">Shortage:</span>{' '}
+                  {supplyShortageActive
+                    ? <span className="text-neon-red">{shortagePriceMultiplier}x prices</span>
+                    : <span className="text-neon-green">Normal</span>}
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-52"><p className="text-xs">During supply shortages, all equipment orders cost more. Stock up when prices are normal!</p></TooltipContent>
+            </Tooltip>
           </div>
-          <div className="mt-2 text-[10px] text-muted-foreground">
-            Inventory: {Object.entries(inventory).map(([k, v]) => `${k.replace('_', ' ')}: ${v}`).join(' | ')}
-          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="mt-2 text-[10px] text-muted-foreground cursor-help">
+                Inventory: {Object.entries(inventory).map(([k, v]) => `${k.replace('_', ' ')}: ${v}`).join(' | ')}
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="max-w-52"><p className="text-xs">Current stock of spare parts. Orders take time to arrive — plan ahead!</p></TooltipContent>
+          </Tooltip>
           {pendingOrders.length > 0 && (
             <div className="mt-1 text-[10px] text-neon-yellow">
               {pendingOrders.filter(o => o.status !== 'delivered').length} orders pending
@@ -2432,19 +2462,29 @@ export function HUD() {
           )}
           <div className="flex gap-1 mt-2 flex-wrap">
             {SUPPLY_CHAIN_CONFIG.map(sc => (
-              <Button key={sc.itemType} variant="outline" size="xs" className="text-[9px]"
-                onClick={() => placeOrder(sc.itemType, 1)}>
-                <Package className="size-2.5" />Order {sc.itemType.replace('_', ' ')}
-              </Button>
+              <Tooltip key={sc.itemType}>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="xs" className="text-[9px]"
+                    onClick={() => placeOrder(sc.itemType, 1)}>
+                    <Package className="size-2.5" />Order {sc.itemType.replace('_', ' ')}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-52"><p className="text-xs">{sc.itemType.replace('_', ' ')} — Lead time: {sc.baseLeadTime} ticks. {sc.bulkDiscount < 1 ? `Bulk discount at ${sc.bulkThreshold}+: ${((1 - sc.bulkDiscount)*100).toFixed(0)}% off` : 'No bulk discount'}</p></TooltipContent>
+              </Tooltip>
             ))}
           </div>
         </div>
 
         {/* ── Phase 5: Interconnection & Peering ── */}
         <div className="rounded-lg border border-border bg-card p-3">
-          <div className="flex items-center gap-2 text-xs font-bold text-neon-orange mb-2">
-            <Globe className="size-3.5" />INTERCONNECTION & PEERING
-          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex items-center gap-2 text-xs font-bold text-neon-orange mb-2 cursor-help">
+                <Globe className="size-3.5" />INTERCONNECTION & PEERING
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="max-w-52"><p className="text-xs">Connect to other networks and tenants for passive revenue. Requires Standard suite tier or higher.</p></TooltipContent>
+          </Tooltip>
           {meetMeRoomTier === null ? (
             <div className="text-[10px]">
               <p className="text-muted-foreground mb-2">Install a Meet-Me Room to enable interconnection revenue.</p>
@@ -2469,16 +2509,26 @@ export function HUD() {
                 <span className="text-muted-foreground">Revenue:</span>
                 <span className="text-neon-green">${meetMeRevenue.toFixed(0)}/tick</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Ports:</span>
-                <span>{interconnectPorts.length} active</span>
-              </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex justify-between cursor-help">
+                    <span className="text-muted-foreground">Ports:</span>
+                    <span>{interconnectPorts.length} active</span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-52"><p className="text-xs">Each port connects a tenant and generates recurring revenue based on port speed.</p></TooltipContent>
+              </Tooltip>
               <div className="flex gap-1 flex-wrap">
                 {INTERCONNECT_PORT_CONFIG.map(pc => (
-                  <Button key={pc.portType} variant="outline" size="xs" className="text-[9px]"
-                    onClick={() => addInterconnectPort(pc.portType)}>
-                    <Plug className="size-2.5" />{pc.label} (${pc.installCost})
-                  </Button>
+                  <Tooltip key={pc.portType}>
+                    <TooltipTrigger asChild>
+                      <Button variant="outline" size="xs" className="text-[9px]"
+                        onClick={() => addInterconnectPort(pc.portType)}>
+                        <Plug className="size-2.5" />{pc.label} (${pc.installCost})
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="max-w-52"><p className="text-xs">{pc.label} — Revenue: ${pc.revenuePerTick}/tick, Uses {pc.capacityUsed} port slot(s)</p></TooltipContent>
+                  </Tooltip>
                 ))}
               </div>
             </div>
@@ -2500,24 +2550,39 @@ export function HUD() {
               ))}
             </div>
             {peeringAgreements.length > 0 && (
-              <div className="mt-1 text-[10px] text-neon-yellow">
-                Peering cost: ${peeringCostPerTick}/tick
-              </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="mt-1 text-[10px] text-neon-yellow cursor-help">
+                    Peering cost: ${peeringCostPerTick}/tick
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-52"><p className="text-xs">Total recurring cost of all active peering agreements.</p></TooltipContent>
+              </Tooltip>
             )}
           </div>
         </div>
 
         {/* ── Phase 5: Server Config & Maintenance ── */}
         <div className="rounded-lg border border-border bg-card p-3">
-          <div className="flex items-center gap-2 text-xs font-bold text-neon-green mb-2">
-            <HardDrive className="size-3.5" />SERVER CONFIG & MAINTENANCE
-          </div>
-          <div className="text-[10px] mb-2">
-            <span className="text-muted-foreground">Default config:</span>{' '}
-            <span style={{ color: SERVER_CONFIG_OPTIONS.find(s => s.id === defaultServerConfig)?.color }}>
-              {SERVER_CONFIG_OPTIONS.find(s => s.id === defaultServerConfig)?.label}
-            </span>
-          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex items-center gap-2 text-xs font-bold text-neon-green mb-2 cursor-help">
+                <HardDrive className="size-3.5" />SERVER CONFIG & MAINTENANCE
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="max-w-52"><p className="text-xs">Choose default server hardware configuration and schedule preventive maintenance.</p></TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="text-[10px] mb-2 cursor-help">
+                <span className="text-muted-foreground">Default config:</span>{' '}
+                <span style={{ color: SERVER_CONFIG_OPTIONS.find(s => s.id === defaultServerConfig)?.color }}>
+                  {SERVER_CONFIG_OPTIONS.find(s => s.id === defaultServerConfig)?.label}
+                </span>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="max-w-52"><p className="text-xs">New servers will use this configuration. Different configs have different power, heat, and revenue characteristics.</p></TooltipContent>
+          </Tooltip>
           <div className="flex gap-1 flex-wrap mb-2">
             {SERVER_CONFIG_OPTIONS.map(cfg => (
               <Tooltip key={cfg.id}>
@@ -2533,9 +2598,14 @@ export function HUD() {
             ))}
           </div>
           <div className="border-t border-border pt-2">
-            <div className="text-[10px] font-medium text-muted-foreground mb-1">
-              Maintenance ({maintenanceWindows.filter(w => w.status !== 'completed').length} active, {maintenanceCompletedCount} completed)
-            </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="text-[10px] font-medium text-muted-foreground mb-1 cursor-help">
+                  Maintenance ({maintenanceWindows.filter(w => w.status !== 'completed').length} active, {maintenanceCompletedCount} completed)
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-52"><p className="text-xs">Schedule maintenance to improve equipment reliability and get a temporary cooling boost.</p></TooltipContent>
+            </Tooltip>
             <div className="flex gap-1 flex-wrap">
               {MAINTENANCE_CONFIG.map(cfg => (
                 <Tooltip key={cfg.targetType}>
@@ -2559,32 +2629,57 @@ export function HUD() {
 
         {/* ── Phase 5: Power Redundancy & Noise ── */}
         <div className="rounded-lg border border-border bg-card p-3">
-          <div className="flex items-center gap-2 text-xs font-bold text-neon-yellow mb-2">
-            <ShieldCheck className="size-3.5" />POWER REDUNDANCY & NOISE
-          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex items-center gap-2 text-xs font-bold text-neon-yellow mb-2 cursor-help">
+                <ShieldCheck className="size-3.5" />POWER REDUNDANCY & NOISE
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="max-w-52"><p className="text-xs">Protect against power failures and manage noise pollution from your data center.</p></TooltipContent>
+          </Tooltip>
           <div className="grid grid-cols-2 gap-2 text-[10px] mb-2">
-            <div>
-              <span className="text-muted-foreground">Redundancy:</span>{' '}
-              <span className="text-neon-green">{powerRedundancy}</span>
-              {powerRedundancyCost > 0 && <span className="text-neon-red ml-1">(${powerRedundancyCost}/tick)</span>}
-            </div>
-            <div>
-              <span className="text-muted-foreground">Noise:</span>{' '}
-              <span className={noiseLevel > NOISE_CONFIG.noiseLimit ? 'text-neon-red' : 'text-neon-green'}>
-                {noiseLevel}dB / {NOISE_CONFIG.noiseLimit}dB
-              </span>
-            </div>
-            <div>
-              <span className="text-muted-foreground">Community:</span>{' '}
-              <span className={communityRelations > 50 ? 'text-neon-green' : 'text-neon-red'}>
-                {communityRelations.toFixed(0)}%
-              </span>
-            </div>
-            <div>
-              <span className="text-muted-foreground">Barriers:</span>{' '}
-              {soundBarriersInstalled}/{NOISE_CONFIG.maxSoundBarriers}
-              {zoningRestricted && <span className="text-neon-red ml-1">(ZONING!)</span>}
-            </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="cursor-help">
+                  <span className="text-muted-foreground">Redundancy:</span>{' '}
+                  <span className="text-neon-green">{powerRedundancy}</span>
+                  {powerRedundancyCost > 0 && <span className="text-neon-red ml-1">(${powerRedundancyCost}/tick)</span>}
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-52"><p className="text-xs">N = no redundancy, N+1 = one backup per component, 2N = full duplication. Higher levels reduce power failure impact but cost more.</p></TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="cursor-help">
+                  <span className="text-muted-foreground">Noise:</span>{' '}
+                  <span className={noiseLevel > NOISE_CONFIG.noiseLimit ? 'text-neon-red' : 'text-neon-green'}>
+                    {noiseLevel}dB / {NOISE_CONFIG.noiseLimit}dB
+                  </span>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-52"><p className="text-xs">Noise level in decibels. Exceeding the limit triggers community complaints and fines.</p></TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="cursor-help">
+                  <span className="text-muted-foreground">Community:</span>{' '}
+                  <span className={communityRelations > 50 ? 'text-neon-green' : 'text-neon-red'}>
+                    {communityRelations.toFixed(0)}%
+                  </span>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-52"><p className="text-xs">Community satisfaction. Low relations can lead to zoning restrictions that block expansion.</p></TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="cursor-help">
+                  <span className="text-muted-foreground">Barriers:</span>{' '}
+                  {soundBarriersInstalled}/{NOISE_CONFIG.maxSoundBarriers}
+                  {zoningRestricted && <span className="text-neon-red ml-1">(ZONING!)</span>}
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-52"><p className="text-xs">Sound barriers reduce noise output. Each barrier reduces noise by a fixed amount.</p></TooltipContent>
+            </Tooltip>
           </div>
           <div className="flex gap-1 flex-wrap">
             {POWER_REDUNDANCY_CONFIG.filter(c => c.level !== powerRedundancy).map(cfg => (
@@ -2599,49 +2694,89 @@ export function HUD() {
                 <TooltipContent><p className="text-xs">{cfg.description}</p></TooltipContent>
               </Tooltip>
             ))}
-            <Button variant="outline" size="xs" className="text-[9px]"
-              onClick={() => installSoundBarrier()}
-              disabled={soundBarriersInstalled >= NOISE_CONFIG.maxSoundBarriers || money < NOISE_CONFIG.soundBarrierCost}>
-              <Volume2 className="size-2.5" />Sound Barrier (${NOISE_CONFIG.soundBarrierCost})
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="outline" size="xs" className="text-[9px]"
+                  onClick={() => installSoundBarrier()}
+                  disabled={soundBarriersInstalled >= NOISE_CONFIG.maxSoundBarriers || money < NOISE_CONFIG.soundBarrierCost}>
+                  <Volume2 className="size-2.5" />Sound Barrier (${NOISE_CONFIG.soundBarrierCost})
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-52"><p className="text-xs">Install a sound barrier to reduce noise by {NOISE_CONFIG.soundBarrierReduction}dB. Max {NOISE_CONFIG.maxSoundBarriers} barriers.</p></TooltipContent>
+            </Tooltip>
           </div>
         </div>
 
         {/* ── Phase 5: Spot Market & Event Log ── */}
         <div className="rounded-lg border border-border bg-card p-3">
-          <div className="flex items-center gap-2 text-xs font-bold text-neon-green mb-2">
-            <BarChart3 className="size-3.5" />SPOT MARKET & STATS
-          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex items-center gap-2 text-xs font-bold text-neon-green mb-2 cursor-help">
+                <BarChart3 className="size-3.5" />SPOT MARKET & STATS
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="max-w-52"><p className="text-xs">Sell spare server capacity on the spot compute market at fluctuating prices.</p></TooltipContent>
+          </Tooltip>
           <div className="grid grid-cols-2 gap-2 text-[10px] mb-2">
-            <div>
-              <span className="text-muted-foreground">Spot price:</span>{' '}
-              <span className={spotPriceMultiplier > 1.5 ? 'text-neon-green' : spotPriceMultiplier < 0.8 ? 'text-neon-red' : ''}>
-                {spotPriceMultiplier.toFixed(2)}x
-              </span>
-            </div>
-            <div>
-              <span className="text-muted-foreground">Spot revenue:</span>{' '}
-              <span className="text-neon-green">${spotRevenue.toFixed(0)}/tick</span>
-            </div>
-            <div>
-              <span className="text-muted-foreground">Allocated:</span>{' '}
-              {spotCapacityAllocated} servers
-            </div>
-            <div>
-              <span className="text-muted-foreground">Demand:</span>{' '}
-              {(spotDemand * 100).toFixed(0)}%
-            </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="cursor-help">
+                  <span className="text-muted-foreground">Spot price:</span>{' '}
+                  <span className={spotPriceMultiplier > 1.5 ? 'text-neon-green' : spotPriceMultiplier < 0.8 ? 'text-neon-red' : ''}>
+                    {spotPriceMultiplier.toFixed(2)}x
+                  </span>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-52"><p className="text-xs">Current spot market price multiplier. Prices fluctuate based on demand — sell high!</p></TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="cursor-help">
+                  <span className="text-muted-foreground">Spot revenue:</span>{' '}
+                  <span className="text-neon-green">${spotRevenue.toFixed(0)}/tick</span>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-52"><p className="text-xs">Revenue earned this tick from spot compute capacity.</p></TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="cursor-help">
+                  <span className="text-muted-foreground">Allocated:</span>{' '}
+                  {spotCapacityAllocated} servers
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-52"><p className="text-xs">Number of servers dedicated to spot compute. These earn spot pricing instead of regular revenue.</p></TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="cursor-help">
+                  <span className="text-muted-foreground">Demand:</span>{' '}
+                  {(spotDemand * 100).toFixed(0)}%
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-52"><p className="text-xs">Current market demand for spot compute. Higher demand = higher prices.</p></TooltipContent>
+            </Tooltip>
           </div>
           <div className="flex gap-1 mb-2">
             {[0, 2, 5, 10].map(n => (
-              <Button key={n} variant={spotCapacityAllocated === n ? 'default' : 'outline'} size="xs" className="text-[9px]"
-                onClick={() => setSpotCapacity(n)}>
-                {n}
-              </Button>
+              <Tooltip key={n}>
+                <TooltipTrigger asChild>
+                  <Button variant={spotCapacityAllocated === n ? 'default' : 'outline'} size="xs" className="text-[9px]"
+                    onClick={() => setSpotCapacity(n)}>
+                    {n}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-52"><p className="text-xs">Allocate {n} servers to spot compute market</p></TooltipContent>
+              </Tooltip>
             ))}
           </div>
           <div className="border-t border-border pt-2 text-[10px]">
-            <div className="font-medium text-muted-foreground mb-1">Lifetime Stats</div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="font-medium text-muted-foreground mb-1 cursor-help">Lifetime Stats</div>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-52"><p className="text-xs">Cumulative statistics tracked across your entire game session.</p></TooltipContent>
+            </Tooltip>
             <div className="grid grid-cols-2 gap-1">
               <div>Revenue: ${lifetimeStats.totalRevenueEarned.toFixed(0)}</div>
               <div>Expenses: ${lifetimeStats.totalExpensesPaid.toFixed(0)}</div>
@@ -2656,14 +2791,24 @@ export function HUD() {
         {/* ── Phase 5: Event Log ── */}
         <div className="rounded-lg border border-border bg-card p-3">
           <div className="flex items-center justify-between text-xs font-bold text-neon-cyan mb-2">
-            <div className="flex items-center gap-2">
-              <BookOpen className="size-3.5" />EVENT LOG
-            </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center gap-2 cursor-help">
+                  <BookOpen className="size-3.5" />EVENT LOG
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-52"><p className="text-xs">Chronological log of all significant events in your data center.</p></TooltipContent>
+            </Tooltip>
             <div className="flex items-center gap-1">
-              <Button variant={tutorialEnabled ? 'default' : 'outline'} size="xs" className="text-[9px]"
-                onClick={() => toggleTutorial()}>
-                {tutorialEnabled ? 'Tutorial ON' : 'Tutorial OFF'}
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant={tutorialEnabled ? 'default' : 'outline'} size="xs" className="text-[9px]"
+                    onClick={() => toggleTutorial()}>
+                    {tutorialEnabled ? 'Tutorial ON' : 'Tutorial OFF'}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-52"><p className="text-xs">{tutorialEnabled ? 'Disable contextual gameplay tips' : 'Enable contextual tips that appear as you play'}</p></TooltipContent>
+              </Tooltip>
             </div>
           </div>
           <div className="max-h-32 overflow-y-auto space-y-0.5">
@@ -2687,40 +2832,70 @@ export function HUD() {
         {/* ── Phase 5: Capacity Planning ── */}
         {capacityHistory.length > 5 && (
           <div className="rounded-lg border border-border bg-card p-3">
-            <div className="flex items-center gap-2 text-xs font-bold text-neon-orange mb-2">
-              <Gauge className="size-3.5" />CAPACITY PLANNING
-            </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center gap-2 text-xs font-bold text-neon-orange mb-2 cursor-help">
+                  <Gauge className="size-3.5" />CAPACITY PLANNING
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-52"><p className="text-xs">Monitor resource utilization and plan for future growth.</p></TooltipContent>
+            </Tooltip>
             <div className="grid grid-cols-2 gap-2 text-[10px]">
-              <div>
-                <span className="text-muted-foreground">Space:</span>{' '}
-                <span className={cabinets.length >= suiteLimits.maxCabinets * 0.8 ? 'text-neon-red' : 'text-neon-green'}>
-                  {cabinets.length}/{suiteLimits.maxCabinets} cabinets
-                </span>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Power:</span>{' '}
-                <span>{(totalPower / 1000).toFixed(1)}kW</span>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Avg heat:</span>{' '}
-                <span className={avgHeat > 70 ? 'text-neon-red' : avgHeat > 50 ? 'text-neon-yellow' : 'text-neon-green'}>
-                  {avgHeat.toFixed(0)}°C
-                </span>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Runway:</span>{' '}
-                {expenses > revenue
-                  ? <span className="text-neon-red">{Math.floor(money / Math.max(1, expenses - revenue))} ticks</span>
-                  : <span className="text-neon-green">Profitable</span>}
-              </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="cursor-help">
+                    <span className="text-muted-foreground">Space:</span>{' '}
+                    <span className={cabinets.length >= suiteLimits.maxCabinets * 0.8 ? 'text-neon-red' : 'text-neon-green'}>
+                      {cabinets.length}/{suiteLimits.maxCabinets} cabinets
+                    </span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-52"><p className="text-xs">Cabinet slots used. Upgrade your suite tier for more space.</p></TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="cursor-help">
+                    <span className="text-muted-foreground">Power:</span>{' '}
+                    <span>{(totalPower / 1000).toFixed(1)}kW</span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-52"><p className="text-xs">Total power draw from all active equipment.</p></TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="cursor-help">
+                    <span className="text-muted-foreground">Avg heat:</span>{' '}
+                    <span className={avgHeat > 70 ? 'text-neon-red' : avgHeat > 50 ? 'text-neon-yellow' : 'text-neon-green'}>
+                      {avgHeat.toFixed(0)}°C
+                    </span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-52"><p className="text-xs">Average temperature across all cabinets. Keep below 80°C to avoid throttling.</p></TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="cursor-help">
+                    <span className="text-muted-foreground">Runway:</span>{' '}
+                    {expenses > revenue
+                      ? <span className="text-neon-red">{Math.floor(money / Math.max(1, expenses - revenue))} ticks</span>
+                      : <span className="text-neon-green">Profitable</span>}
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-52"><p className="text-xs">If losing money, how many ticks until funds run out.</p></TooltipContent>
+              </Tooltip>
             </div>
-            <div className="mt-1 text-[9px] text-muted-foreground">
-              Revenue trend: {capacityHistory.length >= 10
-                ? (capacityHistory[capacityHistory.length - 1].revenue > capacityHistory[capacityHistory.length - 10].revenue
-                  ? '↑ increasing' : capacityHistory[capacityHistory.length - 1].revenue < capacityHistory[capacityHistory.length - 10].revenue
-                    ? '↓ decreasing' : '→ stable')
-                : '...gathering data'}
-            </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="mt-1 text-[9px] text-muted-foreground cursor-help">
+                  Revenue trend: {capacityHistory.length >= 10
+                    ? (capacityHistory[capacityHistory.length - 1].revenue > capacityHistory[capacityHistory.length - 10].revenue
+                      ? '↑ increasing' : capacityHistory[capacityHistory.length - 1].revenue < capacityHistory[capacityHistory.length - 10].revenue
+                        ? '↓ decreasing' : '→ stable')
+                    : '...gathering data'}
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-52"><p className="text-xs">Compares current revenue to 10 ticks ago to show direction.</p></TooltipContent>
+            </Tooltip>
           </div>
         )}
 
