@@ -9,6 +9,9 @@ export type GeneratorStatus = 'standby' | 'running' | 'cooldown'
 export type SuppressionType = 'none' | 'water_suppression' | 'gas_suppression'
 export type TechBranch = 'efficiency' | 'performance' | 'resilience'
 export type SuiteTier = 'starter' | 'standard' | 'professional' | 'enterprise'
+export type StaffRole = 'network_engineer' | 'electrician' | 'cooling_specialist' | 'security_officer'
+export type StaffSkillLevel = 1 | 2 | 3
+export type ShiftPattern = 'day_only' | 'day_night' | 'round_the_clock'
 
 // ── Save Slot Types ──────────────────────────────────────────
 
@@ -359,6 +362,100 @@ export const SUITE_TIERS: Record<SuiteTier, SuiteConfig> = {
 /** Ordered list of suite tiers for progression */
 export const SUITE_TIER_ORDER: SuiteTier[] = ['starter', 'standard', 'professional', 'enterprise']
 
+// ── Staff & HR System ───────────────────────────────────────────
+
+export interface StaffMember {
+  id: string
+  name: string
+  role: StaffRole
+  skillLevel: StaffSkillLevel
+  salaryPerTick: number
+  hiredAtTick: number
+  onShift: boolean
+  certifications: string[]
+  incidentsResolved: number
+  fatigueLevel: number          // 0–100
+}
+
+export interface StaffTraining {
+  staffId: string
+  certification: string
+  ticksRemaining: number
+  cost: number
+}
+
+export interface StaffRoleConfig {
+  role: StaffRole
+  label: string
+  description: string
+  baseSalary: number            // per tick at skill level 1
+  salaryMultiplier: number[]    // [level1, level2, level3] multipliers
+  hireCost: number              // one-time hiring cost
+  effect: string
+}
+
+export interface StaffCertConfig {
+  id: string
+  label: string
+  cost: number
+  durationTicks: number
+  requiredRole: StaffRole | null  // null = any role
+  effect: string
+}
+
+export const STAFF_ROLE_CONFIG: StaffRoleConfig[] = [
+  {
+    role: 'network_engineer', label: 'Network Engineer', baseSalary: 4, salaryMultiplier: [1, 1.5, 2.2],
+    hireCost: 3000, description: 'Speeds up traffic_drop and power_surge incident resolution. +2% traffic capacity per engineer.',
+    effect: 'Incident resolution: 25%/40%/60% faster (by skill). +2% traffic capacity.',
+  },
+  {
+    role: 'electrician', label: 'Electrician', baseSalary: 3, salaryMultiplier: [1, 1.4, 2.0],
+    hireCost: 2500, description: 'Reduces power surge damage. Generator startup 1 tick faster per skill level.',
+    effect: 'Reduces power surge effects. Generator startup -1 tick/skill.',
+  },
+  {
+    role: 'cooling_specialist', label: 'Cooling Specialist', baseSalary: 3, salaryMultiplier: [1, 1.4, 2.0],
+    hireCost: 2500, description: 'Improves cooling efficiency by 5%/10%/15% per specialist.',
+    effect: 'Cooling efficiency +5%/+10%/+15% per specialist.',
+  },
+  {
+    role: 'security_officer', label: 'Security Officer', baseSalary: 5, salaryMultiplier: [1, 1.6, 2.5],
+    hireCost: 4000, description: 'Required for security tier compliance. Reduces physical intrusion events.',
+    effect: 'Required for security compliance. Reduces intrusion risk.',
+  },
+]
+
+export const STAFF_CERT_CONFIG: StaffCertConfig[] = [
+  { id: 'ccna', label: 'CCNA', cost: 3000, durationTicks: 30, requiredRole: 'network_engineer', effect: '+15% traffic optimization' },
+  { id: 'dcim_certified', label: 'DCIM Certified', cost: 2500, durationTicks: 25, requiredRole: null, effect: 'Staff monitors 2x equipment range' },
+  { id: 'fire_safety', label: 'Fire Safety', cost: 1500, durationTicks: 15, requiredRole: null, effect: '+10% fire suppression effectiveness' },
+  { id: 'high_voltage', label: 'High Voltage', cost: 4000, durationTicks: 35, requiredRole: 'electrician', effect: 'Manages enterprise-tier power loads' },
+]
+
+export const SHIFT_PATTERN_CONFIG: Record<ShiftPattern, { label: string; costPerTick: number; coverage: string; description: string }> = {
+  day_only: { label: 'Day Only', costPerTick: 0, coverage: '06:00–22:00', description: 'Staff work daytime only. No incident response at night.' },
+  day_night: { label: 'Day + Night', costPerTick: 500, coverage: '24/7', description: 'Two shifts covering 24 hours. Night shift at -20% effectiveness.' },
+  round_the_clock: { label: 'Round the Clock', costPerTick: 1200, coverage: '24/7 Full', description: 'Three 8-hour shifts at full effectiveness. Requires 50% more staff.' },
+}
+
+/** Max staff by suite tier */
+export const MAX_STAFF_BY_TIER: Record<SuiteTier, number> = {
+  starter: 2,
+  standard: 4,
+  professional: 8,
+  enterprise: 16,
+}
+
+// ── Procedural Name Generation ──────────────────────────────────
+
+const FIRST_NAMES = ['Alex', 'Sam', 'Jordan', 'Casey', 'Riley', 'Morgan', 'Taylor', 'Quinn', 'Drew', 'Blake', 'Jamie', 'Avery', 'Dakota', 'Reese', 'Skyler', 'Charlie', 'Kai', 'Sage', 'Rowan', 'Finley']
+const LAST_NAMES = ['Chen', 'Patel', 'Kim', 'Garcia', 'Murphy', 'Nakamura', 'Berg', 'Santos', 'Fischer', 'Okafor', 'Levy', 'Volkov', 'Tanaka', 'Dubois', 'Ahmed', 'Johansson', 'Rivera', 'Nguyen', 'Hoffman', 'Kowalski']
+
+function generateStaffName(): string {
+  return `${FIRST_NAMES[Math.floor(Math.random() * FIRST_NAMES.length)]} ${LAST_NAMES[Math.floor(Math.random() * LAST_NAMES.length)]}`
+}
+
 // ── Cooling System Constants ────────────────────────────────────
 
 export const COOLING_CONFIG: Record<CoolingType, {
@@ -570,6 +667,11 @@ export const ACHIEVEMENT_CATALOG: AchievementDef[] = [
   { id: 'game_saved', label: 'Save Scummer', description: 'Save your game for the first time.', icon: '💾' },
   { id: 'scenario_complete', label: 'Challenge Accepted', description: 'Complete a scenario challenge.', icon: '🎪' },
   { id: 'heat_map_used', label: 'Thermal Vision', description: 'Toggle the heat map overlay.', icon: '🌡️' },
+  // Staff & HR achievements
+  { id: 'first_hire', label: 'First Hire', description: 'Hire your first staff member.', icon: '👤' },
+  { id: 'full_staff', label: 'Full Staff', description: 'Reach your maximum staff capacity.', icon: '👥' },
+  { id: 'zero_fatigue', label: 'Zero Fatigue', description: 'Resolve 10 incidents without any staff burnout.', icon: '💪' },
+  { id: 'certified_team', label: 'Certified Team', description: 'Have all staff with at least one certification.', icon: '🎓' },
 ]
 
 export interface EnvironmentConfig {
@@ -1492,6 +1594,14 @@ interface GameState {
   // Network Topology
   networkTopology: NetworkTopologyStats
 
+  // Staff & HR
+  staff: StaffMember[]
+  shiftPattern: ShiftPattern
+  trainingQueue: StaffTraining[]
+  staffCostPerTick: number          // total staff salaries + shift overhead
+  staffIncidentsResolved: number    // lifetime count without burnout (for achievement)
+  staffBurnouts: number             // lifetime burnout count
+
   // Heat Map
   heatMapVisible: boolean
 
@@ -1548,6 +1658,11 @@ interface GameState {
   // Scenario actions
   startScenario: (scenarioId: string) => void
   abandonScenario: () => void
+  // Staff & HR actions
+  hireStaff: (role: StaffRole, skillLevel: StaffSkillLevel) => void
+  fireStaff: (staffId: string) => void
+  setShiftPattern: (pattern: ShiftPattern) => void
+  startTraining: (staffId: string, certId: string) => void
   // Heat map
   toggleHeatMap: () => void
   // Save / Load
@@ -1565,6 +1680,7 @@ let nextLoanId = 1
 let nextIncidentId = 1
 let nextContractId = 1
 let nextGeneratorId = 1
+let nextStaffId = 1
 
 function maxIdNum(items: { id: string }[], prefix: string): number {
   let max = 0
@@ -1741,6 +1857,14 @@ export const useGameStore = create<GameState>((set) => ({
 
   // Network Topology
   networkTopology: { totalLinks: 0, healthyLinks: 0, oversubscriptionRatio: 0, avgUtilization: 0, redundancyLevel: 0 },
+
+  // Staff & HR
+  staff: [],
+  shiftPattern: 'day_only' as ShiftPattern,
+  trainingQueue: [],
+  staffCostPerTick: 0,
+  staffIncidentsResolved: 0,
+  staffBurnouts: 0,
 
   // Heat Map
   heatMapVisible: false,
@@ -2379,6 +2503,72 @@ export const useGameStore = create<GameState>((set) => ({
 
   // ── Heat Map ───────────────────────────────────────────────────
 
+  // ── Staff & HR Actions ─────────────────────────────────────────
+
+  hireStaff: (role: StaffRole, skillLevel: StaffSkillLevel) =>
+    set((state) => {
+      const config = STAFF_ROLE_CONFIG.find((c) => c.role === role)
+      if (!config) return state
+      const maxStaff = MAX_STAFF_BY_TIER[state.suiteTier]
+      if (state.staff.length >= maxStaff) return state
+      const salary = +(config.baseSalary * config.salaryMultiplier[skillLevel - 1]).toFixed(2)
+      if (state.money < config.hireCost) return state
+      const member: StaffMember = {
+        id: `staff-${nextStaffId++}`,
+        name: generateStaffName(),
+        role,
+        skillLevel,
+        salaryPerTick: salary,
+        hiredAtTick: state.tickCount,
+        onShift: true,
+        certifications: [],
+        incidentsResolved: 0,
+        fatigueLevel: 0,
+      }
+      return {
+        staff: [...state.staff, member],
+        money: state.money - config.hireCost,
+      }
+    }),
+
+  fireStaff: (staffId: string) =>
+    set((state) => {
+      const member = state.staff.find((s) => s.id === staffId)
+      if (!member) return state
+      return {
+        staff: state.staff.filter((s) => s.id !== staffId),
+        trainingQueue: state.trainingQueue.filter((t) => t.staffId !== staffId),
+      }
+    }),
+
+  setShiftPattern: (pattern: ShiftPattern) =>
+    set({ shiftPattern: pattern }),
+
+  startTraining: (staffId: string, certId: string) =>
+    set((state) => {
+      const member = state.staff.find((s) => s.id === staffId)
+      if (!member) return state
+      // Already has this cert
+      if (member.certifications.includes(certId)) return state
+      // Already in training
+      if (state.trainingQueue.some((t) => t.staffId === staffId)) return state
+      const certConfig = STAFF_CERT_CONFIG.find((c) => c.id === certId)
+      if (!certConfig) return state
+      // Check role requirement
+      if (certConfig.requiredRole && member.role !== certConfig.requiredRole) return state
+      if (state.money < certConfig.cost) return state
+      const training: StaffTraining = {
+        staffId,
+        certification: certId,
+        ticksRemaining: certConfig.durationTicks,
+        cost: certConfig.cost,
+      }
+      return {
+        trainingQueue: [...state.trainingQueue, training],
+        money: state.money - certConfig.cost,
+      }
+    }),
+
   toggleHeatMap: () =>
     set((state) => ({ heatMapVisible: !state.heatMapVisible })),
 
@@ -2428,6 +2618,12 @@ export const useGameStore = create<GameState>((set) => ({
         drillsCompleted: state.drillsCompleted,
         drillsPassed: state.drillsPassed,
         scenariosCompleted: state.scenariosCompleted,
+        // Staff & HR
+        staff: state.staff,
+        shiftPattern: state.shiftPattern,
+        trainingQueue: state.trainingQueue,
+        staffIncidentsResolved: state.staffIncidentsResolved,
+        staffBurnouts: state.staffBurnouts,
       }
       try {
         localStorage.setItem(SAVE_SLOT_PREFIX + slotId, JSON.stringify(saveData))
@@ -2502,6 +2698,12 @@ export const useGameStore = create<GameState>((set) => ({
         drillsCompleted: data.drillsCompleted ?? state.drillsCompleted,
         drillsPassed: data.drillsPassed ?? state.drillsPassed,
         scenariosCompleted: data.scenariosCompleted ?? state.scenariosCompleted,
+        // Staff & HR
+        staff: data.staff ?? state.staff,
+        shiftPattern: data.shiftPattern ?? state.shiftPattern,
+        trainingQueue: data.trainingQueue ?? state.trainingQueue,
+        staffIncidentsResolved: data.staffIncidentsResolved ?? state.staffIncidentsResolved,
+        staffBurnouts: data.staffBurnouts ?? state.staffBurnouts,
         activeSlotId: slotId,
         hasSaved: true,
         ...calcStats(data.cabinets ?? state.cabinets, data.spineSwitches ?? state.spineSwitches),
@@ -2610,6 +2812,13 @@ export const useGameStore = create<GameState>((set) => ({
       networkTopology: { totalLinks: 0, healthyLinks: 0, oversubscriptionRatio: 0, avgUtilization: 0, redundancyLevel: 0 },
       heatMapVisible: false,
       hasSaved: false,
+      // Staff & HR
+      staff: [],
+      shiftPattern: 'day_only' as ShiftPattern,
+      trainingQueue: [],
+      staffCostPerTick: 0,
+      staffIncidentsResolved: 0,
+      staffBurnouts: 0,
       activeSlotId: null,
     })
   },
@@ -2701,6 +2910,124 @@ export const useGameStore = create<GameState>((set) => ({
       const techAiBonus = hasTech('gpu_clusters') ? 0.30 : 0
       const techLinkCapacity = hasTech('optical_interconnect') ? TRAFFIC.linkCapacityGbps * 2 : TRAFFIC.linkCapacityGbps
       const techCoolingFailureReduction = hasTech('redundant_cooling') ? 0.5 : 0
+
+      // ── Staff & HR system ──────────────────────────────────
+      let updatedStaff = [...state.staff]
+      let trainingQueue = [...state.trainingQueue]
+      let staffIncidentsResolved = state.staffIncidentsResolved
+      let staffBurnouts = state.staffBurnouts
+
+      // Determine shift coverage
+      const isNightTime = newHour < 6 || newHour >= 22
+      const shiftCoverage = state.shiftPattern === 'day_only'
+        ? (isNightTime ? 0 : 1)
+        : state.shiftPattern === 'day_night'
+          ? (isNightTime ? 0.8 : 1)  // night shift at 80% effectiveness
+          : 1  // round_the_clock: full coverage
+
+      // Update staff on-shift status
+      updatedStaff = updatedStaff.map((s) => ({
+        ...s,
+        onShift: state.shiftPattern === 'day_only' ? !isNightTime : true,
+      }))
+
+      // Staff cooling bonus: cooling specialists improve cooling efficiency
+      const coolingSpecialists = updatedStaff.filter((s) => s.role === 'cooling_specialist' && s.onShift)
+      const staffCoolingBonus = coolingSpecialists.reduce((sum, s) => {
+        const bonus = s.skillLevel === 1 ? 0.05 : s.skillLevel === 2 ? 0.10 : 0.15
+        return sum + bonus
+      }, 0) * shiftCoverage
+
+      // Staff incident resolution speed bonus
+      const onShiftStaff = updatedStaff.filter((s) => s.onShift && s.fatigueLevel < 100)
+      const networkEngineers = onShiftStaff.filter((s) => s.role === 'network_engineer')
+      const electricians = onShiftStaff.filter((s) => s.role === 'electrician')
+
+      // Calculate per-incident-type speed multipliers from staff
+      const staffTrafficResolution = networkEngineers.reduce((sum, s) => {
+        const bonus = s.skillLevel === 1 ? 0.25 : s.skillLevel === 2 ? 0.40 : 0.60
+        return sum + bonus
+      }, 0) * shiftCoverage
+      const staffPowerResolution = electricians.reduce((sum, s) => {
+        const bonus = s.skillLevel === 1 ? 0.25 : s.skillLevel === 2 ? 0.40 : 0.60
+        return sum + bonus
+      }, 0) * shiftCoverage
+
+      // Apply staff-based incident speed reduction (in addition to tech bonuses)
+      if (onShiftStaff.length > 0) {
+        activeIncidents = activeIncidents.map((i) => {
+          if (i.resolved) return i
+          let staffSpeedBonus = 0
+          if (i.def.effect === 'traffic_drop') staffSpeedBonus = staffTrafficResolution
+          else if (i.def.effect === 'power_surge') staffSpeedBonus = staffPowerResolution
+          // Generic small bonus from any staff for other incident types
+          else staffSpeedBonus = Math.min(0.3, onShiftStaff.length * 0.05) * shiftCoverage
+          const extraReduction = Math.random() < Math.min(0.8, staffSpeedBonus) ? 1 : 0
+          if (extraReduction === 0) return i
+          const remaining = i.ticksRemaining - extraReduction
+          if (remaining <= 0) {
+            incidentLog = [`Staff resolved: ${i.def.label}`, ...incidentLog].slice(0, 10)
+            // Track resolved count for staff
+            staffIncidentsResolved++
+            // Add fatigue to responding staff
+            const responders = i.def.effect === 'traffic_drop' ? networkEngineers
+              : i.def.effect === 'power_surge' ? electricians
+                : onShiftStaff.slice(0, 1)
+            for (const resp of responders) {
+              const idx = updatedStaff.findIndex((s) => s.id === resp.id)
+              if (idx >= 0) {
+                const newFatigue = Math.min(100, updatedStaff[idx].fatigueLevel + 15)
+                updatedStaff[idx] = {
+                  ...updatedStaff[idx],
+                  fatigueLevel: newFatigue,
+                  incidentsResolved: updatedStaff[idx].incidentsResolved + 1,
+                }
+                if (newFatigue >= 100) {
+                  staffBurnouts++
+                  incidentLog = [`Burnout: ${updatedStaff[idx].name} is exhausted!`, ...incidentLog].slice(0, 10)
+                }
+              }
+            }
+            return { ...i, ticksRemaining: 0, resolved: true }
+          }
+          return { ...i, ticksRemaining: remaining }
+        })
+      }
+
+      // Fatigue recovery: -2 per tick for on-shift staff (slow recovery), -5 for off-shift
+      updatedStaff = updatedStaff.map((s) => ({
+        ...s,
+        fatigueLevel: Math.max(0, s.fatigueLevel - (s.onShift ? 2 : 5)),
+      }))
+
+      // Process training queue
+      const completedTraining: string[] = []
+      trainingQueue = trainingQueue
+        .map((t) => ({ ...t, ticksRemaining: t.ticksRemaining - 1 }))
+        .filter((t) => {
+          if (t.ticksRemaining <= 0) {
+            completedTraining.push(`${t.staffId}:${t.certification}`)
+            return false
+          }
+          return true
+        })
+
+      // Apply completed certifications
+      for (const ct of completedTraining) {
+        const [staffId, certId] = ct.split(':')
+        updatedStaff = updatedStaff.map((s) => {
+          if (s.id === staffId && !s.certifications.includes(certId)) {
+            incidentLog = [`Training complete: ${s.name} earned ${certId.toUpperCase()}`, ...incidentLog].slice(0, 10)
+            return { ...s, certifications: [...s.certifications, certId] }
+          }
+          return s
+        })
+      }
+
+      // Staff salary costs (calculated in final expenses)
+      const staffSalaryCost = updatedStaff.reduce((sum, s) => sum + s.salaryPerTick, 0)
+      const shiftOverhead = SHIFT_PATTERN_CONFIG[state.shiftPattern].costPerTick
+      const staffCostPerTick = staffSalaryCost + shiftOverhead
 
       // ── Spot power pricing ───────────────────────────────
       let powerPriceMultiplier = state.powerPriceMultiplier
@@ -2964,7 +3291,7 @@ export const useGameStore = create<GameState>((set) => ({
 
         // Cooling dissipation (base + tech bonus + aisle bonus + in-row cooling; reduced by incident effects)
         const aisleCoolingBoost = currentAisleBonus * 2 // up to +0.5°C/tick extra cooling
-        heat -= (coolingConfig.coolingRate + techCoolingBonus + aisleCoolingBoost + inRowBonus) * incidentCoolingMult
+        heat -= (coolingConfig.coolingRate + techCoolingBonus + aisleCoolingBoost + inRowBonus + staffCoolingBonus) * incidentCoolingMult
 
         // Incident heat spike
         heat += incidentHeatAdd
@@ -3314,7 +3641,7 @@ export const useGameStore = create<GameState>((set) => ({
 
       // ── Stock price calculation ───────────────────────────────
       const totalRev = revenue + contractRevenue + patentIncome
-      const totalExp = expenses + loanPayments + contractPenalties + insuranceCost
+      const totalExp = expenses + loanPayments + contractPenalties + insuranceCost + staffCostPerTick
       const profitability = totalRev - totalExp
       const basePrice = Math.max(1,
         (state.reputationScore * 0.5) +
@@ -3446,11 +3773,16 @@ export const useGameStore = create<GameState>((set) => ({
       if (state.hasSaved) unlock('game_saved')
       if (scenariosCompleted.length > state.scenariosCompleted.length) unlock('scenario_complete')
       if (state.heatMapVisible) unlock('heat_map_used')
+      // Staff & HR achievements
+      if (updatedStaff.length >= 1) unlock('first_hire')
+      if (updatedStaff.length >= MAX_STAFF_BY_TIER[state.suiteTier]) unlock('full_staff')
+      if (staffIncidentsResolved >= 10 && staffBurnouts === 0) unlock('zero_fatigue')
+      if (updatedStaff.length > 0 && updatedStaff.every((s) => s.certifications.length > 0)) unlock('certified_team')
 
       // Recalculate final money with all new income/expenses
       const finalNewMoney = state.sandboxMode
         ? 999999999
-        : Math.round((state.money + revenue + contractRevenue + patentIncome + milestoneMoney + (insurancePayouts - state.insurancePayouts) - expenses - loanPayments - contractPenalties - insuranceCost) * 100) / 100
+        : Math.round((state.money + revenue + contractRevenue + patentIncome + milestoneMoney + (insurancePayouts - state.insurancePayouts) - expenses - loanPayments - contractPenalties - insuranceCost - staffCostPerTick) * 100) / 100
 
       return {
         cabinets: newCabinets,
@@ -3515,6 +3847,12 @@ export const useGameStore = create<GameState>((set) => ({
         networkTopology,
         scenarioProgress,
         scenariosCompleted,
+        // Staff & HR
+        staff: updatedStaff,
+        trainingQueue,
+        staffCostPerTick: +staffCostPerTick.toFixed(2),
+        staffIncidentsResolved,
+        staffBurnouts,
       }
     }),
 }))

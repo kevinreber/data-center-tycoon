@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { useGameStore, RACK_COST, MAX_SERVERS_PER_CABINET, SIM, ENVIRONMENT_CONFIG, formatGameTime, COOLING_CONFIG, LOAN_OPTIONS, ACHIEVEMENT_CATALOG, CONTRACT_TIER_COLORS, CUSTOMER_TYPE_CONFIG, GENERATOR_OPTIONS, SUPPRESSION_CONFIG, TECH_TREE, TECH_BRANCH_COLORS, DEPRECIATION, getReputationTier, POWER_MARKET, SUITE_TIERS, SUITE_TIER_ORDER, getSuiteLimits, PDU_OPTIONS, CABLE_TRAY_OPTIONS, AISLE_CONFIG, getPDULoad, isPDUOverloaded, INSURANCE_OPTIONS, DRILL_CONFIG, VALUATION_MILESTONES, PATENT_CONFIG, BUSWAY_OPTIONS, CROSSCONNECT_OPTIONS, INROW_COOLING_OPTIONS, SCENARIO_CATALOG } from '@/stores/gameStore'
-import type { CabinetEnvironment, CustomerType, SuppressionType, TechBranch, CabinetFacing } from '@/stores/gameStore'
+import { useGameStore, RACK_COST, MAX_SERVERS_PER_CABINET, SIM, ENVIRONMENT_CONFIG, formatGameTime, COOLING_CONFIG, LOAN_OPTIONS, ACHIEVEMENT_CATALOG, CONTRACT_TIER_COLORS, CUSTOMER_TYPE_CONFIG, GENERATOR_OPTIONS, SUPPRESSION_CONFIG, TECH_TREE, TECH_BRANCH_COLORS, DEPRECIATION, getReputationTier, POWER_MARKET, SUITE_TIERS, SUITE_TIER_ORDER, getSuiteLimits, PDU_OPTIONS, CABLE_TRAY_OPTIONS, AISLE_CONFIG, getPDULoad, isPDUOverloaded, INSURANCE_OPTIONS, DRILL_CONFIG, VALUATION_MILESTONES, PATENT_CONFIG, BUSWAY_OPTIONS, CROSSCONNECT_OPTIONS, INROW_COOLING_OPTIONS, SCENARIO_CATALOG, STAFF_ROLE_CONFIG, STAFF_CERT_CONFIG, SHIFT_PATTERN_CONFIG, MAX_STAFF_BY_TIER } from '@/stores/gameStore'
+import type { CabinetEnvironment, CustomerType, SuppressionType, TechBranch, CabinetFacing, StaffRole, StaffSkillLevel, ShiftPattern } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Server, Network, Power, Cpu, Plus, TrendingUp, TrendingDown, DollarSign, ArrowRightLeft, AlertTriangle, Radio, Info, Shield, Clock, Zap, Droplets, Landmark, Siren, Trophy, Wrench, FileText, Check, Fuel, Flame, FlaskConical, Star, RefreshCw, Lock, Building, MousePointer, X, Plug, Cable, ArrowUpDown, Thermometer, Save, Upload, RotateCw, Play, Map, Target, Briefcase, Snowflake, Wifi, Award } from 'lucide-react'
+import { Server, Network, Power, Cpu, Plus, TrendingUp, TrendingDown, DollarSign, ArrowRightLeft, AlertTriangle, Radio, Info, Shield, Clock, Zap, Droplets, Landmark, Siren, Trophy, Wrench, FileText, Check, Fuel, Flame, FlaskConical, Star, RefreshCw, Lock, Building, MousePointer, X, Plug, Cable, ArrowUpDown, Thermometer, Save, Upload, RotateCw, Play, Map, Target, Briefcase, Snowflake, Wifi, Award, Users, UserPlus, GraduationCap, Moon, Sun, Trash2 } from 'lucide-react'
 import {
   Tooltip,
   TooltipContent,
@@ -61,6 +61,9 @@ export function HUD() {
     networkTopology,
     // Heat map
     heatMapVisible, toggleHeatMap,
+    // Staff & HR
+    staff, shiftPattern, trainingQueue, staffCostPerTick, staffIncidentsResolved, staffBurnouts,
+    hireStaff, fireStaff, setShiftPattern, startTraining,
     // Save / Load
     saveGame, loadGame, resetGame, activeSlotId,
   } = useGameStore()
@@ -69,6 +72,8 @@ export function HUD() {
   const [selectedEnv, setSelectedEnv] = useState<CabinetEnvironment>('production')
   const [selectedCustomerType, setSelectedCustomerType] = useState<CustomerType>('general')
   const [selectedFacing, setSelectedFacing] = useState<CabinetFacing>('north')
+  const [selectedStaffRole, setSelectedStaffRole] = useState<StaffRole>('network_engineer')
+  const [selectedSkillLevel, setSelectedSkillLevel] = useState<StaffSkillLevel>(1)
 
   const suiteLimits = getSuiteLimits(suiteTier)
   const suiteConfig = SUITE_TIERS[suiteTier]
@@ -2120,6 +2125,245 @@ export function HUD() {
                     )}
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Staff & HR row */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {/* HIRING panel */}
+          <div className="rounded-lg border border-border bg-card p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <UserPlus className="size-3.5 text-neon-purple" />
+              <span className="text-xs font-bold text-neon-purple tracking-widest">STAFF</span>
+              <Badge variant="outline" className="ml-auto text-[10px] font-mono text-neon-purple border-neon-purple/30">
+                {staff.length}/{MAX_STAFF_BY_TIER[suiteTier]}
+              </Badge>
+            </div>
+            <div className="space-y-1.5 mb-2">
+              <div className="flex gap-1 flex-wrap">
+                {STAFF_ROLE_CONFIG.map((cfg) => (
+                  <Button
+                    key={cfg.role}
+                    variant={selectedStaffRole === cfg.role ? 'default' : 'outline'}
+                    size="xs"
+                    className={`text-[10px] ${selectedStaffRole === cfg.role ? 'bg-neon-purple/20 text-neon-purple border-neon-purple/40' : ''}`}
+                    onClick={() => setSelectedStaffRole(cfg.role)}
+                  >
+                    {cfg.label.split(' ')[0]}
+                  </Button>
+                ))}
+              </div>
+              <div className="flex gap-1">
+                {([1, 2, 3] as StaffSkillLevel[]).map((lvl) => (
+                  <Button
+                    key={lvl}
+                    variant={selectedSkillLevel === lvl ? 'default' : 'outline'}
+                    size="xs"
+                    className={`text-[10px] flex-1 ${selectedSkillLevel === lvl ? 'bg-neon-cyan/20 text-neon-cyan border-neon-cyan/40' : ''}`}
+                    onClick={() => setSelectedSkillLevel(lvl)}
+                  >
+                    {lvl === 1 ? 'Junior' : lvl === 2 ? 'Mid' : 'Senior'}
+                  </Button>
+                ))}
+              </div>
+              {(() => {
+                const cfg = STAFF_ROLE_CONFIG.find((c) => c.role === selectedStaffRole)
+                if (!cfg) return null
+                const salary = +(cfg.baseSalary * cfg.salaryMultiplier[selectedSkillLevel - 1]).toFixed(2)
+                return (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full justify-between font-mono text-xs border-neon-purple/20 hover:border-neon-purple/50 hover:bg-neon-purple/10 hover:text-neon-purple transition-all"
+                        disabled={money < cfg.hireCost || staff.length >= MAX_STAFF_BY_TIER[suiteTier]}
+                        onClick={() => hireStaff(selectedStaffRole, selectedSkillLevel)}
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <Plus className="size-3" />
+                          Hire {cfg.label}
+                        </span>
+                        <span className="text-muted-foreground">${cfg.hireCost.toLocaleString()} + ${salary}/t</span>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="max-w-52">
+                      <p className="text-xs">{cfg.description}</p>
+                      <p className="text-xs text-muted-foreground mt-1">{cfg.effect}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                )
+              })()}
+            </div>
+            {/* Shift pattern selector */}
+            <div className="border-t border-border/50 pt-2">
+              <div className="flex items-center gap-1 mb-1">
+                {shiftPattern === 'day_only' && !((gameHour >= 6 && gameHour < 22)) ? (
+                  <Moon className="size-3 text-neon-yellow" />
+                ) : (
+                  <Sun className="size-3 text-neon-yellow" />
+                )}
+                <span className="text-[10px] font-bold text-neon-yellow">SHIFT PATTERN</span>
+              </div>
+              <div className="flex gap-1">
+                {(Object.entries(SHIFT_PATTERN_CONFIG) as [ShiftPattern, typeof SHIFT_PATTERN_CONFIG['day_only']][]).map(([pattern, cfg]) => (
+                  <Tooltip key={pattern}>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant={shiftPattern === pattern ? 'default' : 'outline'}
+                        size="xs"
+                        className={`text-[10px] flex-1 ${shiftPattern === pattern ? 'bg-neon-yellow/20 text-neon-yellow border-neon-yellow/40' : ''}`}
+                        onClick={() => setShiftPattern(pattern)}
+                      >
+                        {cfg.label.split(' ')[0]}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="max-w-52">
+                      <p className="text-xs">{cfg.description}</p>
+                      {cfg.costPerTick > 0 && <p className="text-xs text-neon-red mt-1">Overhead: ${cfg.costPerTick}/tick</p>}
+                    </TooltipContent>
+                  </Tooltip>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* ROSTER panel */}
+          <div className="rounded-lg border border-border bg-card p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <Users className="size-3.5 text-neon-cyan" />
+              <span className="text-xs font-bold text-neon-cyan tracking-widest">ROSTER</span>
+              {staffCostPerTick > 0 && <Badge variant="outline" className="ml-auto text-[10px] text-neon-red">-${staffCostPerTick.toFixed(0)}/t</Badge>}
+            </div>
+            {staff.length === 0 ? (
+              <p className="text-xs text-muted-foreground">No staff hired yet.</p>
+            ) : (
+              <div className="space-y-1 max-h-44 overflow-y-auto">
+                {staff.map((s) => {
+                  const roleConfig = STAFF_ROLE_CONFIG.find((c) => c.role === s.role)
+                  const isTraining = trainingQueue.some((t) => t.staffId === s.id)
+                  const isBurntOut = s.fatigueLevel >= 100
+                  return (
+                    <div key={s.id} className="flex items-center gap-1.5 text-[10px] border border-border/30 rounded px-1.5 py-1">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1">
+                          <span className={`font-bold truncate ${isBurntOut ? 'text-neon-red' : s.onShift ? 'text-neon-green' : 'text-muted-foreground'}`}>
+                            {s.name}
+                          </span>
+                          <Badge variant="outline" className="text-[8px] py-0 px-1 shrink-0">
+                            L{s.skillLevel}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-1 text-muted-foreground">
+                          <span>{roleConfig?.label ?? s.role}</span>
+                          <span>·</span>
+                          <span>${s.salaryPerTick}/t</span>
+                          {isTraining && <><span>·</span><GraduationCap className="size-2.5 text-neon-yellow" /></>}
+                          {s.certifications.length > 0 && <><span>·</span><span className="text-neon-green">{s.certifications.length} cert{s.certifications.length > 1 ? 's' : ''}</span></>}
+                        </div>
+                        {/* Fatigue bar */}
+                        <div className="w-full h-1 bg-border/50 rounded-full mt-0.5">
+                          <div
+                            className={`h-full rounded-full transition-all ${s.fatigueLevel > 80 ? 'bg-neon-red' : s.fatigueLevel > 40 ? 'bg-neon-yellow' : 'bg-neon-green'}`}
+                            style={{ width: `${s.fatigueLevel}%` }}
+                          />
+                        </div>
+                      </div>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="xs" className="text-neon-red/50 hover:text-neon-red p-0 h-5 w-5" onClick={() => fireStaff(s.id)}>
+                            <Trash2 className="size-3" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Fire {s.name}</TooltipContent>
+                      </Tooltip>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+            {/* Staff stats */}
+            {staff.length > 0 && (
+              <div className="border-t border-border/50 pt-1.5 mt-1.5 space-y-0.5">
+                <div className="flex justify-between text-[10px]">
+                  <span className="text-muted-foreground">Incidents (staff)</span>
+                  <span className="text-neon-green tabular-nums">{staffIncidentsResolved}</span>
+                </div>
+                <div className="flex justify-between text-[10px]">
+                  <span className="text-muted-foreground">Burnouts</span>
+                  <span className={`tabular-nums ${staffBurnouts > 0 ? 'text-neon-red' : 'text-neon-green'}`}>{staffBurnouts}</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* TRAINING panel */}
+          <div className="rounded-lg border border-border bg-card p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <GraduationCap className="size-3.5 text-neon-yellow" />
+              <span className="text-xs font-bold text-neon-yellow tracking-widest">TRAINING</span>
+              {trainingQueue.length > 0 && <Badge variant="outline" className="ml-auto text-[10px] text-neon-yellow border-neon-yellow/30">{trainingQueue.length} active</Badge>}
+            </div>
+            {staff.length === 0 ? (
+              <p className="text-xs text-muted-foreground">Hire staff to enroll in training.</p>
+            ) : (
+              <div className="space-y-1.5">
+                {/* Available certifications */}
+                {STAFF_CERT_CONFIG.map((cert) => {
+                  // Find eligible staff not already certified and not in training
+                  const eligible = staff.filter((s) =>
+                    !s.certifications.includes(cert.id) &&
+                    !trainingQueue.some((t) => t.staffId === s.id) &&
+                    (!cert.requiredRole || s.role === cert.requiredRole)
+                  )
+                  if (eligible.length === 0) return null
+                  return (
+                    <div key={cert.id} className="border border-border/30 rounded p-1.5">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[10px] font-bold text-neon-yellow">{cert.label}</span>
+                        <span className="text-[10px] text-muted-foreground">${cert.cost.toLocaleString()} · {cert.durationTicks}t</span>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground mb-1">{cert.effect}</p>
+                      <div className="flex gap-1 flex-wrap">
+                        {eligible.slice(0, 3).map((s) => (
+                          <Button
+                            key={s.id}
+                            variant="outline"
+                            size="xs"
+                            className="text-[10px] border-neon-yellow/20 hover:border-neon-yellow/50 hover:bg-neon-yellow/10"
+                            disabled={money < cert.cost}
+                            onClick={() => startTraining(s.id, cert.id)}
+                          >
+                            {s.name.split(' ')[0]}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
+                {/* Active training progress */}
+                {trainingQueue.length > 0 && (
+                  <div className="border-t border-border/50 pt-1.5">
+                    <span className="text-[10px] font-bold text-muted-foreground">IN PROGRESS</span>
+                    {trainingQueue.map((t) => {
+                      const s = staff.find((s) => s.id === t.staffId)
+                      const cert = STAFF_CERT_CONFIG.find((c) => c.id === t.certification)
+                      const totalTicks = cert?.durationTicks ?? 1
+                      const progress = ((totalTicks - t.ticksRemaining) / totalTicks) * 100
+                      return (
+                        <div key={`${t.staffId}-${t.certification}`} className="flex items-center gap-1 text-[10px] mt-1">
+                          <span className="text-muted-foreground truncate">{s?.name?.split(' ')[0]} → {cert?.label}</span>
+                          <div className="flex-1 h-1 bg-border/50 rounded-full">
+                            <div className="h-full bg-neon-yellow rounded-full transition-all" style={{ width: `${progress}%` }} />
+                          </div>
+                          <span className="text-neon-yellow tabular-nums">{t.ticksRemaining}t</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
             )}
           </div>
