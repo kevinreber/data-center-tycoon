@@ -20,6 +20,7 @@ export function GameCanvas() {
   const pdus = useGameStore((s) => s.pdus)
   const cableTrays = useGameStore((s) => s.cableTrays)
   const pduOverloaded = useGameStore((s) => s.pduOverloaded)
+  const heatMapVisible = useGameStore((s) => s.heatMapVisible)
 
   // Tile click handler — called from Phaser when user clicks a grid tile
   const handleTileClick = useCallback((col: number, row: number) => {
@@ -169,6 +170,14 @@ export function GameCanvas() {
     if (!scene) return
     scene.setTrafficVisible(trafficVisible)
   }, [trafficVisible])
+
+  // Sync heat map visibility to Phaser
+  useEffect(() => {
+    if (!gameRef.current) return
+    const scene = getScene(gameRef.current)
+    if (!scene) return
+    scene.setHeatMapVisible(heatMapVisible)
+  }, [heatMapVisible])
 
   return (
     <div

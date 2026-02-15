@@ -108,6 +108,23 @@ class DataCenterScene extends Phaser.Scene {
   private onTileClick: ((col: number, row: number) => void) | null = null
   private onTileHover: ((col: number, row: number) => PlacementHint[]) | null = null
 
+  // Pan/zoom
+  private isDragging = false
+  private dragStartX = 0
+  private dragStartY = 0
+  private panOffsetX = 0
+  private panOffsetY = 0
+  private zoomLevel = 1
+
+  // Heat map overlay
+  private heatMapGraphics: Phaser.GameObjects.Graphics | null = null
+  private heatMapVisible = false
+
+  // Selected cabinet
+  private selectedCabinetId: string | null = null
+  private selectionGraphics: Phaser.GameObjects.Graphics | null = null
+  private onCabinetSelect: ((id: string | null) => void) | null = null
+
   constructor() {
     super({ key: 'DataCenterScene' })
   }
@@ -147,14 +164,58 @@ class DataCenterScene extends Phaser.Scene {
       }
     })
 
-    this.input.on('pointerdown', () => {
-      if (!this.placementActive || !this.hoveredTile) return
-      const { col, row } = this.hoveredTile
-      const key = `${col},${row}`
-      if (this.occupiedTiles.has(key)) return
-      if (this.onTileClick) {
-        this.onTileClick(col, row)
+    this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      if (this.placementActive && this.hoveredTile) {
+        const { col, row } = this.hoveredTile
+        const key = `${col},${row}`
+        if (!this.occupiedTiles.has(key) && this.onTileClick) {
+          this.onTileClick(col, row)
+        }
+        return
       }
+
+      // Click-to-select cabinet (when not in placement mode, left click)
+      if (!this.placementActive && pointer.leftButtonDown()) {
+        const tile = this.screenToIso(pointer.x - this.panOffsetX, pointer.y - this.panOffsetY)
+        if (tile) {
+          let foundCab: string | null = null
+          for (const [id, entry] of this.cabEntries) {
+            if (entry.col === tile.col && entry.row === tile.row) {
+              foundCab = id
+              break
+            }
+          }
+          this.selectedCabinetId = foundCab
+          this.renderSelection()
+          if (this.onCabinetSelect) this.onCabinetSelect(foundCab)
+        }
+      }
+
+      // Pan: right-click or middle-click drag
+      if (pointer.rightButtonDown() || pointer.middleButtonDown()) {
+        this.isDragging = true
+        this.dragStartX = pointer.x - this.panOffsetX
+        this.dragStartY = pointer.y - this.panOffsetY
+      }
+    })
+
+    this.input.on('pointerup', () => {
+      this.isDragging = false
+    })
+
+    this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+      if (this.isDragging) {
+        this.panOffsetX = pointer.x - this.dragStartX
+        this.panOffsetY = pointer.y - this.dragStartY
+        this.cameras.main.setScroll(-this.panOffsetX, -this.panOffsetY)
+      }
+    })
+
+    // Zoom with scroll wheel
+    this.input.on('wheel', (_pointer: Phaser.Input.Pointer, _gos: Phaser.GameObjects.GameObject[], _dx: number, dy: number) => {
+      const zoomDelta = dy > 0 ? -0.1 : 0.1
+      this.zoomLevel = Math.max(0.3, Math.min(2.5, this.zoomLevel + zoomDelta))
+      this.cameras.main.setZoom(this.zoomLevel)
     })
   }
 
@@ -965,6 +1026,84 @@ class DataCenterScene extends Phaser.Scene {
     this.pduEntries.clear()
     this.cableTrayGraphics.clear()
     this.cableTrayEntries.clear()
+  }
+
+  /** Render selection highlight around a cabinet */
+  private renderSelection() {
+    if (this.selectionGraphics) this.selectionGraphics.destroy()
+    if (!this.selectedCabinetId) return
+
+    const entry = this.cabEntries.get(this.selectedCabinetId)
+    if (!entry) return
+
+    this.selectionGraphics = this.add.graphics()
+    this.selectionGraphics.setDepth(50)
+
+    const { x, y } = this.isoToScreen(entry.col, entry.row)
+    // Draw a pulsing selection border
+    this.selectionGraphics.lineStyle(2, 0x00ffff, 0.8)
+    this.selectionGraphics.beginPath()
+    this.selectionGraphics.moveTo(x, y - 4)
+    this.selectionGraphics.lineTo(x + TILE_W / 2 + 4, y + TILE_H / 2)
+    this.selectionGraphics.lineTo(x, y + TILE_H + 4)
+    this.selectionGraphics.lineTo(x - TILE_W / 2 - 4, y + TILE_H / 2)
+    this.selectionGraphics.closePath()
+    this.selectionGraphics.strokePath()
+  }
+
+  /** Render heat map overlay showing temperature per cabinet */
+  private renderHeatMap() {
+    if (this.heatMapGraphics) this.heatMapGraphics.destroy()
+    if (!this.heatMapVisible) return
+
+    this.heatMapGraphics = this.add.graphics()
+    this.heatMapGraphics.setDepth(45)
+
+    for (const [, entry] of this.cabEntries) {
+      const { x, y } = this.isoToScreen(entry.col, entry.row)
+      // Color based on implicit heat from server count and power status
+      const heatFactor = entry.powerOn ? Math.min(1, entry.serverCount / 4) : 0
+      const r = Math.round(255 * heatFactor)
+      const g = Math.round(255 * (1 - heatFactor))
+      const b = 0
+      const color = (r << 16) | (g << 8) | b
+
+      this.heatMapGraphics.fillStyle(color, 0.25)
+      this.heatMapGraphics.beginPath()
+      this.heatMapGraphics.moveTo(x, y)
+      this.heatMapGraphics.lineTo(x + TILE_W / 2, y + TILE_H / 2)
+      this.heatMapGraphics.lineTo(x, y + TILE_H)
+      this.heatMapGraphics.lineTo(x - TILE_W / 2, y + TILE_H / 2)
+      this.heatMapGraphics.closePath()
+      this.heatMapGraphics.fillPath()
+    }
+  }
+
+  /** Set heat map overlay visibility */
+  setHeatMapVisible(visible: boolean) {
+    this.heatMapVisible = visible
+    this.renderHeatMap()
+  }
+
+  /** Set callback for cabinet selection */
+  setOnCabinetSelect(cb: (id: string | null) => void) {
+    this.onCabinetSelect = cb
+  }
+
+  /** Deselect all cabinets */
+  clearSelection() {
+    this.selectedCabinetId = null
+    if (this.selectionGraphics) this.selectionGraphics.destroy()
+    this.selectionGraphics = null
+  }
+
+  /** Reset camera to default position and zoom */
+  resetCamera() {
+    this.panOffsetX = 0
+    this.panOffsetY = 0
+    this.zoomLevel = 1
+    this.cameras.main.setScroll(0, 0)
+    this.cameras.main.setZoom(1)
   }
 }
 
