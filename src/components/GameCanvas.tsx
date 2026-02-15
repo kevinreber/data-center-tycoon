@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback } from 'react'
 import type Phaser from 'phaser'
 import { createGame, getScene } from '@/game/PhaserGame'
 import { useGameStore, getSuiteLimits, getPlacementHints } from '@/stores/gameStore'
+import { Crosshair } from 'lucide-react'
 
 export function GameCanvas() {
   const gameRef = useRef<Phaser.Game | null>(null)
@@ -179,6 +180,13 @@ export function GameCanvas() {
     scene.setHeatMapVisible(heatMapVisible)
   }, [heatMapVisible])
 
+  const handleCenterGrid = useCallback(() => {
+    if (gameRef.current) {
+      const scene = getScene(gameRef.current)
+      scene?.resetCamera()
+    }
+  }, [])
+
   return (
     <div
       id="phaser-container"
@@ -188,6 +196,15 @@ export function GameCanvas() {
           : 'border-border glow-green'
       }`}
       style={{ background: 'linear-gradient(180deg, #060a10 0%, #0a1018 50%, #060a10 100%)' }}
-    />
+      onContextMenu={(e) => e.preventDefault()}
+    >
+      <button
+        onClick={handleCenterGrid}
+        className="absolute top-2 right-2 z-10 p-1.5 rounded bg-black/60 border border-neon-green/30 text-neon-green/70 hover:text-neon-green hover:border-neon-green/60 transition-colors cursor-pointer"
+        title="Center grid (reset pan & zoom)"
+      >
+        <Crosshair size={14} />
+      </button>
+    </div>
   )
 }
