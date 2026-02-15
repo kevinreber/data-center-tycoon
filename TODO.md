@@ -99,12 +99,12 @@
 - [ ] In-row cooling unit entity
 
 ## Network / CLOS Fabric
-- [ ] Network topology data model (connections between nodes)
-- [ ] Cabling visualization (lines between connected switches)
-- [ ] Spine-leaf wiring validation (over-subscription ratio)
-- [ ] Traffic flow animation (packet dots moving along cables)
-- [ ] Shortest-path routing with failover when a node goes down
-- [ ] Bandwidth capacity and current traffic tracking
+- [x] Network topology data model (connections between nodes)
+- [x] Cabling visualization (lines between connected switches)
+- [x] Spine-leaf wiring validation (over-subscription ratio)
+- [x] Traffic flow animation (packet dots moving along cables)
+- [x] Shortest-path routing with failover when a node goes down
+- [x] Bandwidth capacity and current traffic tracking
 
 ## Simulation
 - [x] Heat simulation (heat levels update over time based on load/cooling)
@@ -120,7 +120,7 @@
 ## Incident System
 - [x] Timer-based random event roller
 - [x] Real-world incidents: fiber cuts, squirrels, DDoS, pipe leaks
-- [ ] Creative incidents: sentient AI, solar flares, quantum decoherence
+- [x] Creative incidents: sentient AI, solar flares, quantum decoherence
 - [x] Incident notification UI and resolution mechanics
 
 ## Loan System
@@ -130,10 +130,10 @@
 - [x] Spot pricing for power (market rate fluctuations with random walk and spikes)
 
 ## Achievement System
-- [x] 15 achievements + 6 Phase 2/3 achievements tracking milestones
+- [x] 45 achievements tracking milestones (Phase 1, Phase 2/3, infrastructure, and new features)
 - [x] Achievement unlock toast notifications
 - [x] Full achievements panel in HUD
-- [ ] Sandbox mode (unlimited budget, all tech unlocked)
+- [x] Sandbox mode (unlimited budget, all tech unlocked)
 
 ## Scaling Tiers
 - [ ] Tier 1: Solar/Grid Power + Air Cooling
@@ -149,7 +149,7 @@
 - [ ] Heat map overlay toggle
 
 ## Polish
-- [ ] Save/load game state (localStorage or IndexedDB)
+- [x] Save/load game state (localStorage)
 - [ ] Sound effects
 - [ ] Placement animations
 - [ ] Tutorial / guided first-time experience
@@ -196,7 +196,7 @@
 
 ### Workload Simulation
 - [ ] AI training jobs — Long-running GPU workloads generating massive heat, needing uninterrupted power; completion earns big payouts
-- [ ] Traffic patterns — Day/night cycles with peak hours; streaming spikes in evening, batch processing runs overnight
+- [x] Traffic patterns — Day/night cycles with peak hours; streaming spikes in evening, batch processing runs overnight
 - [ ] Workload migration — Manually or automatically migrate VMs when racks overheat or switches fail
 
 ### Disaster & Recovery
@@ -213,5 +213,5 @@
 ### Social & Meta
 - [ ] Leaderboards — Compare PUE, uptime, revenue, or green energy % with other players
 - [x] Achievement system — "365 days without downtime", "Reached Tier 3 in under 1 hour", "Zero carbon footprint"
-- [ ] Sandbox mode — Unlimited budget, all tech unlocked for creative building
+- [x] Sandbox mode — Unlimited budget, all tech unlocked for creative building
 - [ ] Scenario challenges — "Recover from catastrophic flood", "Build zero-emission facility", "Handle Black Friday traffic surge"
