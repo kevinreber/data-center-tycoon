@@ -36,6 +36,11 @@ export function GameCanvas() {
     return getPlacementHints(col, row, state.cabinets, state.suiteTier)
   }, [])
 
+  // Cabinet selection handler — called from Phaser when user clicks a cabinet
+  const handleCabinetSelect = useCallback((id: string | null) => {
+    useGameStore.getState().selectCabinet(id)
+  }, [])
+
   useEffect(() => {
     if (!gameRef.current) {
       gameRef.current = createGame('phaser-container')
@@ -57,8 +62,14 @@ export function GameCanvas() {
     if (!scene) return
     scene.setOnTileClick(handleTileClick)
     scene.setOnTileHover(handleTileHover)
+    scene.setOnCabinetSelect(handleCabinetSelect)
     scene.setPlacementMode(placementMode)
-  }, [placementMode, handleTileClick, handleTileHover])
+    // Clear cabinet selection when entering placement mode
+    if (placementMode) {
+      scene.clearSelection()
+      useGameStore.getState().selectCabinet(null)
+    }
+  }, [placementMode, handleTileClick, handleTileHover, handleCabinetSelect])
 
   // Sync suite tier (grid dimensions) to Phaser
   useEffect(() => {
