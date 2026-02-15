@@ -98,7 +98,7 @@ class DataCenterScene extends Phaser.Scene {
   private packetGraphics: Phaser.GameObjects.Graphics | null = null
   private trafficLinks: TrafficLink[] = []
   private trafficVisible = true
-  private packetPhase = 0
+  private packetTime = 0   // cumulative time (seconds) for per-link speed animation
 
   // Infrastructure overlays
   private pduGraphics: Map<string, Phaser.GameObjects.Graphics> = new Map()
@@ -754,7 +754,7 @@ class DataCenterScene extends Phaser.Scene {
   /** Phaser update loop — animate packet dots */
   update(_time: number, delta: number) {
     if (!this.trafficVisible || this.trafficLinks.length === 0) return
-    this.packetPhase = (this.packetPhase + delta * 0.001) % 1
+    this.packetTime += delta * 0.001
     this.renderPackets()
   }
 
@@ -820,12 +820,31 @@ class DataCenterScene extends Phaser.Scene {
       const alpha = 0.15 + link.utilization * 0.45
       const lineWidth = link.redirected ? 2 : 1.5
 
-      this.trafficGraphics.lineStyle(lineWidth, color, alpha)
-      this.trafficGraphics.lineBetween(leafPos.x, leafPos.y, spinePos.x, spinePos.y)
+      // Low-traffic links: dashed line to indicate degraded/minimal connection
+      if (link.utilization < 0.1 && link.bandwidthGbps > 0) {
+        const segments = 12
+        const dx = spinePos.x - leafPos.x
+        const dy = spinePos.y - leafPos.y
+        this.trafficGraphics.lineStyle(1, color, alpha * 0.5)
+        for (let s = 0; s < segments; s += 2) {
+          const t0 = s / segments
+          const t1 = (s + 1) / segments
+          this.trafficGraphics.lineBetween(
+            leafPos.x + dx * t0, leafPos.y + dy * t0,
+            leafPos.x + dx * t1, leafPos.y + dy * t1
+          )
+        }
+      } else {
+        this.trafficGraphics.lineStyle(lineWidth, color, alpha)
+        this.trafficGraphics.lineBetween(leafPos.x, leafPos.y, spinePos.x, spinePos.y)
+      }
     }
   }
 
-  /** Render animated packet dots moving along traffic lines */
+  /** Render animated packet dots moving along traffic lines.
+   *  - Speed scales with bandwidth (low traffic = slow-moving packets)
+   *  - Packet loss visualized on congested links (>80% utilization)
+   *  - Dim/small packets on near-zero traffic links */
   private renderPackets() {
     if (this.packetGraphics) this.packetGraphics.destroy()
     this.packetGraphics = this.add.graphics()
@@ -840,18 +859,50 @@ class DataCenterScene extends Phaser.Scene {
       if (!leafPos || !spinePos) continue
 
       const color = this.utilizationColor(link.utilization, link.redirected)
+      const dx = spinePos.x - leafPos.x
+      const dy = spinePos.y - leafPos.y
+
+      // Packet speed scales with utilization — low traffic = slow, high traffic = fast
+      const speedMult = 0.2 + Math.min(link.utilization, 1) * 0.8
 
       // Number of packets proportional to utilization (1–3 dots)
       const packetCount = Math.max(1, Math.ceil(link.utilization * 3))
-      for (let p = 0; p < packetCount; p++) {
-        // Stagger packets along the line, offset by link index for variety
-        const t = ((this.packetPhase + p / packetCount + i * 0.17) % 1)
-        const px = leafPos.x + (spinePos.x - leafPos.x) * t
-        const py = leafPos.y + (spinePos.y - leafPos.y) * t
-        const size = link.redirected ? 2.5 : 2
 
-        this.packetGraphics.fillStyle(color, 0.8)
-        this.packetGraphics.fillCircle(px, py, size)
+      // Packet loss rate: congested links (>80% utilization) start dropping packets
+      const dropRate = link.utilization > 0.8 ? (link.utilization - 0.8) * 5 : 0
+
+      for (let p = 0; p < packetCount; p++) {
+        // Per-link phase: advances proportionally to speed (bandwidth)
+        const t = ((this.packetTime * speedMult + p / packetCount + i * 0.17) % 1)
+
+        // Deterministic pseudo-random for packet drop decision
+        // Changes every ~0.5s per link so drops feel natural, not flickering
+        const cycle = Math.floor(this.packetTime * speedMult * 2 + i * 0.17)
+        const hash = Math.abs(Math.sin(i * 127.1 + p * 311.7 + cycle * 43.7))
+
+        if (hash < dropRate) {
+          // Packet "drops" mid-transit: deviates from path, turns red, fades out
+          const dropZone = 0.3 + hash * 0.4
+          if (t > dropZone && t < dropZone + 0.25) {
+            const dropProgress = (t - dropZone) / 0.25
+            const px = leafPos.x + dx * t
+            const py = leafPos.y + dy * t + dropProgress * 12 // fall downward
+            const dropAlpha = 0.7 * (1 - dropProgress)
+
+            this.packetGraphics.fillStyle(0xff2222, dropAlpha)
+            this.packetGraphics.fillCircle(px, py, 1.5)
+          }
+        } else {
+          // Normal packet — dim and small on very low-traffic links
+          const px = leafPos.x + dx * t
+          const py = leafPos.y + dy * t
+          const baseSize = link.redirected ? 2.5 : 2
+          const packetAlpha = link.utilization < 0.1 ? 0.3 + link.utilization * 5 : 0.8
+          const size = link.utilization < 0.1 ? baseSize * 0.7 : baseSize
+
+          this.packetGraphics.fillStyle(color, packetAlpha)
+          this.packetGraphics.fillCircle(px, py, size)
+        }
       }
     }
   }
