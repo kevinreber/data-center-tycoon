@@ -11,6 +11,7 @@ const TILE_H = 32
 const DEFAULT_CAB_COLS = 4
 const DEFAULT_CAB_ROWS = 2
 const DEFAULT_SPINE_SLOTS = 2
+const DRAG_THRESHOLD = 5  // pixels before mouse movement counts as a drag
 
 // Cabinet visual dimensions
 const CUBE_W = 44
@@ -110,8 +111,11 @@ class DataCenterScene extends Phaser.Scene {
 
   // Pan/zoom
   private isDragging = false
+  private isPotentialDrag = false
   private dragStartX = 0
   private dragStartY = 0
+  private clickStartX = 0
+  private clickStartY = 0
   private panOffsetX = 0
   private panOffsetY = 0
   private zoomLevel = 1
@@ -166,6 +170,7 @@ class DataCenterScene extends Phaser.Scene {
     })
 
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      // Placement mode tile click
       if (this.placementActive && this.hoveredTile) {
         const { col, row } = this.hoveredTile
         const key = `${col},${row}`
@@ -175,8 +180,27 @@ class DataCenterScene extends Phaser.Scene {
         return
       }
 
-      // Click-to-select cabinet (when not in placement mode, left click)
-      if (!this.placementActive && pointer.leftButtonDown()) {
+      // Left click: start potential drag (resolved as click or pan on pointerup)
+      if (pointer.leftButtonDown()) {
+        this.isPotentialDrag = true
+        this.isDragging = false
+        this.clickStartX = pointer.x
+        this.clickStartY = pointer.y
+        this.dragStartX = pointer.x - this.panOffsetX
+        this.dragStartY = pointer.y - this.panOffsetY
+      }
+
+      // Right/middle click: immediate drag
+      if (pointer.rightButtonDown() || pointer.middleButtonDown()) {
+        this.isDragging = true
+        this.dragStartX = pointer.x - this.panOffsetX
+        this.dragStartY = pointer.y - this.panOffsetY
+      }
+    })
+
+    this.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
+      // If left-click didn't become a drag, treat as cabinet selection click
+      if (this.isPotentialDrag && !this.isDragging && !this.placementActive) {
         const wp = this.cameras.main.getWorldPoint(pointer.x, pointer.y)
         const tile = this.screenToIso(wp.x, wp.y)
         if (tile) {
@@ -192,20 +216,24 @@ class DataCenterScene extends Phaser.Scene {
           if (this.onCabinetSelect) this.onCabinetSelect(foundCab)
         }
       }
-
-      // Pan: right-click or middle-click drag
-      if (pointer.rightButtonDown() || pointer.middleButtonDown()) {
-        this.isDragging = true
-        this.dragStartX = pointer.x - this.panOffsetX
-        this.dragStartY = pointer.y - this.panOffsetY
+      if (this.isDragging) {
+        this.game.canvas.style.cursor = 'default'
       }
-    })
-
-    this.input.on('pointerup', () => {
       this.isDragging = false
+      this.isPotentialDrag = false
     })
 
     this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+      // Detect when a potential left-click drag exceeds the threshold
+      if (this.isPotentialDrag && !this.isDragging) {
+        const dx = pointer.x - this.clickStartX
+        const dy = pointer.y - this.clickStartY
+        if (Math.sqrt(dx * dx + dy * dy) > DRAG_THRESHOLD) {
+          this.isDragging = true
+          this.isPotentialDrag = false
+          this.game.canvas.style.cursor = 'grabbing'
+        }
+      }
       if (this.isDragging) {
         this.panOffsetX = pointer.x - this.dragStartX
         this.panOffsetY = pointer.y - this.dragStartY
