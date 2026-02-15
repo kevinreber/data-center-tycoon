@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { useGameStore, DEFAULT_COLORS, RACK_COST, MAX_SERVERS_PER_CABINET, SIM, ENVIRONMENT_CONFIG, formatGameTime, COOLING_CONFIG, LOAN_OPTIONS, ACHIEVEMENT_CATALOG, CONTRACT_TIER_COLORS, CUSTOMER_TYPE_CONFIG, GENERATOR_OPTIONS, SUPPRESSION_CONFIG, TECH_TREE, TECH_BRANCH_COLORS, DEPRECIATION, getReputationTier, POWER_MARKET, SUITE_TIERS, SUITE_TIER_ORDER, getSuiteLimits, PDU_OPTIONS, CABLE_TRAY_OPTIONS, AISLE_CONFIG, getPDULoad, isPDUOverloaded } from '@/stores/gameStore'
+import { useGameStore, DEFAULT_COLORS, RACK_COST, MAX_SERVERS_PER_CABINET, SIM, ENVIRONMENT_CONFIG, formatGameTime, COOLING_CONFIG, LOAN_OPTIONS, ACHIEVEMENT_CATALOG, CONTRACT_TIER_COLORS, CUSTOMER_TYPE_CONFIG, GENERATOR_OPTIONS, SUPPRESSION_CONFIG, TECH_TREE, TECH_BRANCH_COLORS, DEPRECIATION, getReputationTier, POWER_MARKET, SUITE_TIERS, SUITE_TIER_ORDER, getSuiteLimits, PDU_OPTIONS, CABLE_TRAY_OPTIONS, AISLE_CONFIG, getPDULoad, isPDUOverloaded, INSURANCE_OPTIONS, DRILL_CONFIG, VALUATION_MILESTONES, PATENT_CONFIG, BUSWAY_OPTIONS, CROSSCONNECT_OPTIONS, INROW_COOLING_OPTIONS, SCENARIO_CATALOG } from '@/stores/gameStore'
 import type { NodeType, LayerColors, CabinetEnvironment, CustomerType, SuppressionType, TechBranch, CabinetFacing } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Server, Network, Power, Cpu, Eye, SlidersHorizontal, EyeOff, RotateCcw, Plus, TrendingUp, TrendingDown, DollarSign, ArrowRightLeft, AlertTriangle, Radio, Info, Shield, Clock, Zap, Droplets, Landmark, Siren, Trophy, Wrench, FileText, Check, Fuel, Flame, FlaskConical, Star, RefreshCw, Lock, Building, MousePointer, X, Plug, Cable, ArrowUpDown, Thermometer } from 'lucide-react'
+import { Server, Network, Power, Cpu, Eye, SlidersHorizontal, EyeOff, RotateCcw, Plus, TrendingUp, TrendingDown, DollarSign, ArrowRightLeft, AlertTriangle, Radio, Info, Shield, Clock, Zap, Droplets, Landmark, Siren, Trophy, Wrench, FileText, Check, Fuel, Flame, FlaskConical, Star, RefreshCw, Lock, Building, MousePointer, X, Plug, Cable, ArrowUpDown, Thermometer, Save, Upload, RotateCw, Play, Map, Target, Briefcase, Snowflake, Wifi, Award } from 'lucide-react'
 import {
   Tooltip,
   TooltipContent,
@@ -67,6 +67,30 @@ export function HUD() {
     pdus, cableTrays, cableRuns, aisleBonus, aisleViolations,
     messyCableCount, pduOverloaded, infraIncidentBonus,
     placePDU, placeCableTray, autoRouteCables, toggleCabinetFacing,
+    // Insurance
+    insurancePolicies, insuranceCost, buyInsurance, cancelInsurance,
+    // DR Drills
+    drillCooldown, lastDrillResult, drillsCompleted, drillsPassed, runDrill,
+    // Stock Price
+    stockPrice, stockHistory, valuationMilestonesReached,
+    // Patents
+    patents, patentIncome, patentTech,
+    // RFP Bidding
+    rfpOffers, rfpsWon, bidOnRFP,
+    // Infrastructure entities
+    busways, crossConnects, inRowCoolers,
+    placeBusway, placeCrossConnect, placeInRowCooling,
+    // Sandbox
+    sandboxMode, toggleSandboxMode,
+    // Scenarios
+    activeScenario, scenarioProgress, scenariosCompleted,
+    startScenario, abandonScenario,
+    // Network topology
+    networkTopology,
+    // Heat map
+    heatMapVisible, toggleHeatMap,
+    // Save / Load
+    saveGame, loadGame, resetGame,
   } = useGameStore()
   const [showGuide, setShowGuide] = useState(true)
   const [selectedEnv, setSelectedEnv] = useState<CabinetEnvironment>('production')
@@ -1919,6 +1943,283 @@ export function HUD() {
             Loan payments: -${loanPayments.toFixed(2)}/tick (not included in FINANCE panel above)
           </div>
         )}
+
+        {/* Insurance, DR Drills, Stock, Patents, RFP, Infrastructure Entities, Scenarios, Save/Load */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+
+          {/* Insurance Panel */}
+          <div className="rounded-lg border border-border bg-card p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <Shield className="size-3.5 text-neon-cyan" />
+              <span className="text-xs font-bold text-neon-cyan tracking-widest">INSURANCE</span>
+              {insuranceCost > 0 && <Badge variant="outline" className="text-neon-red text-[10px]">-${insuranceCost.toFixed(0)}/t</Badge>}
+            </div>
+            <div className="space-y-1.5">
+              {INSURANCE_OPTIONS.map((opt) => {
+                const held = insurancePolicies.includes(opt.type)
+                return (
+                  <div key={opt.type} className="flex items-center justify-between text-xs">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className={held ? 'text-neon-green' : 'text-muted-foreground'}>{opt.label}</span>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">{opt.description}</TooltipContent>
+                    </Tooltip>
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      className={`text-[10px] px-1.5 ${held ? 'text-neon-red' : 'text-neon-green'}`}
+                      onClick={() => held ? cancelInsurance(opt.type) : buyInsurance(opt.type)}
+                    >
+                      {held ? 'Cancel' : `$${opt.premiumPerTick}/t`}
+                    </Button>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* DR Drills Panel */}
+          <div className="rounded-lg border border-border bg-card p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <Target className="size-3.5 text-neon-orange" />
+              <span className="text-xs font-bold text-neon-orange tracking-widest">DR DRILLS</span>
+              <Badge variant="outline" className="text-[10px]">{drillsPassed}/{drillsCompleted}</Badge>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full text-xs mb-2"
+              disabled={drillCooldown > 0 || (!sandboxMode && money < DRILL_CONFIG.cost)}
+              onClick={() => runDrill()}
+            >
+              {drillCooldown > 0 ? `Cooldown: ${drillCooldown}t` : `Run Drill ($${DRILL_CONFIG.cost})`}
+            </Button>
+            {lastDrillResult && (
+              <div className={`text-[10px] space-y-0.5 ${lastDrillResult.passed ? 'text-neon-green' : 'text-neon-red'}`}>
+                <div className="font-bold">{lastDrillResult.passed ? 'PASSED' : 'FAILED'} — Score: {lastDrillResult.score}%</div>
+                {lastDrillResult.findings.slice(0, 3).map((f, i) => (
+                  <div key={i} className="text-muted-foreground">• {f}</div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Stock Price Panel */}
+          <div className="rounded-lg border border-border bg-card p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <TrendingUp className="size-3.5 text-neon-yellow" />
+              <span className="text-xs font-bold text-neon-yellow tracking-widest">STOCK</span>
+              <span className="text-xs font-bold text-neon-yellow">${stockPrice.toFixed(2)}</span>
+            </div>
+            {/* Mini sparkline */}
+            <div className="flex items-end gap-px h-8 mb-2">
+              {stockHistory.slice(-30).map((price, i) => {
+                const max = Math.max(...stockHistory.slice(-30))
+                const min = Math.min(...stockHistory.slice(-30))
+                const range = max - min || 1
+                const h = Math.max(2, ((price - min) / range) * 28)
+                return <div key={i} className="flex-1 bg-neon-yellow/40 rounded-t" style={{ height: `${h}px` }} />
+              })}
+            </div>
+            <div className="space-y-0.5">
+              {VALUATION_MILESTONES.map((m) => (
+                <div key={m.id} className={`flex items-center justify-between text-[10px] ${valuationMilestonesReached.includes(m.id) ? 'text-neon-green' : 'text-muted-foreground'}`}>
+                  <span>{m.label} (${m.targetPrice})</span>
+                  {valuationMilestonesReached.includes(m.id) ? <Check className="size-3" /> : <span>${m.reward.toLocaleString()}</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Patents Panel */}
+          <div className="rounded-lg border border-border bg-card p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <Award className="size-3.5 text-neon-purple" />
+              <span className="text-xs font-bold text-neon-purple tracking-widest">PATENTS</span>
+              {patentIncome > 0 && <Badge variant="outline" className="text-neon-green text-[10px]">+${patentIncome.toFixed(0)}/t</Badge>}
+            </div>
+            <div className="space-y-1">
+              {unlockedTech.map((techId) => {
+                const tech = TECH_TREE.find((t) => t.id === techId)
+                const patented = patents.some((p) => p.techId === techId)
+                if (!tech) return null
+                return (
+                  <div key={techId} className="flex items-center justify-between text-[10px]">
+                    <span className={patented ? 'text-neon-green' : 'text-muted-foreground'}>{tech.label}</span>
+                    {patented ? (
+                      <Badge variant="outline" className="text-neon-green text-[9px]">Patented</Badge>
+                    ) : (
+                      <Button variant="ghost" size="xs" className="text-[9px] text-neon-purple px-1" onClick={() => patentTech(techId)} disabled={!sandboxMode && money < PATENT_CONFIG.cost}>
+                        Patent ${PATENT_CONFIG.cost}
+                      </Button>
+                    )}
+                  </div>
+                )
+              })}
+              {unlockedTech.length === 0 && <p className="text-[10px] text-muted-foreground italic">Research tech to patent it</p>}
+            </div>
+          </div>
+
+          {/* RFP Bidding Panel */}
+          <div className="rounded-lg border border-border bg-card p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <Briefcase className="size-3.5 text-neon-cyan" />
+              <span className="text-xs font-bold text-neon-cyan tracking-widest">RFP BIDS</span>
+              <Badge variant="outline" className="text-[10px]">Won: {rfpsWon}</Badge>
+            </div>
+            {rfpOffers.length === 0 ? (
+              <p className="text-[10px] text-muted-foreground italic">No active RFPs. New ones appear periodically.</p>
+            ) : (
+              <div className="space-y-2">
+                {rfpOffers.map((rfp) => (
+                  <div key={rfp.id} className="border border-border/50 rounded p-1.5 space-y-1">
+                    <div className="flex items-center justify-between text-[10px]">
+                      <span className="text-foreground font-bold">{rfp.def.company}</span>
+                      <span className="text-neon-red">{rfp.bidWindowTicks}t left</span>
+                    </div>
+                    <div className="text-[9px] text-muted-foreground">vs {rfp.competitorName} (str: {rfp.competitorStrength})</div>
+                    <div className="text-[9px] text-neon-green">+${rfp.def.revenuePerTick}/t for {rfp.def.durationTicks}t</div>
+                    <Button variant="outline" size="xs" className="w-full text-[10px]" onClick={() => bidOnRFP(rfp.id)}>
+                      Place Bid
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Infrastructure Entities Panel */}
+          <div className="rounded-lg border border-border bg-card p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <Plug className="size-3.5 text-neon-orange" />
+              <span className="text-xs font-bold text-neon-orange tracking-widest">INFRASTRUCTURE</span>
+            </div>
+            <div className="space-y-1.5 text-[10px]">
+              <div className="text-muted-foreground">
+                Busways: {busways.length} | Cross-connects: {crossConnects.length} | In-row: {inRowCoolers.length}
+              </div>
+              <div className="grid grid-cols-3 gap-1">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" size="xs" className="text-[9px]" onClick={() => {
+                      const sl = getSuiteLimits(suiteTier)
+                      placeBusway(Math.floor(Math.random() * sl.cols), Math.floor(Math.random() * sl.rows), 0)
+                    }} disabled={!sandboxMode && money < BUSWAY_OPTIONS[0].cost}>
+                      <Zap className="size-2.5 mr-0.5" />Busway
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>{BUSWAY_OPTIONS[0].description} (${BUSWAY_OPTIONS[0].cost})</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" size="xs" className="text-[9px]" onClick={() => {
+                      const sl = getSuiteLimits(suiteTier)
+                      placeCrossConnect(Math.floor(Math.random() * sl.cols), Math.floor(Math.random() * sl.rows), 0)
+                    }} disabled={!sandboxMode && money < CROSSCONNECT_OPTIONS[0].cost}>
+                      <Wifi className="size-2.5 mr-0.5" />Patch
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>{CROSSCONNECT_OPTIONS[0].description} (${CROSSCONNECT_OPTIONS[0].cost})</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" size="xs" className="text-[9px]" onClick={() => {
+                      const sl = getSuiteLimits(suiteTier)
+                      placeInRowCooling(Math.floor(Math.random() * sl.cols), Math.floor(Math.random() * sl.rows), 0)
+                    }} disabled={!sandboxMode && money < INROW_COOLING_OPTIONS[0].cost}>
+                      <Snowflake className="size-2.5 mr-0.5" />Cooling
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>{INROW_COOLING_OPTIONS[0].description} (${INROW_COOLING_OPTIONS[0].cost})</TooltipContent>
+                </Tooltip>
+              </div>
+            </div>
+          </div>
+
+          {/* Network Topology Panel */}
+          <div className="rounded-lg border border-border bg-card p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <Network className="size-3.5 text-neon-green" />
+              <span className="text-xs font-bold text-neon-green tracking-widest">NETWORK</span>
+            </div>
+            <div className="space-y-1 text-[10px]">
+              <div className="flex justify-between"><span className="text-muted-foreground">Total Links</span><span>{networkTopology.totalLinks}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Healthy</span><span className="text-neon-green">{networkTopology.healthyLinks}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Oversub Ratio</span><span>{networkTopology.oversubscriptionRatio}:1</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Avg Utilization</span><span className={networkTopology.avgUtilization > 0.8 ? 'text-neon-red' : 'text-neon-green'}>{(networkTopology.avgUtilization * 100).toFixed(1)}%</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Redundancy</span><span>{(networkTopology.redundancyLevel * 100).toFixed(0)}%</span></div>
+            </div>
+            <Button variant="outline" size="xs" className={`w-full text-[10px] mt-2 ${heatMapVisible ? 'text-neon-red' : ''}`} onClick={() => toggleHeatMap()}>
+              <Map className="size-2.5 mr-1" />{heatMapVisible ? 'Hide Heat Map' : 'Show Heat Map'}
+            </Button>
+          </div>
+
+          {/* Scenarios Panel */}
+          <div className="rounded-lg border border-border bg-card p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <Target className="size-3.5 text-neon-yellow" />
+              <span className="text-xs font-bold text-neon-yellow tracking-widest">SCENARIOS</span>
+              <Badge variant="outline" className="text-[10px]">{scenariosCompleted.length}/{SCENARIO_CATALOG.length}</Badge>
+            </div>
+            {activeScenario ? (
+              <div className="space-y-1">
+                <div className="text-xs font-bold text-foreground">{activeScenario.label}</div>
+                <div className="text-[10px] text-muted-foreground">{activeScenario.description}</div>
+                {activeScenario.objectives.map((obj) => (
+                  <div key={obj.id} className={`flex items-center gap-1 text-[10px] ${scenarioProgress[obj.id] ? 'text-neon-green' : 'text-muted-foreground'}`}>
+                    {scenarioProgress[obj.id] ? <Check className="size-2.5" /> : <Clock className="size-2.5" />}
+                    {obj.description}
+                  </div>
+                ))}
+                <Button variant="ghost" size="xs" className="text-[10px] text-neon-red" onClick={() => abandonScenario()}>Abandon</Button>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {SCENARIO_CATALOG.map((s) => (
+                  <div key={s.id} className="flex items-center justify-between text-[10px]">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className={scenariosCompleted.includes(s.id) ? 'text-neon-green' : 'text-muted-foreground'}>{s.label}</span>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">{s.description}</TooltipContent>
+                    </Tooltip>
+                    {scenariosCompleted.includes(s.id) ? (
+                      <Check className="size-3 text-neon-green" />
+                    ) : (
+                      <Button variant="ghost" size="xs" className="text-[9px] text-neon-yellow px-1" onClick={() => startScenario(s.id)}>Start</Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Save/Load & Sandbox bar */}
+        <div className="flex items-center justify-between rounded-lg border border-border bg-card p-2">
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="xs" className="text-[10px] gap-1" onClick={() => saveGame()}>
+              <Save className="size-3" />Save
+            </Button>
+            <Button variant="outline" size="xs" className="text-[10px] gap-1" onClick={() => loadGame()}>
+              <Upload className="size-3" />Load
+            </Button>
+            <Button variant="outline" size="xs" className="text-[10px] gap-1 text-neon-red" onClick={() => { if (confirm('Reset all progress?')) resetGame() }}>
+              <RotateCw className="size-3" />Reset
+            </Button>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant={sandboxMode ? 'default' : 'outline'}
+              size="xs"
+              className={`text-[10px] gap-1 ${sandboxMode ? 'bg-neon-yellow/20 text-neon-yellow border-neon-yellow/40' : ''}`}
+              onClick={() => toggleSandboxMode()}
+            >
+              <Play className="size-3" />{sandboxMode ? 'SANDBOX ON' : 'Sandbox'}
+            </Button>
+          </div>
+        </div>
 
         {!showGuide && (
           <Button

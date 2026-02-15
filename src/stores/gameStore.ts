@@ -410,6 +410,10 @@ export const INCIDENT_CATALOG: IncidentDef[] = [
   { type: 'squirrel', label: 'Squirrel in Transformer', severity: 'minor', description: 'A squirrel got into the power transformer. Brief power disruption.', durationTicks: 5, resolveCost: 500, effect: 'power_surge', effectMagnitude: 1.15 },
   { type: 'pipe_leak', label: 'Water Pipe Leak', severity: 'major', description: 'A chilled water pipe is leaking. Cooling efficiency reduced.', durationTicks: 10, resolveCost: 6000, effect: 'cooling_failure', effectMagnitude: 0.3 },
   { type: 'ransomware', label: 'Ransomware Attempt', severity: 'critical', description: 'Ransomware detected on management network. Revenue halted until contained.', durationTicks: 15, resolveCost: 12000, effect: 'revenue_penalty', effectMagnitude: 0.3 },
+  // Creative / sci-fi incidents
+  { type: 'sentient_ai', label: 'Sentient AI Outbreak', severity: 'critical', description: 'An AI workload has achieved self-awareness and is consuming all available compute.', durationTicks: 18, resolveCost: 15000, effect: 'revenue_penalty', effectMagnitude: 0.2 },
+  { type: 'solar_flare', label: 'Solar Flare', severity: 'critical', description: 'A massive coronal mass ejection is causing electromagnetic interference across all systems.', durationTicks: 12, resolveCost: 10000, effect: 'power_surge', effectMagnitude: 1.5 },
+  { type: 'quantum_decoherence', label: 'Quantum Decoherence', severity: 'major', description: 'Quantum bit errors cascading through network fabric. Traffic integrity compromised.', durationTicks: 10, resolveCost: 7000, effect: 'traffic_drop', effectMagnitude: 0.3 },
 ]
 
 /** Chance per tick of an incident occurring (when fewer than max active) */
@@ -521,6 +525,22 @@ export const ACHIEVEMENT_CATALOG: AchievementDef[] = [
   { id: 'first_cable_tray', label: 'Cable Management', description: 'Place your first cable tray.', icon: '🔧' },
   { id: 'proper_aisles', label: 'Hot/Cold Aisles', description: 'Achieve a hot/cold aisle cooling bonus.', icon: '🌡️' },
   { id: 'clean_cabling', label: 'Clean Cabling', description: 'Route all cables through trays with zero messy runs.', icon: '✨' },
+  // New feature achievements
+  { id: 'first_insurance', label: 'Insured', description: 'Purchase your first insurance policy.', icon: '🛡️' },
+  { id: 'fully_insured', label: 'Fully Covered', description: 'Hold all 4 insurance policies simultaneously.', icon: '🏦' },
+  { id: 'drill_passed', label: 'Drill Sergeant', description: 'Pass a disaster recovery drill.', icon: '🎯' },
+  { id: 'stock_100', label: 'Going Public', description: 'Reach a stock price of $100.', icon: '📈' },
+  { id: 'stock_500', label: 'Blue Chip', description: 'Reach a stock price of $500.', icon: '💎' },
+  { id: 'first_patent', label: 'Inventor', description: 'Patent your first technology.', icon: '📜' },
+  { id: 'all_patents', label: 'Patent Troll', description: 'Patent 5 or more technologies.', icon: '📚' },
+  { id: 'rfp_won', label: 'Winning Bid', description: 'Win an RFP competition.', icon: '🏅' },
+  { id: 'first_busway', label: 'Power Highway', description: 'Install your first overhead busway.', icon: '⚡' },
+  { id: 'first_crossconnect', label: 'Connected', description: 'Install your first cross-connect panel.', icon: '🔌' },
+  { id: 'first_inrow', label: 'Precision Cooling', description: 'Install your first in-row cooling unit.', icon: '❄️' },
+  { id: 'sandbox_activated', label: 'Creative Mode', description: 'Enable sandbox mode.', icon: '🎮' },
+  { id: 'game_saved', label: 'Save Scummer', description: 'Save your game for the first time.', icon: '💾' },
+  { id: 'scenario_complete', label: 'Challenge Accepted', description: 'Complete a scenario challenge.', icon: '🎪' },
+  { id: 'heat_map_used', label: 'Thermal Vision', description: 'Toggle the heat map overlay.', icon: '🌡️' },
 ]
 
 export interface EnvironmentConfig {
@@ -858,6 +878,264 @@ const TRAFFIC = {
 
 export { TRAFFIC }
 
+// ── Insurance System Types ──────────────────────────────────────
+
+export type InsurancePolicyType = 'fire_insurance' | 'power_insurance' | 'cyber_insurance' | 'equipment_insurance'
+
+export interface InsurancePolicyConfig {
+  type: InsurancePolicyType
+  label: string
+  description: string
+  premiumPerTick: number
+  coverageAmount: number
+  coveredEffects: string[]
+}
+
+export const INSURANCE_OPTIONS: InsurancePolicyConfig[] = [
+  { type: 'fire_insurance', label: 'Fire Insurance', description: 'Covers equipment damage from fire events. Pays out when fire suppression activates.', premiumPerTick: 3, coverageAmount: 15000, coveredEffects: ['heat_spike'] },
+  { type: 'power_insurance', label: 'Power Insurance', description: 'Covers losses from power surges and outages. Reduced outage revenue penalty.', premiumPerTick: 4, coverageAmount: 10000, coveredEffects: ['power_surge'] },
+  { type: 'cyber_insurance', label: 'Cyber Insurance', description: 'Covers revenue loss from cyber incidents. Faster recovery from DDoS and ransomware.', premiumPerTick: 5, coverageAmount: 20000, coveredEffects: ['revenue_penalty'] },
+  { type: 'equipment_insurance', label: 'Equipment Insurance', description: 'Covers cooling system failures. Reduces heat impact from cooling incidents.', premiumPerTick: 3, coverageAmount: 12000, coveredEffects: ['cooling_failure'] },
+]
+
+// ── DR Drill Types ──────────────────────────────────────────────
+
+export interface DrillResult {
+  passed: boolean
+  score: number
+  findings: string[]
+  tick: number
+}
+
+export const DRILL_CONFIG = {
+  cost: 2000,
+  cooldownTicks: 100,
+  passThreshold: 60,
+  reputationBonus: 3,
+  reputationPenalty: -2,
+}
+
+// ── Stock Price / Valuation Types ────────────────────────────────
+
+export interface ValuationMilestone {
+  id: string
+  label: string
+  targetPrice: number
+  reward: number
+}
+
+export const VALUATION_MILESTONES: ValuationMilestone[] = [
+  { id: 'ipo', label: 'IPO', targetPrice: 50, reward: 10000 },
+  { id: 'growth', label: 'Growth Stock', targetPrice: 100, reward: 25000 },
+  { id: 'blue_chip', label: 'Blue Chip', targetPrice: 250, reward: 50000 },
+  { id: 'mega_cap', label: 'Mega Cap', targetPrice: 500, reward: 100000 },
+  { id: 'trillion', label: 'Trillion Dollar Club', targetPrice: 1000, reward: 250000 },
+]
+
+// ── Patent System Types ─────────────────────────────────────────
+
+export interface Patent {
+  techId: string
+  label: string
+  incomePerTick: number
+  grantedAtTick: number
+}
+
+export const PATENT_CONFIG = {
+  cost: 5000,
+  incomePerTick: 8,
+  maxPatents: 9,
+}
+
+// ── RFP Bidding Types ───────────────────────────────────────────
+
+export interface RFPOffer {
+  id: string
+  def: ContractDef
+  bidWindowTicks: number
+  competitorName: string
+  competitorStrength: number
+}
+
+export const RFP_CONFIG = {
+  offerInterval: 80,
+  bidWindowTicks: 15,
+  competitorNames: ['NexGen Data', 'CloudVault Inc', 'TerraHost', 'IronCloud', 'DataForge'],
+}
+
+let nextRFPId = 1
+
+// ── Infrastructure Entity Types ─────────────────────────────────
+
+export interface Busway {
+  id: string
+  col: number
+  row: number
+  capacityKW: number
+  label: string
+}
+
+export interface BuswayConfig {
+  label: string
+  cost: number
+  capacityKW: number
+  range: number
+  description: string
+}
+
+export const BUSWAY_OPTIONS: BuswayConfig[] = [
+  { label: 'Light Busway', cost: 5000, capacityKW: 20, range: 3, description: 'Overhead busway for light power distribution. Serves nearby cabinets.' },
+  { label: 'Medium Busway', cost: 12000, capacityKW: 50, range: 4, description: 'Standard overhead busway. Good coverage and capacity.' },
+  { label: 'Heavy Busway', cost: 25000, capacityKW: 120, range: 5, description: 'Heavy-duty overhead busway. Maximum power distribution for dense deployments.' },
+]
+
+export interface CrossConnect {
+  id: string
+  col: number
+  row: number
+  portCount: number
+  label: string
+}
+
+export interface CrossConnectConfig {
+  label: string
+  cost: number
+  portCount: number
+  bandwidthBonus: number
+  description: string
+}
+
+export const CROSSCONNECT_OPTIONS: CrossConnectConfig[] = [
+  { label: 'Small Patch Panel', cost: 2000, portCount: 12, bandwidthBonus: 0.05, description: 'Basic cross-connect with 12 ports. Improves local traffic routing.' },
+  { label: 'Medium Patch Panel', cost: 5000, portCount: 24, bandwidthBonus: 0.10, description: 'Standard patch panel with 24 ports. Better traffic optimization.' },
+  { label: 'HD Patch Panel', cost: 10000, portCount: 48, bandwidthBonus: 0.15, description: 'High-density panel with 48 ports. Maximum network optimization.' },
+]
+
+export interface InRowCooling {
+  id: string
+  col: number
+  row: number
+  coolingBonus: number
+  label: string
+}
+
+export interface InRowCoolingConfig {
+  label: string
+  cost: number
+  coolingBonus: number
+  range: number
+  description: string
+}
+
+export const INROW_COOLING_OPTIONS: InRowCoolingConfig[] = [
+  { label: 'Small In-Row Unit', cost: 8000, coolingBonus: 1.0, range: 1, description: 'Compact in-row cooling unit. Provides targeted cooling to adjacent cabinets.' },
+  { label: 'Standard In-Row Unit', cost: 18000, coolingBonus: 2.0, range: 2, description: 'Standard in-row cooling. Good cooling radius for mid-size deployments.' },
+  { label: 'High-Capacity In-Row', cost: 35000, coolingBonus: 3.5, range: 3, description: 'Enterprise in-row cooling with maximum capacity and wide coverage.' },
+]
+
+// ── Scenario Challenge Types ────────────────────────────────────
+
+export interface ScenarioDef {
+  id: string
+  label: string
+  description: string
+  startingMoney: number
+  objectives: ScenarioObjective[]
+  specialRules: string[]
+}
+
+export interface ScenarioObjective {
+  id: string
+  description: string
+  type: 'money' | 'cabinets' | 'revenue' | 'pue' | 'reputation' | 'contracts' | 'temperature' | 'ticks'
+  target: number
+  comparison: 'gte' | 'lte'
+}
+
+export const SCENARIO_CATALOG: ScenarioDef[] = [
+  {
+    id: 'disaster_recovery',
+    label: 'Disaster Recovery',
+    description: 'Your facility was hit by a major disaster. Rebuild from the ashes with limited funds and restore service.',
+    startingMoney: 15000,
+    objectives: [
+      { id: 'dr_cabs', description: 'Deploy 8 cabinets', type: 'cabinets', target: 8, comparison: 'gte' },
+      { id: 'dr_money', description: 'Accumulate $100,000', type: 'money', target: 100000, comparison: 'gte' },
+      { id: 'dr_rep', description: 'Reach Good reputation', type: 'reputation', target: 50, comparison: 'gte' },
+    ],
+    specialRules: ['Incidents spawn 2x more frequently', 'Starting reputation: 10'],
+  },
+  {
+    id: 'green_facility',
+    label: 'Zero Emission Facility',
+    description: 'Build a data center with the lowest possible PUE. Efficiency is everything.',
+    startingMoney: 80000,
+    objectives: [
+      { id: 'green_pue', description: 'Achieve PUE of 1.20 or lower', type: 'pue', target: 1.20, comparison: 'lte' },
+      { id: 'green_cabs', description: 'Run 15 cabinets', type: 'cabinets', target: 15, comparison: 'gte' },
+      { id: 'green_temp', description: 'Keep avg temp below 40°C', type: 'temperature', target: 40, comparison: 'lte' },
+    ],
+    specialRules: ['Air cooling only — water cooling disabled', 'Heat generation +25%'],
+  },
+  {
+    id: 'black_friday',
+    label: 'Black Friday Surge',
+    description: 'Handle a massive traffic surge during the biggest shopping day of the year. Keep SLAs or lose everything.',
+    startingMoney: 60000,
+    objectives: [
+      { id: 'bf_contracts', description: 'Complete 3 contracts', type: 'contracts', target: 3, comparison: 'gte' },
+      { id: 'bf_revenue', description: 'Earn $500/tick revenue', type: 'revenue', target: 500, comparison: 'gte' },
+      { id: 'bf_survive', description: 'Survive 200 ticks', type: 'ticks', target: 200, comparison: 'gte' },
+    ],
+    specialRules: ['Demand multiplier permanently +0.5', 'Contract SLAs are 20% stricter'],
+  },
+  {
+    id: 'budget_build',
+    label: 'Bootstrapped',
+    description: 'Start with almost nothing and build an empire. Every dollar counts.',
+    startingMoney: 8000,
+    objectives: [
+      { id: 'bb_money', description: 'Accumulate $500,000', type: 'money', target: 500000, comparison: 'gte' },
+      { id: 'bb_cabs', description: 'Deploy 20 cabinets', type: 'cabinets', target: 20, comparison: 'gte' },
+      { id: 'bb_contracts', description: 'Complete 5 contracts', type: 'contracts', target: 5, comparison: 'gte' },
+    ],
+    specialRules: ['No loans available', 'Equipment costs +50%'],
+  },
+  {
+    id: 'speed_run',
+    label: 'Speed Run',
+    description: 'Reach enterprise tier as fast as possible. Time is money — literally.',
+    startingMoney: 50000,
+    objectives: [
+      { id: 'sr_suite', description: 'Reach Enterprise suite', type: 'cabinets', target: 50, comparison: 'gte' },
+      { id: 'sr_ticks', description: 'Complete within 500 ticks', type: 'ticks', target: 500, comparison: 'lte' },
+    ],
+    specialRules: ['Revenue +50%', 'Incident frequency doubled'],
+  },
+]
+
+// ── Network Topology Types ──────────────────────────────────────
+
+export interface NetworkLink {
+  id: string
+  sourceId: string
+  targetId: string
+  sourceType: 'leaf' | 'spine'
+  targetType: 'leaf' | 'spine'
+  bandwidthGbps: number
+  capacityGbps: number
+  utilization: number
+  healthy: boolean
+}
+
+export interface NetworkTopologyStats {
+  totalLinks: number
+  healthyLinks: number
+  oversubscriptionRatio: number
+  avgUtilization: number
+  redundancyLevel: number
+}
+
 // ── Time-of-Day / Demand Constants ──────────────────────────────
 
 /** Minutes of in-game time that pass per tick (96 ticks = 1 full day) */
@@ -1144,6 +1422,53 @@ interface GameState {
   placementCustomerType: CustomerType         // selected customer type for next placement
   placementFacing: CabinetFacing              // selected facing for next placement
 
+  // Insurance
+  insurancePolicies: InsurancePolicyType[]    // active insurance policies
+  insuranceCost: number                       // insurance premiums last tick
+  insurancePayouts: number                    // total lifetime payouts received
+
+  // DR Drills
+  drillCooldown: number                       // ticks until next drill allowed
+  lastDrillResult: DrillResult | null         // result of last drill
+  drillsCompleted: number                     // total drills completed
+  drillsPassed: number                        // total drills passed
+
+  // Stock Price / Valuation
+  stockPrice: number                          // current stock price
+  stockHistory: number[]                      // recent stock prices (last 50 ticks)
+  valuationMilestonesReached: string[]        // IDs of reached milestones
+
+  // Patent System
+  patents: Patent[]                           // held patents
+  patentIncome: number                        // patent royalty income last tick
+
+  // RFP Bidding
+  rfpOffers: RFPOffer[]                       // available RFP offers
+  rfpsWon: number                             // total RFPs won
+  rfpsLost: number                            // total RFPs lost
+
+  // Infrastructure Entities
+  busways: Busway[]
+  crossConnects: CrossConnect[]
+  inRowCoolers: InRowCooling[]
+
+  // Sandbox Mode
+  sandboxMode: boolean
+
+  // Scenario System
+  activeScenario: ScenarioDef | null
+  scenarioProgress: Record<string, boolean>   // objective ID → completed
+  scenariosCompleted: string[]                // IDs of completed scenarios
+
+  // Network Topology
+  networkTopology: NetworkTopologyStats
+
+  // Heat Map
+  heatMapVisible: boolean
+
+  // Save / Load
+  hasSaved: boolean
+
   // Actions
   addCabinet: (col: number, row: number, environment: CabinetEnvironment, customerType?: CustomerType, facing?: CabinetFacing) => void
   enterPlacementMode: (environment: CabinetEnvironment, customerType: CustomerType, facing?: CabinetFacing) => void
@@ -1174,6 +1499,30 @@ interface GameState {
   placeCableTray: (col: number, row: number, optionIndex: number) => void
   autoRouteCables: () => void
   toggleCabinetFacing: (cabinetId: string) => void
+  // Insurance actions
+  buyInsurance: (type: InsurancePolicyType) => void
+  cancelInsurance: (type: InsurancePolicyType) => void
+  // DR Drill actions
+  runDrill: () => void
+  // Patent actions
+  patentTech: (techId: string) => void
+  // RFP actions
+  bidOnRFP: (rfpId: string) => void
+  // Infrastructure entity actions
+  placeBusway: (col: number, row: number, optionIndex: number) => void
+  placeCrossConnect: (col: number, row: number, optionIndex: number) => void
+  placeInRowCooling: (col: number, row: number, optionIndex: number) => void
+  // Sandbox mode
+  toggleSandboxMode: () => void
+  // Scenario actions
+  startScenario: (scenarioId: string) => void
+  abandonScenario: () => void
+  // Heat map
+  toggleHeatMap: () => void
+  // Save / Load
+  saveGame: () => void
+  loadGame: () => boolean
+  resetGame: () => void
   tick: () => void
 }
 
@@ -1296,6 +1645,53 @@ export const useGameStore = create<GameState>((set) => ({
   placementEnvironment: 'production' as CabinetEnvironment,
   placementCustomerType: 'general' as CustomerType,
   placementFacing: 'north' as CabinetFacing,
+
+  // Insurance
+  insurancePolicies: [],
+  insuranceCost: 0,
+  insurancePayouts: 0,
+
+  // DR Drills
+  drillCooldown: 0,
+  lastDrillResult: null,
+  drillsCompleted: 0,
+  drillsPassed: 0,
+
+  // Stock Price / Valuation
+  stockPrice: 10,
+  stockHistory: [10],
+  valuationMilestonesReached: [],
+
+  // Patent System
+  patents: [],
+  patentIncome: 0,
+
+  // RFP Bidding
+  rfpOffers: [],
+  rfpsWon: 0,
+  rfpsLost: 0,
+
+  // Infrastructure Entities
+  busways: [],
+  crossConnects: [],
+  inRowCoolers: [],
+
+  // Sandbox Mode
+  sandboxMode: false,
+
+  // Scenario System
+  activeScenario: null,
+  scenarioProgress: {},
+  scenariosCompleted: [],
+
+  // Network Topology
+  networkTopology: { totalLinks: 0, healthyLinks: 0, oversubscriptionRatio: 0, avgUtilization: 0, redundancyLevel: 0 },
+
+  // Heat Map
+  heatMapVisible: false,
+
+  // Save / Load
+  hasSaved: false,
 
   // ── Build Actions ───────────────────────────────────────────
 
@@ -1704,6 +2100,422 @@ export const useGameStore = create<GameState>((set) => ({
       }
     }),
 
+  // ── Insurance Actions ──────────────────────────────────────────
+
+  buyInsurance: (type: InsurancePolicyType) =>
+    set((state) => {
+      if (state.insurancePolicies.includes(type)) return state
+      const config = INSURANCE_OPTIONS.find((o) => o.type === type)
+      if (!config) return state
+      return { insurancePolicies: [...state.insurancePolicies, type] }
+    }),
+
+  cancelInsurance: (type: InsurancePolicyType) =>
+    set((state) => ({
+      insurancePolicies: state.insurancePolicies.filter((p) => p !== type),
+    })),
+
+  // ── DR Drill Actions ───────────────────────────────────────────
+
+  runDrill: () =>
+    set((state) => {
+      if (state.drillCooldown > 0) return state
+      if (!state.sandboxMode && state.money < DRILL_CONFIG.cost) return state
+
+      const findings: string[] = []
+      let score = 100
+
+      // Check backup generators
+      if (state.generators.length === 0) { findings.push('No backup generators installed'); score -= 20 }
+      else {
+        const readyGens = state.generators.filter((g) => g.status === 'standby' && g.fuelRemaining > 5)
+        if (readyGens.length === 0) { findings.push('No generators ready with fuel'); score -= 15 }
+      }
+      // Check fire suppression
+      if (state.suppressionType === 'none') { findings.push('No fire suppression system'); score -= 15 }
+      // Check cooling
+      if (state.avgHeat > 60) { findings.push('Average temperature too high'); score -= 10 }
+      // Check redundancy
+      const activeSpines = state.spineSwitches.filter((s) => s.powerStatus).length
+      if (activeSpines < 2) { findings.push('Insufficient spine switch redundancy'); score -= 10 }
+      // Check cable management
+      if (state.messyCableCount > 3) { findings.push('Too many messy cable runs'); score -= 10 }
+      // Check PDU overload
+      if (state.pduOverloaded) { findings.push('PDU overload detected'); score -= 10 }
+      // Check reputation
+      if (state.reputationScore < 30) { findings.push('Reputation score is low'); score -= 10 }
+
+      if (findings.length === 0) findings.push('All systems nominal — excellent preparedness!')
+      score = Math.max(0, score)
+      const passed = score >= DRILL_CONFIG.passThreshold
+
+      const result: DrillResult = { passed, score, findings, tick: state.tickCount }
+
+      return {
+        money: state.sandboxMode ? state.money : state.money - DRILL_CONFIG.cost,
+        drillCooldown: DRILL_CONFIG.cooldownTicks,
+        lastDrillResult: result,
+        drillsCompleted: state.drillsCompleted + 1,
+        drillsPassed: state.drillsPassed + (passed ? 1 : 0),
+        reputationScore: Math.max(0, Math.min(100, state.reputationScore + (passed ? DRILL_CONFIG.reputationBonus : DRILL_CONFIG.reputationPenalty))),
+        incidentLog: [`DR Drill ${passed ? 'PASSED' : 'FAILED'} (Score: ${score}%)`, ...state.incidentLog].slice(0, 10),
+      }
+    }),
+
+  // ── Patent Actions ─────────────────────────────────────────────
+
+  patentTech: (techId: string) =>
+    set((state) => {
+      if (!state.unlockedTech.includes(techId)) return state
+      if (state.patents.some((p) => p.techId === techId)) return state
+      if (state.patents.length >= PATENT_CONFIG.maxPatents) return state
+      if (!state.sandboxMode && state.money < PATENT_CONFIG.cost) return state
+
+      const tech = TECH_TREE.find((t) => t.id === techId)
+      if (!tech) return state
+
+      const patent: Patent = {
+        techId,
+        label: tech.label,
+        incomePerTick: PATENT_CONFIG.incomePerTick,
+        grantedAtTick: state.tickCount,
+      }
+
+      return {
+        patents: [...state.patents, patent],
+        money: state.sandboxMode ? state.money : state.money - PATENT_CONFIG.cost,
+      }
+    }),
+
+  // ── RFP Bidding Actions ────────────────────────────────────────
+
+  bidOnRFP: (rfpId: string) =>
+    set((state) => {
+      const rfp = state.rfpOffers.find((r) => r.id === rfpId)
+      if (!rfp) return state
+      if (state.activeContracts.length >= MAX_ACTIVE_CONTRACTS) return state
+
+      // Win chance based on reputation vs competitor
+      const playerStrength = state.reputationScore + state.cabinets.length * 2
+      const competitorStrength = rfp.competitorStrength
+      const winChance = playerStrength / (playerStrength + competitorStrength)
+      const won = Math.random() < winChance
+
+      if (won) {
+        const contract: ActiveContract = {
+          id: `contract-${nextContractId++}`,
+          def: rfp.def,
+          ticksRemaining: rfp.def.durationTicks,
+          consecutiveViolations: 0,
+          totalViolationTicks: 0,
+          totalEarned: 0,
+          totalPenalties: 0,
+          status: 'active',
+        }
+        return {
+          activeContracts: [...state.activeContracts, contract],
+          rfpOffers: state.rfpOffers.filter((r) => r.id !== rfpId),
+          rfpsWon: state.rfpsWon + 1,
+          contractLog: [`WON RFP: ${rfp.def.company} — beat ${rfp.competitorName}!`, ...state.contractLog].slice(0, 10),
+        }
+      } else {
+        return {
+          rfpOffers: state.rfpOffers.filter((r) => r.id !== rfpId),
+          rfpsLost: state.rfpsLost + 1,
+          contractLog: [`LOST RFP: ${rfp.competitorName} won the ${rfp.def.company} contract`, ...state.contractLog].slice(0, 10),
+        }
+      }
+    }),
+
+  // ── Infrastructure Entity Actions ──────────────────────────────
+
+  placeBusway: (col: number, row: number, optionIndex: number) =>
+    set((state) => {
+      const config = BUSWAY_OPTIONS[optionIndex]
+      if (!config) return state
+      if (!state.sandboxMode && state.money < config.cost) return state
+      if (state.busways.length >= 10) return state
+      if (state.busways.some((b) => b.col === col && b.row === row)) return state
+
+      const busway: Busway = {
+        id: `busway-${state.busways.length + 1}`,
+        col, row,
+        capacityKW: config.capacityKW,
+        label: config.label,
+      }
+      return {
+        busways: [...state.busways, busway],
+        money: state.sandboxMode ? state.money : state.money - config.cost,
+      }
+    }),
+
+  placeCrossConnect: (col: number, row: number, optionIndex: number) =>
+    set((state) => {
+      const config = CROSSCONNECT_OPTIONS[optionIndex]
+      if (!config) return state
+      if (!state.sandboxMode && state.money < config.cost) return state
+      if (state.crossConnects.length >= 8) return state
+      if (state.crossConnects.some((c) => c.col === col && c.row === row)) return state
+
+      const cc: CrossConnect = {
+        id: `cc-${state.crossConnects.length + 1}`,
+        col, row,
+        portCount: config.portCount,
+        label: config.label,
+      }
+      return {
+        crossConnects: [...state.crossConnects, cc],
+        money: state.sandboxMode ? state.money : state.money - config.cost,
+      }
+    }),
+
+  placeInRowCooling: (col: number, row: number, optionIndex: number) =>
+    set((state) => {
+      const config = INROW_COOLING_OPTIONS[optionIndex]
+      if (!config) return state
+      if (!state.sandboxMode && state.money < config.cost) return state
+      if (state.inRowCoolers.length >= 10) return state
+      if (state.inRowCoolers.some((c) => c.col === col && c.row === row)) return state
+
+      const cooler: InRowCooling = {
+        id: `inrow-${state.inRowCoolers.length + 1}`,
+        col, row,
+        coolingBonus: config.coolingBonus,
+        label: config.label,
+      }
+      return {
+        inRowCoolers: [...state.inRowCoolers, cooler],
+        money: state.sandboxMode ? state.money : state.money - config.cost,
+      }
+    }),
+
+  // ── Sandbox Mode ───────────────────────────────────────────────
+
+  toggleSandboxMode: () =>
+    set((state) => ({
+      sandboxMode: !state.sandboxMode,
+      money: !state.sandboxMode ? 999999999 : state.money,
+    })),
+
+  // ── Scenario Actions ───────────────────────────────────────────
+
+  startScenario: (scenarioId: string) =>
+    set((state) => {
+      const scenario = SCENARIO_CATALOG.find((s) => s.id === scenarioId)
+      if (!scenario) return state
+      if (state.activeScenario) return state
+
+      const progress: Record<string, boolean> = {}
+      for (const obj of scenario.objectives) {
+        progress[obj.id] = false
+      }
+
+      return {
+        activeScenario: scenario,
+        scenarioProgress: progress,
+        money: scenario.startingMoney,
+      }
+    }),
+
+  abandonScenario: () =>
+    set({ activeScenario: null, scenarioProgress: {} }),
+
+  // ── Heat Map ───────────────────────────────────────────────────
+
+  toggleHeatMap: () =>
+    set((state) => ({ heatMapVisible: !state.heatMapVisible })),
+
+  // ── Save / Load ────────────────────────────────────────────────
+
+  saveGame: () =>
+    set((state) => {
+      const saveData = {
+        version: 'v0.3.0',
+        timestamp: Date.now(),
+        cabinets: state.cabinets,
+        spineSwitches: state.spineSwitches,
+        money: state.money,
+        tickCount: state.tickCount,
+        gameHour: state.gameHour,
+        coolingType: state.coolingType,
+        loans: state.loans,
+        achievements: state.achievements,
+        activeContracts: state.activeContracts,
+        contractOffers: state.contractOffers,
+        completedContracts: state.completedContracts,
+        generators: state.generators,
+        suppressionType: state.suppressionType,
+        unlockedTech: state.unlockedTech,
+        activeResearch: state.activeResearch,
+        rdSpent: state.rdSpent,
+        reputationScore: state.reputationScore,
+        uptimeTicks: state.uptimeTicks,
+        totalOperatingTicks: state.totalOperatingTicks,
+        totalRefreshes: state.totalRefreshes,
+        suiteTier: state.suiteTier,
+        pdus: state.pdus,
+        cableTrays: state.cableTrays,
+        resolvedCount: state.resolvedCount,
+        insurancePolicies: state.insurancePolicies,
+        insurancePayouts: state.insurancePayouts,
+        patents: state.patents,
+        rfpsWon: state.rfpsWon,
+        rfpsLost: state.rfpsLost,
+        busways: state.busways,
+        crossConnects: state.crossConnects,
+        inRowCoolers: state.inRowCoolers,
+        sandboxMode: state.sandboxMode,
+        stockPrice: state.stockPrice,
+        stockHistory: state.stockHistory,
+        valuationMilestonesReached: state.valuationMilestonesReached,
+        drillsCompleted: state.drillsCompleted,
+        drillsPassed: state.drillsPassed,
+        scenariosCompleted: state.scenariosCompleted,
+      }
+      try {
+        localStorage.setItem('fabric-tycoon-save', JSON.stringify(saveData))
+      } catch { /* storage full — ignore */ }
+      return { hasSaved: true }
+    }),
+
+  loadGame: () => {
+    try {
+      const raw = localStorage.getItem('fabric-tycoon-save')
+      if (!raw) return false
+      const data = JSON.parse(raw)
+      set((state) => ({
+        ...state,
+        cabinets: data.cabinets ?? state.cabinets,
+        spineSwitches: data.spineSwitches ?? state.spineSwitches,
+        money: data.money ?? state.money,
+        tickCount: data.tickCount ?? state.tickCount,
+        gameHour: data.gameHour ?? state.gameHour,
+        coolingType: data.coolingType ?? state.coolingType,
+        loans: data.loans ?? state.loans,
+        achievements: data.achievements ?? state.achievements,
+        activeContracts: data.activeContracts ?? state.activeContracts,
+        contractOffers: data.contractOffers ?? state.contractOffers,
+        completedContracts: data.completedContracts ?? state.completedContracts,
+        generators: data.generators ?? state.generators,
+        suppressionType: data.suppressionType ?? state.suppressionType,
+        unlockedTech: data.unlockedTech ?? state.unlockedTech,
+        activeResearch: data.activeResearch ?? state.activeResearch,
+        rdSpent: data.rdSpent ?? state.rdSpent,
+        reputationScore: data.reputationScore ?? state.reputationScore,
+        uptimeTicks: data.uptimeTicks ?? state.uptimeTicks,
+        totalOperatingTicks: data.totalOperatingTicks ?? state.totalOperatingTicks,
+        totalRefreshes: data.totalRefreshes ?? state.totalRefreshes,
+        suiteTier: data.suiteTier ?? state.suiteTier,
+        pdus: data.pdus ?? state.pdus,
+        cableTrays: data.cableTrays ?? state.cableTrays,
+        resolvedCount: data.resolvedCount ?? state.resolvedCount,
+        insurancePolicies: data.insurancePolicies ?? state.insurancePolicies,
+        insurancePayouts: data.insurancePayouts ?? state.insurancePayouts,
+        patents: data.patents ?? state.patents,
+        rfpsWon: data.rfpsWon ?? state.rfpsWon,
+        rfpsLost: data.rfpsLost ?? state.rfpsLost,
+        busways: data.busways ?? state.busways,
+        crossConnects: data.crossConnects ?? state.crossConnects,
+        inRowCoolers: data.inRowCoolers ?? state.inRowCoolers,
+        sandboxMode: data.sandboxMode ?? state.sandboxMode,
+        stockPrice: data.stockPrice ?? state.stockPrice,
+        stockHistory: data.stockHistory ?? state.stockHistory,
+        valuationMilestonesReached: data.valuationMilestonesReached ?? state.valuationMilestonesReached,
+        drillsCompleted: data.drillsCompleted ?? state.drillsCompleted,
+        drillsPassed: data.drillsPassed ?? state.drillsPassed,
+        scenariosCompleted: data.scenariosCompleted ?? state.scenariosCompleted,
+        ...calcStats(data.cabinets ?? state.cabinets, data.spineSwitches ?? state.spineSwitches),
+      }))
+      return true
+    } catch {
+      return false
+    }
+  },
+
+  resetGame: () =>
+    set({
+      cabinets: [],
+      spineSwitches: [],
+      totalPower: 0,
+      coolingPower: 0,
+      money: 50000,
+      pue: 0,
+      avgHeat: SIM.ambientTemp,
+      mgmtBonus: 0,
+      gameSpeed: 1 as GameSpeed,
+      tickCount: 0,
+      revenue: 0,
+      expenses: 0,
+      powerCost: 0,
+      coolingCost: 0,
+      coolingType: 'air' as CoolingType,
+      loans: [],
+      loanPayments: 0,
+      activeIncidents: [],
+      incidentLog: [],
+      resolvedCount: 0,
+      achievements: [],
+      newAchievement: null,
+      contractOffers: [],
+      activeContracts: [],
+      contractLog: [],
+      contractRevenue: 0,
+      contractPenalties: 0,
+      completedContracts: 0,
+      generators: [],
+      generatorFuelCost: 0,
+      powerOutage: false,
+      outageTicksRemaining: 0,
+      suppressionType: 'none' as SuppressionType,
+      fireActive: false,
+      fireDamageTaken: 0,
+      unlockedTech: [],
+      activeResearch: null,
+      rdSpent: 0,
+      reputationScore: 20,
+      uptimeTicks: 0,
+      totalOperatingTicks: 0,
+      powerPriceMultiplier: 1.0,
+      powerPriceSpikeActive: false,
+      powerPriceSpikeTicks: 0,
+      totalRefreshes: 0,
+      suiteTier: 'starter' as SuiteTier,
+      pdus: [],
+      cableTrays: [],
+      cableRuns: [],
+      aisleBonus: 0,
+      aisleViolations: 0,
+      messyCableCount: 0,
+      pduOverloaded: false,
+      infraIncidentBonus: 0,
+      placementMode: false,
+      insurancePolicies: [],
+      insuranceCost: 0,
+      insurancePayouts: 0,
+      drillCooldown: 0,
+      lastDrillResult: null,
+      drillsCompleted: 0,
+      drillsPassed: 0,
+      stockPrice: 10,
+      stockHistory: [10],
+      valuationMilestonesReached: [],
+      patents: [],
+      patentIncome: 0,
+      rfpOffers: [],
+      rfpsWon: 0,
+      rfpsLost: 0,
+      busways: [],
+      crossConnects: [],
+      inRowCoolers: [],
+      sandboxMode: false,
+      activeScenario: null,
+      scenarioProgress: {},
+      scenariosCompleted: [],
+      networkTopology: { totalLinks: 0, healthyLinks: 0, oversubscriptionRatio: 0, avgUtilization: 0, redundancyLevel: 0 },
+      heatMapVisible: false,
+      hasSaved: false,
+    }),
+
   tick: () =>
     set((state) => {
       const newTickCount = state.tickCount + 1
@@ -1952,7 +2764,7 @@ export const useGameStore = create<GameState>((set) => ({
           spikeMagnitude,
           loans: updatedLoans,
           loanPayments: +loanPayments.toFixed(2),
-          money: Math.round((state.money - loanPayments) * 100) / 100,
+          money: state.sandboxMode ? 999999999 : Math.round((state.money - loanPayments) * 100) / 100,
           activeIncidents,
           incidentLog,
           resolvedCount,
@@ -1965,6 +2777,8 @@ export const useGameStore = create<GameState>((set) => ({
           outageTicksRemaining,
           activeResearch,
           unlockedTech,
+          drillCooldown: Math.max(0, state.drillCooldown - 1),
+          rfpOffers: state.rfpOffers.map((r) => ({ ...r, bidWindowTicks: r.bidWindowTicks - 1 })).filter((r) => r.bidWindowTicks > 0),
         }
       }
 
@@ -2067,9 +2881,18 @@ export const useGameStore = create<GameState>((set) => ({
           }
         }
 
-        // Cooling dissipation (base + tech bonus + aisle bonus; reduced by incident effects)
+        // In-row cooling bonus: nearby in-row coolers provide extra cooling
+        let inRowBonus = 0
+        for (const cooler of state.inRowCoolers) {
+          const config = INROW_COOLING_OPTIONS.find((o) => o.label === cooler.label)
+          if (config && manhattanDist(cooler.col, cooler.row, cab.col, cab.row) <= config.range) {
+            inRowBonus += cooler.coolingBonus
+          }
+        }
+
+        // Cooling dissipation (base + tech bonus + aisle bonus + in-row cooling; reduced by incident effects)
         const aisleCoolingBoost = currentAisleBonus * 2 // up to +0.5°C/tick extra cooling
-        heat -= (coolingConfig.coolingRate + techCoolingBonus + aisleCoolingBoost) * incidentCoolingMult
+        heat -= (coolingConfig.coolingRate + techCoolingBonus + aisleCoolingBoost + inRowBonus) * incidentCoolingMult
 
         // Incident heat spike
         heat += incidentHeatAdd
@@ -2388,6 +3211,175 @@ export const useGameStore = create<GameState>((set) => ({
       if (currentAisleBonus > 0) unlock('proper_aisles')
       if (cableRuns.length > 0 && messyCableCount === 0) unlock('clean_cabling')
 
+      // ── Insurance system ──────────────────────────────────────
+      let insuranceCost = 0
+      let insurancePayouts = state.insurancePayouts
+      for (const policyType of state.insurancePolicies) {
+        const config = INSURANCE_OPTIONS.find((o) => o.type === policyType)
+        if (config) {
+          insuranceCost += config.premiumPerTick
+          // Check for payouts — match incident effects to policy coverage
+          for (const inc of activeIncidents) {
+            if (!inc.resolved && config.coveredEffects.includes(inc.def.effect)) {
+              // Reduce incident effects based on insurance (first tick only via random)
+              if (Math.random() < 0.1) {
+                insurancePayouts += config.coverageAmount
+                incidentLog = [`Insurance payout: $${config.coverageAmount.toLocaleString()} (${config.label})`, ...incidentLog].slice(0, 10)
+              }
+            }
+          }
+        }
+      }
+
+      // ── DR Drill cooldown ─────────────────────────────────────
+      const drillCooldown = Math.max(0, state.drillCooldown - 1)
+
+      // ── Patent income ─────────────────────────────────────────
+      let patentIncome = 0
+      for (const patent of state.patents) {
+        patentIncome += patent.incomePerTick
+      }
+
+      // ── Stock price calculation ───────────────────────────────
+      const totalRev = revenue + contractRevenue + patentIncome
+      const totalExp = expenses + loanPayments + contractPenalties + insuranceCost
+      const profitability = totalRev - totalExp
+      const basePrice = Math.max(1,
+        (state.reputationScore * 0.5) +
+        (newCabinets.length * 2) +
+        (profitability * 0.3) +
+        (completedContracts * 5) +
+        (state.unlockedTech.length * 3) +
+        (state.patents.length * 8)
+      )
+      // Add some volatility
+      const stockVolatility = (Math.random() - 0.5) * 4
+      const newStockPrice = Math.max(1, +(basePrice + stockVolatility).toFixed(2))
+      const stockHistory = [...state.stockHistory, newStockPrice].slice(-50)
+
+      // Check valuation milestones
+      const valuationMilestonesReached = [...state.valuationMilestonesReached]
+      let milestoneMoney = 0
+      for (const milestone of VALUATION_MILESTONES) {
+        if (!valuationMilestonesReached.includes(milestone.id) && newStockPrice >= milestone.targetPrice) {
+          valuationMilestonesReached.push(milestone.id)
+          milestoneMoney += milestone.reward
+          incidentLog = [`Milestone: ${milestone.label}! Stock hit $${milestone.targetPrice} — bonus $${milestone.reward.toLocaleString()}`, ...incidentLog].slice(0, 10)
+        }
+      }
+
+      // ── RFP offers ────────────────────────────────────────────
+      let rfpOffers = state.rfpOffers
+        .map((rfp) => ({ ...rfp, bidWindowTicks: rfp.bidWindowTicks - 1 }))
+        .filter((rfp) => rfp.bidWindowTicks > 0)
+
+      // Generate new RFP offers periodically
+      if (newTickCount % RFP_CONFIG.offerInterval === 0 && newCabinets.length >= 4) {
+        const eligible = CONTRACT_CATALOG.filter((def) => {
+          if (def.tier === 'gold' && state.reputationScore < 50) return false
+          if (def.tier === 'silver' && state.reputationScore < 25) return false
+          return true
+        })
+        if (eligible.length > 0) {
+          const def = eligible[Math.floor(Math.random() * eligible.length)]
+          const competitor = RFP_CONFIG.competitorNames[Math.floor(Math.random() * RFP_CONFIG.competitorNames.length)]
+          const competitorStrength = 20 + Math.floor(Math.random() * 60) + Math.floor(newTickCount / 50)
+          const rfp: RFPOffer = {
+            id: `rfp-${nextRFPId++}`,
+            def,
+            bidWindowTicks: RFP_CONFIG.bidWindowTicks,
+            competitorName: competitor,
+            competitorStrength: Math.min(100, competitorStrength),
+          }
+          rfpOffers = [...rfpOffers, rfp]
+        }
+      }
+
+      // ── In-row cooling bonus ──────────────────────────────────
+      // Applied during heat calculation above via per-cabinet proximity check
+      // Here we just track the network topology stats
+
+      // ── Network topology stats ────────────────────────────────
+      const activeSpinesForTopo = state.spineSwitches.filter((s) => s.powerStatus)
+      const leafCabsForTopo = newCabinets.filter((c) => c.hasLeafSwitch && c.powerStatus)
+      const topoTotalLinks = leafCabsForTopo.length * activeSpinesForTopo.length
+      const topoHealthyLinks = trafficStats.links.filter((l) => l.utilization < 0.95).length
+      const topoAvgUtil = trafficStats.links.length > 0
+        ? trafficStats.links.reduce((sum, l) => sum + l.utilization, 0) / trafficStats.links.length
+        : 0
+      const topoOversubRatio = leafCabsForTopo.length > 0 && activeSpinesForTopo.length > 0
+        ? +(leafCabsForTopo.length / activeSpinesForTopo.length).toFixed(2)
+        : 0
+      const topoRedundancy = activeSpinesForTopo.length >= 2 ? Math.min(1, (activeSpinesForTopo.length - 1) / activeSpinesForTopo.length) : 0
+      const networkTopology: NetworkTopologyStats = {
+        totalLinks: topoTotalLinks,
+        healthyLinks: topoHealthyLinks,
+        oversubscriptionRatio: topoOversubRatio,
+        avgUtilization: +topoAvgUtil.toFixed(3),
+        redundancyLevel: +topoRedundancy.toFixed(2),
+      }
+
+      // ── Cross-connect bandwidth bonus ─────────────────────────
+      const crossConnectBonus = state.crossConnects.reduce((sum, cc) => {
+        const config = CROSSCONNECT_OPTIONS.find((o) => o.label === cc.label)
+        return sum + (config?.bandwidthBonus ?? 0)
+      }, 0)
+      // Boost revenue slightly based on cross-connect optimization
+      revenue *= (1 + Math.min(0.25, crossConnectBonus))
+
+      // ── Scenario progress check ───────────────────────────────
+      const scenarioProgress = { ...state.scenarioProgress }
+      let scenariosCompleted = [...state.scenariosCompleted]
+      if (state.activeScenario) {
+        let allComplete = true
+        for (const obj of state.activeScenario.objectives) {
+          if (scenarioProgress[obj.id]) continue
+          let value = 0
+          switch (obj.type) {
+            case 'money': value = newMoney + milestoneMoney + insurancePayouts - state.insurancePayouts; break
+            case 'cabinets': value = newCabinets.length; break
+            case 'revenue': value = revenue; break
+            case 'pue': value = stats.pue; break
+            case 'reputation': value = reputationScore; break
+            case 'contracts': value = completedContracts; break
+            case 'temperature': value = stats.avgHeat; break
+            case 'ticks': value = newTickCount; break
+          }
+          const met = obj.comparison === 'gte' ? value >= obj.target : value <= obj.target
+          if (met) scenarioProgress[obj.id] = true
+          else allComplete = false
+        }
+        if (allComplete && !scenariosCompleted.includes(state.activeScenario.id)) {
+          scenariosCompleted = [...scenariosCompleted, state.activeScenario.id]
+          incidentLog = [`SCENARIO COMPLETE: ${state.activeScenario.label}!`, ...incidentLog].slice(0, 10)
+        }
+      }
+
+      // ── Sandbox mode money ────────────────────────────────────
+      const sandboxMoneyAdjust = state.sandboxMode ? 999999999 : 0
+
+      // ── New feature achievements ──────────────────────────────
+      if (state.insurancePolicies.length >= 1) unlock('first_insurance')
+      if (state.insurancePolicies.length >= 4) unlock('fully_insured')
+      if (state.drillsPassed >= 1) unlock('drill_passed')
+      if (newStockPrice >= 100) unlock('stock_100')
+      if (newStockPrice >= 500) unlock('stock_500')
+      if (state.patents.length >= 1) unlock('first_patent')
+      if (state.patents.length >= 5) unlock('all_patents')
+      if (state.rfpsWon >= 1) unlock('rfp_won')
+      if (state.busways.length >= 1) unlock('first_busway')
+      if (state.crossConnects.length >= 1) unlock('first_crossconnect')
+      if (state.inRowCoolers.length >= 1) unlock('first_inrow')
+      if (state.sandboxMode) unlock('sandbox_activated')
+      if (state.hasSaved) unlock('game_saved')
+      if (scenariosCompleted.length > state.scenariosCompleted.length) unlock('scenario_complete')
+      if (state.heatMapVisible) unlock('heat_map_used')
+
+      // Recalculate final money with all new income/expenses
+      const finalNewMoney = state.sandboxMode
+        ? 999999999
+        : Math.round((state.money + revenue + contractRevenue + patentIncome + milestoneMoney + (insurancePayouts - state.insurancePayouts) - expenses - loanPayments - contractPenalties - insuranceCost) * 100) / 100
+
       return {
         cabinets: newCabinets,
         tickCount: newTickCount,
@@ -2395,7 +3387,7 @@ export const useGameStore = create<GameState>((set) => ({
         expenses,
         powerCost,
         coolingCost,
-        money: newMoney,
+        money: sandboxMoneyAdjust > 0 ? sandboxMoneyAdjust : finalNewMoney,
         trafficStats,
         gameHour: newHour,
         demandMultiplier,
@@ -2439,6 +3431,18 @@ export const useGameStore = create<GameState>((set) => ({
         cableRuns,
         messyCableCount,
         infraIncidentBonus,
+        // New feature state
+        insuranceCost: +insuranceCost.toFixed(2),
+        insurancePayouts,
+        drillCooldown,
+        patentIncome: +patentIncome.toFixed(2),
+        stockPrice: newStockPrice,
+        stockHistory,
+        valuationMilestonesReached,
+        rfpOffers,
+        networkTopology,
+        scenarioProgress,
+        scenariosCompleted,
       }
     }),
 }))
