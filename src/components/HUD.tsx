@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { useGameStore, DEFAULT_COLORS, RACK_COST, MAX_SERVERS_PER_CABINET, MAX_CABINETS, MAX_SPINES, SIM, ENVIRONMENT_CONFIG, formatGameTime, COOLING_CONFIG, LOAN_OPTIONS, ACHIEVEMENT_CATALOG, CONTRACT_TIER_COLORS } from '@/stores/gameStore'
-import type { NodeType, LayerColors, CabinetEnvironment } from '@/stores/gameStore'
+import { useGameStore, DEFAULT_COLORS, RACK_COST, MAX_SERVERS_PER_CABINET, MAX_CABINETS, MAX_SPINES, SIM, ENVIRONMENT_CONFIG, formatGameTime, COOLING_CONFIG, LOAN_OPTIONS, ACHIEVEMENT_CATALOG, CONTRACT_TIER_COLORS, CUSTOMER_TYPE_CONFIG, GENERATOR_OPTIONS, SUPPRESSION_CONFIG, TECH_TREE, TECH_BRANCH_COLORS, DEPRECIATION, getReputationTier, POWER_MARKET } from '@/stores/gameStore'
+import type { NodeType, LayerColors, CabinetEnvironment, CustomerType, SuppressionType, TechBranch } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Server, Network, Power, Cpu, Eye, SlidersHorizontal, EyeOff, RotateCcw, HardDrive, Plus, TrendingUp, TrendingDown, DollarSign, ArrowRightLeft, AlertTriangle, Radio, Info, Shield, Clock, Zap, Droplets, Landmark, Siren, Trophy, Wrench, FileText, Check } from 'lucide-react'
+import { Server, Network, Power, Cpu, Eye, SlidersHorizontal, EyeOff, RotateCcw, HardDrive, Plus, TrendingUp, TrendingDown, DollarSign, ArrowRightLeft, AlertTriangle, Radio, Info, Shield, Clock, Zap, Droplets, Landmark, Siren, Trophy, Wrench, FileText, Check, Fuel, Flame, FlaskConical, Star, RefreshCw, Lock } from 'lucide-react'
 import {
   Tooltip,
   TooltipContent,
@@ -52,9 +52,18 @@ export function HUD() {
     activeIncidents, resolveIncident,
     achievements,
     contractOffers, activeContracts, acceptContract, contractRevenue, contractPenalties, completedContracts,
+    // Phase 2/3
+    generators, generatorFuelCost, powerOutage, outageTicksRemaining,
+    buyGenerator, activateGenerator,
+    suppressionType, fireActive, upgradeSuppression,
+    unlockedTech, activeResearch, startResearch, rdSpent,
+    reputationScore, uptimeTicks, totalOperatingTicks,
+    powerPriceMultiplier, powerPriceSpikeActive,
+    refreshServers, totalRefreshes,
   } = useGameStore()
   const [showGuide, setShowGuide] = useState(true)
   const [selectedEnv, setSelectedEnv] = useState<CabinetEnvironment>('production')
+  const [selectedCustomerType, setSelectedCustomerType] = useState<CustomerType>('general')
 
   const envEntries = Object.entries(ENVIRONMENT_CONFIG) as [CabinetEnvironment, typeof ENVIRONMENT_CONFIG['production']][]
   const prodCount = cabinets.filter((c) => c.environment === 'production').length
@@ -279,12 +288,47 @@ export function HUD() {
                   ))}
                 </div>
               </div>
+              {/* Customer type selector */}
+              <div className="flex flex-col gap-1.5">
+                <span className="text-xs text-muted-foreground">Workload:</span>
+                <div className="flex gap-1 flex-wrap">
+                  {(Object.entries(CUSTOMER_TYPE_CONFIG) as [CustomerType, typeof CUSTOMER_TYPE_CONFIG['general']][]).map(([type, config]) => (
+                    <Tooltip key={type}>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="xs"
+                          onClick={() => setSelectedCustomerType(type)}
+                          className={`font-mono text-xs transition-all ${
+                            selectedCustomerType === type
+                              ? 'border-2'
+                              : 'border border-border/50 opacity-50 hover:opacity-80'
+                          }`}
+                          style={{
+                            borderColor: selectedCustomerType === type ? config.color : undefined,
+                            color: selectedCustomerType === type ? config.color : undefined,
+                            backgroundColor: selectedCustomerType === type ? `${config.color}15` : undefined,
+                          }}
+                        >
+                          {config.label}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="max-w-52">
+                        <p className="font-bold" style={{ color: config.color }}>{config.label}</p>
+                        <p className="text-xs mt-1">{config.description}</p>
+                        <p className="text-xs mt-1">Power: {Math.round(config.powerMultiplier * 100)}% | Heat: {Math.round(config.heatMultiplier * 100)}%</p>
+                        <p className="text-xs">Revenue: {Math.round(config.revenueMultiplier * 100)}% | Bandwidth: {Math.round(config.bandwidthMultiplier * 100)}%</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  ))}
+                </div>
+              </div>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => addCabinet(selectedEnv)}
+                    onClick={() => addCabinet(selectedEnv, selectedCustomerType)}
                     disabled={money < RACK_COST.cabinet || cabinets.length >= MAX_CABINETS}
                     className="justify-between font-mono text-xs transition-all"
                     style={{
@@ -302,7 +346,7 @@ export function HUD() {
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom">
-                  Place a new {ENVIRONMENT_CONFIG[selectedEnv].name.toLowerCase()} cabinet with 1 server ({cabinets.length}/{MAX_CABINETS} slots used)
+                  Place a new {ENVIRONMENT_CONFIG[selectedEnv].name.toLowerCase()} cabinet with {CUSTOMER_TYPE_CONFIG[selectedCustomerType].label} workload ({cabinets.length}/{MAX_CABINETS} slots used)
                 </TooltipContent>
               </Tooltip>
               <Tooltip>
@@ -476,6 +520,33 @@ export function HUD() {
                   <span className="text-neon-red tabular-nums">${contractPenalties.toFixed(0)}</span>
                 </div>
               )}
+              {generatorFuelCost > 0 && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground ml-4">Generator Fuel</span>
+                  <span className="text-muted-foreground tabular-nums">${generatorFuelCost.toFixed(2)}</span>
+                </div>
+              )}
+              <div className="border-t border-border my-0.5" />
+              <div className="flex justify-between text-xs">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className={`flex items-center gap-1 cursor-help ${
+                      powerPriceSpikeActive ? 'text-neon-red animate-pulse' : 'text-muted-foreground'
+                    }`}>
+                      <Zap className="size-3" />
+                      Power Rate
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-52">
+                    Electricity spot price fluctuates with the market. Base: ${POWER_MARKET.baseCost}/kW
+                  </TooltipContent>
+                </Tooltip>
+                <span className={`tabular-nums ${
+                  powerPriceMultiplier > 1.3 ? 'text-neon-red' : powerPriceMultiplier < 0.8 ? 'text-neon-green' : 'text-foreground'
+                }`}>
+                  {Math.round(powerPriceMultiplier * 100)}%{powerPriceSpikeActive ? ' SPIKE' : ''}
+                </span>
+              </div>
               <div className="border-t border-border my-0.5" />
               <div className="flex justify-between text-xs font-bold">
                 <span className={netIncome >= 0 ? 'text-neon-green' : 'text-neon-red'}>
@@ -656,8 +727,12 @@ export function HUD() {
               <div className="flex gap-1.5 flex-wrap max-h-28 overflow-y-auto">
                 {cabinets.map((c) => {
                   const envConfig = ENVIRONMENT_CONFIG[c.environment]
+                  const custConfig = CUSTOMER_TYPE_CONFIG[c.customerType]
                   const leafTag = c.hasLeafSwitch ? '+L' : ''
                   const isThrottled = c.powerStatus && c.heatLevel >= SIM.throttleTemp
+                  const lifeProgress = c.serverAge / DEPRECIATION.serverLifespanTicks
+                  const isAging = lifeProgress > 0.6
+                  const isEndOfLife = lifeProgress > 0.9
                   const label = `C${c.id.replace('cab-', '')} ×${c.serverCount}${leafTag}`
                   const envColor = envConfig.color
 
@@ -669,23 +744,33 @@ export function HUD() {
                           style={{
                             backgroundColor: isThrottled ? 'rgba(255,68,68,0.2)' : c.powerStatus ? `${envColor}20` : undefined,
                             color: isThrottled ? '#ff4444' : c.powerStatus ? envColor : undefined,
-                            borderColor: isThrottled ? 'rgba(255,68,68,0.3)' : c.powerStatus ? `${envColor}40` : undefined,
+                            borderColor: isEndOfLife ? 'rgba(255,170,0,0.5)' : isThrottled ? 'rgba(255,68,68,0.3)' : c.powerStatus ? `${envColor}40` : undefined,
                           }}
                           onClick={() => toggleCabinetPower(c.id)}
                         >
                           <span className="opacity-60 mr-0.5">{envConfig.label}</span>
+                          {c.customerType !== 'general' && (
+                            <span className="opacity-60 mr-0.5" style={{ color: custConfig.color }}>
+                              {custConfig.label.charAt(0)}
+                            </span>
+                          )}
                           {label}
                           {!c.powerStatus && ' OFF'}
                           {isThrottled && ' HOT'}
+                          {isEndOfLife && ' OLD'}
                         </Badge>
                       </TooltipTrigger>
-                      <TooltipContent side="top">
+                      <TooltipContent side="top" className="max-w-60">
                         <span style={{ color: envColor }}>{envConfig.name}</span>
+                        {' — '}<span style={{ color: custConfig.color }}>{custConfig.label}</span>
                         {' — '}{c.serverCount} server{c.serverCount > 1 ? 's' : ''}
                         {c.hasLeafSwitch ? ' + leaf' : ''}
                         {' — '}{Math.round(c.heatLevel)}°C
                         {isThrottled ? ' (THROTTLED)' : ''}
-                        {' — click to toggle power'}
+                        <br />Age: {c.serverAge}/{DEPRECIATION.serverLifespanTicks}t ({Math.round(lifeProgress * 100)}%)
+                        {isAging && <><br /><span className="text-neon-orange">Efficiency declining — consider refresh (${(DEPRECIATION.refreshCost * c.serverCount).toLocaleString()})</span></>}
+                        <br />Click to toggle power
+                        {isAging && <><br /><Button variant="link" size="sm" className="text-xs text-neon-cyan p-0 h-auto" onClick={(e) => { e.stopPropagation(); refreshServers(c.id) }}>Refresh Servers</Button></>}
                       </TooltipContent>
                     </Tooltip>
                   )
@@ -716,6 +801,29 @@ export function HUD() {
             )}
           </div>
         </div>
+
+        {/* Alert banners for outage/fire */}
+        {powerOutage && (
+          <div className="rounded-lg border border-neon-red/40 bg-neon-red/10 p-2 flex items-center gap-2 animate-pulse">
+            <Zap className="size-4 text-neon-red" />
+            <span className="text-xs font-bold text-neon-red tracking-widest">GRID POWER OUTAGE</span>
+            <span className="text-xs text-neon-red tabular-nums ml-auto">{outageTicksRemaining}t remaining</span>
+            {generators.filter((g) => g.status === 'running').length > 0 && (
+              <Badge className="bg-neon-green/20 text-neon-green border-neon-green/30 font-mono text-xs">
+                GENERATORS RUNNING
+              </Badge>
+            )}
+          </div>
+        )}
+        {fireActive && (
+          <div className="rounded-lg border border-neon-orange/40 bg-neon-orange/10 p-2 flex items-center gap-2 animate-pulse">
+            <Flame className="size-4 text-neon-orange" />
+            <span className="text-xs font-bold text-neon-orange tracking-widest">FIRE IN PROGRESS</span>
+            <span className="text-xs text-muted-foreground ml-auto">
+              Suppression: {SUPPRESSION_CONFIG[suppressionType].label}
+            </span>
+          </div>
+        )}
 
         {/* Second row: Contracts, Cooling, Loans, Incidents, Achievements */}
         <div className="grid grid-cols-[1fr_1fr_1fr_1fr_1fr] gap-3">
@@ -1065,6 +1173,272 @@ export function HUD() {
                 )
               })}
             </div>
+          </div>
+        </div>
+
+        {/* Third row: Generators, Tech Tree, Reputation */}
+        <div className="grid grid-cols-[1fr_1fr_1fr] gap-3">
+          {/* GENERATORS & SUPPRESSION panel */}
+          <div className="rounded-lg border border-border bg-card p-3 glow-green">
+            <div className="flex items-center gap-2 mb-2">
+              <Fuel className="size-3.5 text-neon-orange" />
+              <span className="text-xs font-bold text-neon-orange tracking-widest">POWER BACKUP</span>
+              {generators.length > 0 && (
+                <Badge className="ml-auto bg-neon-orange/20 text-neon-orange border-neon-orange/30 font-mono text-xs">
+                  {generators.filter((g) => g.status === 'running').length} RUNNING
+                </Badge>
+              )}
+            </div>
+            {/* Active generators */}
+            {generators.length > 0 && (
+              <div className="flex flex-col gap-1 mb-2 pb-2 border-b border-border/50">
+                {generators.map((gen) => (
+                  <div key={gen.id} className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground truncate">{gen.config.label}</span>
+                    <div className="flex items-center gap-2">
+                      <span className={`tabular-nums ${
+                        gen.status === 'running' ? 'text-neon-green' :
+                        gen.status === 'cooldown' ? 'text-neon-orange' : 'text-muted-foreground'
+                      }`}>
+                        {gen.status === 'running' ? `${gen.fuelRemaining}t fuel` :
+                         gen.status === 'cooldown' ? `cooling ${gen.ticksUntilReady}t` : 'STANDBY'}
+                      </span>
+                      {gen.status === 'standby' && gen.fuelRemaining > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="xs"
+                          className="text-neon-green text-xs p-0 h-auto"
+                          onClick={() => activateGenerator(gen.id)}
+                        >
+                          Start
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {/* Buy generators */}
+            <div className="flex flex-col gap-1 mb-2">
+              {GENERATOR_OPTIONS.map((opt, i) => (
+                <Tooltip key={opt.label}>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => buyGenerator(i)}
+                      disabled={money < opt.cost || generators.length >= 3}
+                      className="justify-between font-mono text-xs border-neon-orange/20 hover:border-neon-orange/50 hover:bg-neon-orange/10 hover:text-neon-orange transition-all"
+                    >
+                      <span className="truncate">{opt.label}</span>
+                      <span className="text-muted-foreground">${opt.cost.toLocaleString()}</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-52">
+                    {opt.description}
+                    <br />Capacity: {(opt.powerCapacityW / 1000).toFixed(0)}kW | Fuel: {opt.fuelCapacity} ticks | Cost: ${opt.fuelCostPerTick}/tick
+                  </TooltipContent>
+                </Tooltip>
+              ))}
+              {generators.length >= 3 && (
+                <p className="text-xs text-neon-orange/60 italic">Max 3 generators</p>
+              )}
+            </div>
+            {/* Fire suppression */}
+            <div className="border-t border-border/50 pt-2">
+              <div className="flex items-center gap-2 mb-1.5">
+                <Flame className="size-3 text-neon-red" />
+                <span className="text-xs font-bold text-neon-red">FIRE SUPPRESSION</span>
+                <Badge
+                  className="ml-auto font-mono text-xs border"
+                  style={{
+                    backgroundColor: `${SUPPRESSION_CONFIG[suppressionType].color}20`,
+                    color: SUPPRESSION_CONFIG[suppressionType].color,
+                    borderColor: `${SUPPRESSION_CONFIG[suppressionType].color}40`,
+                  }}
+                >
+                  {SUPPRESSION_CONFIG[suppressionType].label}
+                </Badge>
+              </div>
+              {(Object.entries(SUPPRESSION_CONFIG) as [SuppressionType, typeof SUPPRESSION_CONFIG['none']][])
+                .filter(([type]) => type !== 'none' && type !== suppressionType)
+                .map(([type, config]) => (
+                  <Tooltip key={type}>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => upgradeSuppression(type)}
+                        disabled={money < config.cost}
+                        className="justify-between font-mono text-xs w-full mt-1 border-neon-red/20 hover:border-neon-red/50 hover:bg-neon-red/10 hover:text-neon-red transition-all"
+                      >
+                        <span className="truncate">{config.label}</span>
+                        <span className="text-muted-foreground">${config.cost.toLocaleString()}</span>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="max-w-52">
+                      {config.description}
+                      <br />Effectiveness: {Math.round(config.effectiveness * 100)}%
+                      {config.equipmentDamage && <><br /><span className="text-neon-red">Warning: Damages equipment on activation</span></>}
+                    </TooltipContent>
+                  </Tooltip>
+                ))}
+            </div>
+          </div>
+
+          {/* TECH TREE panel */}
+          <div className="rounded-lg border border-border bg-card p-3 glow-green">
+            <div className="flex items-center gap-2 mb-2">
+              <FlaskConical className="size-3.5 text-neon-cyan" />
+              <span className="text-xs font-bold text-neon-cyan tracking-widest">R&D LAB</span>
+              <span className="ml-auto text-xs text-muted-foreground tabular-nums">
+                {unlockedTech.length}/{TECH_TREE.length}
+              </span>
+            </div>
+            {/* Active research progress */}
+            {activeResearch && (() => {
+              const tech = TECH_TREE.find((t) => t.id === activeResearch.techId)
+              if (!tech) return null
+              const progress = 1 - activeResearch.ticksRemaining / tech.researchTicks
+              return (
+                <div className="mb-2 pb-2 border-b border-border/50">
+                  <div className="flex justify-between text-xs mb-1">
+                    <span className="font-bold" style={{ color: TECH_BRANCH_COLORS[tech.branch] }}>
+                      Researching: {tech.label}
+                    </span>
+                    <span className="text-muted-foreground tabular-nums">{activeResearch.ticksRemaining}t</span>
+                  </div>
+                  <div className="w-full h-1.5 bg-border rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all"
+                      style={{ width: `${Math.round(progress * 100)}%`, backgroundColor: TECH_BRANCH_COLORS[tech.branch] }}
+                    />
+                  </div>
+                </div>
+              )
+            })()}
+            {/* Tech tree by branch */}
+            {(['efficiency', 'performance', 'resilience'] as TechBranch[]).map((branch) => (
+              <div key={branch} className="mb-2">
+                <span className="text-xs font-bold tracking-wider" style={{ color: TECH_BRANCH_COLORS[branch] }}>
+                  {branch.toUpperCase()}
+                </span>
+                <div className="flex flex-col gap-0.5 mt-0.5">
+                  {TECH_TREE.filter((t) => t.branch === branch).map((tech) => {
+                    const isUnlocked = unlockedTech.includes(tech.id)
+                    const isResearching = activeResearch?.techId === tech.id
+                    const prereqMet = !tech.prereqId || unlockedTech.includes(tech.prereqId)
+                    const canResearch = !isUnlocked && !activeResearch && prereqMet && money >= tech.cost
+                    return (
+                      <Tooltip key={tech.id}>
+                        <TooltipTrigger asChild>
+                          <div className={`flex items-center justify-between text-xs rounded px-1.5 py-0.5 ${
+                            isUnlocked ? 'text-foreground' : isResearching ? 'text-neon-cyan' : prereqMet ? 'text-muted-foreground' : 'text-muted-foreground/40'
+                          }`}>
+                            <span className="flex items-center gap-1.5 truncate">
+                              {isUnlocked ? <Check className="size-3 text-neon-green" /> : !prereqMet ? <Lock className="size-3" /> : <FlaskConical className="size-3" />}
+                              {tech.label}
+                            </span>
+                            {!isUnlocked && !isResearching && prereqMet && (
+                              <Button
+                                variant="ghost"
+                                size="xs"
+                                disabled={!canResearch}
+                                onClick={() => startResearch(tech.id)}
+                                className="text-xs p-0 h-auto ml-1"
+                                style={{ color: canResearch ? TECH_BRANCH_COLORS[branch] : undefined }}
+                              >
+                                ${(tech.cost / 1000).toFixed(0)}k
+                              </Button>
+                            )}
+                            {isResearching && <span className="text-neon-cyan animate-pulse text-xs">...</span>}
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" className="max-w-52">
+                          <p className="font-bold" style={{ color: TECH_BRANCH_COLORS[branch] }}>{tech.label}</p>
+                          <p className="text-xs mt-1">{tech.description}</p>
+                          <p className="text-xs mt-1 text-neon-green">{tech.effect}</p>
+                          {tech.prereqId && !unlockedTech.includes(tech.prereqId) && (
+                            <p className="text-xs mt-1 text-neon-red">Requires: {TECH_TREE.find((t) => t.id === tech.prereqId)?.label}</p>
+                          )}
+                          <p className="text-xs mt-1">Cost: ${tech.cost.toLocaleString()} | Time: {tech.researchTicks} ticks</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
+            {rdSpent > 0 && (
+              <div className="flex justify-between text-xs pt-1.5 border-t border-border/50">
+                <span className="text-muted-foreground">Total R&D</span>
+                <span className="text-neon-cyan tabular-nums">${rdSpent.toLocaleString()}</span>
+              </div>
+            )}
+          </div>
+
+          {/* REPUTATION panel */}
+          <div className="rounded-lg border border-border bg-card p-3 glow-green">
+            <div className="flex items-center gap-2 mb-2">
+              <Star className="size-3.5 text-neon-yellow" />
+              <span className="text-xs font-bold text-neon-yellow tracking-widest">REPUTATION</span>
+            </div>
+            {(() => {
+              const tier = getReputationTier(reputationScore)
+              return (
+                <>
+                  <div className="text-center mb-2">
+                    <p className="text-3xl font-bold tabular-nums" style={{ color: tier.color }}>
+                      {Math.round(reputationScore)}
+                    </p>
+                    <p className="text-xs font-bold tracking-wider" style={{ color: tier.color }}>
+                      {tier.label.toUpperCase()}
+                    </p>
+                  </div>
+                  <div className="w-full h-2 bg-border rounded-full overflow-hidden mb-2">
+                    <div
+                      className="h-full rounded-full transition-all"
+                      style={{ width: `${reputationScore}%`, backgroundColor: tier.color }}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">Contract Bonus</span>
+                      <span className={`tabular-nums ${tier.contractBonus >= 0 ? 'text-neon-green' : 'text-neon-red'}`}>
+                        {tier.contractBonus >= 0 ? '+' : ''}{Math.round(tier.contractBonus * 100)}%
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">Uptime</span>
+                      <span className="text-foreground tabular-nums">
+                        {totalOperatingTicks > 0 ? Math.round((uptimeTicks / totalOperatingTicks) * 100) : 0}%
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">Contracts Done</span>
+                      <span className="text-neon-green tabular-nums">{completedContracts}</span>
+                    </div>
+                    {totalRefreshes > 0 && (
+                      <div className="flex justify-between text-xs">
+                        <span className="flex items-center gap-1 text-muted-foreground">
+                          <RefreshCw className="size-3" />
+                          HW Refreshes
+                        </span>
+                        <span className="text-neon-cyan tabular-nums">{totalRefreshes}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="mt-2 pt-2 border-t border-border/50">
+                    <p className="text-xs text-muted-foreground">
+                      {reputationScore < 25 && 'Only bronze contracts available. Keep SLAs met to improve.'}
+                      {reputationScore >= 25 && reputationScore < 50 && 'Silver contracts unlocked. Maintain uptime for gold.'}
+                      {reputationScore >= 50 && reputationScore < 75 && 'Gold contracts unlocked. Push for Excellent status.'}
+                      {reputationScore >= 75 && 'Premium reputation. Maximum contract bonuses active.'}
+                    </p>
+                  </div>
+                </>
+              )
+            })()}
           </div>
         </div>
 

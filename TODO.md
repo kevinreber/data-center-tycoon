@@ -12,6 +12,17 @@
 - [x] Filter UI (checkboxes or toggle chips in HUD)
 - [x] Per-layer opacity/color controls
 
+## Phase 2/3 Systems (Complete)
+- [x] Customer types with differentiated power/heat/revenue/bandwidth profiles
+- [x] Backup generators (3 tiers) with fuel system and auto-start on outage
+- [x] Fire suppression (water vs. gas) with equipment damage trade-offs
+- [x] Power outage system triggered by power surge incidents
+- [x] Tech tree with 9 technologies across 3 branches (efficiency/performance/resilience)
+- [x] Spot power pricing with market fluctuations and price spikes
+- [x] Hardware depreciation and server refresh cycle
+- [x] Reputation score affecting contract quality and revenue bonuses
+- [x] 6 new achievements for Phase 2/3 features
+
 ## Future: Sub-Floor View (Plane 1)
 - [ ] Third view mode: raised floor plenum
 - [ ] Cooling pipes, chilled air flow visualization
@@ -56,10 +67,10 @@
 - [x] Small/Medium/Large loan options with interest rates
 - [x] Per-tick loan repayment deducted from income
 - [x] Max 3 active loans, finance panel integration
-- [ ] Spot pricing for power (market rate fluctuations)
+- [x] Spot pricing for power (market rate fluctuations with random walk and spikes)
 
 ## Achievement System
-- [x] 15 achievements tracking milestones (equipment, money, incidents, cooling)
+- [x] 15 achievements + 6 Phase 2/3 achievements tracking milestones
 - [x] Achievement unlock toast notifications
 - [x] Full achievements panel in HUD
 - [ ] Sandbox mode (unlimited budget, all tech unlocked)
@@ -89,7 +100,7 @@
 
 ### Customer & Contract System
 - [x] Tenant contracts — Companies rent capacity with SLA requirements (uptime %, latency, bandwidth); missing SLAs means penalties or lost contracts
-- [ ] Customer types — AI training (GPU-heavy), streaming (high bandwidth), crypto (cheap power), enterprise (high security); each with different demands and revenue
+- [x] Customer types — AI training (GPU-heavy), streaming (high bandwidth), crypto (cheap power), enterprise (high security); each with different demands and revenue
 - [ ] RFP bidding — Compete against rival data centers for large contracts by offering better pricing, uptime, or green certifications
 
 ### Staff & HR
@@ -98,12 +109,12 @@
 - [ ] Shift management — Night shift staff cheaper but slower; understaffing during incidents causes cascading failures
 
 ### Research & Tech Tree
-- [ ] R&D lab — Invest to unlock technologies: liquid immersion cooling, optical interconnects, ARM servers, custom ASICs
-- [ ] Tech tree progression — Branch between efficiency (lower PUE), performance (higher density), or resilience (better failover)
+- [x] R&D lab — Invest to unlock technologies: immersion cooling, optical interconnects, GPU clusters, UPS upgrades
+- [x] Tech tree progression — 3 branches: efficiency (lower PUE), performance (higher density), resilience (better failover)
 - [ ] Patent system — Developed tech can be patented for passive income or license others' tech
 
 ### Reputation & Market
-- [ ] Reputation score — Uptime history, green energy, and incident response build public reputation affecting which customers approach you
+- [x] Reputation score — Uptime history and incident response build reputation affecting contract quality and revenue bonuses
 - [ ] Stock price / company valuation — Live ticker reflecting performance, unlocking investor funding for expansion
 - [ ] Competitor AI — Rival data center companies bid on same contracts, race to adopt tech, and poach your staff
 
@@ -129,14 +140,14 @@
 - [ ] Workload migration — Manually or automatically migrate VMs when racks overheat or switches fail
 
 ### Disaster & Recovery
-- [ ] Backup generators — Diesel or natural gas with finite fuel; power outages test UPS and generator capacity
-- [ ] Fire suppression systems — Gas-based (expensive, electronics-safe) vs. water-based (cheap, destructive); fires from overloaded circuits
+- [x] Backup generators — Diesel, large diesel, and natural gas with finite fuel; auto-start on power outages
+- [x] Fire suppression systems — Gas-based (FM-200, electronics-safe) vs. water-based (cheap, destructive); fires from critical temps
 - [ ] Disaster recovery drills — Periodic failover tests; passing boosts reputation, failing reveals weaknesses
 
 ### Economy & Finance
 - [x] Loan system — Take loans for rapid expansion; interest payments eat into margins
-- [ ] Spot pricing for power — Electricity costs fluctuate with market rates; buy long-term contracts or gamble on spot pricing
-- [ ] Hardware depreciation — Servers lose value and efficiency over time; refresh cycles are strategic decisions
+- [x] Spot pricing for power — Electricity costs fluctuate with random walk, mean reversion, and price spikes
+- [x] Hardware depreciation — Servers lose efficiency over time; refresh cycles restore performance at a cost
 - [ ] Insurance policies — Insure against specific disasters; cheaper premiums with good safety records
 
 ### Social & Meta
