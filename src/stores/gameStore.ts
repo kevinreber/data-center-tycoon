@@ -91,6 +91,63 @@ export const INCIDENT_CATALOG: IncidentDef[] = [
 const INCIDENT_CHANCE = 0.02
 const MAX_ACTIVE_INCIDENTS = 3
 
+// ── Contract / Tenant System Types ──────────────────────────────
+
+export type ContractTier = 'bronze' | 'silver' | 'gold'
+
+export interface ContractDef {
+  type: string
+  company: string
+  tier: ContractTier
+  description: string
+  minServers: number           // minimum production servers needed online
+  maxTemp: number              // max avg facility temp (SLA)
+  revenuePerTick: number       // bonus $/tick while SLA met
+  durationTicks: number        // contract length
+  penaltyPerTick: number       // $/tick deducted when SLA violated
+  terminationTicks: number     // consecutive violation ticks before contract lost
+  completionBonus: number      // bonus $ on successful completion
+}
+
+export interface ActiveContract {
+  id: string
+  def: ContractDef
+  ticksRemaining: number
+  consecutiveViolations: number
+  totalViolationTicks: number
+  totalEarned: number
+  totalPenalties: number
+  status: 'active' | 'completed' | 'terminated'
+}
+
+export const CONTRACT_CATALOG: ContractDef[] = [
+  // Bronze tier — easy requirements, modest pay
+  { type: 'startup_cloud', company: 'StartupCo', tier: 'bronze', description: 'Small SaaS startup needs basic cloud hosting. Lenient SLA.', minServers: 2, maxTemp: 90, revenuePerTick: 8, durationTicks: 100, penaltyPerTick: 4, terminationTicks: 15, completionBonus: 1500 },
+  { type: 'dev_agency', company: 'DevForge', tier: 'bronze', description: 'Web development agency needs staging servers. Flexible on downtime.', minServers: 3, maxTemp: 85, revenuePerTick: 10, durationTicks: 80, penaltyPerTick: 5, terminationTicks: 12, completionBonus: 1200 },
+  { type: 'indie_game', company: 'PixelDream', tier: 'bronze', description: 'Indie game studio hosting multiplayer backend. Moderate needs.', minServers: 2, maxTemp: 85, revenuePerTick: 9, durationTicks: 120, penaltyPerTick: 4, terminationTicks: 15, completionBonus: 2000 },
+  // Silver tier — moderate requirements, good pay
+  { type: 'streaming_cdn', company: 'StreamFlix', tier: 'silver', description: 'Video streaming CDN edge node. Needs reliable bandwidth and uptime.', minServers: 6, maxTemp: 78, revenuePerTick: 25, durationTicks: 200, penaltyPerTick: 15, terminationTicks: 10, completionBonus: 6000 },
+  { type: 'ecommerce', company: 'ShopEngine', tier: 'silver', description: 'E-commerce platform. Transaction processing requires stable temps.', minServers: 5, maxTemp: 75, revenuePerTick: 22, durationTicks: 180, penaltyPerTick: 12, terminationTicks: 10, completionBonus: 5000 },
+  { type: 'saas_platform', company: 'CloudStack', tier: 'silver', description: 'Enterprise SaaS provider. Needs consistent availability for B2B clients.', minServers: 8, maxTemp: 78, revenuePerTick: 30, durationTicks: 250, penaltyPerTick: 18, terminationTicks: 8, completionBonus: 8000 },
+  // Gold tier — strict SLA, high pay
+  { type: 'bank_trading', company: 'MegaBank', tier: 'gold', description: 'High-frequency trading platform. Zero tolerance for thermal issues.', minServers: 10, maxTemp: 70, revenuePerTick: 60, durationTicks: 300, penaltyPerTick: 40, terminationTicks: 5, completionBonus: 20000 },
+  { type: 'ai_training', company: 'DeepMind Labs', tier: 'gold', description: 'Large language model training cluster. Massive compute, strict cooling.', minServers: 12, maxTemp: 72, revenuePerTick: 70, durationTicks: 250, penaltyPerTick: 45, terminationTicks: 6, completionBonus: 18000 },
+  { type: 'gov_secure', company: 'GovCloud', tier: 'gold', description: 'Government secure cloud workloads. Maximum reliability required.', minServers: 10, maxTemp: 68, revenuePerTick: 55, durationTicks: 350, penaltyPerTick: 35, terminationTicks: 5, completionBonus: 22000 },
+]
+
+/** How often (in ticks) new contract offers refresh */
+const CONTRACT_OFFER_INTERVAL = 50
+/** Max contracts a player can have active at once */
+const MAX_ACTIVE_CONTRACTS = 3
+/** Number of offers available at a time */
+const CONTRACT_OFFER_COUNT = 3
+
+export const CONTRACT_TIER_COLORS: Record<ContractTier, string> = {
+  bronze: '#cd7f32',
+  silver: '#c0c0c0',
+  gold: '#ffd700',
+}
+
 // ── Achievement System Types ────────────────────────────────────
 
 export interface AchievementDef {
@@ -121,6 +178,10 @@ export const ACHIEVEMENT_CATALOG: AchievementDef[] = [
   { id: 'thermal_crisis', label: 'Feeling the Heat', description: 'Have a cabinet reach critical temperature (95°C).', icon: '🔥' },
   { id: 'five_incidents', label: 'Veteran Operator', description: 'Resolve 5 incidents.', icon: '⭐' },
   { id: 'full_grid', label: 'No Vacancy', description: 'Fill all 32 cabinet slots.', icon: '🏢' },
+  { id: 'first_contract', label: 'Open for Business', description: 'Accept your first tenant contract.', icon: '📋' },
+  { id: 'contract_complete', label: 'Delivered', description: 'Successfully complete a tenant contract.', icon: '🤝' },
+  { id: 'gold_contract', label: 'Enterprise Grade', description: 'Accept a Gold tier contract.', icon: '👑' },
+  { id: 'three_contracts', label: 'Full House', description: 'Have 3 active contracts simultaneously.', icon: '🏆' },
 ]
 
 export interface EnvironmentConfig {
@@ -505,6 +566,14 @@ interface GameState {
   achievements: Achievement[]
   newAchievement: Achievement | null  // most recently unlocked (for toast)
 
+  // Contracts
+  contractOffers: ContractDef[]        // available contracts to accept
+  activeContracts: ActiveContract[]    // accepted contracts
+  contractLog: string[]                // recent contract messages
+  contractRevenue: number              // contract bonus revenue last tick
+  contractPenalties: number            // contract penalties last tick
+  completedContracts: number           // total contracts completed successfully
+
   // Visual
   layerVisibility: LayerVisibility
   layerOpacity: LayerOpacity
@@ -536,6 +605,7 @@ interface GameState {
   upgradeCooling: (type: CoolingType) => void
   takeLoan: (optionIndex: number) => void
   resolveIncident: (id: string) => void
+  acceptContract: (index: number) => void
   dismissAchievement: () => void
   tick: () => void
 }
@@ -544,6 +614,7 @@ let nextCabId = 1
 let nextSpineId = 1
 let nextLoanId = 1
 let nextIncidentId = 1
+let nextContractId = 1
 
 export const useGameStore = create<GameState>((set) => ({
   cabinets: [],
@@ -578,6 +649,14 @@ export const useGameStore = create<GameState>((set) => ({
   // Achievements
   achievements: [],
   newAchievement: null,
+
+  // Contracts
+  contractOffers: [],
+  activeContracts: [],
+  contractLog: [],
+  contractRevenue: 0,
+  contractPenalties: 0,
+  completedContracts: 0,
 
   // Visual
   layerVisibility: { server: true, leaf_switch: true, spine_switch: true },
@@ -777,6 +856,28 @@ export const useGameStore = create<GameState>((set) => ({
       }
     }),
 
+  acceptContract: (index: number) =>
+    set((state) => {
+      const def = state.contractOffers[index]
+      if (!def) return state
+      if (state.activeContracts.length >= MAX_ACTIVE_CONTRACTS) return state
+      const contract: ActiveContract = {
+        id: `contract-${nextContractId++}`,
+        def,
+        ticksRemaining: def.durationTicks,
+        consecutiveViolations: 0,
+        totalViolationTicks: 0,
+        totalEarned: 0,
+        totalPenalties: 0,
+        status: 'active',
+      }
+      return {
+        activeContracts: [...state.activeContracts, contract],
+        contractOffers: state.contractOffers.filter((_, i) => i !== index),
+        contractLog: [`Accepted: ${def.company} — ${def.description}`, ...state.contractLog].slice(0, 10),
+      }
+    }),
+
   dismissAchievement: () => set({ newAchievement: null }),
 
   tick: () =>
@@ -813,7 +914,7 @@ export const useGameStore = create<GameState>((set) => ({
       // ── Incident system ────────────────────────────────────
       let activeIncidents = [...state.activeIncidents]
       let incidentLog = [...state.incidentLog]
-      let resolvedCount = state.resolvedCount
+      const resolvedCount = state.resolvedCount
 
       // Tick down active incidents
       activeIncidents = activeIncidents
@@ -966,11 +1067,89 @@ export const useGameStore = create<GameState>((set) => ({
         })
         .filter((loan) => loan.remaining > 0.01)
 
-      // 6. Update money
-      const netIncome = revenue - expenses - loanPayments
+      // 6. Process contracts — SLA checks, revenue, penalties
+      const activeProductionServers = newCabinets
+        .filter((c) => c.environment === 'production' && c.powerStatus)
+        .reduce((sum, c) => sum + c.serverCount, 0)
+
+      let contractRevenue = 0
+      let contractPenalties = 0
+      let contractLog = [...state.contractLog]
+      let completedContracts = state.completedContracts
+
+      const updatedContracts = state.activeContracts
+        .map((contract) => {
+          if (contract.status !== 'active') return contract
+
+          // Check SLA: enough production servers online AND avg temp within limits
+          const slaMet = activeProductionServers >= contract.def.minServers &&
+            stats.avgHeat <= contract.def.maxTemp
+
+          let consecutiveViolations = contract.consecutiveViolations
+          let totalViolationTicks = contract.totalViolationTicks
+          let totalEarned = contract.totalEarned
+          let totalPenalties = contract.totalPenalties
+          let status: 'active' | 'completed' | 'terminated' = contract.status
+
+          if (slaMet) {
+            consecutiveViolations = 0
+            contractRevenue += contract.def.revenuePerTick
+            totalEarned += contract.def.revenuePerTick
+          } else {
+            consecutiveViolations++
+            totalViolationTicks++
+            contractPenalties += contract.def.penaltyPerTick
+            totalPenalties += contract.def.penaltyPerTick
+          }
+
+          // Check for termination
+          if (consecutiveViolations >= contract.def.terminationTicks) {
+            status = 'terminated'
+            contractLog = [`TERMINATED: ${contract.def.company} — SLA violated for ${consecutiveViolations} consecutive ticks`, ...contractLog].slice(0, 10)
+            return { ...contract, consecutiveViolations, totalViolationTicks, totalEarned, totalPenalties, status: status as 'terminated', ticksRemaining: 0 }
+          }
+
+          // Check for completion
+          const ticksRemaining = contract.ticksRemaining - 1
+          if (ticksRemaining <= 0) {
+            status = 'completed'
+            completedContracts++
+            // Completion bonus added to contract revenue
+            contractRevenue += contract.def.completionBonus
+            totalEarned += contract.def.completionBonus
+            contractLog = [`COMPLETED: ${contract.def.company} — Bonus $${contract.def.completionBonus.toLocaleString()}!`, ...contractLog].slice(0, 10)
+            return { ...contract, consecutiveViolations, totalViolationTicks, totalEarned, totalPenalties, status: status as 'completed', ticksRemaining: 0 }
+          }
+
+          return { ...contract, consecutiveViolations, totalViolationTicks, totalEarned, totalPenalties, ticksRemaining }
+        })
+        .filter((c) => c.status === 'active') // Remove completed/terminated
+
+      // Generate new contract offers periodically
+      let contractOffers = state.contractOffers
+      if (newTickCount % CONTRACT_OFFER_INTERVAL === 0 || (state.contractOffers.length === 0 && newCabinets.length >= 2)) {
+        // Filter eligible contracts based on facility size
+        const eligible = CONTRACT_CATALOG.filter((def) => {
+          // Only offer contracts the player could plausibly fulfill
+          const totalProdServers = newCabinets
+            .filter((c) => c.environment === 'production')
+            .reduce((sum, c) => sum + c.serverCount, 0)
+          return totalProdServers >= Math.ceil(def.minServers * 0.5) // Offer if player has at least half the required servers
+        })
+        if (eligible.length > 0) {
+          // Pick random offers (no duplicates of active contracts)
+          const activeTypes = new Set(updatedContracts.map((c) => c.def.type))
+          const available = eligible.filter((d) => !activeTypes.has(d.type))
+          const shuffled = [...available].sort(() => Math.random() - 0.5)
+          contractOffers = shuffled.slice(0, CONTRACT_OFFER_COUNT)
+        }
+      }
+
+      // 7. Update money (now includes contract revenue/penalties)
+      const netIncome = revenue + contractRevenue - expenses - loanPayments - contractPenalties
       const newMoney = Math.round((state.money + netIncome) * 100) / 100
 
-      // 7. Calculate traffic flows (scaled by demand multiplier, modified by incidents)
+      // 8. Calculate traffic flows (scaled by demand multiplier, modified by incidents)
       const effectiveDemand = demandMultiplier * incidentTrafficMult
       const trafficStats = calcTraffic(newCabinets, state.spineSwitches, effectiveDemand)
 
@@ -1004,6 +1183,10 @@ export const useGameStore = create<GameState>((set) => ({
       if (newMoney >= 1000000) unlock('million')
       if (stats.pue > 0 && stats.pue <= 1.30) unlock('low_pue')
       if (newCabinets.some((c) => c.heatLevel >= SIM.criticalTemp)) unlock('thermal_crisis')
+      if (state.activeContracts.length > 0 || updatedContracts.length > 0) unlock('first_contract')
+      if (completedContracts > 0) unlock('contract_complete')
+      if (state.activeContracts.some((c) => c.def.tier === 'gold') || updatedContracts.some((c) => c.def.tier === 'gold')) unlock('gold_contract')
+      if (updatedContracts.length >= 3) unlock('three_contracts')
 
       return {
         cabinets: newCabinets,
@@ -1024,6 +1207,12 @@ export const useGameStore = create<GameState>((set) => ({
         activeIncidents,
         incidentLog,
         resolvedCount,
+        activeContracts: updatedContracts,
+        contractOffers,
+        contractLog,
+        contractRevenue: +contractRevenue.toFixed(2),
+        contractPenalties: +contractPenalties.toFixed(2),
+        completedContracts,
         achievements: newAchievements,
         newAchievement,
         ...stats,
