@@ -211,19 +211,12 @@ class DataCenterScene extends Phaser.Scene {
       // If left-click didn't become a drag, treat as cabinet selection click
       if (this.isPotentialDrag && !this.isDragging && !this.placementActive) {
         const wp = this.cameras.main.getWorldPoint(pointer.x, pointer.y)
-        const tile = this.screenToIso(wp.x, wp.y)
-        if (tile) {
-          let foundCab: string | null = null
-          for (const [id, entry] of this.cabEntries) {
-            if (entry.col === tile.col && entry.row === tile.row) {
-              foundCab = id
-              break
-            }
-          }
-          this.selectedCabinetId = foundCab
-          this.renderSelection()
-          if (this.onCabinetSelect) this.onCabinetSelect(foundCab)
-        }
+        // Use visual bounding box hit test so clicking anywhere on the cabinet
+        // (servers, leaf switch, labels) selects it — not just the ground tile
+        const foundCab = this.findCabinetAtPoint(wp.x, wp.y)
+        this.selectedCabinetId = foundCab
+        this.renderSelection()
+        if (this.onCabinetSelect) this.onCabinetSelect(foundCab)
       }
       if (this.isDragging) {
         this.game.canvas.style.cursor = 'default'
@@ -268,6 +261,37 @@ class DataCenterScene extends Phaser.Scene {
     const roundRow = Math.floor(row)
     if (roundCol < 0 || roundCol >= this.cabCols || roundRow < 0 || roundRow >= this.cabRows) return null
     return { col: roundCol, row: roundRow }
+  }
+
+  /** Find the cabinet whose visual bounding box contains the given world point.
+   *  Cabinets are tall isometric cubes, so we check the full rendered area (not just the ground tile).
+   *  If multiple overlap, we pick the one closest to the camera (highest depth). */
+  private findCabinetAtPoint(wx: number, wy: number): string | null {
+    let bestId: string | null = null
+    let bestDepth = -1
+
+    for (const [id, entry] of this.cabEntries) {
+      const { x, y } = this.isoToScreen(entry.col, entry.row)
+      const cx = x
+      const cy = y + TILE_H / 2
+
+      // AABB of the cabinet's rendered isometric prism
+      const minX = cx - CUBE_W / 2
+      const maxX = cx + CUBE_W / 2
+      const minY = cy - CABINET_ENCLOSURE_DEPTH - 10 // a bit above the top for labels
+      const maxY = cy + CUBE_H / 2
+
+      if (wx >= minX && wx <= maxX && wy >= minY && wy <= maxY) {
+        // Depth: higher row/col = closer to camera
+        const depth = entry.row * this.cabCols + entry.col
+        if (depth > bestDepth) {
+          bestDepth = depth
+          bestId = id
+        }
+      }
+    }
+
+    return bestId
   }
 
   /** Draw hover highlight on grid tile during placement mode */
