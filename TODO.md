@@ -26,18 +26,18 @@
 ## Phase 4: Add World (Next Up)
 
 ### 4A. Staff & HR System
-- [ ] `StaffMember` type with role, skill level, salary, fatigue, certifications
-- [ ] 4 staff roles: network_engineer, electrician, cooling_specialist, security_officer
-- [ ] 3 skill levels (junior/mid/senior) with hire costs and salary scaling
-- [ ] Hiring UI panel with available candidates and role filters
-- [ ] Staff roster display showing names, roles, skill, shift status, fatigue
-- [ ] Incident resolution speed bonus based on relevant staff on shift
-- [ ] Fatigue system — back-to-back incidents increase fatigue, burnout at 100
-- [ ] Shift patterns: day_only (free), day_night ($500/tick), round_the_clock ($1200/tick)
-- [ ] Night shift effectiveness penalty (-20%) when on day_night pattern
-- [ ] Training system — send staff to certifications (CCNA, DCIM, Fire Safety, etc.)
-- [ ] Suite tier gates on max staff count (starter=2, standard=4, professional=8, enterprise=16)
-- [ ] 4 achievements: First Hire, Full Staff, Zero Fatigue, Certified Team
+- [x] `StaffMember` type with role, skill level, salary, fatigue, certifications
+- [x] 4 staff roles: network_engineer, electrician, cooling_specialist, security_officer
+- [x] 3 skill levels (junior/mid/senior) with hire costs and salary scaling
+- [x] Hiring UI panel with available candidates and role filters
+- [x] Staff roster display showing names, roles, skill, shift status, fatigue
+- [x] Incident resolution speed bonus based on relevant staff on shift
+- [x] Fatigue system — back-to-back incidents increase fatigue, burnout at 100
+- [x] Shift patterns: day_only (free), day_night ($500/tick), round_the_clock ($1200/tick)
+- [x] Night shift effectiveness penalty (-20%) when on day_night pattern
+- [x] Training system — send staff to certifications (CCNA, DCIM, Fire Safety, etc.)
+- [x] Suite tier gates on max staff count (starter=2, standard=4, professional=8, enterprise=16)
+- [x] 4 achievements: First Hire, Full Staff, Zero Fatigue, Certified Team
 
 ### 4B. Carbon Footprint & Environmental
 - [ ] `EnergySource` type: grid_mixed, grid_green, onsite_solar, onsite_wind
