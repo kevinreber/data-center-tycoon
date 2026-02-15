@@ -41,7 +41,7 @@ function App() {
   const activeNodes = cabinets.filter((c) => c.powerStatus).length + spineSwitches.filter((s) => s.powerStatus).length
   const netIncome = revenue - expenses - loanPayments
   const tickRef = useRef(tick)
-  tickRef.current = tick
+  useEffect(() => { tickRef.current = tick }, [tick])
 
   // Auto-load demo from URL parameter (?demo=true)
   useEffect(() => {
