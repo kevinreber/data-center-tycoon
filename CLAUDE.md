@@ -18,6 +18,7 @@
 | Language | TypeScript 5.9 (strict mode) |
 | Icons | lucide-react |
 | Linting | ESLint 9 (flat config) |
+| Testing | Vitest 4 (jsdom environment) |
 
 ## Commands
 
@@ -25,10 +26,11 @@
 npm run dev       # Start Vite dev server with hot reload
 npm run build     # Type-check (tsc -b) then production build (vite build)
 npm run lint      # Lint all .ts/.tsx files with ESLint
+npm run test      # Run Vitest test suite
 npm run preview   # Serve production build locally
 ```
 
-There is no test runner configured. Linting (`npm run lint`) is the primary code quality check.
+Linting (`npm run lint`) and tests (`npm run test`) are the primary code quality checks. Always run both before submitting changes.
 
 ## Project Structure
 
@@ -39,17 +41,39 @@ src/
 ├── index.css                   # Global styles, Tailwind imports, neon color theme
 ├── components/
 │   ├── GameCanvas.tsx          # Phaser <-> React bridge; syncs Zustand state to Phaser scene
-│   ├── HUD.tsx                 # Main control panel (build, layers, finance, traffic, equipment)
+│   ├── Sidebar.tsx             # Icon-rail sidebar with 13 slide-out panels
+│   ├── HUD.tsx                 # Legacy control panel (build, layers, finance, traffic, equipment)
+│   ├── CabinetDetailPanel.tsx  # Floating detail panel for selected cabinet (stats, actions)
+│   ├── LayersPopup.tsx         # Layer visibility/opacity/color controls popup
 │   ├── StatusBar.tsx           # Bottom footer bar (status, nodes, tick, speed, suite tier, version)
-│   └── ui/                     # shadcn/ui primitives
-│       ├── badge.tsx
-│       ├── button.tsx
-│       ├── card.tsx
-│       └── tooltip.tsx
+│   ├── ui/                     # shadcn/ui primitives
+│   │   ├── badge.tsx
+│   │   ├── button.tsx
+│   │   ├── card.tsx
+│   │   └── tooltip.tsx
+│   └── sidebar/                # Individual sidebar panel components
+│       ├── BuildPanel.tsx      # Cabinet placement, environment, customer type
+│       ├── EquipmentPanel.tsx  # Server/switch upgrades, server configs
+│       ├── FinancePanel.tsx    # Revenue, expenses, loans, stock price
+│       ├── NetworkPanel.tsx    # Traffic, peering, meet-me rooms, interconnects
+│       ├── OperationsPanel.tsx # Power, cooling, generators, maintenance
+│       ├── InfrastructurePanel.tsx # PDUs, cable trays, busways, cross-connects
+│       ├── ResearchPanel.tsx   # Tech tree, patents
+│       ├── ContractsPanel.tsx  # Contracts, RFP bidding
+│       ├── IncidentsPanel.tsx  # Active incidents, DR drills, insurance
+│       ├── FacilityPanel.tsx   # Suite upgrades, noise, sound barriers, power redundancy
+│       ├── ProgressPanel.tsx   # Achievements, reputation, lifetime stats
+│       ├── SettingsPanel.tsx   # Save/load, sandbox mode, reset, demo
+│       └── GuidePanel.tsx      # How to play / tutorial
 ├── game/
-│   └── PhaserGame.ts           # Phaser scene: isometric rendering, traffic visualization, placement mode
+│   ├── PhaserGame.ts           # Phaser scene: isometric rendering, traffic visualization, placement mode
+│   └── CLAUDE.md               # Phaser-specific coding rules (see Sub-module Rules below)
 ├── stores/
-│   └── gameStore.ts            # Single Zustand store (~2500 lines): all game state, types, constants, actions
+│   ├── gameStore.ts            # Single Zustand store (~5300 lines): all game state, types, constants, actions
+│   ├── gameStore.test.ts       # Vitest tests for cabinet placement and placement hints
+│   ├── __tests__/
+│   │   └── gameStore.test.ts   # Vitest tests for Phase 5 systems (supply chain, weather, etc.)
+│   └── CLAUDE.md               # Store-specific coding rules (see Sub-module Rules below)
 └── lib/
     └── utils.ts                # cn() utility for Tailwind class merging
 ```
@@ -64,28 +88,52 @@ src/
 ### Configuration files
 
 - `eslint.config.js` — ESLint 9 flat config (tseslint, react-hooks, react-refresh plugins)
+- `vitest.config.ts` — Vitest config (jsdom environment, globals enabled, `@/` alias)
 - `components.json` — shadcn/ui config (New York style, neutral base, CSS variables, lucide icons)
-- `vite.config.ts` — Vite config with `@/` alias and Phaser manual chunk splitting
+- `vite.config.ts` — Vite config with `@/` alias, Phaser manual chunk splitting, base path `/data-center-tycoon/`
 - `tsconfig.json` — Project references to `tsconfig.app.json` and `tsconfig.node.json`
 - `tsconfig.app.json` — App TypeScript config (strict, ES2022, bundler resolution, `verbatimModuleSyntax`)
+
+### Claude Code configuration
+
+- `.claude/settings.json` — Hooks: ESLint runs after Edit/Write on `.ts/.tsx` files; lint + type-check on session start
+- `.claude/skills/add-feature/SKILL.md` — 7-step feature addition checklist (invoked with `/add-feature`)
+
+## Sub-module Rules
+
+The codebase has module-specific `CLAUDE.md` files with focused rules:
+
+- **`src/game/CLAUDE.md`** — Phaser rendering rules: procedural graphics only, isometric coordinate system, `drawIsoCube()` usage, neon color palette, public API pattern (add/update methods), one-way data flow (React → Phaser), dynamic grid handling, monospace text
+- **`src/stores/CLAUDE.md`** — Store rules: immutable updates via spread operators, always recalculate after mutations (`calcStats()`/`calcTraffic()`), no `enum`/`namespace`, `import type` for type-only imports, naming conventions, catalog pattern for data-driven features, `tick()` ordering
 
 ## Architecture
 
 ### State Management — `src/stores/gameStore.ts`
 
-All game state lives in a **single Zustand store** (`useGameStore`). This ~2500-line file contains:
+All game state lives in a **single Zustand store** (`useGameStore`). This ~5300-line file contains:
 
 - **Type definitions** (see Types section below)
 - **Simulation constants** (`SIM`): revenue rates, power costs, heat generation/dissipation, temperature thresholds
 - **Equipment constants**: `MAX_SERVERS_PER_CABINET` (4), `MAX_CABINETS` (50), `MAX_SPINES` (8), costs, power draw
 - **Suite tier configs** (`SUITE_TIERS`): grid dimensions and spine slots per tier
 - **Customer type configs** (`CUSTOMER_TYPE_CONFIG`): power/heat/revenue/bandwidth multipliers per customer
-- **Infrastructure configs**: PDU options, cable tray options, aisle configuration
-- **Economy configs**: loan options, depreciation, power market parameters
-- **Progression configs**: tech tree (9 techs), contracts (9 contracts), achievements (25), incidents (8 types)
+- **Infrastructure configs**: PDU options, cable tray options, aisle configuration, busway options, cross-connect options, in-row cooling options
+- **Economy configs**: loan options, depreciation, power market parameters, insurance options, valuation milestones
+- **Progression configs**: tech tree (9 techs), contracts (9 contracts), achievements (45+), incidents (20+ types), scenarios (5)
+- **Staff configs** (`STAFF_ROLE_CONFIG`, `STAFF_CERT_CONFIG`, `SHIFT_PATTERN_CONFIG`): roles, certifications, shift costs
+- **Supply chain configs** (`SUPPLY_CHAIN_CONFIG`): lead times, bulk discounts, shortage mechanics
+- **Weather configs** (`SEASON_CONFIG`, `WEATHER_CONDITION_CONFIG`): seasonal/weather ambient modifiers
+- **Interconnection configs** (`MEETME_ROOM_CONFIG`, `INTERCONNECT_PORT_CONFIG`): meet-me room tiers, port types
+- **Server configuration options** (`SERVER_CONFIG_OPTIONS`): 5 server types with cost/power/heat/revenue multipliers
+- **Peering options** (`PEERING_OPTIONS`): 4 transit/peering agreement types
+- **Maintenance configs** (`MAINTENANCE_CONFIG`): preventive maintenance for 4 target types
+- **Power redundancy configs** (`POWER_REDUNDANCY_CONFIG`): N, N+1, 2N levels
+- **Noise configs** (`NOISE_CONFIG`): noise generation, complaints, fines, sound barriers
+- **Spot compute configs** (`SPOT_COMPUTE_CONFIG`): dynamic spot market pricing
+- **Tutorial tips** (`TUTORIAL_TIPS`): 18 contextual gameplay tips
 - **Traffic constants** (`TRAFFIC`): bandwidth per server, link capacity
-- **Pure calculation functions**: `calcStats()`, `calcTraffic()`, `calcTrafficWithCapacity()`, `coolingOverheadFactor()`, `calcManagementBonus()`, `calcAisleBonus()`, and more
-- **Store actions**: build, power, visual, simulation, finance, infrastructure, incidents, contracts, research
+- **Pure calculation functions**: `calcStats()`, `calcTraffic()`, `calcTrafficWithCapacity()`, `coolingOverheadFactor()`, `calcManagementBonus()`, `calcAisleBonus()`, `getPlacementHints()`, and more
+- **Store actions**: build, power, visual, simulation, finance, infrastructure, incidents, contracts, research, staff, supply chain, interconnection, peering, maintenance, save/load, and more
 
 **Pattern for accessing state in components:**
 ```typescript
@@ -117,15 +165,62 @@ Progression types:
 - `GeneratorStatus` = `'standby' | 'running' | 'cooldown'`
 - `SuppressionType` = `'none' | 'water_suppression' | 'gas_suppression'`
 
-Key interfaces:
+Staff & HR types:
+- `StaffRole` = `'network_engineer' | 'electrician' | 'cooling_specialist' | 'security_officer'`
+- `StaffSkillLevel` = `1 | 2 | 3`
+- `ShiftPattern` = `'day_only' | 'day_night' | 'round_the_clock'`
+- `StaffMember`, `StaffTraining` interfaces
+
+Supply chain & procurement types:
+- `OrderStatus` = `'pending' | 'in_transit' | 'delivered'`
+- `HardwareOrder`, `SupplyChainConfig` interfaces
+
+Weather types:
+- `Season` = `'spring' | 'summer' | 'autumn' | 'winter'`
+- `WeatherCondition` = `'clear' | 'cloudy' | 'rain' | 'storm' | 'heatwave' | 'cold_snap'`
+
+Interconnection types:
+- `InterconnectPortType` = `'copper_1g' | 'fiber_10g' | 'fiber_100g'`
+- `InterconnectPort`, `MeetMeRoomConfig` interfaces
+
+Server configuration types:
+- `ServerConfig` = `'balanced' | 'cpu_optimized' | 'gpu_accelerated' | 'storage_dense' | 'memory_optimized'`
+
+Network peering types:
+- `PeeringType` = `'budget_transit' | 'premium_transit' | 'public_peering' | 'private_peering'`
+- `PeeringAgreement`, `PeeringConfig` interfaces
+
+Maintenance types:
+- `MaintenanceTargetType` = `'cabinet' | 'spine' | 'cooling' | 'power'`
+- `MaintenanceStatus` = `'scheduled' | 'in_progress' | 'completed'`
+- `MaintenanceWindow` interface
+
+Power & insurance types:
+- `PowerRedundancy` = `'N' | 'N+1' | '2N'`
+- `InsurancePolicyType` = `'fire_insurance' | 'power_insurance' | 'cyber_insurance' | 'equipment_insurance'`
+
+Infrastructure entity types:
+- `Busway`, `CrossConnect`, `InRowCooling` interfaces
+
+Event & analytics types:
+- `EventCategory` = `'incident' | 'finance' | 'contract' | 'achievement' | 'infrastructure' | 'staff' | 'research' | 'system'`
+- `EventSeverity` = `'info' | 'warning' | 'error' | 'success'`
+- `EventLogEntry`, `HistoryPoint`, `LifetimeStats` interfaces
+
+Other types:
+- `ScenarioDef`, `ScenarioObjective` — challenge scenarios
+- `DrillResult`, `Patent`, `RFPOffer` — DR drills, patents, RFP bidding
+- `ValuationMilestone` — stock price milestones
+- `TutorialTip`, `SaveSlotMeta` — tutorial system, save slots
+
+Key interfaces (core):
 - `Cabinet` — grid position (col/row), environment, customerType, serverCount, hasLeafSwitch, powerStatus, heatLevel, serverAge, facing
 - `SpineSwitch` — id, powerStatus
 - `TrafficLink` — leafCabinetId, spineId, bandwidthGbps, capacityGbps, utilization, redirected
 - `TrafficStats` — totalFlows, totalBandwidthGbps, totalCapacityGbps, redirectedFlows, links, spineUtilization
 - `PDU`, `CableTray`, `CableRun` — infrastructure types
 - `Loan`, `Generator`, `ActiveIncident`, `ActiveContract`, `Achievement`, `ActiveResearch`
-
-Layer control types: `LayerVisibility`, `LayerOpacity`, `LayerColorOverrides`
+- `LayerVisibility`, `LayerOpacity`, `LayerColorOverrides`
 
 #### Store Actions
 
@@ -133,14 +228,36 @@ Layer control types: `LayerVisibility`, `LayerOpacity`, `LayerColorOverrides`
 |----------|---------|
 | Build | `addCabinet`, `enterPlacementMode`, `exitPlacementMode`, `upgradeNextCabinet`, `addLeafToNextCabinet`, `addSpineSwitch` |
 | Power | `toggleCabinetPower`, `toggleSpinePower` |
-| Visual | `toggleLayerVisibility`, `setLayerOpacity`, `setLayerColor`, `toggleTrafficVisible` |
+| Visual | `toggleLayerVisibility`, `setLayerOpacity`, `setLayerColor`, `toggleTrafficVisible`, `toggleHeatMap` |
 | Simulation | `setGameSpeed`, `upgradeCooling`, `tick` |
 | Finance | `takeLoan`, `refreshServers`, `upgradeSuite` |
-| Infrastructure | `placePDU`, `placeCableTray`, `autoRouteCables`, `toggleCabinetFacing` |
+| Infrastructure | `placePDU`, `placeCableTray`, `autoRouteCables`, `toggleCabinetFacing`, `placeBusway`, `placeCrossConnect`, `placeInRowCooling` |
 | Incidents | `resolveIncident`, `buyGenerator`, `activateGenerator`, `upgradeSuppression` |
 | Contracts | `acceptContract` |
 | Research | `startResearch` |
-| Misc | `dismissAchievement` |
+| Staff | `hireStaff`, `fireStaff`, `setShiftPattern`, `startTraining` |
+| Supply Chain | `placeOrder` |
+| Interconnection | `installMeetMeRoom`, `addInterconnectPort` |
+| Server Config | `setDefaultServerConfig` |
+| Peering | `addPeeringAgreement`, `removePeeringAgreement` |
+| Maintenance | `scheduleMaintenance` |
+| Power Redundancy | `upgradePowerRedundancy` |
+| Noise | `installSoundBarrier` |
+| Spot Compute | `setSpotCapacity` |
+| Insurance | `buyInsurance`, `cancelInsurance` |
+| DR Drills | `runDrill` |
+| Patents | `patentTech` |
+| RFP Bidding | `bidOnRFP` |
+| Scenarios | `startScenario`, `abandonScenario` |
+| Tutorial | `dismissTip`, `toggleTutorial` |
+| Save/Load | `saveGame`, `loadGame`, `deleteGame`, `resetGame`, `refreshSaveSlots` |
+| Sandbox/Demo | `toggleSandboxMode`, `loadDemoState`, `exitDemo` |
+| Misc | `dismissAchievement`, `selectCabinet` |
+
+#### Exported Functions
+
+- `getPlacementHints(col, row, cabinets, suiteTier)` — contextual placement strategy hints during cabinet placement
+- `calcTrafficWithCapacity(cabinets, spines, demandMultiplier, linkCapacity)` — traffic calculation with custom link capacity
 
 ### Phaser Rendering — `src/game/PhaserGame.ts`
 
@@ -188,6 +305,16 @@ The `DataCenterScene` class handles all isometric graphics using Phaser's Graphi
 - `addCableTrayToScene(id, col, row)`
 - `clearInfrastructure()` — clears PDUs and cable trays
 
+### UI Architecture
+
+The UI uses a **sidebar-driven navigation pattern**:
+
+- **`Sidebar.tsx`** renders an icon rail on the left with 13 panel icons organized into top/middle/bottom sections. Clicking an icon slides out the corresponding panel.
+- **`sidebar/*.tsx`** — Each panel is a separate component: `BuildPanel`, `EquipmentPanel`, `FinancePanel`, `NetworkPanel`, `OperationsPanel`, `InfrastructurePanel`, `ResearchPanel`, `ContractsPanel`, `IncidentsPanel`, `FacilityPanel`, `ProgressPanel`, `SettingsPanel`, `GuidePanel`
+- **`CabinetDetailPanel.tsx`** — Floating detail panel shown when a cabinet is selected; displays hardware slots, real-time stats (power, temp, revenue, age, traffic), and actions (power toggle, flip facing, refresh servers)
+- **`LayersPopup.tsx`** — Layer controls popup for toggling visibility, opacity, and custom colors per network layer
+- **`HUD.tsx`** — Legacy monolithic control panel (still present, ~2940 lines)
+
 ### React-Phaser Bridge — `src/components/GameCanvas.tsx`
 
 `GameCanvas` manages the Phaser game instance lifecycle and syncs Zustand state changes to the Phaser scene via `useEffect` hooks. It tracks previous counts via `useRef` to only add new objects, not re-create existing ones.
@@ -206,54 +333,131 @@ The `DataCenterScene` class handles all isometric graphics using Phaser's Graphi
 
 ### Game Tick Loop — `src/App.tsx`
 
-A `setInterval` in `App.tsx` calls `tick()` at the rate determined by `gameSpeed` (0=paused, 1=1000ms, 2=500ms, 3=250ms). The `tick()` function (~730 lines) processes these systems per tick:
+A `setInterval` in `App.tsx` calls `tick()` at the rate determined by `gameSpeed` (0=paused, 1=1000ms, 2=500ms, 3=250ms). The `tick()` function processes these systems per tick:
 
 1. **Time-of-day**: Advances `gameHour` (0–23), applies demand curve and random traffic spikes
-2. **Incidents**: Spawns random incidents (8 types), ticks active incidents, applies effects (revenue penalty, power surge, cooling failure, heat spike, traffic drop)
-3. **Tech tree**: Ticks active research progress
-4. **Power market**: Updates spot pricing with random walk, mean reversion, and price spikes (0.6–2.0x multiplier)
-5. **Generators**: Manages fuel consumption, startup/cooldown, auto-activation during outages
-6. **Fire system**: Triggers fires at critical temps (95°C), applies suppression logic
-7. **Heat**: Generates heat per server (+1.5°C), cools via system (-2.0 to -3.5°C), affected by environment/customer type/incidents/aisle violations/PDU overloads
-8. **Revenue**: $12/tick per server, modified by throttling, environment, customer type, depreciation, tech bonuses, outage/incident penalties
-9. **Expenses**: Power costs with market pricing, cooling costs, loan repayments
-10. **Infrastructure**: Checks aisle bonuses, cable mess penalties, PDU overloads
-11. **Contracts**: Checks SLA compliance, termination/completion logic
-12. **Reputation**: Adjusts score based on SLAs, outages, fires, violations
-13. **Depreciation**: Ages servers, reduces efficiency after 30% of 800-tick lifespan
-14. **Achievements**: Checks 25 achievement conditions
-15. **Traffic**: ECMP distribution across active spines
+2. **Weather**: Season rotation, weather condition changes, ambient temperature modifiers
+3. **Supply chain**: Ticks pending orders, delivery processing, supply shortage events
+4. **Incidents**: Spawns random incidents (20+ types), ticks active incidents, applies effects
+5. **Tech tree**: Ticks active research progress
+6. **Power market**: Updates spot pricing with random walk, mean reversion, and price spikes
+7. **Generators**: Manages fuel consumption, startup/cooldown, auto-activation during outages
+8. **Fire system**: Triggers fires at critical temps (95°C), applies suppression logic
+9. **Heat**: Generates heat per server (+1.5°C), cools via system (-2.0 to -3.5°C), affected by environment/customer type/incidents/aisle violations/PDU overloads/weather
+10. **Revenue**: $12/tick per server, modified by throttling, environment, customer type, depreciation, tech bonuses, outage/incident penalties, meet-me room income, patent royalties, spot compute revenue
+11. **Expenses**: Power costs with market pricing, cooling costs, loan repayments, staff salaries, peering costs, insurance premiums, maintenance costs, power redundancy overhead
+12. **Noise**: Calculates noise level, tracks complaints, applies fines if over threshold, zoning restrictions
+13. **Spot compute**: Updates spot market price, calculates spot revenue based on allocated capacity
+14. **Staff**: Processes fatigue, training, shift coverage, incident auto-resolution
+15. **Maintenance**: Ticks scheduled maintenance windows, applies benefits on completion
+16. **Infrastructure**: Checks aisle bonuses, cable mess penalties, PDU overloads
+17. **Contracts**: Checks SLA compliance, termination/completion logic
+18. **Reputation**: Adjusts score based on SLAs, outages, fires, violations
+19. **Depreciation**: Ages servers, reduces efficiency after 30% of 800-tick lifespan
+20. **Achievements**: Checks 45+ achievement conditions
+21. **Traffic**: ECMP distribution across active spines
+22. **Capacity history**: Records snapshot of current stats each tick (capped at 100 entries)
+23. **Lifetime stats**: Updates running totals (revenue, expenses, peak temp, uptime streaks, etc.)
+24. **Event logging**: Records significant events (capped at 200 entries)
+25. **Tutorial**: Triggers contextual tips based on game state
 
 ## Game Systems
 
-### Progression
+### Core Systems
 
-Players upgrade through **suite tiers** (starter → standard → professional → enterprise), unlocking larger grids and more spine slots. **Reputation** (unknown → legendary) gates access to higher-tier contracts. The **tech tree** has 3 branches (efficiency, performance, resilience) with 3 techs each.
+**Progression:** Players upgrade through **suite tiers** (starter → standard → professional → enterprise), unlocking larger grids and more spine slots. **Reputation** (unknown → legendary) gates access to higher-tier contracts. The **tech tree** has 3 branches (efficiency, performance, resilience) with 3 techs each.
 
-### Economy
-
+**Economy:**
 - **Revenue** from servers, modified by customer type, environment, throttling, depreciation, and tech bonuses
-- **Expenses** from power (dynamic market pricing), cooling, and loan repayments
+- **Additional revenue**: meet-me room interconnects, patent royalties, spot compute market, RFP contract wins
+- **Expenses** from power (dynamic market pricing), cooling, loan repayments, staff salaries, peering costs, insurance premiums, maintenance, power redundancy overhead, noise fines
 - **Loans** available in 3 tiers with different amounts/interest/terms
 - **Contracts** (bronze/silver/gold) provide bonus revenue with SLA requirements
 - **Power market** fluctuates with random walk, mean reversion, and spike events
+- **Stock price** tracked with valuation milestones
 
-### Infrastructure
-
+**Infrastructure:**
 - **Cabinet environments**: production (baseline), lab (low revenue, low heat), management (3% bonus per server, capped at 30%)
 - **Customer types**: general, ai_training, streaming, crypto, enterprise — each with power/heat/revenue/bandwidth multipliers
-- **Cooling**: air (2.0°C/tick, free) or water (3.5°C/tick, $25,000 upgrade)
+- **Cooling**: air (2.0°C/tick, free) or water (3.5°C/tick, $25,000 upgrade), plus in-row cooling units
 - **PDUs**: Power distribution units with capacity limits; overloaded PDUs cause heat and revenue penalties
 - **Cable trays**: Organized cabling reduces messy cable penalties
 - **Hot/cold aisles**: Proper cabinet facing (alternating north/south) provides cooling bonuses
+- **Busways**: Power distribution infrastructure with capacity options
+- **Cross-connects**: Direct physical connections between equipment
 - **Server depreciation**: Efficiency decays over time, refreshable for a cost
+- **Server configurations**: 5 types (balanced, cpu_optimized, gpu_accelerated, storage_dense, memory_optimized) with different cost/power/heat/revenue profiles
 
-### Incidents & Resilience
+### Advanced Systems
 
-- **8 incident types** with minor/major/critical severity
+**Staff & HR:**
+- 4 roles: network_engineer, electrician, cooling_specialist, security_officer
+- 3 skill levels per role, training/certification system
+- Shift patterns (day_only, day_night, round_the_clock) with cost implications
+- Staff fatigue and burnout tracking
+- Auto-resolution of incidents by qualified staff
+
+**Supply Chain & Procurement:**
+- Hardware orders with lead times and bulk discounts
+- Supply shortage events with price multipliers and extended lead times
+- Inventory management (server, leaf_switch, spine_switch, cabinet)
+
+**Weather System:**
+- 4 seasons (spring → summer → autumn → winter) with cyclical rotation
+- 6 weather conditions (clear, cloudy, rain, storm, heatwave, cold_snap)
+- Ambient temperature modifiers affecting cooling requirements
+
+**Interconnection / Meet-Me Rooms:**
+- Install meet-me rooms (3 tiers) with port capacity limits
+- 3 interconnect port types (copper_1g, fiber_10g, fiber_100g) generating passive revenue
+- Requires Standard suite tier or higher
+
+**Network Peering & Transit:**
+- 4 agreement types: budget_transit, premium_transit, public_peering, private_peering
+- Each with bandwidth, latency, and cost-per-tick trade-offs
+- Maximum 4 concurrent agreements
+
+**Maintenance Windows:**
+- Schedule preventive maintenance on cabinets, spines, cooling, or power systems
+- Each type has configurable duration and cost
+- Maximum 3 concurrent maintenance windows
+- Provides cooling/reliability benefits on completion
+
+**Power Redundancy:**
+- 3 levels: N (none), N+1, 2N
+- Higher levels provide power resilience at increased cost
+- Upgrade path: N → N+1 → 2N (no downgrades)
+
+**Noise & Community Relations:**
+- Noise generated by server/cooling activity
+- Noise complaints escalate to fines if threshold exceeded
+- Sound barriers reduce noise (configurable max count)
+- Zoning restrictions can be triggered by persistent violations
+
+**Spot Compute Market:**
+- Allocate spare server capacity to a dynamic spot market
+- Price fluctuates with mean reversion and volatility
+- Revenue based on allocated capacity × current spot price
+
+**Incidents & Resilience:**
+- **20+ incident types** with minor/major/critical severity
 - **Generators**: 3 options (Small Diesel, Large Diesel, Natural Gas) with fuel management
 - **Fire suppression**: none, water (cheap, some damage), gas (expensive, minimal damage)
 - **Fires** trigger at critical temperature (95°C)
+- **Insurance**: 4 policy types (fire, power, cyber, equipment)
+- **DR Drills**: Test disaster readiness, affects reputation
+
+**Additional Systems:**
+- **Patents**: Patent unlocked technologies for ongoing royalty income
+- **RFP Bidding**: Compete for contract wins/losses
+- **Scenario Challenges**: 5 predefined challenges with special rules and objectives
+- **Tutorial System**: 18 contextual tips triggered during gameplay
+- **Event Logging**: Filterable log of significant events (capped at 200)
+- **Capacity History**: Per-tick snapshot of key metrics (capped at 100)
+- **Lifetime Statistics**: Revenue, expenses, peak temp, uptime streaks, fires survived, etc.
+- **Save/Load System**: 3 save slots with metadata
+- **Sandbox Mode**: Unlimited funds for creative building
+- **Demo Mode**: Pre-populated professional-tier state (URL param `?demo=true`)
 
 ## Code Conventions
 
@@ -274,6 +478,7 @@ Players upgrade through **suite tiers** (starter → standard → professional �
 - shadcn/ui components live in `src/components/ui/` — add new ones via `npx shadcn add <component>`
 - Tooltip wrapping pattern: always wrap interactive elements with `<Tooltip><TooltipTrigger asChild>...<TooltipContent>` within a `<TooltipProvider>`
 - All layout uses Tailwind utility classes; no separate CSS modules
+- Sidebar panels follow the pattern in `src/components/sidebar/` — new game system UI should be added as a panel or within an existing panel
 
 ### Styling
 
@@ -290,6 +495,7 @@ Players upgrade through **suite tiers** (starter → standard → professional �
 - Immutable updates: spread operators to create new arrays/objects
 - Stats recalculated after every mutation via `calcStats()` and `calcTraffic()`
 - Module-level `let` counters for auto-incrementing IDs (`nextCabId`, `nextSpineId`)
+- `resetGame()` must reset all state fields to defaults
 
 ### Phaser
 
@@ -301,12 +507,22 @@ Players upgrade through **suite tiers** (starter → standard → professional �
 - Dynamic grid resizing via `setGridSize()` on suite tier upgrades
 - Interactive placement mode with tile hover/click callbacks
 
+### Testing
+
+- Tests use **Vitest** with `jsdom` environment
+- Test files located at `src/stores/gameStore.test.ts` and `src/stores/__tests__/gameStore.test.ts`
+- Store tests use helper pattern: `getState()` / `setState()` wrappers around `useGameStore`
+- `setupBasicDataCenter()` helper creates a standard test fixture (sandbox mode, cabinet with server + leaf + spine)
+- `beforeEach` resets store state via `getState().resetGame()`
+- Tests organized by game system in `describe()` blocks
+- Run with `npm run test`
+
 ## Domain Concepts
 
 | Term | Meaning |
 |------|---------|
 | Cabinet | A rack unit on the grid. Holds up to 4 servers and 1 leaf switch. Has environment and customer type. |
-| Server | Compute node inside a cabinet. Generates revenue, heat, and traffic. Subject to depreciation. |
+| Server | Compute node inside a cabinet. Generates revenue, heat, and traffic. Subject to depreciation. Configurable type. |
 | Leaf Switch | Top-of-rack (ToR) network switch. Connects cabinet servers to spines. |
 | Spine Switch | Backbone switch in the elevated row. Connects all leaf switches together. |
 | Clos Fabric | Spine-leaf network topology. Every leaf connects to every spine. |
@@ -318,6 +534,12 @@ Players upgrade through **suite tiers** (starter → standard → professional �
 | PDU | Power Distribution Unit. Distributes power to cabinets; can overload. |
 | Hot/Cold Aisle | Cabinet facing pattern. Proper alternation provides cooling bonus. |
 | Reputation | Score (0–100) that unlocks contracts and affects gameplay. |
+| Meet-Me Room | Shared interconnection facility where tenants connect. Generates passive revenue. |
+| Peering | Network interconnection agreement for transit/bandwidth. |
+| Busway | Overhead power distribution infrastructure. |
+| Cross-Connect | Direct physical cable connection between customer equipment. |
+| Spot Compute | On-demand compute capacity sold at dynamic market prices. |
+| Season | Time cycle (spring/summer/autumn/winter) affecting ambient temperature. |
 
 ## Simulation Parameters (quick reference)
 
@@ -327,7 +549,7 @@ Players upgrade through **suite tiers** (starter → standard → professional �
 - Server power: 450W, Leaf: 150W, Spine: 250W
 - Heat: +1.5°C/server/tick, +0.3°C/leaf/tick
 - Air cooling: -2.0°C/tick (free), Water cooling: -3.5°C/tick ($25,000 upgrade)
-- Ambient: 22°C, Throttle: 80°C, Critical: 95°C (fire trigger)
+- Ambient: 22°C (modified by weather), Throttle: 80°C, Critical: 95°C (fire trigger)
 - Starting money: $50,000
 - Traffic: 1 Gbps/server, 10 Gbps/link capacity
 
@@ -345,17 +567,22 @@ Each customer type (general, ai_training, streaming, crypto, enterprise) has dif
 - Lab: reduced revenue, reduced heat
 - Management: 3% bonus per management server (capped at 30%)
 
+### Server config multipliers
+Each server config (balanced, cpu_optimized, gpu_accelerated, storage_dense, memory_optimized) has different cost, power, heat, revenue multipliers and customer type bonuses.
+
 ## Adding New Features
 
-When adding new game systems or equipment types:
+When adding new game systems or equipment types, follow the 7-step checklist (also available via `/add-feature` skill):
 
 1. **Define types and constants** in `src/stores/gameStore.ts`
 2. **Add state fields and actions** to the `GameState` interface and store
-3. **Update `tick()`** if the feature affects per-tick simulation (~730-line function, add new system processing in the appropriate section)
+3. **Update `tick()`** if the feature affects per-tick simulation (add new system processing in the appropriate section — order matters)
 4. **Update `calcStats()`** if it affects power/heat calculations
 5. **Add Phaser rendering** in `src/game/PhaserGame.ts` with a public API method
 6. **Bridge in `GameCanvas.tsx`** — add `useEffect` hooks to sync new state to Phaser
-7. **Add UI controls** in `src/components/HUD.tsx` following existing panel patterns
+7. **Add UI controls** in the appropriate sidebar panel in `src/components/sidebar/`, or in `src/components/HUD.tsx`
+8. **Add tests** in `src/stores/__tests__/gameStore.test.ts` for new store actions and tick behavior
+9. **Update `resetGame()`** to reset all new state fields to defaults
 
 For new shadcn/ui components: `npx shadcn add <component-name>` (configured in `components.json`).
 
@@ -371,9 +598,17 @@ Add to `ACHIEVEMENT_CATALOG` in `gameStore.ts`. The `tick()` function checks all
 
 Add to `TECH_TREE` in `gameStore.ts`. Research is managed by `startResearch` action, progress ticked in `tick()`, and bonuses applied where relevant in the tick loop.
 
+### Adding new sidebar panels
+
+1. Create a new component in `src/components/sidebar/YourPanel.tsx`
+2. Add the panel to the `PanelId` type, `SIDEBAR_ITEMS`, and `PANEL_TITLES` in `Sidebar.tsx`
+3. Add a case to the `PanelContent` switch in `Sidebar.tsx`
+
 ## Build & Deployment
 
 - Phaser is split into a separate chunk via `manualChunks` in `vite.config.ts`
+- Base path configured as `/data-center-tycoon/` for GitHub Pages
 - Production build: `npm run build` outputs to `dist/`
-- No CI/CD pipeline configured — development uses PR-based workflow
-- No test suite — validate changes with `npm run lint` and `npm run build`
+- **CI/CD**: GitHub Actions workflow (`.github/workflows/deploy.yml`) deploys to GitHub Pages on push to `main`
+- Validate changes with `npm run lint`, `npm run test`, and `npm run build`
+- Demo available at deployment URL with `?demo=true` parameter
