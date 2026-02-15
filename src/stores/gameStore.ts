@@ -447,6 +447,332 @@ export const MAX_STAFF_BY_TIER: Record<SuiteTier, number> = {
   enterprise: 16,
 }
 
+// ── Supply Chain & Procurement Types ────────────────────────────────
+
+export type OrderStatus = 'pending' | 'in_transit' | 'delivered'
+
+export interface HardwareOrder {
+  id: string
+  itemType: 'server' | 'leaf_switch' | 'spine_switch' | 'cabinet'
+  quantity: number
+  unitCost: number
+  totalCost: number
+  leadTimeTicks: number
+  ticksRemaining: number
+  status: OrderStatus
+  orderedAtTick: number
+}
+
+export interface SupplyChainConfig {
+  itemType: string
+  baseLeadTime: number
+  shortageLeadTime: number
+  bulkThreshold: number
+  bulkDiscount: number
+}
+
+export const SUPPLY_CHAIN_CONFIG: SupplyChainConfig[] = [
+  { itemType: 'server', baseLeadTime: 3, shortageLeadTime: 8, bulkThreshold: 10, bulkDiscount: 0.85 },
+  { itemType: 'leaf_switch', baseLeadTime: 5, shortageLeadTime: 12, bulkThreshold: 5, bulkDiscount: 0.90 },
+  { itemType: 'spine_switch', baseLeadTime: 8, shortageLeadTime: 20, bulkThreshold: 3, bulkDiscount: 0.88 },
+  { itemType: 'cabinet', baseLeadTime: 2, shortageLeadTime: 5, bulkThreshold: 8, bulkDiscount: 0.80 },
+]
+
+// ── Weather System Types ────────────────────────────────────────────
+
+export type Season = 'spring' | 'summer' | 'autumn' | 'winter'
+export type WeatherCondition = 'clear' | 'cloudy' | 'rain' | 'storm' | 'heatwave' | 'cold_snap'
+
+export interface SeasonConfig {
+  season: Season
+  label: string
+  ambientModifier: number
+  solarEfficiency: number
+  windEfficiency: number
+  durationTicks: number
+  color: string
+}
+
+export const SEASON_CONFIG: SeasonConfig[] = [
+  { season: 'spring', label: 'Spring', ambientModifier: 2, solarEfficiency: 0.6, windEfficiency: 0.7, durationTicks: 200, color: '#88ff88' },
+  { season: 'summer', label: 'Summer', ambientModifier: 8, solarEfficiency: 0.9, windEfficiency: 0.4, durationTicks: 200, color: '#ffaa44' },
+  { season: 'autumn', label: 'Autumn', ambientModifier: 0, solarEfficiency: 0.5, windEfficiency: 0.8, durationTicks: 200, color: '#cc8844' },
+  { season: 'winter', label: 'Winter', ambientModifier: -5, solarEfficiency: 0.3, windEfficiency: 0.9, durationTicks: 200, color: '#aaddff' },
+]
+
+export interface WeatherConditionConfig {
+  condition: WeatherCondition
+  label: string
+  ambientModifier: number
+  solarMultiplier: number
+  windMultiplier: number
+  minDuration: number
+  maxDuration: number
+  chance: number
+  color: string
+}
+
+export const WEATHER_CONDITION_CONFIG: WeatherConditionConfig[] = [
+  { condition: 'clear', label: 'Clear', ambientModifier: 0, solarMultiplier: 1.0, windMultiplier: 0.8, minDuration: 10, maxDuration: 20, chance: 0.30, color: '#ffdd44' },
+  { condition: 'cloudy', label: 'Cloudy', ambientModifier: -1, solarMultiplier: 0.5, windMultiplier: 1.0, minDuration: 8, maxDuration: 15, chance: 0.25, color: '#aaaaaa' },
+  { condition: 'rain', label: 'Rain', ambientModifier: -2, solarMultiplier: 0.3, windMultiplier: 1.2, minDuration: 5, maxDuration: 12, chance: 0.20, color: '#6688cc' },
+  { condition: 'storm', label: 'Storm', ambientModifier: -3, solarMultiplier: 0.1, windMultiplier: 0.2, minDuration: 3, maxDuration: 8, chance: 0.10, color: '#445588' },
+  { condition: 'heatwave', label: 'Heatwave', ambientModifier: 10, solarMultiplier: 1.2, windMultiplier: 0.3, minDuration: 8, maxDuration: 15, chance: 0.10, color: '#ff4444' },
+  { condition: 'cold_snap', label: 'Cold Snap', ambientModifier: -8, solarMultiplier: 0.4, windMultiplier: 1.0, minDuration: 5, maxDuration: 10, chance: 0.05, color: '#44ccff' },
+]
+
+// ── Interconnection / Meet-Me Room Types ────────────────────────────
+
+export type InterconnectPortType = 'copper_1g' | 'fiber_10g' | 'fiber_100g'
+
+export interface InterconnectPort {
+  id: string
+  tenantName: string
+  portType: InterconnectPortType
+  revenuePerTick: number
+  installedAtTick: number
+}
+
+export interface InterconnectPortConfig {
+  portType: InterconnectPortType
+  label: string
+  installCost: number
+  revenuePerTick: number
+  capacityUsed: number
+}
+
+export const INTERCONNECT_PORT_CONFIG: InterconnectPortConfig[] = [
+  { portType: 'copper_1g', label: 'Copper 1G', installCost: 500, revenuePerTick: 3, capacityUsed: 1 },
+  { portType: 'fiber_10g', label: 'Fiber 10G', installCost: 2000, revenuePerTick: 10, capacityUsed: 1 },
+  { portType: 'fiber_100g', label: 'Fiber 100G', installCost: 8000, revenuePerTick: 35, capacityUsed: 2 },
+]
+
+export interface MeetMeRoomConfig {
+  label: string
+  installCost: number
+  portCapacity: number
+  maintenanceCostPerTick: number
+  description: string
+}
+
+export const MEETME_ROOM_CONFIG: MeetMeRoomConfig[] = [
+  { label: 'Basic Meet-Me Room', installCost: 15000, portCapacity: 12, maintenanceCostPerTick: 5, description: 'Small interconnection room with 12 ports.' },
+  { label: 'Standard Meet-Me Room', installCost: 40000, portCapacity: 24, maintenanceCostPerTick: 12, description: 'Standard meet-me room with 24 ports.' },
+  { label: 'Premium Meet-Me Room', installCost: 100000, portCapacity: 48, maintenanceCostPerTick: 25, description: 'Large interconnection facility with 48 ports.' },
+]
+
+// Tenant names for procedural interconnect port generation
+const INTERCONNECT_TENANTS = ['CloudFlare', 'Akamai', 'AWS Direct', 'Azure Express', 'Google Cloud', 'Netflix OCA', 'Meta Edge', 'Fastly', 'Limelight', 'Verizon Digital', 'AT&T Peering', 'Comcast IX', 'Level3', 'Zayo', 'Cogent']
+
+// ── Custom Server Configuration Types ───────────────────────────────
+
+export type ServerConfig = 'balanced' | 'cpu_optimized' | 'gpu_accelerated' | 'storage_dense' | 'memory_optimized'
+
+export interface ServerConfigDef {
+  id: ServerConfig
+  label: string
+  description: string
+  costMultiplier: number
+  powerMultiplier: number
+  heatMultiplier: number
+  revenueMultiplier: number
+  bestFor: CustomerType[]
+  customerBonus: number
+  color: string
+}
+
+export const SERVER_CONFIG_OPTIONS: ServerConfigDef[] = [
+  { id: 'balanced', label: 'Balanced', description: 'Standard general-purpose configuration.', costMultiplier: 1.0, powerMultiplier: 1.0, heatMultiplier: 1.0, revenueMultiplier: 1.0, bestFor: ['general', 'enterprise'], customerBonus: 0.10, color: '#88aacc' },
+  { id: 'cpu_optimized', label: 'CPU Optimized', description: 'High core count for compute-heavy workloads.', costMultiplier: 1.2, powerMultiplier: 1.3, heatMultiplier: 1.2, revenueMultiplier: 1.3, bestFor: ['enterprise', 'streaming'], customerBonus: 0.20, color: '#44ff88' },
+  { id: 'gpu_accelerated', label: 'GPU Accelerated', description: 'NVIDIA GPU clusters for AI/ML and crypto workloads.', costMultiplier: 1.8, powerMultiplier: 2.0, heatMultiplier: 2.2, revenueMultiplier: 2.0, bestFor: ['ai_training', 'crypto'], customerBonus: 0.30, color: '#ff66ff' },
+  { id: 'storage_dense', label: 'Storage Dense', description: 'High-capacity storage for CDN and archival workloads.', costMultiplier: 1.3, powerMultiplier: 0.8, heatMultiplier: 0.7, revenueMultiplier: 1.1, bestFor: ['streaming', 'general'], customerBonus: 0.15, color: '#ffaa44' },
+  { id: 'memory_optimized', label: 'Memory Optimized', description: 'Large RAM configurations for in-memory databases.', costMultiplier: 1.4, powerMultiplier: 1.1, heatMultiplier: 1.0, revenueMultiplier: 1.2, bestFor: ['enterprise', 'ai_training'], customerBonus: 0.15, color: '#44aaff' },
+]
+
+// ── Network Peering & Transit Types ─────────────────────────────────
+
+export type PeeringType = 'budget_transit' | 'premium_transit' | 'public_peering' | 'private_peering'
+
+export interface PeeringAgreement {
+  id: string
+  provider: string
+  type: PeeringType
+  bandwidthGbps: number
+  costPerTick: number
+  latencyMs: number
+  installedAtTick: number
+}
+
+export interface PeeringConfig {
+  type: PeeringType
+  label: string
+  provider: string
+  bandwidthGbps: number
+  costPerTick: number
+  latencyMs: number
+  description: string
+}
+
+export const PEERING_OPTIONS: PeeringConfig[] = [
+  { type: 'budget_transit', label: 'Budget Transit', provider: 'CheapNet', bandwidthGbps: 10, costPerTick: 5, latencyMs: 25, description: 'Cheap but high latency. Good for non-critical traffic.' },
+  { type: 'premium_transit', label: 'Premium Transit', provider: 'FastPipe Inc', bandwidthGbps: 10, costPerTick: 15, latencyMs: 8, description: 'Low latency, reliable. Good for enterprise workloads.' },
+  { type: 'public_peering', label: 'Public Peering (IX)', provider: 'Metro IX', bandwidthGbps: 20, costPerTick: 8, latencyMs: 5, description: 'Internet Exchange peering. Great bandwidth and latency.' },
+  { type: 'private_peering', label: 'Private Peering', provider: 'DirectLink', bandwidthGbps: 40, costPerTick: 20, latencyMs: 3, description: 'Direct connection to major networks. Lowest latency.' },
+]
+
+// ── Maintenance Window Types ────────────────────────────────────────
+
+export type MaintenanceTargetType = 'cabinet' | 'spine' | 'cooling' | 'power'
+export type MaintenanceStatus = 'scheduled' | 'in_progress' | 'completed'
+
+export interface MaintenanceWindow {
+  id: string
+  targetType: MaintenanceTargetType
+  targetId: string
+  scheduledTick: number
+  durationTicks: number
+  cost: number
+  status: MaintenanceStatus
+  benefitApplied: boolean
+}
+
+export interface MaintenanceConfig {
+  targetType: MaintenanceTargetType
+  label: string
+  durationTicks: number
+  cost: number
+  effect: string
+}
+
+export const MAINTENANCE_CONFIG: MaintenanceConfig[] = [
+  { targetType: 'cabinet', label: 'Cabinet Maintenance', durationTicks: 3, cost: 500, effect: 'Resets server age by 20%, -5°C heat' },
+  { targetType: 'spine', label: 'Spine Maintenance', durationTicks: 2, cost: 1000, effect: 'Prevents next hardware failure incident' },
+  { targetType: 'cooling', label: 'Cooling Maintenance', durationTicks: 4, cost: 2000, effect: '+0.5°C cooling rate for 50 ticks' },
+  { targetType: 'power', label: 'Power Maintenance', durationTicks: 3, cost: 1500, effect: 'Prevents next power surge incident' },
+]
+
+// ── Power Redundancy Types ──────────────────────────────────────────
+
+export type PowerRedundancy = 'N' | 'N+1' | '2N'
+
+export interface PowerRedundancyConfig {
+  level: PowerRedundancy
+  label: string
+  costMultiplier: number
+  failureProtection: number
+  upgradeCost: number
+  maintenanceCostPerTick: number
+  description: string
+}
+
+export const POWER_REDUNDANCY_CONFIG: PowerRedundancyConfig[] = [
+  { level: 'N', label: 'N (No Redundancy)', costMultiplier: 1.0, failureProtection: 0, upgradeCost: 0, maintenanceCostPerTick: 0, description: 'No redundancy. Any power failure causes full outage.' },
+  { level: 'N+1', label: 'N+1 (Single Redundant)', costMultiplier: 1.3, failureProtection: 0.70, upgradeCost: 30000, maintenanceCostPerTick: 8, description: 'One backup path. Survives most single failures.' },
+  { level: '2N', label: '2N (Fully Redundant)', costMultiplier: 2.0, failureProtection: 0.95, upgradeCost: 80000, maintenanceCostPerTick: 20, description: 'Fully redundant power. Required for gold contracts.' },
+]
+
+// ── Noise & Community Relations Types ────────────────────────────────
+
+export const NOISE_CONFIG = {
+  airCoolingPerCabinet: 2,        // dB per cabinet with air cooling
+  waterCoolingPerCabinet: 1,      // dB per cabinet with water cooling
+  generatorNoise: 15,             // dB per running generator
+  spineNoise: 1,                  // dB per spine switch
+  noiseLimit: 70,                 // default max dB
+  soundBarrierReduction: 5,       // dB reduced per barrier
+  maxSoundBarriers: 5,
+  soundBarrierCost: 5000,
+  complaintInterval: 10,          // ticks between complaints when over limit
+  fineThreshold: 5,               // complaints before fines
+  fineAmount: 5000,
+  zoningRestrictionThreshold: 10, // complaints before zoning restriction
+  reputationPenaltyPerComplaint: 2,
+}
+
+// ── Spot Compute Market Types ───────────────────────────────────────
+
+export const SPOT_COMPUTE_CONFIG = {
+  minPriceMultiplier: 0.3,
+  maxPriceMultiplier: 2.5,
+  volatility: 0.12,
+  meanReversion: 0.03,
+  baseDemandCorrelation: -0.5,    // inversely correlated with regular demand
+}
+
+// ── Event Log Types ─────────────────────────────────────────────────
+
+export type EventCategory = 'incident' | 'finance' | 'contract' | 'achievement' | 'infrastructure' | 'staff' | 'research' | 'system'
+export type EventSeverity = 'info' | 'warning' | 'error' | 'success'
+
+export interface EventLogEntry {
+  tick: number
+  gameHour: number
+  category: EventCategory
+  message: string
+  severity: EventSeverity
+}
+
+// ── Capacity Planning Types ─────────────────────────────────────────
+
+export interface CapacityProjection {
+  metric: string
+  label: string
+  currentValue: number
+  maxValue: number
+  utilizationPct: number
+  trend: 'increasing' | 'stable' | 'decreasing'
+  color: string
+}
+
+export interface HistoryPoint {
+  tick: number
+  power: number
+  heat: number
+  revenue: number
+  cabinets: number
+  money: number
+}
+
+// ── Statistics Dashboard Types ──────────────────────────────────────
+
+export interface LifetimeStats {
+  totalRevenueEarned: number
+  totalExpensesPaid: number
+  totalIncidentsSurvived: number
+  totalServersDeployed: number
+  totalSpinesDeployed: number
+  peakTemperatureReached: number
+  longestUptimeStreak: number
+  currentUptimeStreak: number
+  totalFiresSurvived: number
+  totalPowerOutages: number
+  totalContractsCompleted: number
+  totalContractsTerminated: number
+  peakRevenueTick: number
+  peakCabinetCount: number
+  totalMoneyEarned: number
+}
+
+// ── Tutorial System Types ───────────────────────────────────────────
+
+export interface TutorialTip {
+  id: string
+  title: string
+  message: string
+  category: 'build' | 'cooling' | 'finance' | 'network' | 'incidents' | 'contracts'
+}
+
+export const TUTORIAL_TIPS: TutorialTip[] = [
+  { id: 'first_overheat', title: 'Overheating!', message: 'Your cabinet is heating up! Consider upgrading to water cooling or adding management cabinets.', category: 'cooling' },
+  { id: 'first_throttle', title: 'Thermal Throttling', message: 'This server is earning only 50% revenue due to heat. Cool it down fast.', category: 'cooling' },
+  { id: 'first_low_money', title: 'Low Funds', message: 'Running low on funds! Consider taking a loan or reducing expenses.', category: 'finance' },
+  { id: 'no_leaf_switch', title: 'No Network', message: 'Cabinets without leaf switches cannot connect to the network fabric.', category: 'network' },
+  { id: 'no_spine', title: 'No Backbone', message: 'You need spine switches to complete the network fabric and route traffic.', category: 'network' },
+  { id: 'first_incident', title: 'Incident!', message: 'Incidents happen! Resolve them quickly by clicking the resolve button to minimize damage.', category: 'incidents' },
+  { id: 'aisle_hint', title: 'Aisle Layout', message: 'Tip: Alternate cabinet facing (N/S) in adjacent rows for a hot/cold aisle cooling bonus.', category: 'build' },
+  { id: 'first_contract', title: 'Contracts', message: 'Contracts provide bonus revenue but require meeting SLA targets. Monitor your temp and server count!', category: 'contracts' },
+]
+
 // ── Procedural Name Generation ──────────────────────────────────
 
 const FIRST_NAMES = ['Alex', 'Sam', 'Jordan', 'Casey', 'Riley', 'Morgan', 'Taylor', 'Quinn', 'Drew', 'Blake', 'Jamie', 'Avery', 'Dakota', 'Reese', 'Skyler', 'Charlie', 'Kai', 'Sage', 'Rowan', 'Finley']
@@ -1613,6 +1939,74 @@ interface GameState {
   // Heat Map
   heatMapVisible: boolean
 
+  // Supply Chain & Procurement
+  pendingOrders: HardwareOrder[]
+  inventory: Record<string, number>
+  supplyShortageActive: boolean
+  shortagePriceMultiplier: number
+  shortageTicksRemaining: number
+
+  // Weather System
+  currentSeason: Season
+  currentCondition: WeatherCondition
+  weatherAmbientModifier: number
+  weatherConditionTicksRemaining: number
+  seasonTickCounter: number
+  seasonsExperienced: Season[]
+
+  // Interconnection / Meet-Me Room
+  meetMeRoomTier: number | null
+  interconnectPorts: InterconnectPort[]
+  meetMeRevenue: number
+  meetMeMaintenanceCost: number
+
+  // Custom Server Configurations
+  defaultServerConfig: ServerConfig
+
+  // Network Peering & Transit
+  peeringAgreements: PeeringAgreement[]
+  peeringCostPerTick: number
+  avgLatencyMs: number
+
+  // Maintenance Windows
+  maintenanceWindows: MaintenanceWindow[]
+  maintenanceCompletedCount: number
+  maintenanceCoolingBoostTicks: number
+
+  // Power Redundancy
+  powerRedundancy: PowerRedundancy
+  powerRedundancyCost: number
+
+  // Noise & Community Relations
+  noiseLevel: number
+  communityRelations: number
+  noiseComplaints: number
+  noiseFinesAccumulated: number
+  soundBarriersInstalled: number
+  zoningRestricted: boolean
+
+  // Spot Compute Market
+  spotPriceMultiplier: number
+  spotCapacityAllocated: number
+  spotRevenue: number
+  spotDemand: number
+  spotHistoryPrices: number[]
+
+  // Event Log
+  eventLog: EventLogEntry[]
+  eventLogFilterCategory: EventCategory | null
+
+  // Capacity Planning
+  capacityHistory: HistoryPoint[]
+
+  // Lifetime Statistics
+  lifetimeStats: LifetimeStats
+
+  // Tutorial System
+  seenTips: string[]
+  activeTip: TutorialTip | null
+  tutorialEnabled: boolean
+
   // Save / Load
   hasSaved: boolean
   activeSlotId: number | null
@@ -1677,6 +2071,27 @@ interface GameState {
   startTraining: (staffId: string, certId: string) => void
   // Heat map
   toggleHeatMap: () => void
+  // Supply Chain actions
+  placeOrder: (itemType: string, quantity: number) => void
+  // Interconnection actions
+  installMeetMeRoom: (tier: number) => void
+  addInterconnectPort: (portType: InterconnectPortType) => void
+  // Server config actions
+  setDefaultServerConfig: (config: ServerConfig) => void
+  // Peering actions
+  addPeeringAgreement: (optionIndex: number) => void
+  removePeeringAgreement: (id: string) => void
+  // Maintenance actions
+  scheduleMaintenance: (targetType: MaintenanceTargetType, targetId: string) => void
+  // Power redundancy actions
+  upgradePowerRedundancy: (level: PowerRedundancy) => void
+  // Noise actions
+  installSoundBarrier: () => void
+  // Spot compute actions
+  setSpotCapacity: (count: number) => void
+  // Tutorial actions
+  dismissTip: (tipId: string) => void
+  toggleTutorial: () => void
   // Demo
   loadDemoState: () => void
   exitDemo: () => void
@@ -1886,6 +2301,80 @@ export const useGameStore = create<GameState>((set) => ({
 
   // Heat Map
   heatMapVisible: false,
+
+  // Supply Chain & Procurement
+  pendingOrders: [],
+  inventory: { server: 0, leaf_switch: 0, spine_switch: 0, cabinet: 0 },
+  supplyShortageActive: false,
+  shortagePriceMultiplier: 1.0,
+  shortageTicksRemaining: 0,
+
+  // Weather System
+  currentSeason: 'spring' as Season,
+  currentCondition: 'clear' as WeatherCondition,
+  weatherAmbientModifier: 2,
+  weatherConditionTicksRemaining: 15,
+  seasonTickCounter: 0,
+  seasonsExperienced: ['spring'] as Season[],
+
+  // Interconnection / Meet-Me Room
+  meetMeRoomTier: null,
+  interconnectPorts: [],
+  meetMeRevenue: 0,
+  meetMeMaintenanceCost: 0,
+
+  // Custom Server Configurations
+  defaultServerConfig: 'balanced' as ServerConfig,
+
+  // Network Peering & Transit
+  peeringAgreements: [],
+  peeringCostPerTick: 0,
+  avgLatencyMs: 50,
+
+  // Maintenance Windows
+  maintenanceWindows: [],
+  maintenanceCompletedCount: 0,
+  maintenanceCoolingBoostTicks: 0,
+
+  // Power Redundancy
+  powerRedundancy: 'N' as PowerRedundancy,
+  powerRedundancyCost: 0,
+
+  // Noise & Community Relations
+  noiseLevel: 0,
+  communityRelations: 80,
+  noiseComplaints: 0,
+  noiseFinesAccumulated: 0,
+  soundBarriersInstalled: 0,
+  zoningRestricted: false,
+
+  // Spot Compute Market
+  spotPriceMultiplier: 1.0,
+  spotCapacityAllocated: 0,
+  spotRevenue: 0,
+  spotDemand: 0.5,
+  spotHistoryPrices: [1.0],
+
+  // Event Log
+  eventLog: [],
+  eventLogFilterCategory: null,
+
+  // Capacity Planning
+  capacityHistory: [],
+
+  // Lifetime Statistics
+  lifetimeStats: {
+    totalRevenueEarned: 0, totalExpensesPaid: 0, totalIncidentsSurvived: 0,
+    totalServersDeployed: 0, totalSpinesDeployed: 0, peakTemperatureReached: 22,
+    longestUptimeStreak: 0, currentUptimeStreak: 0, totalFiresSurvived: 0,
+    totalPowerOutages: 0, totalContractsCompleted: 0, totalContractsTerminated: 0,
+    peakRevenueTick: 0, peakCabinetCount: 0, totalMoneyEarned: 0,
+  },
+
+  // Tutorial System
+  seenTips: [],
+  activeTip: null,
+  tutorialEnabled: true,
 
   // Demo mode
   isDemo: false,
@@ -2623,6 +3112,185 @@ export const useGameStore = create<GameState>((set) => ({
   toggleHeatMap: () =>
     set((state) => ({ heatMapVisible: !state.heatMapVisible })),
 
+  // ── Supply Chain Actions ────────────────────────────────────────
+
+  placeOrder: (itemType: string, quantity: number) =>
+    set((state) => {
+      const config = SUPPLY_CHAIN_CONFIG.find((c) => c.itemType === itemType)
+      if (!config) return state
+
+      const baseCost = itemType === 'server' ? COSTS.server
+        : itemType === 'leaf_switch' ? COSTS.leaf_switch
+          : itemType === 'spine_switch' ? COSTS.spine_switch
+            : COSTS.cabinet
+      const shortageMult = state.supplyShortageActive ? state.shortagePriceMultiplier : 1
+      const bulkMult = quantity >= config.bulkThreshold ? config.bulkDiscount : 1
+      const unitCost = Math.round(baseCost * shortageMult * bulkMult)
+      const totalCost = unitCost * quantity
+      if (!state.sandboxMode && state.money < totalCost) return state
+
+      const leadTime = state.supplyShortageActive ? config.shortageLeadTime : config.baseLeadTime
+      const order: HardwareOrder = {
+        id: `order-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        itemType: itemType as HardwareOrder['itemType'],
+        quantity,
+        unitCost,
+        totalCost,
+        leadTimeTicks: leadTime,
+        ticksRemaining: leadTime,
+        status: 'pending',
+        orderedAtTick: state.tickCount,
+      }
+      return {
+        pendingOrders: [...state.pendingOrders, order],
+        money: state.sandboxMode ? state.money : state.money - totalCost,
+      }
+    }),
+
+  // ── Interconnection Actions ─────────────────────────────────────
+
+  installMeetMeRoom: (tier: number) =>
+    set((state) => {
+      const config = MEETME_ROOM_CONFIG[tier]
+      if (!config) return state
+      if (state.meetMeRoomTier !== null) return state
+      const tierIdx = SUITE_TIER_ORDER.indexOf(state.suiteTier)
+      if (tierIdx < 1) return state // requires at least Standard tier
+      if (!state.sandboxMode && state.money < config.installCost) return state
+      return {
+        meetMeRoomTier: tier,
+        money: state.sandboxMode ? state.money : state.money - config.installCost,
+      }
+    }),
+
+  addInterconnectPort: (portType: InterconnectPortType) =>
+    set((state) => {
+      if (state.meetMeRoomTier === null) return state
+      const roomConfig = MEETME_ROOM_CONFIG[state.meetMeRoomTier]
+      if (!roomConfig) return state
+      const portConfig = INTERCONNECT_PORT_CONFIG.find((p) => p.portType === portType)
+      if (!portConfig) return state
+      const usedPorts = state.interconnectPorts.reduce((sum, p) => {
+        const pc = INTERCONNECT_PORT_CONFIG.find((c) => c.portType === p.portType)
+        return sum + (pc?.capacityUsed ?? 1)
+      }, 0)
+      if (usedPorts + portConfig.capacityUsed > roomConfig.portCapacity) return state
+      if (!state.sandboxMode && state.money < portConfig.installCost) return state
+      const tenant = INTERCONNECT_TENANTS[Math.floor(Math.random() * INTERCONNECT_TENANTS.length)]
+      const port: InterconnectPort = {
+        id: `port-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        tenantName: tenant,
+        portType,
+        revenuePerTick: portConfig.revenuePerTick,
+        installedAtTick: state.tickCount,
+      }
+      return {
+        interconnectPorts: [...state.interconnectPorts, port],
+        money: state.sandboxMode ? state.money : state.money - portConfig.installCost,
+      }
+    }),
+
+  // ── Server Config Actions ───────────────────────────────────────
+
+  setDefaultServerConfig: (config: ServerConfig) =>
+    set({ defaultServerConfig: config }),
+
+  // ── Peering Actions ─────────────────────────────────────────────
+
+  addPeeringAgreement: (optionIndex: number) =>
+    set((state) => {
+      const config = PEERING_OPTIONS[optionIndex]
+      if (!config) return state
+      if (state.peeringAgreements.length >= 4) return state
+      if (state.peeringAgreements.some((p) => p.type === config.type)) return state
+      const agreement: PeeringAgreement = {
+        id: `peering-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        provider: config.provider,
+        type: config.type,
+        bandwidthGbps: config.bandwidthGbps,
+        costPerTick: config.costPerTick,
+        latencyMs: config.latencyMs,
+        installedAtTick: state.tickCount,
+      }
+      return { peeringAgreements: [...state.peeringAgreements, agreement] }
+    }),
+
+  removePeeringAgreement: (id: string) =>
+    set((state) => ({
+      peeringAgreements: state.peeringAgreements.filter((p) => p.id !== id),
+    })),
+
+  // ── Maintenance Actions ─────────────────────────────────────────
+
+  scheduleMaintenance: (targetType: MaintenanceTargetType, targetId: string) =>
+    set((state) => {
+      const config = MAINTENANCE_CONFIG.find((c) => c.targetType === targetType)
+      if (!config) return state
+      if (!state.sandboxMode && state.money < config.cost) return state
+      if (state.maintenanceWindows.filter((w) => w.status !== 'completed').length >= 3) return state
+      const window: MaintenanceWindow = {
+        id: `maint-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        targetType,
+        targetId,
+        scheduledTick: state.tickCount + 1,
+        durationTicks: config.durationTicks,
+        cost: config.cost,
+        status: 'scheduled',
+        benefitApplied: false,
+      }
+      return {
+        maintenanceWindows: [...state.maintenanceWindows, window],
+        money: state.sandboxMode ? state.money : state.money - config.cost,
+      }
+    }),
+
+  // ── Power Redundancy Actions ────────────────────────────────────
+
+  upgradePowerRedundancy: (level: PowerRedundancy) =>
+    set((state) => {
+      const config = POWER_REDUNDANCY_CONFIG.find((c) => c.level === level)
+      if (!config) return state
+      const currentIdx = POWER_REDUNDANCY_CONFIG.findIndex((c) => c.level === state.powerRedundancy)
+      const targetIdx = POWER_REDUNDANCY_CONFIG.findIndex((c) => c.level === level)
+      if (targetIdx <= currentIdx) return state
+      if (!state.sandboxMode && state.money < config.upgradeCost) return state
+      return {
+        powerRedundancy: level,
+        money: state.sandboxMode ? state.money : state.money - config.upgradeCost,
+      }
+    }),
+
+  // ── Noise Actions ───────────────────────────────────────────────
+
+  installSoundBarrier: () =>
+    set((state) => {
+      if (state.soundBarriersInstalled >= NOISE_CONFIG.maxSoundBarriers) return state
+      if (!state.sandboxMode && state.money < NOISE_CONFIG.soundBarrierCost) return state
+      return {
+        soundBarriersInstalled: state.soundBarriersInstalled + 1,
+        money: state.sandboxMode ? state.money : state.money - NOISE_CONFIG.soundBarrierCost,
+      }
+    }),
+
+  // ── Spot Compute Actions ────────────────────────────────────────
+
+  setSpotCapacity: (count: number) =>
+    set((state) => {
+      const totalServers = state.cabinets.reduce((sum, c) => sum + (c.powerStatus ? c.serverCount : 0), 0)
+      return { spotCapacityAllocated: Math.max(0, Math.min(count, totalServers)) }
+    }),
+
+  // ── Tutorial Actions ────────────────────────────────────────────
+
+  dismissTip: (tipId: string) =>
+    set((state) => ({
+      seenTips: [...state.seenTips, tipId],
+      activeTip: state.activeTip?.id === tipId ? null : state.activeTip,
+    })),
+
+  toggleTutorial: () =>
+    set((state) => ({ tutorialEnabled: !state.tutorialEnabled, activeTip: null })),
+
   // ── Demo Mode ─────────────────────────────────────────────────
 
   loadDemoState: () => {
@@ -2859,6 +3527,55 @@ export const useGameStore = create<GameState>((set) => ({
       staffCostPerTick: 0,
       staffIncidentsResolved: 0,
       staffBurnouts: 0,
+      // Phase 5 resets
+      pendingOrders: [],
+      inventory: { server: 0, leaf_switch: 0, spine_switch: 0, cabinet: 0 },
+      supplyShortageActive: false,
+      shortagePriceMultiplier: 1.0,
+      shortageTicksRemaining: 0,
+      currentSeason: 'spring' as Season,
+      currentCondition: 'clear' as WeatherCondition,
+      weatherAmbientModifier: 2,
+      weatherConditionTicksRemaining: 15,
+      seasonTickCounter: 0,
+      seasonsExperienced: ['spring'] as Season[],
+      meetMeRoomTier: null,
+      interconnectPorts: [],
+      meetMeRevenue: 0,
+      meetMeMaintenanceCost: 0,
+      defaultServerConfig: 'balanced' as ServerConfig,
+      peeringAgreements: [],
+      peeringCostPerTick: 0,
+      avgLatencyMs: 50,
+      maintenanceWindows: [],
+      maintenanceCompletedCount: 0,
+      maintenanceCoolingBoostTicks: 0,
+      powerRedundancy: 'N' as PowerRedundancy,
+      powerRedundancyCost: 0,
+      noiseLevel: 0,
+      communityRelations: 80,
+      noiseComplaints: 0,
+      noiseFinesAccumulated: 0,
+      soundBarriersInstalled: 0,
+      zoningRestricted: false,
+      spotPriceMultiplier: 1.0,
+      spotCapacityAllocated: 0,
+      spotRevenue: 0,
+      spotDemand: 0.5,
+      spotHistoryPrices: [1.0],
+      eventLog: [],
+      eventLogFilterCategory: null,
+      capacityHistory: [],
+      lifetimeStats: {
+        totalRevenueEarned: 0, totalExpensesPaid: 0, totalIncidentsSurvived: 0,
+        totalServersDeployed: 0, totalSpinesDeployed: 0, peakTemperatureReached: 22,
+        longestUptimeStreak: 0, currentUptimeStreak: 0, totalFiresSurvived: 0,
+        totalPowerOutages: 0, totalContractsCompleted: 0, totalContractsTerminated: 0,
+        peakRevenueTick: 0, peakCabinetCount: 0, totalMoneyEarned: 0,
+      },
+      seenTips: [],
+      activeTip: null,
+      tutorialEnabled: true,
       activeSlotId: null,
     })
   },
@@ -3111,6 +3828,55 @@ export const useGameStore = create<GameState>((set) => ({
       staffCostPerTick: 0,
       staffIncidentsResolved: 0,
       staffBurnouts: 0,
+      // Phase 5 resets
+      pendingOrders: [],
+      inventory: { server: 0, leaf_switch: 0, spine_switch: 0, cabinet: 0 },
+      supplyShortageActive: false,
+      shortagePriceMultiplier: 1.0,
+      shortageTicksRemaining: 0,
+      currentSeason: 'spring' as Season,
+      currentCondition: 'clear' as WeatherCondition,
+      weatherAmbientModifier: 2,
+      weatherConditionTicksRemaining: 15,
+      seasonTickCounter: 0,
+      seasonsExperienced: ['spring'] as Season[],
+      meetMeRoomTier: null,
+      interconnectPorts: [],
+      meetMeRevenue: 0,
+      meetMeMaintenanceCost: 0,
+      defaultServerConfig: 'balanced' as ServerConfig,
+      peeringAgreements: [],
+      peeringCostPerTick: 0,
+      avgLatencyMs: 50,
+      maintenanceWindows: [],
+      maintenanceCompletedCount: 0,
+      maintenanceCoolingBoostTicks: 0,
+      powerRedundancy: 'N' as PowerRedundancy,
+      powerRedundancyCost: 0,
+      noiseLevel: 0,
+      communityRelations: 80,
+      noiseComplaints: 0,
+      noiseFinesAccumulated: 0,
+      soundBarriersInstalled: 0,
+      zoningRestricted: false,
+      spotPriceMultiplier: 1.0,
+      spotCapacityAllocated: 0,
+      spotRevenue: 0,
+      spotDemand: 0.5,
+      spotHistoryPrices: [1.0],
+      eventLog: [],
+      eventLogFilterCategory: null,
+      capacityHistory: [],
+      lifetimeStats: {
+        totalRevenueEarned: 0, totalExpensesPaid: 0, totalIncidentsSurvived: 0,
+        totalServersDeployed: 0, totalSpinesDeployed: 0, peakTemperatureReached: 22,
+        longestUptimeStreak: 0, currentUptimeStreak: 0, totalFiresSurvived: 0,
+        totalPowerOutages: 0, totalContractsCompleted: 0, totalContractsTerminated: 0,
+        peakRevenueTick: 0, peakCabinetCount: 0, totalMoneyEarned: 0,
+      },
+      seenTips: [],
+      activeTip: null,
+      tutorialEnabled: true,
       activeSlotId: null,
     })
   },
@@ -4088,6 +4854,232 @@ export const useGameStore = create<GameState>((set) => ({
         }
       }
 
+      // ── Supply Chain system ─────────────────────────────────────
+      let pendingOrders = [...state.pendingOrders]
+      const inventory = { ...state.inventory }
+      let supplyShortageActive = state.supplyShortageActive
+      let shortagePriceMultiplier = state.shortagePriceMultiplier
+      let shortageTicksRemaining = state.shortageTicksRemaining
+
+      // Process orders
+      pendingOrders = pendingOrders.map((order) => {
+        if (order.status === 'delivered') return order
+        const remaining = order.ticksRemaining - 1
+        if (remaining <= 0) {
+          inventory[order.itemType] = (inventory[order.itemType] ?? 0) + order.quantity
+          return { ...order, ticksRemaining: 0, status: 'delivered' as OrderStatus }
+        }
+        const status: OrderStatus = remaining <= Math.ceil(order.leadTimeTicks / 2) ? 'in_transit' : 'pending'
+        return { ...order, ticksRemaining: remaining, status }
+      })
+      pendingOrders = pendingOrders.filter((o) => o.status !== 'delivered' || o.ticksRemaining > -5)
+
+      // Supply shortage events
+      if (supplyShortageActive) {
+        shortageTicksRemaining--
+        if (shortageTicksRemaining <= 0) {
+          supplyShortageActive = false
+          shortagePriceMultiplier = 1.0
+          incidentLog = ['Supply shortage ended — prices normalized.', ...incidentLog].slice(0, 10)
+        }
+      } else if (Math.random() < 0.005 && newCabinets.length >= 4) {
+        supplyShortageActive = true
+        shortageTicksRemaining = 30 + Math.floor(Math.random() * 20)
+        shortagePriceMultiplier = +(1.5 + Math.random() * 1.5).toFixed(2)
+        incidentLog = [`CHIP SHORTAGE! Equipment prices at ${shortagePriceMultiplier}x for ${shortageTicksRemaining} ticks.`, ...incidentLog].slice(0, 10)
+      }
+
+      // ── Weather system ────────────────────────────────────────────
+      let currentSeason = state.currentSeason
+      let currentCondition = state.currentCondition
+      let weatherAmbientModifier = state.weatherAmbientModifier
+      let weatherConditionTicksRemaining = state.weatherConditionTicksRemaining - 1
+      let seasonTickCounter = state.seasonTickCounter + 1
+      const seasonsExperienced = [...state.seasonsExperienced]
+
+      // Season rotation
+      const seasonConfig = SEASON_CONFIG.find((s) => s.season === currentSeason)
+      if (seasonConfig && seasonTickCounter >= seasonConfig.durationTicks) {
+        const seasonOrder: Season[] = ['spring', 'summer', 'autumn', 'winter']
+        const idx = seasonOrder.indexOf(currentSeason)
+        currentSeason = seasonOrder[(idx + 1) % 4]
+        seasonTickCounter = 0
+        if (!seasonsExperienced.includes(currentSeason)) seasonsExperienced.push(currentSeason)
+        incidentLog = [`Season changed to ${SEASON_CONFIG.find((s) => s.season === currentSeason)?.label ?? currentSeason}.`, ...incidentLog].slice(0, 10)
+      }
+
+      // Weather condition rotation
+      if (weatherConditionTicksRemaining <= 0) {
+        const roll = Math.random()
+        let cumulative = 0
+        for (const wc of WEATHER_CONDITION_CONFIG) {
+          cumulative += wc.chance
+          if (roll <= cumulative) {
+            currentCondition = wc.condition
+            weatherConditionTicksRemaining = wc.minDuration + Math.floor(Math.random() * (wc.maxDuration - wc.minDuration))
+            break
+          }
+        }
+      }
+
+      // Calculate ambient modifier
+      const seasonMod = SEASON_CONFIG.find((s) => s.season === currentSeason)?.ambientModifier ?? 0
+      const weatherMod = WEATHER_CONDITION_CONFIG.find((w) => w.condition === currentCondition)?.ambientModifier ?? 0
+      weatherAmbientModifier = seasonMod + weatherMod
+
+      // Storm events can trigger power incidents
+      if (currentCondition === 'storm' && Math.random() < 0.08 && !powerOutage) {
+        incidentLog = ['Storm causing power grid instability!', ...incidentLog].slice(0, 10)
+      }
+
+      // ── Meet-Me Room revenue ──────────────────────────────────────
+      let meetMeRevenue = 0
+      let meetMeMaintenanceCost = 0
+      if (state.meetMeRoomTier !== null) {
+        const roomConfig = MEETME_ROOM_CONFIG[state.meetMeRoomTier]
+        if (roomConfig) meetMeMaintenanceCost = roomConfig.maintenanceCostPerTick
+        // Network effect: +2% per 4 ports
+        const networkBonus = 1 + Math.floor(state.interconnectPorts.length / 4) * 0.02
+        for (const port of state.interconnectPorts) {
+          meetMeRevenue += port.revenuePerTick * networkBonus
+        }
+      }
+
+      // ── Network peering costs ─────────────────────────────────────
+      let peeringCostPerTick = 0
+      let avgLatencyMs = 50
+      if (state.peeringAgreements.length > 0) {
+        peeringCostPerTick = state.peeringAgreements.reduce((sum, p) => sum + p.costPerTick, 0)
+        avgLatencyMs = Math.round(state.peeringAgreements.reduce((sum, p) => sum + p.latencyMs, 0) / state.peeringAgreements.length)
+      }
+
+      // ── Maintenance windows ───────────────────────────────────────
+      let maintenanceCoolingBoostTicks = Math.max(0, state.maintenanceCoolingBoostTicks - 1)
+      let maintenanceCompletedCount = state.maintenanceCompletedCount
+      const maintenanceWindows = state.maintenanceWindows.map((w) => {
+        if (w.status === 'completed') return w
+        if (w.status === 'scheduled' && newTickCount >= w.scheduledTick) {
+          return { ...w, status: 'in_progress' as MaintenanceStatus }
+        }
+        if (w.status === 'in_progress') {
+          const remaining = w.durationTicks - (newTickCount - w.scheduledTick)
+          if (remaining <= 0) {
+            maintenanceCompletedCount++
+            if (w.targetType === 'cooling') maintenanceCoolingBoostTicks = 50
+            return { ...w, status: 'completed' as MaintenanceStatus, benefitApplied: true }
+          }
+        }
+        return w
+      }).filter((w) => w.status !== 'completed' || newTickCount - w.scheduledTick < 20)
+
+      // ── Power redundancy costs ────────────────────────────────────
+      const powerRedConfig = POWER_REDUNDANCY_CONFIG.find((c) => c.level === state.powerRedundancy)
+      const powerRedundancyCost = powerRedConfig?.maintenanceCostPerTick ?? 0
+
+      // ── Noise & Community ─────────────────────────────────────────
+      const runningGens = updatedGenerators.filter((g) => g.status === 'running').length
+      const noiseFromCooling = state.coolingType === 'air'
+        ? newCabinets.length * NOISE_CONFIG.airCoolingPerCabinet
+        : newCabinets.length * NOISE_CONFIG.waterCoolingPerCabinet
+      const noiseFromGens = runningGens * NOISE_CONFIG.generatorNoise
+      const noiseFromSpines = spineSwitches.filter((s) => s.powerStatus).length * NOISE_CONFIG.spineNoise
+      const barrierReduction = state.soundBarriersInstalled * NOISE_CONFIG.soundBarrierReduction
+      const noiseLevel = Math.max(0, noiseFromCooling + noiseFromGens + noiseFromSpines - barrierReduction)
+
+      let noiseComplaints = state.noiseComplaints
+      let noiseFinesAccumulated = state.noiseFinesAccumulated
+      let communityRelations = state.communityRelations
+      let zoningRestricted = state.zoningRestricted
+
+      if (noiseLevel > NOISE_CONFIG.noiseLimit) {
+        if (newTickCount % NOISE_CONFIG.complaintInterval === 0) {
+          noiseComplaints++
+          communityRelations = Math.max(0, communityRelations - NOISE_CONFIG.reputationPenaltyPerComplaint)
+          incidentLog = [`Noise complaint #${noiseComplaints}! Noise: ${noiseLevel}dB (limit: ${NOISE_CONFIG.noiseLimit}dB)`, ...incidentLog].slice(0, 10)
+          if (noiseComplaints >= NOISE_CONFIG.fineThreshold && noiseComplaints % NOISE_CONFIG.fineThreshold === 0) {
+            noiseFinesAccumulated += NOISE_CONFIG.fineAmount
+          }
+          if (noiseComplaints >= NOISE_CONFIG.zoningRestrictionThreshold) {
+            zoningRestricted = true
+          }
+        }
+      } else {
+        communityRelations = Math.min(100, communityRelations + 0.1)
+        if (zoningRestricted && noiseLevel < NOISE_CONFIG.noiseLimit - 10) zoningRestricted = false
+      }
+
+      // ── Spot Compute Market ───────────────────────────────────────
+      let spotPriceMultiplier = state.spotPriceMultiplier
+      const spotDemand = Math.max(0, Math.min(1, 1 - demandMultiplier * 0.5 + (Math.random() - 0.5) * 0.2))
+      const spotPriceChange = (Math.random() - 0.5) * 2 * SPOT_COMPUTE_CONFIG.volatility
+      const spotReversion = (1.0 - spotPriceMultiplier) * SPOT_COMPUTE_CONFIG.meanReversion
+      const demandEffect = (spotDemand - 0.5) * SPOT_COMPUTE_CONFIG.baseDemandCorrelation * -1
+      spotPriceMultiplier = Math.max(
+        SPOT_COMPUTE_CONFIG.minPriceMultiplier,
+        Math.min(SPOT_COMPUTE_CONFIG.maxPriceMultiplier,
+          +(spotPriceMultiplier + spotPriceChange + spotReversion + demandEffect).toFixed(3)
+        )
+      )
+      const spotCapacity = Math.min(state.spotCapacityAllocated,
+        newCabinets.reduce((sum, c) => sum + (c.powerStatus ? c.serverCount : 0), 0))
+      const spotRevenue = +(spotCapacity * SIM.revenuePerServer * spotPriceMultiplier).toFixed(2)
+      const spotHistoryPrices = [...state.spotHistoryPrices, spotPriceMultiplier].slice(-50)
+
+      // ── Event log ─────────────────────────────────────────────────
+      const eventLog = [...state.eventLog]
+      const logEvent = (category: EventCategory, message: string, severity: EventSeverity = 'info') => {
+        eventLog.push({ tick: newTickCount, gameHour: newHour, category, message, severity })
+        if (eventLog.length > 200) eventLog.splice(0, eventLog.length - 200)
+      }
+      // Log key events
+      if (fireActive && !state.fireActive) logEvent('incident', 'Fire detected!', 'error')
+      if (powerOutage && !state.powerOutage) logEvent('incident', 'Power outage!', 'error')
+      if (supplyShortageActive && !state.supplyShortageActive) logEvent('system', `Chip shortage active (${shortagePriceMultiplier}x prices)`, 'warning')
+      if (completedContracts > state.completedContracts) logEvent('contract', 'Contract completed!', 'success')
+      if (currentSeason !== state.currentSeason) logEvent('system', `Season changed to ${currentSeason}`, 'info')
+
+      // ── Capacity history ──────────────────────────────────────────
+      const capacityHistory = [...state.capacityHistory, {
+        tick: newTickCount, power: stats.totalPower, heat: stats.avgHeat,
+        revenue, cabinets: newCabinets.length, money: state.money,
+      }].slice(-100)
+
+      // ── Lifetime stats ────────────────────────────────────────────
+      const lifetimeStats = { ...state.lifetimeStats }
+      lifetimeStats.totalRevenueEarned += revenue + contractRevenue + spotRevenue + meetMeRevenue
+      lifetimeStats.totalExpensesPaid += expenses + loanPayments + contractPenalties + insuranceCost + staffCostPerTick + peeringCostPerTick + powerRedundancyCost + meetMeMaintenanceCost
+      lifetimeStats.totalMoneyEarned += revenue + contractRevenue + spotRevenue + meetMeRevenue + patentIncome
+      lifetimeStats.peakTemperatureReached = Math.max(lifetimeStats.peakTemperatureReached, stats.avgHeat)
+      lifetimeStats.peakRevenueTick = Math.max(lifetimeStats.peakRevenueTick, revenue)
+      lifetimeStats.peakCabinetCount = Math.max(lifetimeStats.peakCabinetCount, newCabinets.length)
+      lifetimeStats.totalContractsCompleted = completedContracts
+      if (powerOutage && !state.powerOutage) lifetimeStats.totalPowerOutages++
+      if (fireActive && !state.fireActive) lifetimeStats.totalFiresSurvived++
+      if (!fireActive && !powerOutage && activeIncidents.filter((i) => !i.resolved).length === 0) {
+        lifetimeStats.currentUptimeStreak++
+        lifetimeStats.longestUptimeStreak = Math.max(lifetimeStats.longestUptimeStreak, lifetimeStats.currentUptimeStreak)
+      } else {
+        lifetimeStats.currentUptimeStreak = 0
+      }
+
+      // ── Tutorial tip checks ───────────────────────────────────────
+      let activeTip = state.activeTip
+      if (state.tutorialEnabled && !activeTip) {
+        const unseen = TUTORIAL_TIPS.filter((t) => !state.seenTips.includes(t.id))
+        for (const tip of unseen) {
+          let trigger = false
+          if (tip.id === 'first_overheat' && newCabinets.some((c) => c.heatLevel > 60)) trigger = true
+          if (tip.id === 'first_throttle' && newCabinets.some((c) => c.heatLevel >= 80)) trigger = true
+          if (tip.id === 'first_low_money' && state.money < 1000 && newCabinets.length > 0) trigger = true
+          if (tip.id === 'no_leaf_switch' && newCabinets.filter((c) => !c.hasLeafSwitch).length >= 3) trigger = true
+          if (tip.id === 'no_spine' && newCabinets.some((c) => c.hasLeafSwitch) && spineSwitches.length === 0) trigger = true
+          if (tip.id === 'first_incident' && activeIncidents.length > 0 && state.activeIncidents.length === 0) trigger = true
+          if (tip.id === 'aisle_hint' && newCabinets.length >= 4 && state.aisleBonus === 0) trigger = true
+          if (tip.id === 'first_contract' && state.contractOffers.length > 0 && state.activeContracts.length === 0 && completedContracts === 0) trigger = true
+          if (trigger) { activeTip = tip; break }
+        }
+      }
+
       // ── Sandbox mode money ────────────────────────────────────
       const sandboxMoneyAdjust = state.sandboxMode ? 999999999 : 0
 
@@ -4112,11 +5104,30 @@ export const useGameStore = create<GameState>((set) => ({
       if (updatedStaff.length >= MAX_STAFF_BY_TIER[state.suiteTier]) unlock('full_staff')
       if (staffIncidentsResolved >= 10 && staffBurnouts === 0) unlock('zero_fatigue')
       if (updatedStaff.length > 0 && updatedStaff.every((s) => s.certifications.length > 0)) unlock('certified_team')
+      // Phase 5 achievements
+      if (state.pendingOrders.length >= 1) unlock('first_order')
+      if (Object.values(inventory).reduce((s, v) => s + v, 0) >= 20) unlock('stockpile')
+      if (seasonsExperienced.length >= 4) unlock('four_seasons')
+      if (state.meetMeRoomTier !== null) unlock('peering_point')
+      if (state.interconnectPorts.length >= (MEETME_ROOM_CONFIG[state.meetMeRoomTier ?? 0]?.portCapacity ?? 99)) unlock('network_hub')
+      if (state.peeringAgreements.length >= 1) unlock('connected')
+      if (avgLatencyMs <= 5) unlock('zero_latency')
+      if (maintenanceCompletedCount >= 5) unlock('preventive_care')
+      if (state.powerRedundancy === 'N+1') unlock('redundant')
+      if (state.powerRedundancy === '2N') unlock('belt_suspenders')
+      if (noiseLevel <= NOISE_CONFIG.noiseLimit && newCabinets.length >= 10) unlock('good_neighbor')
+      if (state.soundBarriersInstalled >= NOISE_CONFIG.maxSoundBarriers) unlock('sound_barrier')
+      if (lifetimeStats.totalMoneyEarned >= 10000 && spotRevenue > 0) unlock('spot_trader')
+      if (lifetimeStats.longestUptimeStreak >= 1000) unlock('ironman')
+      if (state.seenTips.length >= 5) unlock('student')
+      if (state.seenTips.length >= TUTORIAL_TIPS.length) unlock('graduate')
 
-      // Recalculate final money with all new income/expenses
+      // Recalculate final money with all new income/expenses (Phase 5 included)
+      const phase5Income = spotRevenue + meetMeRevenue
+      const phase5Expenses = peeringCostPerTick + powerRedundancyCost + meetMeMaintenanceCost + (noiseComplaints > state.noiseComplaints && noiseComplaints % NOISE_CONFIG.fineThreshold === 0 ? NOISE_CONFIG.fineAmount : 0)
       const finalNewMoney = state.sandboxMode
         ? 999999999
-        : Math.round((state.money + revenue + contractRevenue + patentIncome + milestoneMoney + (insurancePayouts - state.insurancePayouts) - expenses - loanPayments - contractPenalties - insuranceCost - staffCostPerTick) * 100) / 100
+        : Math.round((state.money + revenue + contractRevenue + patentIncome + milestoneMoney + phase5Income + (insurancePayouts - state.insurancePayouts) - expenses - loanPayments - contractPenalties - insuranceCost - staffCostPerTick - phase5Expenses) * 100) / 100
 
       return {
         cabinets: newCabinets,
@@ -4188,6 +5199,50 @@ export const useGameStore = create<GameState>((set) => ({
         staffCostPerTick: +staffCostPerTick.toFixed(2),
         staffIncidentsResolved,
         staffBurnouts,
+        // Phase 5 — Supply Chain
+        pendingOrders,
+        inventory,
+        supplyShortageActive,
+        shortagePriceMultiplier,
+        shortageTicksRemaining,
+        // Phase 5 — Weather
+        currentSeason,
+        currentCondition,
+        weatherAmbientModifier,
+        weatherConditionTicksRemaining,
+        seasonTickCounter,
+        seasonsExperienced,
+        // Phase 5 — Interconnection
+        meetMeRevenue: +meetMeRevenue.toFixed(2),
+        meetMeMaintenanceCost: +meetMeMaintenanceCost.toFixed(2),
+        // Phase 5 — Peering
+        peeringCostPerTick: +peeringCostPerTick.toFixed(2),
+        avgLatencyMs,
+        // Phase 5 — Maintenance
+        maintenanceWindows,
+        maintenanceCompletedCount,
+        maintenanceCoolingBoostTicks,
+        // Phase 5 — Power Redundancy
+        powerRedundancyCost: +powerRedundancyCost.toFixed(2),
+        // Phase 5 — Noise
+        noiseLevel,
+        communityRelations: +communityRelations.toFixed(1),
+        noiseComplaints,
+        noiseFinesAccumulated,
+        zoningRestricted,
+        // Phase 5 — Spot Compute
+        spotPriceMultiplier,
+        spotRevenue,
+        spotDemand: +spotDemand.toFixed(3),
+        spotHistoryPrices,
+        // Phase 5 — Event Log
+        eventLog,
+        // Phase 5 — Capacity
+        capacityHistory,
+        // Phase 5 — Statistics
+        lifetimeStats,
+        // Phase 5 — Tutorial
+        activeTip,
       }
     }),
 }))

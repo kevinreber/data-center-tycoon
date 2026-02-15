@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { useGameStore, RACK_COST, MAX_SERVERS_PER_CABINET, SIM, ENVIRONMENT_CONFIG, formatGameTime, COOLING_CONFIG, LOAN_OPTIONS, ACHIEVEMENT_CATALOG, CONTRACT_TIER_COLORS, CUSTOMER_TYPE_CONFIG, GENERATOR_OPTIONS, SUPPRESSION_CONFIG, TECH_TREE, TECH_BRANCH_COLORS, DEPRECIATION, getReputationTier, POWER_MARKET, SUITE_TIERS, SUITE_TIER_ORDER, getSuiteLimits, PDU_OPTIONS, CABLE_TRAY_OPTIONS, AISLE_CONFIG, getPDULoad, isPDUOverloaded, INSURANCE_OPTIONS, DRILL_CONFIG, VALUATION_MILESTONES, PATENT_CONFIG, BUSWAY_OPTIONS, CROSSCONNECT_OPTIONS, INROW_COOLING_OPTIONS, SCENARIO_CATALOG, STAFF_ROLE_CONFIG, STAFF_CERT_CONFIG, SHIFT_PATTERN_CONFIG, MAX_STAFF_BY_TIER } from '@/stores/gameStore'
+import { useGameStore, RACK_COST, MAX_SERVERS_PER_CABINET, SIM, ENVIRONMENT_CONFIG, formatGameTime, COOLING_CONFIG, LOAN_OPTIONS, ACHIEVEMENT_CATALOG, CONTRACT_TIER_COLORS, CUSTOMER_TYPE_CONFIG, GENERATOR_OPTIONS, SUPPRESSION_CONFIG, TECH_TREE, TECH_BRANCH_COLORS, DEPRECIATION, getReputationTier, POWER_MARKET, SUITE_TIERS, SUITE_TIER_ORDER, getSuiteLimits, PDU_OPTIONS, CABLE_TRAY_OPTIONS, AISLE_CONFIG, getPDULoad, isPDUOverloaded, INSURANCE_OPTIONS, DRILL_CONFIG, VALUATION_MILESTONES, PATENT_CONFIG, BUSWAY_OPTIONS, CROSSCONNECT_OPTIONS, INROW_COOLING_OPTIONS, SCENARIO_CATALOG, STAFF_ROLE_CONFIG, STAFF_CERT_CONFIG, SHIFT_PATTERN_CONFIG, MAX_STAFF_BY_TIER, SUPPLY_CHAIN_CONFIG, SEASON_CONFIG, WEATHER_CONDITION_CONFIG, MEETME_ROOM_CONFIG, INTERCONNECT_PORT_CONFIG, SERVER_CONFIG_OPTIONS, PEERING_OPTIONS, MAINTENANCE_CONFIG, POWER_REDUNDANCY_CONFIG, NOISE_CONFIG } from '@/stores/gameStore'
 import type { CabinetEnvironment, CustomerType, SuppressionType, TechBranch, CabinetFacing, StaffRole, StaffSkillLevel, ShiftPattern } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Server, Network, Power, Cpu, Plus, TrendingUp, TrendingDown, DollarSign, ArrowRightLeft, AlertTriangle, Radio, Info, Shield, Clock, Zap, Droplets, Landmark, Siren, Trophy, Wrench, FileText, Check, Fuel, Flame, FlaskConical, Star, RefreshCw, Lock, Building, MousePointer, X, Plug, Cable, ArrowUpDown, Thermometer, Save, Upload, RotateCw, Play, Map, Target, Briefcase, Snowflake, Wifi, Award, Users, UserPlus, GraduationCap, Moon, Sun, Trash2 } from 'lucide-react'
+import { Server, Network, Power, Cpu, Plus, TrendingUp, TrendingDown, DollarSign, ArrowRightLeft, AlertTriangle, Radio, Info, Shield, Clock, Zap, Droplets, Landmark, Siren, Trophy, Wrench, FileText, Check, Fuel, Flame, FlaskConical, Star, RefreshCw, Lock, Building, MousePointer, X, Plug, Cable, ArrowUpDown, Thermometer, Save, Upload, RotateCw, Play, Map, Target, Briefcase, Snowflake, Wifi, Award, Users, UserPlus, GraduationCap, Moon, Sun, Trash2, CloudRain, Package, Volume2, BarChart3, BookOpen, Gauge, Globe, HardDrive, ShieldCheck } from 'lucide-react'
 import {
   Tooltip,
   TooltipContent,
@@ -66,6 +66,21 @@ export function HUD() {
     hireStaff, fireStaff, setShiftPattern, startTraining,
     // Save / Load
     saveGame, loadGame, resetGame, activeSlotId,
+    // Phase 5
+    pendingOrders, inventory, supplyShortageActive, shortagePriceMultiplier, placeOrder,
+    currentSeason, currentCondition, weatherAmbientModifier,
+    meetMeRoomTier, interconnectPorts, meetMeRevenue,
+    installMeetMeRoom, addInterconnectPort,
+    defaultServerConfig, setDefaultServerConfig,
+    peeringAgreements, peeringCostPerTick, avgLatencyMs, addPeeringAgreement,
+    maintenanceWindows, maintenanceCompletedCount, scheduleMaintenance,
+    powerRedundancy, powerRedundancyCost, upgradePowerRedundancy,
+    noiseLevel, communityRelations, soundBarriersInstalled, zoningRestricted, installSoundBarrier,
+    spotPriceMultiplier, spotCapacityAllocated, spotRevenue, spotDemand, setSpotCapacity,
+    eventLog,
+    capacityHistory,
+    lifetimeStats,
+    tutorialEnabled, toggleTutorial,
   } = useGameStore()
   const [showGuide, setShowGuide] = useState(true)
   const [showTrafficLegend, setShowTrafficLegend] = useState(false)
@@ -2375,6 +2390,339 @@ export function HUD() {
             )}
           </div>
         </div>
+
+        {/* ── Phase 5: Weather & Supply Chain ── */}
+        <div className="rounded-lg border border-border bg-card p-3">
+          <div className="flex items-center gap-2 text-xs font-bold text-neon-cyan mb-2">
+            <CloudRain className="size-3.5" />WEATHER & SUPPLY
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-[10px]">
+            <div>
+              <span className="text-muted-foreground">Season:</span>{' '}
+              <span style={{ color: SEASON_CONFIG.find(s => s.season === currentSeason)?.color }}>
+                {SEASON_CONFIG.find(s => s.season === currentSeason)?.label}
+              </span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Weather:</span>{' '}
+              <span style={{ color: WEATHER_CONDITION_CONFIG.find(w => w.condition === currentCondition)?.color }}>
+                {WEATHER_CONDITION_CONFIG.find(w => w.condition === currentCondition)?.label}
+              </span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Temp mod:</span>{' '}
+              <span className={weatherAmbientModifier > 0 ? 'text-neon-red' : 'text-neon-cyan'}>
+                {weatherAmbientModifier > 0 ? '+' : ''}{weatherAmbientModifier}°C
+              </span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Shortage:</span>{' '}
+              {supplyShortageActive
+                ? <span className="text-neon-red">{shortagePriceMultiplier}x prices</span>
+                : <span className="text-neon-green">Normal</span>}
+            </div>
+          </div>
+          <div className="mt-2 text-[10px] text-muted-foreground">
+            Inventory: {Object.entries(inventory).map(([k, v]) => `${k.replace('_', ' ')}: ${v}`).join(' | ')}
+          </div>
+          {pendingOrders.length > 0 && (
+            <div className="mt-1 text-[10px] text-neon-yellow">
+              {pendingOrders.filter(o => o.status !== 'delivered').length} orders pending
+            </div>
+          )}
+          <div className="flex gap-1 mt-2 flex-wrap">
+            {SUPPLY_CHAIN_CONFIG.map(sc => (
+              <Button key={sc.itemType} variant="outline" size="xs" className="text-[9px]"
+                onClick={() => placeOrder(sc.itemType, 1)}>
+                <Package className="size-2.5" />Order {sc.itemType.replace('_', ' ')}
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Phase 5: Interconnection & Peering ── */}
+        <div className="rounded-lg border border-border bg-card p-3">
+          <div className="flex items-center gap-2 text-xs font-bold text-neon-orange mb-2">
+            <Globe className="size-3.5" />INTERCONNECTION & PEERING
+          </div>
+          {meetMeRoomTier === null ? (
+            <div className="text-[10px]">
+              <p className="text-muted-foreground mb-2">Install a Meet-Me Room to enable interconnection revenue.</p>
+              <div className="flex flex-wrap gap-1">
+                {MEETME_ROOM_CONFIG.map((cfg, i) => (
+                  <Tooltip key={i}>
+                    <TooltipTrigger asChild>
+                      <Button variant="outline" size="xs" className="text-[9px]"
+                        onClick={() => installMeetMeRoom(i)}
+                        disabled={money < cfg.installCost || SUITE_TIER_ORDER.indexOf(suiteTier) < 1}>
+                        ${(cfg.installCost / 1000).toFixed(0)}k — {cfg.label}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent><p className="text-xs">{cfg.description} ({cfg.portCapacity} ports)</p></TooltipContent>
+                  </Tooltip>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="text-[10px] space-y-1">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Revenue:</span>
+                <span className="text-neon-green">${meetMeRevenue.toFixed(0)}/tick</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Ports:</span>
+                <span>{interconnectPorts.length} active</span>
+              </div>
+              <div className="flex gap-1 flex-wrap">
+                {INTERCONNECT_PORT_CONFIG.map(pc => (
+                  <Button key={pc.portType} variant="outline" size="xs" className="text-[9px]"
+                    onClick={() => addInterconnectPort(pc.portType)}>
+                    <Plug className="size-2.5" />{pc.label} (${pc.installCost})
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="mt-2 border-t border-border pt-2">
+            <div className="text-[10px] font-medium text-muted-foreground mb-1">Peering ({peeringAgreements.length}/4) — Avg latency: {avgLatencyMs}ms</div>
+            <div className="flex gap-1 flex-wrap">
+              {PEERING_OPTIONS.map((opt, i) => (
+                <Tooltip key={opt.type}>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" size="xs" className="text-[9px]"
+                      onClick={() => addPeeringAgreement(i)}
+                      disabled={peeringAgreements.some(p => p.type === opt.type) || peeringAgreements.length >= 4}>
+                      <Wifi className="size-2.5" />{opt.label}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent><p className="text-xs">{opt.description} — ${opt.costPerTick}/tick, {opt.latencyMs}ms</p></TooltipContent>
+                </Tooltip>
+              ))}
+            </div>
+            {peeringAgreements.length > 0 && (
+              <div className="mt-1 text-[10px] text-neon-yellow">
+                Peering cost: ${peeringCostPerTick}/tick
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── Phase 5: Server Config & Maintenance ── */}
+        <div className="rounded-lg border border-border bg-card p-3">
+          <div className="flex items-center gap-2 text-xs font-bold text-neon-green mb-2">
+            <HardDrive className="size-3.5" />SERVER CONFIG & MAINTENANCE
+          </div>
+          <div className="text-[10px] mb-2">
+            <span className="text-muted-foreground">Default config:</span>{' '}
+            <span style={{ color: SERVER_CONFIG_OPTIONS.find(s => s.id === defaultServerConfig)?.color }}>
+              {SERVER_CONFIG_OPTIONS.find(s => s.id === defaultServerConfig)?.label}
+            </span>
+          </div>
+          <div className="flex gap-1 flex-wrap mb-2">
+            {SERVER_CONFIG_OPTIONS.map(cfg => (
+              <Tooltip key={cfg.id}>
+                <TooltipTrigger asChild>
+                  <Button variant={defaultServerConfig === cfg.id ? 'default' : 'outline'} size="xs" className="text-[9px]"
+                    onClick={() => setDefaultServerConfig(cfg.id)}
+                    style={defaultServerConfig === cfg.id ? { backgroundColor: cfg.color + '30', color: cfg.color, borderColor: cfg.color + '60' } : {}}>
+                    {cfg.label}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent><p className="text-xs">{cfg.description}<br/>Cost: {cfg.costMultiplier}x | Power: {cfg.powerMultiplier}x | Revenue: {cfg.revenueMultiplier}x</p></TooltipContent>
+              </Tooltip>
+            ))}
+          </div>
+          <div className="border-t border-border pt-2">
+            <div className="text-[10px] font-medium text-muted-foreground mb-1">
+              Maintenance ({maintenanceWindows.filter(w => w.status !== 'completed').length} active, {maintenanceCompletedCount} completed)
+            </div>
+            <div className="flex gap-1 flex-wrap">
+              {MAINTENANCE_CONFIG.map(cfg => (
+                <Tooltip key={cfg.targetType}>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" size="xs" className="text-[9px]"
+                      onClick={() => {
+                        const target = cfg.targetType === 'cabinet' ? (cabinets[0]?.id ?? 'system')
+                          : cfg.targetType === 'spine' ? (spineSwitches[0]?.id ?? 'system')
+                            : 'system'
+                        scheduleMaintenance(cfg.targetType, target)
+                      }}>
+                      <Wrench className="size-2.5" />{cfg.label} (${cfg.cost})
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent><p className="text-xs">{cfg.effect} — {cfg.durationTicks} ticks</p></TooltipContent>
+                </Tooltip>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Phase 5: Power Redundancy & Noise ── */}
+        <div className="rounded-lg border border-border bg-card p-3">
+          <div className="flex items-center gap-2 text-xs font-bold text-neon-yellow mb-2">
+            <ShieldCheck className="size-3.5" />POWER REDUNDANCY & NOISE
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-[10px] mb-2">
+            <div>
+              <span className="text-muted-foreground">Redundancy:</span>{' '}
+              <span className="text-neon-green">{powerRedundancy}</span>
+              {powerRedundancyCost > 0 && <span className="text-neon-red ml-1">(${powerRedundancyCost}/tick)</span>}
+            </div>
+            <div>
+              <span className="text-muted-foreground">Noise:</span>{' '}
+              <span className={noiseLevel > NOISE_CONFIG.noiseLimit ? 'text-neon-red' : 'text-neon-green'}>
+                {noiseLevel}dB / {NOISE_CONFIG.noiseLimit}dB
+              </span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Community:</span>{' '}
+              <span className={communityRelations > 50 ? 'text-neon-green' : 'text-neon-red'}>
+                {communityRelations.toFixed(0)}%
+              </span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Barriers:</span>{' '}
+              {soundBarriersInstalled}/{NOISE_CONFIG.maxSoundBarriers}
+              {zoningRestricted && <span className="text-neon-red ml-1">(ZONING!)</span>}
+            </div>
+          </div>
+          <div className="flex gap-1 flex-wrap">
+            {POWER_REDUNDANCY_CONFIG.filter(c => c.level !== powerRedundancy).map(cfg => (
+              <Tooltip key={cfg.level}>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="xs" className="text-[9px]"
+                    onClick={() => upgradePowerRedundancy(cfg.level)}
+                    disabled={money < cfg.upgradeCost}>
+                    <Shield className="size-2.5" />{cfg.label} (${(cfg.upgradeCost / 1000).toFixed(0)}k)
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent><p className="text-xs">{cfg.description}</p></TooltipContent>
+              </Tooltip>
+            ))}
+            <Button variant="outline" size="xs" className="text-[9px]"
+              onClick={() => installSoundBarrier()}
+              disabled={soundBarriersInstalled >= NOISE_CONFIG.maxSoundBarriers || money < NOISE_CONFIG.soundBarrierCost}>
+              <Volume2 className="size-2.5" />Sound Barrier (${NOISE_CONFIG.soundBarrierCost})
+            </Button>
+          </div>
+        </div>
+
+        {/* ── Phase 5: Spot Market & Event Log ── */}
+        <div className="rounded-lg border border-border bg-card p-3">
+          <div className="flex items-center gap-2 text-xs font-bold text-neon-green mb-2">
+            <BarChart3 className="size-3.5" />SPOT MARKET & STATS
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-[10px] mb-2">
+            <div>
+              <span className="text-muted-foreground">Spot price:</span>{' '}
+              <span className={spotPriceMultiplier > 1.5 ? 'text-neon-green' : spotPriceMultiplier < 0.8 ? 'text-neon-red' : ''}>
+                {spotPriceMultiplier.toFixed(2)}x
+              </span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Spot revenue:</span>{' '}
+              <span className="text-neon-green">${spotRevenue.toFixed(0)}/tick</span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Allocated:</span>{' '}
+              {spotCapacityAllocated} servers
+            </div>
+            <div>
+              <span className="text-muted-foreground">Demand:</span>{' '}
+              {(spotDemand * 100).toFixed(0)}%
+            </div>
+          </div>
+          <div className="flex gap-1 mb-2">
+            {[0, 2, 5, 10].map(n => (
+              <Button key={n} variant={spotCapacityAllocated === n ? 'default' : 'outline'} size="xs" className="text-[9px]"
+                onClick={() => setSpotCapacity(n)}>
+                {n}
+              </Button>
+            ))}
+          </div>
+          <div className="border-t border-border pt-2 text-[10px]">
+            <div className="font-medium text-muted-foreground mb-1">Lifetime Stats</div>
+            <div className="grid grid-cols-2 gap-1">
+              <div>Revenue: ${lifetimeStats.totalRevenueEarned.toFixed(0)}</div>
+              <div>Expenses: ${lifetimeStats.totalExpensesPaid.toFixed(0)}</div>
+              <div>Peak temp: {lifetimeStats.peakTemperatureReached.toFixed(0)}°C</div>
+              <div>Uptime streak: {lifetimeStats.longestUptimeStreak}</div>
+              <div>Fires: {lifetimeStats.totalFiresSurvived}</div>
+              <div>Outages: {lifetimeStats.totalPowerOutages}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Phase 5: Event Log ── */}
+        <div className="rounded-lg border border-border bg-card p-3">
+          <div className="flex items-center justify-between text-xs font-bold text-neon-cyan mb-2">
+            <div className="flex items-center gap-2">
+              <BookOpen className="size-3.5" />EVENT LOG
+            </div>
+            <div className="flex items-center gap-1">
+              <Button variant={tutorialEnabled ? 'default' : 'outline'} size="xs" className="text-[9px]"
+                onClick={() => toggleTutorial()}>
+                {tutorialEnabled ? 'Tutorial ON' : 'Tutorial OFF'}
+              </Button>
+            </div>
+          </div>
+          <div className="max-h-32 overflow-y-auto space-y-0.5">
+            {eventLog.length === 0 ? (
+              <p className="text-[10px] text-muted-foreground">No events yet.</p>
+            ) : (
+              eventLog.slice(-15).reverse().map((entry, i) => (
+                <div key={i} className={`text-[9px] ${
+                  entry.severity === 'error' ? 'text-neon-red' :
+                  entry.severity === 'warning' ? 'text-neon-yellow' :
+                  entry.severity === 'success' ? 'text-neon-green' :
+                  'text-muted-foreground'
+                }`}>
+                  <span className="opacity-50">[T{entry.tick}]</span> {entry.message}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* ── Phase 5: Capacity Planning ── */}
+        {capacityHistory.length > 5 && (
+          <div className="rounded-lg border border-border bg-card p-3">
+            <div className="flex items-center gap-2 text-xs font-bold text-neon-orange mb-2">
+              <Gauge className="size-3.5" />CAPACITY PLANNING
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-[10px]">
+              <div>
+                <span className="text-muted-foreground">Space:</span>{' '}
+                <span className={cabinets.length >= suiteLimits.maxCabinets * 0.8 ? 'text-neon-red' : 'text-neon-green'}>
+                  {cabinets.length}/{suiteLimits.maxCabinets} cabinets
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Power:</span>{' '}
+                <span>{(totalPower / 1000).toFixed(1)}kW</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Avg heat:</span>{' '}
+                <span className={avgHeat > 70 ? 'text-neon-red' : avgHeat > 50 ? 'text-neon-yellow' : 'text-neon-green'}>
+                  {avgHeat.toFixed(0)}°C
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Runway:</span>{' '}
+                {expenses > revenue
+                  ? <span className="text-neon-red">{Math.floor(money / Math.max(1, expenses - revenue))} ticks</span>
+                  : <span className="text-neon-green">Profitable</span>}
+              </div>
+            </div>
+            <div className="mt-1 text-[9px] text-muted-foreground">
+              Revenue trend: {capacityHistory.length >= 10
+                ? (capacityHistory[capacityHistory.length - 1].revenue > capacityHistory[capacityHistory.length - 10].revenue
+                  ? '↑ increasing' : capacityHistory[capacityHistory.length - 1].revenue < capacityHistory[capacityHistory.length - 10].revenue
+                    ? '↓ decreasing' : '→ stable')
+                : '...gathering data'}
+            </div>
+          </div>
+        )}
 
         {/* Save/Load & Sandbox bar */}
         <div className="flex items-center justify-between rounded-lg border border-border bg-card p-2">
