@@ -43,9 +43,11 @@ export function GuidePanel() {
 
       {/* Layout strategy guide */}
       <div className="rounded-lg border border-neon-cyan/20 bg-neon-cyan/5 p-3">
-        <p className="text-xs font-bold text-neon-cyan mb-2">LAYOUT STRATEGY</p>
+        <p className="text-xs font-bold text-neon-cyan mb-2">LAYOUT &amp; AISLES</p>
         <p className="text-xs font-mono text-muted-foreground mb-2">
-          When placing cabinets, colored overlays show airflow zones. Press <strong className="text-neon-green">R</strong> to rotate facing.
+          Your facility has pre-built <strong className="text-foreground">cabinet rows</strong> with cold aisles between them.
+          Cabinet facing (N/S) is enforced by the row layout &mdash; no manual rotation needed.
+          Colored overlays show airflow zones during placement.
         </p>
         <div className="space-y-2">
           <div className="flex gap-2 items-start">
@@ -79,8 +81,9 @@ export function GuidePanel() {
         </div>
         <div className="mt-2 pt-2 border-t border-neon-cyan/10">
           <p className="text-[10px] font-mono text-muted-foreground">
-            <strong className="text-foreground">Pro tip:</strong> Alternate facing (N/S or E/W) in adjacent rows/columns.
-            Leave 1&ndash;2 tile gaps for proper hot/cold aisles. This earns up to {Math.round(SPACING_CONFIG.maxAisleSpacingBonus * 100)}% cooling bonus.
+            <strong className="text-foreground">Pro tip:</strong> The row layout handles hot/cold aisle separation automatically.
+            Fill both sides of an aisle to earn up to {Math.round(SPACING_CONFIG.maxAisleSpacingBonus * 100)}% cooling bonus.
+            At Standard tier+, upgrade aisles with <strong className="text-foreground">containment</strong> for even better cooling.
           </p>
         </div>
       </div>
@@ -113,8 +116,8 @@ export function GuidePanel() {
           <p className="text-[10px] font-mono font-bold text-neon-cyan">COOLING STRATEGIES (CHEAPEST FIRST)</p>
           <ol className="text-xs font-mono text-muted-foreground space-y-1.5 list-decimal list-inside">
             <li>
-              <strong className="text-foreground">Layout optimization</strong> (free)
-              <span className="text-muted-foreground"> &mdash; Alternate cabinet facing and leave gaps for hot/cold aisles. Up to {Math.round(SPACING_CONFIG.maxAisleSpacingBonus * 100)}% cooling bonus.</span>
+              <strong className="text-foreground">Fill both sides of aisles</strong> (free)
+              <span className="text-muted-foreground"> &mdash; Populate cabinet rows on both sides of each aisle for up to {Math.round(SPACING_CONFIG.maxAisleSpacingBonus * 100)}% cooling bonus. Upgrade with containment ($15k/aisle) for extra efficiency.</span>
             </li>
             <li>
               <strong className="text-foreground">Management cabinets</strong> (${(2000).toLocaleString()}/cab)

@@ -80,7 +80,7 @@ function StatRow({ icon: Icon, label, value, color, sub }: {
 
 function CabinetDetail({ cabinet }: { cabinet: Cabinet }) {
   const {
-    toggleCabinetPower, toggleCabinetFacing, refreshServers, money,
+    toggleCabinetPower, refreshServers, money,
     selectCabinet, coolingType, trafficStats, zones,
   } = useGameStore()
 
@@ -275,18 +275,12 @@ function CabinetDetail({ cabinet }: { cabinet: Cabinet }) {
 
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="xs"
-                    className="flex-1 text-[10px] gap-1 border-border hover:bg-muted"
-                    onClick={() => toggleCabinetFacing(cabinet.id)}
-                  >
-                    <ArrowUpDown className="size-3" />
-                    Flip
-                  </Button>
+                  <span className="flex-1 text-[10px] gap-1 border border-border rounded px-2 py-1 text-center text-muted-foreground/50 font-mono">
+                    {cabinet.facing === 'north' ? '▲ N' : '▼ S'}
+                  </span>
                 </TooltipTrigger>
                 <TooltipContent side="top">
-                  Rotate facing ({cabinet.facing.charAt(0).toUpperCase()}) for hot/cold aisle
+                  Facing {cabinet.facing} (set by row layout)
                 </TooltipContent>
               </Tooltip>
             </div>

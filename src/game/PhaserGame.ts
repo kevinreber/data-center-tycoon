@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import type { LayerVisibility, LayerOpacity, LayerColors, LayerColorOverrides, TrafficLink, CabinetEnvironment, CabinetFacing, PlacementHint } from '@/stores/gameStore'
+import type { LayerVisibility, LayerOpacity, LayerColors, LayerColorOverrides, TrafficLink, CabinetEnvironment, CabinetFacing, PlacementHint, DataCenterLayout } from '@/stores/gameStore'
 import { DEFAULT_COLORS, ENVIRONMENT_CONFIG, MAX_SERVERS_PER_CABINET, getFacingOffsets } from '@/stores/gameStore'
 
 const COLORS = DEFAULT_COLORS
@@ -98,6 +98,14 @@ class DataCenterScene extends Phaser.Scene {
   private cabRows = DEFAULT_CAB_ROWS
   private spineSlots = DEFAULT_SPINE_SLOTS
 
+  // Row-based layout
+  private layout: DataCenterLayout | null = null
+  private aisleGraphics: Phaser.GameObjects.Graphics | null = null
+  private aisleLabels: Phaser.GameObjects.Text[] = []
+  private corridorGraphics: Phaser.GameObjects.Graphics | null = null
+  private containmentGraphics: Phaser.GameObjects.Graphics | null = null
+  private containedAisles: Set<number> = new Set()
+
   // Traffic visualization
   private trafficGraphics: Phaser.GameObjects.Graphics | null = null
   private packetGraphics: Phaser.GameObjects.Graphics | null = null
@@ -182,6 +190,8 @@ class DataCenterScene extends Phaser.Scene {
     this.drawSpineFloor()
     this.drawFloor()
     this.drawGrid()
+    this.drawAisles()
+    this.drawCorridors()
 
     // Set up pointer events for placement mode
     this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
@@ -298,6 +308,12 @@ class DataCenterScene extends Phaser.Scene {
     return { col: roundCol, row: roundRow }
   }
 
+  /** Check if a grid row is a valid cabinet row (not an aisle or corridor) */
+  private isCabinetRow(gridRow: number): boolean {
+    if (!this.layout) return true // fallback: treat all rows as valid
+    return this.layout.cabinetRows.some(r => r.gridRow === gridRow)
+  }
+
   /** Find the cabinet whose visual bounding box contains the given world point.
    *  Cabinets are tall isometric cubes, so we check the full rendered area (not just the ground tile).
    *  If multiple overlap, we pick the one closest to the camera (highest depth). */
@@ -390,7 +406,17 @@ class DataCenterScene extends Phaser.Scene {
     this.clearZoneOverlays()
 
     const { x, y } = this.isoToScreen(col, row)
+    const isValidRow = this.isCabinetRow(row)
     const occupied = this.occupiedTiles.has(`${col},${row}`)
+
+    // Non-cabinet rows (aisles, corridors) show dim gray
+    if (!isValidRow) {
+      const color = 0x556677
+      const alpha = 0.15
+      // Draw dim overlay for non-placeable row
+      this.drawIsoTile(this.placementZoneGraphics!, col, row, color, alpha)
+      return
+    }
 
     // Count orthogonal neighbors to determine density
     let adjacentCount = 0
@@ -505,7 +531,7 @@ class DataCenterScene extends Phaser.Scene {
     }
 
     // Show hint text
-    if (this.onTileHover && !occupied) {
+    if (this.onTileHover && !occupied && isValidRow) {
       const hints = this.onTileHover(col, row)
       if (hints.length > 0) {
         const hintMsg = hints.map((h) => {
@@ -528,6 +554,30 @@ class DataCenterScene extends Phaser.Scene {
         this.placementHintText.setVisible(true)
       } else {
         if (this.placementHintText) this.placementHintText.setVisible(false)
+      }
+    } else if (!isValidRow) {
+      // Hovering over aisle or corridor — pass to hint system for info
+      if (this.onTileHover) {
+        const hints = this.onTileHover(col, row)
+        if (hints.length > 0) {
+          const hintMsg = hints.map((h) => {
+            const prefix = h.type === 'warning' ? '!' : h.type === 'tip' ? '*' : '-'
+            return `${prefix} ${h.message}`
+          }).join('\n')
+          if (!this.placementHintText) {
+            this.placementHintText = this.add.text(0, 0, '', {
+              fontFamily: 'monospace',
+              fontSize: '8px',
+              color: '#aacccc',
+              backgroundColor: '#0a1520ee',
+              padding: { x: 6, y: 4 },
+              wordWrap: { width: 240 },
+            }).setDepth(100)
+          }
+          this.placementHintText.setText(hintMsg)
+          this.placementHintText.setPosition(x + TILE_W / 2 + 8, y - 10)
+          this.placementHintText.setVisible(true)
+        }
       }
     } else if (occupied) {
       if (!this.placementHintText) {
@@ -566,30 +616,40 @@ class DataCenterScene extends Phaser.Scene {
   private drawFloor() {
     this.floorGraphics = this.add.graphics()
 
-    // Detect which rows are "aisle rows" (empty rows between cabinet rows)
-    const cabinetRows = new Set<number>()
-    for (const entry of this.cabEntries.values()) {
-      cabinetRows.add(entry.row)
+    // Build sets for quick lookup of row types from layout
+    const cabinetGridRows = new Set<number>()
+    const aisleGridRows = new Map<number, 'cold' | 'hot' | 'neutral'>()
+    const corridorGridRows = new Set<number>()
+
+    if (this.layout) {
+      for (const row of this.layout.cabinetRows) cabinetGridRows.add(row.gridRow)
+      for (const aisle of this.layout.aisles) aisleGridRows.set(aisle.gridRow, aisle.type)
+      corridorGridRows.add(this.layout.corridorTop)
+      corridorGridRows.add(this.layout.corridorBottom)
     }
 
     for (let r = 0; r < this.cabRows; r++) {
-      // An aisle row is one with no cabinets that sits between two cabinet rows
-      const isAisleRow = !cabinetRows.has(r) && cabinetRows.size > 0 &&
-        [...cabinetRows].some(cr => cr < r) && [...cabinetRows].some(cr => cr > r)
-
       for (let c = 0; c < this.cabCols; c++) {
         const { x, y } = this.isoToScreen(c, r)
-        const isAlternate = (r + c) % 2 === 0
-
         let fillColor: number
-        let alpha: number
-        if (isAisleRow) {
-          // Aisle tiles: slightly brighter with a warm tint (walkway floor)
-          fillColor = isAlternate ? 0x121a14 : 0x141c16
-          alpha = 0.95
+        let alpha = 0.9
+
+        if (aisleGridRows.has(r)) {
+          const aisleType = aisleGridRows.get(r)!
+          if (aisleType === 'cold') {
+            fillColor = (c + r) % 2 === 0 ? 0x061828 : 0x081e30
+          } else if (aisleType === 'hot') {
+            fillColor = (c + r) % 2 === 0 ? 0x1a0e06 : 0x201208
+          } else {
+            fillColor = (c + r) % 2 === 0 ? 0x0e1218 : 0x10141a
+          }
+        } else if (corridorGridRows.has(r)) {
+          fillColor = (c + r) % 2 === 0 ? 0x0f1520 : 0x111822
+          alpha = 0.7
         } else {
+          // Cabinet row — standard dark floor
+          const isAlternate = (r + c) % 2 === 0
           fillColor = isAlternate ? 0x0a1520 : 0x0c1825
-          alpha = 0.9
         }
 
         this.floorGraphics.fillStyle(fillColor, alpha)
@@ -602,7 +662,7 @@ class DataCenterScene extends Phaser.Scene {
         this.floorGraphics.fillPath()
 
         // Draw subtle aisle lane markings
-        if (isAisleRow) {
+        if (aisleGridRows.has(r)) {
           this.floorGraphics.lineStyle(0.5, 0x335533, 0.3)
           this.floorGraphics.lineBetween(
             x - TILE_W / 4, y + TILE_H / 2,
@@ -612,6 +672,139 @@ class DataCenterScene extends Phaser.Scene {
       }
     }
     this.floorGraphics.setDepth(0)
+  }
+
+  /** Draw aisle overlays with labels and color tinting */
+  private drawAisles() {
+    // Clean up old aisle graphics
+    if (this.aisleGraphics) this.aisleGraphics.destroy()
+    for (const label of this.aisleLabels) label.destroy()
+    this.aisleLabels = []
+    if (this.containmentGraphics) this.containmentGraphics.destroy()
+
+    if (!this.layout) return
+
+    this.aisleGraphics = this.add.graphics()
+    this.aisleGraphics.setDepth(1)
+
+    this.containmentGraphics = this.add.graphics()
+    this.containmentGraphics.setDepth(2)
+
+    for (const aisle of this.layout.aisles) {
+      const r = aisle.gridRow
+      const color = aisle.type === 'cold' ? 0x00aaff : aisle.type === 'hot' ? 0xff6644 : 0x888888
+      const typeLabel = aisle.type === 'cold' ? 'COLD AISLE' : aisle.type === 'hot' ? 'HOT AISLE' : 'AISLE'
+
+      // Draw aisle border lines (top and bottom edges of the aisle row)
+      const leftTop = this.isoToScreen(0, r)
+      const rightTop = this.isoToScreen(this.cabCols, r)
+      const leftBot = this.isoToScreen(0, r + 1)
+      const rightBot = this.isoToScreen(this.cabCols, r + 1)
+
+      // Top edge
+      this.aisleGraphics.lineStyle(1, color, 0.25)
+      this.aisleGraphics.lineBetween(leftTop.x, leftTop.y, rightTop.x, rightTop.y)
+      // Bottom edge
+      this.aisleGraphics.lineBetween(leftBot.x, leftBot.y, rightBot.x, rightBot.y)
+
+      // Center dashed line down the middle of the aisle
+      const midY = (leftTop.y + leftBot.y) / 2
+      const midX = (leftTop.x + leftBot.x) / 2
+      const midYR = (rightTop.y + rightBot.y) / 2
+      const midXR = (rightTop.x + rightBot.x) / 2
+      this.aisleGraphics.lineStyle(1, color, 0.12)
+      const segments = 16
+      for (let s = 0; s < segments; s += 2) {
+        const t0 = s / segments
+        const t1 = (s + 1) / segments
+        this.aisleGraphics.lineBetween(
+          midX + (midXR - midX) * t0, midY + (midYR - midY) * t0,
+          midX + (midXR - midX) * t1, midY + (midYR - midY) * t1
+        )
+      }
+
+      // Aisle type label
+      const centerX = (leftTop.x + rightBot.x) / 2
+      const centerY = (leftTop.y + rightBot.y) / 2
+      const label = this.add
+        .text(centerX, centerY, typeLabel, {
+          fontFamily: 'monospace',
+          fontSize: '7px',
+          color: `#${color.toString(16).padStart(6, '0')}`,
+        })
+        .setOrigin(0.5)
+        .setAlpha(0.35)
+        .setDepth(2)
+      this.aisleLabels.push(label)
+
+      // Containment panels if installed
+      if (this.containedAisles.has(aisle.id)) {
+        this.drawContainmentPanels(aisle.gridRow, color)
+      }
+    }
+  }
+
+  /** Draw containment panel indicators on a contained aisle */
+  private drawContainmentPanels(aisleGridRow: number, aisleColor: number) {
+    if (!this.containmentGraphics) return
+
+    // Draw small barrier marks at each end of the aisle
+    const leftTop = this.isoToScreen(0, aisleGridRow)
+    const rightTop = this.isoToScreen(this.cabCols, aisleGridRow)
+    const leftBot = this.isoToScreen(0, aisleGridRow + 1)
+    const rightBot = this.isoToScreen(this.cabCols, aisleGridRow + 1)
+
+    // Solid barrier lines (thicker, brighter) on top and bottom edges
+    this.containmentGraphics.lineStyle(2.5, aisleColor, 0.5)
+    this.containmentGraphics.lineBetween(leftTop.x, leftTop.y, rightTop.x, rightTop.y)
+    this.containmentGraphics.lineBetween(leftBot.x, leftBot.y, rightBot.x, rightBot.y)
+
+    // Small panel markers at ends
+    this.containmentGraphics.fillStyle(aisleColor, 0.2)
+    // Left end panel
+    this.containmentGraphics.fillRect(leftTop.x - 2, leftTop.y - 1, 4, (leftBot.y - leftTop.y) + 2)
+    // Right end panel
+    this.containmentGraphics.fillRect(rightTop.x - 2, rightTop.y - 1, 4, (rightBot.y - rightTop.y) + 2)
+  }
+
+  /** Draw corridor overlays at top and bottom */
+  private drawCorridors() {
+    if (this.corridorGraphics) this.corridorGraphics.destroy()
+    if (!this.layout) return
+
+    this.corridorGraphics = this.add.graphics()
+    this.corridorGraphics.setDepth(1)
+
+    for (const cr of [this.layout.corridorTop, this.layout.corridorBottom]) {
+      const leftTop = this.isoToScreen(0, cr)
+      const rightTop = this.isoToScreen(this.cabCols, cr)
+      const leftBot = this.isoToScreen(0, cr + 1)
+      const rightBot = this.isoToScreen(this.cabCols, cr + 1)
+
+      // Dashed border
+      this.corridorGraphics.lineStyle(1, 0x556677, 0.15)
+      const segments = 20
+      const dx1 = rightTop.x - leftTop.x
+      const dy1 = rightTop.y - leftTop.y
+      for (let s = 0; s < segments; s += 2) {
+        const t0 = s / segments
+        const t1 = (s + 1) / segments
+        this.corridorGraphics.lineBetween(
+          leftTop.x + dx1 * t0, leftTop.y + dy1 * t0,
+          leftTop.x + dx1 * t1, leftTop.y + dy1 * t1
+        )
+      }
+      const dx2 = rightBot.x - leftBot.x
+      const dy2 = rightBot.y - leftBot.y
+      for (let s = 0; s < segments; s += 2) {
+        const t0 = s / segments
+        const t1 = (s + 1) / segments
+        this.corridorGraphics.lineBetween(
+          leftBot.x + dx2 * t0, leftBot.y + dy2 * t0,
+          leftBot.x + dx2 * t1, leftBot.y + dy2 * t1
+        )
+      }
+    }
   }
 
   private drawGrid() {
@@ -1226,25 +1419,33 @@ class DataCenterScene extends Phaser.Scene {
   }
 
   /** Update grid dimensions (on suite upgrade) and rebuild the scene layout */
-  setGridSize(cols: number, rows: number, spineSlots: number) {
-    if (cols === this.cabCols && rows === this.cabRows && spineSlots === this.spineSlots) return
+  setGridSize(cols: number, rows: number, spineSlots: number, layout?: DataCenterLayout) {
+    if (cols === this.cabCols && rows === this.cabRows && spineSlots === this.spineSlots && !layout) return
 
     this.cabCols = cols
     this.cabRows = rows
     this.spineSlots = spineSlots
+    if (layout) this.layout = layout
 
     // Recalculate offsets (centered both horizontally and vertically)
     this.computeLayout()
 
-    // Clear and redraw floor/grid
+    // Clear and redraw floor/grid/aisles/corridors
     if (this.floorGraphics) { this.floorGraphics.destroy(); this.floorGraphics = null }
     if (this.gridGraphics) { this.gridGraphics.destroy(); this.gridGraphics = null }
     if (this.spineFloorGraphics) { this.spineFloorGraphics.destroy(); this.spineFloorGraphics = null }
     if (this.spineLabel) { this.spineLabel.destroy(); this.spineLabel = null }
+    if (this.aisleGraphics) { this.aisleGraphics.destroy(); this.aisleGraphics = null }
+    for (const label of this.aisleLabels) label.destroy()
+    this.aisleLabels = []
+    if (this.corridorGraphics) { this.corridorGraphics.destroy(); this.corridorGraphics = null }
+    if (this.containmentGraphics) { this.containmentGraphics.destroy(); this.containmentGraphics = null }
 
     this.drawSpineFloor()
     this.drawFloor()
     this.drawGrid()
+    this.drawAisles()
+    this.drawCorridors()
 
     // Rebuild occupied tiles set (positions are preserved — grid only grows)
     this.occupiedTiles.clear()
@@ -1293,10 +1494,11 @@ class DataCenterScene extends Phaser.Scene {
         this.placementModeLabel = null
       }
     } else {
-      // Show placement mode indicator
+      // Show placement mode indicator — position below the grid
       const w = this.scale.width
+      const labelRow = this.cabRows + 1
       this.placementModeLabel = this.add
-        .text(w / 2, this.offsetY + (this.cabRows + 1) * TILE_H, 'CLICK A TILE TO PLACE CABINET', {
+        .text(w / 2, this.offsetY + labelRow * TILE_H, 'CLICK A ROW SLOT TO PLACE CABINET', {
           fontFamily: 'monospace',
           fontSize: '10px',
           color: '#00ff88',
@@ -1453,6 +1655,12 @@ class DataCenterScene extends Phaser.Scene {
     this.pduEntries.clear()
     this.cableTrayGraphics.clear()
     this.cableTrayEntries.clear()
+  }
+
+  /** Update aisle containment state and redraw aisle overlays */
+  setAisleContainments(containedIds: number[]) {
+    this.containedAisles = new Set(containedIds)
+    this.drawAisles()
   }
 
   /** Render selection highlight around a cabinet */
