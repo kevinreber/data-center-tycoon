@@ -150,13 +150,31 @@ class DataCenterScene extends Phaser.Scene {
     super({ key: 'DataCenterScene' })
   }
 
-  create() {
+  /** Compute offsets to center all content (spine area + grid) both horizontally and vertically */
+  private computeLayout() {
     const w = this.scale.width
-    this.offsetX = w / 2
-    this.offsetY = 150
+    const h = this.scale.height
 
+    // Horizontal centering
+    this.offsetX = w / 2
     this.spineOffsetX = w / 2
-    this.spineOffsetY = 40
+
+    // Vertical centering:
+    // Content spans from spine label (spineOffsetY - 20) to grid diamond bottom.
+    // Keep the relative gap between spine and grid constant.
+    const SPINE_GRID_GAP = 110
+    const LABEL_OVERHEAD = 20 // spine label sits above spineOffsetY
+    const gridHeight = (this.cabCols + this.cabRows) * (TILE_H / 2)
+
+    const totalHeight = LABEL_OVERHEAD + SPINE_GRID_GAP + gridHeight
+    const startY = Math.max(10, (h - totalHeight) / 2)
+
+    this.spineOffsetY = startY + LABEL_OVERHEAD
+    this.offsetY = this.spineOffsetY + SPINE_GRID_GAP
+  }
+
+  create() {
+    this.computeLayout()
 
     this.drawSpineFloor()
     this.drawFloor()
@@ -1212,12 +1230,8 @@ class DataCenterScene extends Phaser.Scene {
     this.cabRows = rows
     this.spineSlots = spineSlots
 
-    // Recalculate offsets
-    const w = this.scale.width
-    this.offsetX = w / 2
-    this.offsetY = 150
-    this.spineOffsetX = w / 2
-    this.spineOffsetY = 40
+    // Recalculate offsets (centered both horizontally and vertically)
+    this.computeLayout()
 
     // Clear and redraw floor/grid
     if (this.floorGraphics) { this.floorGraphics.destroy(); this.floorGraphics = null }
@@ -1571,13 +1585,26 @@ class DataCenterScene extends Phaser.Scene {
     this.clearZoneOverlays()
   }
 
-  /** Reset camera to default position and zoom */
+  /** Reset camera to default position and zoom, centered on content */
   resetCamera() {
-    this.panOffsetX = 0
-    this.panOffsetY = 0
     this.zoomLevel = 1
-    this.cameras.main.setScroll(0, 0)
     this.cameras.main.setZoom(1)
+
+    // Compute content center in world space and scroll so it's at viewport center
+    const w = this.scale.width
+    const h = this.scale.height
+
+    const contentCenterX = this.offsetX
+    const contentTop = this.spineOffsetY - 20
+    const gridBottom = this.offsetY + (this.cabCols + this.cabRows) * (TILE_H / 2)
+    const contentCenterY = (contentTop + gridBottom) / 2
+
+    const scrollX = contentCenterX - w / 2
+    const scrollY = contentCenterY - h / 2
+
+    this.panOffsetX = -scrollX
+    this.panOffsetY = -scrollY
+    this.cameras.main.setScroll(scrollX, scrollY)
   }
 }
 
