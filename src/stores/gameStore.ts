@@ -244,7 +244,7 @@ export const DEPRECIATION = {
 // ── Infrastructure Layout Types ──────────────────────────────
 
 /** Cabinet facing direction for hot/cold aisle enforcement */
-export type CabinetFacing = 'north' | 'south'
+export type CabinetFacing = 'north' | 'south' | 'east' | 'west'
 
 /** Power Distribution Unit placed on the grid */
 export interface PDU {
@@ -310,6 +310,30 @@ export const AISLE_CONFIG = {
   degradedCablePenalty: 0.10,   // 10% bandwidth penalty on over-length cables
 }
 
+/** Realistic spacing & adjacency configuration */
+export const SPACING_CONFIG = {
+  // Heat penalties for dense placement
+  adjacentHeatPenalty: 0.3,       // +0.3°C/tick per orthogonally adjacent cabinet
+  surroundedHeatBonus: 0.8,      // additional +0.8°C/tick if surrounded on 3+ sides (trapped hot air)
+
+  // Enhanced aisle bonuses (rewards leaving gaps between cabinet rows)
+  properAisleBonusPerPair: 0.12, // 12% cooling bonus per row pair with 1+ tile gap AND opposing faces
+  narrowAisleBonusPerPair: 0.05, // 5% bonus for back-to-back rows with opposing faces (no gap)
+  maxAisleSpacingBonus: 0.30,    // cap at 30% total cooling overhead reduction
+
+  // Airflow bonuses (cabinet front/rear facing empty space)
+  openFrontCoolingBonus: 0.3,    // +0.3°C/tick extra cooling if intake side faces empty tile
+  openRearCoolingBonus: 0.2,     // +0.2°C/tick extra cooling if exhaust side faces empty tile
+
+  // Maintenance access
+  noAccessMaintenanceCostMult: 2.0, // 2x maintenance cost if no adjacent empty tile
+  noAccessResolutionMult: 1.5,      // 1.5x incident resolution time if cabinet has no access
+
+  // Fire spread between adjacent cabinets
+  fireSpreadChance: 0.12,        // 12% chance per tick that fire spreads to each adjacent cabinet
+  fireSpreadMaxPerTick: 2,       // max cabinets fire can spread to per tick
+}
+
 // ── Suite Tier Config ──────────────────────────────────────────
 
 export interface SuiteConfig {
@@ -318,7 +342,7 @@ export interface SuiteConfig {
   description: string
   cols: number              // cabinet grid columns
   rows: number              // cabinet grid rows
-  maxCabinets: number       // cols * rows
+  maxCabinets: number       // max cabinets (less than cols * rows to allow aisle space)
   maxSpines: number         // spine switch slots
   upgradeCost: number       // cost to upgrade to this tier (0 for starter)
   color: string
@@ -329,8 +353,8 @@ export const SUITE_TIERS: Record<SuiteTier, SuiteConfig> = {
     tier: 'starter',
     label: 'Starter Suite',
     description: 'A small colocation closet. Enough room to get started.',
-    cols: 4,
-    rows: 2,
+    cols: 5,
+    rows: 5,
     maxCabinets: 8,
     maxSpines: 2,
     upgradeCost: 0,
@@ -340,8 +364,8 @@ export const SUITE_TIERS: Record<SuiteTier, SuiteConfig> = {
     tier: 'standard',
     label: 'Standard Suite',
     description: 'A proper server room with room to grow.',
-    cols: 6,
-    rows: 3,
+    cols: 8,
+    rows: 7,
     maxCabinets: 18,
     maxSpines: 4,
     upgradeCost: 40000,
@@ -351,8 +375,8 @@ export const SUITE_TIERS: Record<SuiteTier, SuiteConfig> = {
     tier: 'professional',
     label: 'Professional Suite',
     description: 'A full-size data hall with enterprise-grade capacity.',
-    cols: 8,
-    rows: 4,
+    cols: 10,
+    rows: 9,
     maxCabinets: 32,
     maxSpines: 6,
     upgradeCost: 120000,
@@ -362,8 +386,8 @@ export const SUITE_TIERS: Record<SuiteTier, SuiteConfig> = {
     tier: 'enterprise',
     label: 'Enterprise Suite',
     description: 'A massive hyperscale facility. Maximum capacity.',
-    cols: 10,
-    rows: 5,
+    cols: 14,
+    rows: 11,
     maxCabinets: 50,
     maxSpines: 8,
     upgradeCost: 350000,
@@ -1014,7 +1038,7 @@ export const TUTORIAL_TIPS: TutorialTip[] = [
   { id: 'no_leaf_switch', title: 'No Network', message: 'Cabinets without leaf switches cannot connect to the network fabric.', category: 'network' },
   { id: 'no_spine', title: 'No Backbone', message: 'You need spine switches to complete the network fabric and route traffic.', category: 'network' },
   { id: 'first_incident', title: 'Incident!', message: 'Incidents happen! Resolve them quickly by clicking the resolve button to minimize damage.', category: 'incidents' },
-  { id: 'aisle_hint', title: 'Aisle Layout', message: 'Tip: Alternate cabinet facing (N/S) in adjacent rows for a hot/cold aisle cooling bonus.', category: 'build' },
+  { id: 'aisle_hint', title: 'Aisle Layout', message: 'Tip: Alternate cabinet facing in adjacent rows or columns for a hot/cold aisle cooling bonus. Use N/S for row aisles or E/W for column aisles.', category: 'build' },
   { id: 'first_contract', title: 'Contracts', message: 'Contracts provide bonus revenue but require meeting SLA targets. Monitor your temp and server count!', category: 'contracts' },
   { id: 'first_order_arrived', title: 'Order Delivered!', message: 'Your first supply chain order has arrived! Stock up on inventory before shortages hit to avoid price spikes.', category: 'build' },
   { id: 'weather_hot', title: 'Heat Wave!', message: 'Hot weather is increasing ambient temperature. Your cooling systems need to work harder — consider water cooling.', category: 'cooling' },
@@ -1369,47 +1393,94 @@ export function getPlacementHints(
   const hints: PlacementHint[] = []
   const limits = getSuiteLimits(suiteTier)
 
-  // Check adjacent cabinets for heat warnings
-  const neighbors = cabinets.filter(
+  // Simulate placing a cabinet here to check adjacency
+  const orthogonalNeighbors = cabinets.filter(
+    (c) => (c.col === col && Math.abs(c.row - row) === 1) || (c.row === row && Math.abs(c.col - col) === 1)
+  )
+  const allNeighbors = cabinets.filter(
     (c) => Math.abs(c.col - col) <= 1 && Math.abs(c.row - row) <= 1 && (c.col !== col || c.row !== row)
   )
-  const hotNeighbors = neighbors.filter((c) => c.heatLevel >= 60)
-  const critNeighbors = neighbors.filter((c) => c.heatLevel >= SIM.throttleTemp)
 
+  // Heat warnings from hot neighbors
+  const hotNeighbors = allNeighbors.filter((c) => c.heatLevel >= 60)
+  const critNeighbors = allNeighbors.filter((c) => c.heatLevel >= SIM.throttleTemp)
   if (critNeighbors.length > 0) {
     hints.push({ message: 'Adjacent to overheating cabinets — risk of thermal throttle', type: 'warning' })
   } else if (hotNeighbors.length > 0) {
     hints.push({ message: 'Warm neighbors nearby — monitor cooling capacity', type: 'warning' })
   }
 
-  if (neighbors.length === 0) {
-    hints.push({ message: 'Isolated placement — good for airflow', type: 'tip' })
+  // Spacing and density analysis
+  if (orthogonalNeighbors.length >= 3) {
+    hints.push({ message: 'Surrounded on 3+ sides — trapped hot air, poor maintenance access', type: 'warning' })
+  } else if (orthogonalNeighbors.length === 0) {
+    hints.push({ message: 'Open placement — good airflow and maintenance access', type: 'tip' })
   }
 
-  // Row length guidance (real DCs typically use rows of 4-8)
-  const rowCabs = cabinets.filter((c) => c.row === row)
-  if (rowCabs.length >= limits.cols - 1) {
-    hints.push({ message: 'This row is nearly full — consider starting a new row for airflow', type: 'info' })
-  }
-
-  // Hot/cold aisle pattern hint
-  if (cabinets.length === 0) {
-    hints.push({ message: 'First cabinet — consider leaving gaps for hot/cold aisle layout', type: 'tip' })
-  } else if (cabinets.length >= 3) {
-    const sameRow = cabinets.filter((c) => c.row === row)
-    const adjacentInRow = sameRow.filter((c) => Math.abs(c.col - col) === 1)
-    if (adjacentInRow.length >= 2) {
-      hints.push({ message: 'Dense row — plan cooling paths between cabinets', type: 'info' })
+  // Maintenance access check: would placing here block neighbors' access?
+  for (const neighbor of orthogonalNeighbors) {
+    const neighborAdjacentEmpty = [
+      { col: neighbor.col, row: neighbor.row - 1 },
+      { col: neighbor.col, row: neighbor.row + 1 },
+      { col: neighbor.col - 1, row: neighbor.row },
+      { col: neighbor.col + 1, row: neighbor.row },
+    ].filter((d) => {
+      if (d.col < 0 || d.col >= limits.cols || d.row < 0 || d.row >= limits.rows) return false
+      if (d.col === col && d.row === row) return false // this tile would be occupied
+      return !cabinets.some((c) => c.col === d.col && c.row === d.row)
+    })
+    if (neighborAdjacentEmpty.length === 0) {
+      hints.push({ message: `Would block maintenance access to ${neighbor.id}`, type: 'warning' })
+      break
     }
   }
 
-  // Aisle facing hint (reusing rowCabs from above)
+  // Aisle gap guidance
+  const rowCabs = cabinets.filter((c) => c.row === row)
+  const colCabs = cabinets.filter((c) => c.col === col)
+  const adjacentRowNorth = cabinets.filter((c) => c.row === row - 1)
+  const adjacentRowSouth = cabinets.filter((c) => c.row === row + 1)
+  const adjacentColWest = cabinets.filter((c) => c.col === col - 1)
+  const adjacentColEast = cabinets.filter((c) => c.col === col + 1)
+  if (adjacentRowNorth.length > 0 && adjacentRowSouth.length > 0) {
+    hints.push({ message: 'Between two cabinet rows — consider leaving as an aisle for DC techs', type: 'warning' })
+  }
+  if (adjacentColWest.length > 0 && adjacentColEast.length > 0) {
+    hints.push({ message: 'Between two cabinet columns — consider leaving as an aisle', type: 'warning' })
+  }
+
+  // Row/column facing consistency
   if (rowCabs.length > 0) {
     const rowFacings = new Set(rowCabs.map((c) => c.facing))
     if (rowFacings.size === 1) {
       const facing = rowCabs[0].facing
-      hints.push({ message: `Row faces ${facing} — match this facing for aisle consistency`, type: 'info' })
+      hints.push({ message: `Row faces ${facing} — match facing for aisle consistency`, type: 'info' })
     }
+  }
+  if (colCabs.length > 0) {
+    const colFacings = new Set(colCabs.filter((c) => c.facing === 'east' || c.facing === 'west').map((c) => c.facing))
+    if (colFacings.size === 1) {
+      const facing = [...colFacings][0]
+      hints.push({ message: `Column faces ${facing} — match facing for aisle consistency`, type: 'info' })
+    }
+  }
+
+  // Aisle spacing hint: suggest leaving gaps between cabinet groups
+  if (cabinets.length === 0) {
+    hints.push({ message: 'Leave gaps between cabinets for aisles — DC techs need walkway access', type: 'tip' })
+  } else if (cabinets.length >= 2 && cabinets.length < 6) {
+    const cabRows = [...new Set(cabinets.map((c) => c.row))].sort((a, b) => a - b)
+    if (cabRows.length >= 2) {
+      const hasGap = cabRows.some((r, i) => i > 0 && r - cabRows[i - 1] >= 2)
+      if (!hasGap && row !== cabRows[0] && row !== cabRows[cabRows.length - 1]) {
+        hints.push({ message: 'Skip a row between cabinet rows for proper hot/cold aisles', type: 'tip' })
+      }
+    }
+  }
+
+  // Dense row warning
+  if (rowCabs.length >= limits.cols - 2) {
+    hints.push({ message: 'Row nearly full — start a new row with aisle gap for airflow', type: 'info' })
   }
 
   return hints
@@ -1525,42 +1596,153 @@ function calcCableLength(cabCol: number, cabRow: number, _spineSlot: number, gri
   return cabRow + 1 + Math.abs(cabCol - Math.floor(gridRows / 2))
 }
 
-/** Calculate hot/cold aisle cooling bonus based on cabinet layout */
+/** Get the front (intake) and rear (exhaust) tile offsets for a given facing direction.
+ *  For N/S facing: front/rear are row offsets, sides are column offsets.
+ *  For E/W facing: front/rear are column offsets, sides are row offsets. */
+export function getFacingOffsets(facing: CabinetFacing, col: number, row: number) {
+  switch (facing) {
+    case 'north': return { front: { col, row: row - 1 }, rear: { col, row: row + 1 }, sides: [{ col: col - 1, row }, { col: col + 1, row }] }
+    case 'south': return { front: { col, row: row + 1 }, rear: { col, row: row - 1 }, sides: [{ col: col - 1, row }, { col: col + 1, row }] }
+    case 'east':  return { front: { col: col + 1, row }, rear: { col: col - 1, row }, sides: [{ col, row: row - 1 }, { col, row: row + 1 }] }
+    case 'west':  return { front: { col: col - 1, row }, rear: { col: col + 1, row }, sides: [{ col, row: row - 1 }, { col, row: row + 1 }] }
+  }
+}
+
+/** Check if a facing direction aligns along the row axis (N/S) or column axis (E/W) */
+function isRowAligned(facing: CabinetFacing): boolean {
+  return facing === 'north' || facing === 'south'
+}
+
+/** Calculate hot/cold aisle cooling bonus based on cabinet layout.
+ *  Enhanced: rewards actual physical gaps between cabinet rows/columns (proper aisles for walkways).
+ *  Supports both row-aligned (N/S) and column-aligned (E/W) aisle patterns. */
 export function calcAisleBonus(cabinets: Cabinet[]): number {
   if (cabinets.length < 2) return 0
 
-  // Group cabinets by row
-  const rowMap = new Map<number, Cabinet[]>()
-  for (const cab of cabinets) {
-    const row = cab.row
-    const list = rowMap.get(row) ?? []
-    list.push(cab)
-    rowMap.set(row, list)
-  }
+  let bonus = 0
 
-  // Check for properly formed aisle pairs (adjacent rows with opposing faces)
-  let properPairs = 0
-  const rows = [...rowMap.keys()].sort((a, b) => a - b)
-  for (let i = 0; i < rows.length - 1; i++) {
-    const thisRow = rowMap.get(rows[i])!
-    const nextRow = rowMap.get(rows[i + 1])!
-    // Adjacent rows (consecutive) with cabinets facing toward each other = hot aisle
-    if (rows[i + 1] - rows[i] === 1) {
+  // ── Row-based aisles (N/S facing cabinets) ──
+  const rowAligned = cabinets.filter((c) => isRowAligned(c.facing))
+  if (rowAligned.length >= 2) {
+    const rowMap = new Map<number, Cabinet[]>()
+    for (const cab of rowAligned) {
+      const list = rowMap.get(cab.row) ?? []
+      list.push(cab)
+      rowMap.set(cab.row, list)
+    }
+    const rows = [...rowMap.keys()].sort((a, b) => a - b)
+    for (let i = 0; i < rows.length - 1; i++) {
+      const thisRow = rowMap.get(rows[i])!
+      const nextRow = rowMap.get(rows[i + 1])!
+      const gap = rows[i + 1] - rows[i]
+
       const thisFacingSouth = thisRow.every((c) => c.facing === 'south')
       const nextFacingNorth = nextRow.every((c) => c.facing === 'north')
-      if (thisFacingSouth && nextFacingNorth) properPairs++
-      // Or the reverse orientation
+      const pattern1 = thisFacingSouth && nextFacingNorth
+
       const thisFacingNorth = thisRow.every((c) => c.facing === 'north')
       const nextFacingSouth = nextRow.every((c) => c.facing === 'south')
-      if (thisFacingNorth && nextFacingSouth) properPairs++
+      const pattern2 = thisFacingNorth && nextFacingSouth
+
+      if (pattern1 || pattern2) {
+        bonus += gap >= 2 ? SPACING_CONFIG.properAisleBonusPerPair : SPACING_CONFIG.narrowAisleBonusPerPair
+      }
     }
   }
 
-  return Math.min(AISLE_CONFIG.maxCoolingBonus, properPairs * AISLE_CONFIG.coolingBonusPerPair)
+  // ── Column-based aisles (E/W facing cabinets) ──
+  const colAligned = cabinets.filter((c) => !isRowAligned(c.facing))
+  if (colAligned.length >= 2) {
+    const colMap = new Map<number, Cabinet[]>()
+    for (const cab of colAligned) {
+      const list = colMap.get(cab.col) ?? []
+      list.push(cab)
+      colMap.set(cab.col, list)
+    }
+    const cols = [...colMap.keys()].sort((a, b) => a - b)
+    for (let i = 0; i < cols.length - 1; i++) {
+      const thisCol = colMap.get(cols[i])!
+      const nextCol = colMap.get(cols[i + 1])!
+      const gap = cols[i + 1] - cols[i]
+
+      const thisFacingEast = thisCol.every((c) => c.facing === 'east')
+      const nextFacingWest = nextCol.every((c) => c.facing === 'west')
+      const pattern1 = thisFacingEast && nextFacingWest
+
+      const thisFacingWest = thisCol.every((c) => c.facing === 'west')
+      const nextFacingEast = nextCol.every((c) => c.facing === 'east')
+      const pattern2 = thisFacingWest && nextFacingEast
+
+      if (pattern1 || pattern2) {
+        bonus += gap >= 2 ? SPACING_CONFIG.properAisleBonusPerPair : SPACING_CONFIG.narrowAisleBonusPerPair
+      }
+    }
+  }
+
+  return Math.min(SPACING_CONFIG.maxAisleSpacingBonus, bonus)
 }
 
-/** Count how many cabinets violate aisle layout (mixed facing in a row) */
+/** Get orthogonally adjacent cabinets (N/S/E/W only, no diagonals) */
+export function getAdjacentCabinets(cab: Cabinet, cabinets: Cabinet[]): Cabinet[] {
+  return cabinets.filter((c) =>
+    c.id !== cab.id && (
+      (c.col === cab.col && Math.abs(c.row - cab.row) === 1) ||
+      (c.row === cab.row && Math.abs(c.col - cab.col) === 1)
+    )
+  )
+}
+
+/** Check if a cabinet has maintenance access (at least 1 orthogonally adjacent empty tile) */
+export function hasMaintenanceAccess(cab: Cabinet, cabinets: Cabinet[], gridCols: number, gridRows: number): boolean {
+  const directions = [
+    { col: cab.col, row: cab.row - 1 },
+    { col: cab.col, row: cab.row + 1 },
+    { col: cab.col - 1, row: cab.row },
+    { col: cab.col + 1, row: cab.row },
+  ]
+  for (const dir of directions) {
+    // Check if the tile is within grid bounds
+    if (dir.col < 0 || dir.col >= gridCols || dir.row < 0 || dir.row >= gridRows) continue
+    // Check if the tile is empty (no cabinet there)
+    const occupied = cabinets.some((c) => c.col === dir.col && c.row === dir.row)
+    if (!occupied) return true
+  }
+  return false
+}
+
+/** Calculate spacing heat effect for a cabinet (penalty from adjacent cabinets, bonus from open faces).
+ *  Returns a net °C/tick adjustment (positive = more heat, negative = better cooling). */
+export function calcSpacingHeatEffect(cab: Cabinet, cabinets: Cabinet[]): number {
+  if (!cab.powerStatus) return 0
+
+  const adjacent = getAdjacentCabinets(cab, cabinets)
+  let effect = 0
+
+  // Adjacent heat penalty: each neighboring cabinet traps hot air
+  effect += adjacent.length * SPACING_CONFIG.adjacentHeatPenalty
+
+  // Surrounded penalty: 3+ neighbors means severely restricted airflow
+  if (adjacent.length >= 3) {
+    effect += SPACING_CONFIG.surroundedHeatBonus
+  }
+
+  // Airflow bonus: cabinet's intake (front) or exhaust (rear) facing an empty tile
+  const offsets = getFacingOffsets(cab.facing, cab.col, cab.row)
+  const frontOccupied = cabinets.some((c) => c.col === offsets.front.col && c.row === offsets.front.row)
+  const rearOccupied = cabinets.some((c) => c.col === offsets.rear.col && c.row === offsets.rear.row)
+
+  if (!frontOccupied) effect -= SPACING_CONFIG.openFrontCoolingBonus
+  if (!rearOccupied) effect -= SPACING_CONFIG.openRearCoolingBonus
+
+  return effect
+}
+
+/** Count how many rows/columns violate aisle layout (mixed facing in the same row/column).
+ *  N/S cabinets in the same row should all face the same direction.
+ *  E/W cabinets in the same column should all face the same direction.
+ *  Mixing N/S and E/W in the same row or column is also a violation. */
 export function countAisleViolations(cabinets: Cabinet[]): number {
+  // Check rows: all cabinets in a row should face the same N/S direction (or all be E/W-aligned)
   const rowMap = new Map<number, Set<CabinetFacing>>()
   for (const cab of cabinets) {
     const facings = rowMap.get(cab.row) ?? new Set()
@@ -1569,7 +1751,17 @@ export function countAisleViolations(cabinets: Cabinet[]): number {
   }
   let violations = 0
   for (const facings of rowMap.values()) {
-    if (facings.size > 1) violations++ // mixed facings in the same row
+    if (facings.size > 1) violations++
+  }
+  // Check columns: all E/W cabinets in a column should face the same direction
+  const colMap = new Map<number, Set<CabinetFacing>>()
+  for (const cab of cabinets.filter((c) => !isRowAligned(c.facing))) {
+    const facings = colMap.get(cab.col) ?? new Set()
+    facings.add(cab.facing)
+    colMap.set(cab.col, facings)
+  }
+  for (const facings of colMap.values()) {
+    if (facings.size > 1) violations++
   }
   return violations
 }
@@ -2342,6 +2534,7 @@ interface GameState {
   addCabinet: (col: number, row: number, environment: CabinetEnvironment, customerType?: CustomerType, facing?: CabinetFacing) => void
   enterPlacementMode: (environment: CabinetEnvironment, customerType: CustomerType, facing?: CabinetFacing) => void
   exitPlacementMode: () => void
+  togglePlacementFacing: () => void
   upgradeNextCabinet: () => void
   addLeafToNextCabinet: () => void
   addSpineSwitch: () => void
@@ -2797,6 +2990,13 @@ export const useGameStore = create<GameState>((set) => ({
   exitPlacementMode: () =>
     set({ placementMode: false }),
 
+  togglePlacementFacing: () =>
+    set((state) => {
+      const cycle: CabinetFacing[] = ['north', 'east', 'south', 'west']
+      const idx = cycle.indexOf(state.placementFacing)
+      return { placementFacing: cycle[(idx + 1) % cycle.length] }
+    }),
+
   upgradeNextCabinet: () =>
     set((state) => {
       if (state.money < COSTS.server) return state
@@ -3181,9 +3381,12 @@ export const useGameStore = create<GameState>((set) => ({
 
   toggleCabinetFacing: (cabinetId: string) =>
     set((state) => {
-      const newCabinets = state.cabinets.map((c) =>
-        c.id === cabinetId ? { ...c, facing: (c.facing === 'north' ? 'south' : 'north') as CabinetFacing } : c
-      )
+      const cycle: CabinetFacing[] = ['north', 'east', 'south', 'west']
+      const newCabinets = state.cabinets.map((c) => {
+        if (c.id !== cabinetId) return c
+        const idx = cycle.indexOf(c.facing)
+        return { ...c, facing: cycle[(idx + 1) % cycle.length] }
+      })
       return {
         cabinets: newCabinets,
         aisleBonus: calcAisleBonus(newCabinets),
@@ -3596,21 +3799,37 @@ export const useGameStore = create<GameState>((set) => ({
     set((state) => {
       const config = MAINTENANCE_CONFIG.find((c) => c.targetType === targetType)
       if (!config) return state
-      if (!state.sandboxMode && state.money < config.cost) return state
+
+      // Maintenance access check: cabinets without adjacent empty space cost more
+      let costMult = 1.0
+      let durationMult = 1.0
+      if (targetType === 'cabinet') {
+        const targetCab = state.cabinets.find((c) => c.id === targetId)
+        if (targetCab) {
+          const suiteLimits = getSuiteLimits(state.suiteTier)
+          if (!hasMaintenanceAccess(targetCab, state.cabinets, suiteLimits.cols, suiteLimits.rows)) {
+            costMult = SPACING_CONFIG.noAccessMaintenanceCostMult
+            durationMult = SPACING_CONFIG.noAccessResolutionMult
+          }
+        }
+      }
+
+      const adjustedCost = Math.round(config.cost * costMult)
+      if (!state.sandboxMode && state.money < adjustedCost) return state
       if (state.maintenanceWindows.filter((w) => w.status !== 'completed').length >= 3) return state
       const window: MaintenanceWindow = {
         id: `maint-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         targetType,
         targetId,
         scheduledTick: state.tickCount + 1,
-        durationTicks: config.durationTicks,
-        cost: config.cost,
+        durationTicks: Math.ceil(config.durationTicks * durationMult),
+        cost: adjustedCost,
         status: 'scheduled',
         benefitApplied: false,
       }
       return {
         maintenanceWindows: [...state.maintenanceWindows, window],
-        money: state.sandboxMode ? state.money : state.money - config.cost,
+        money: state.sandboxMode ? state.money : state.money - adjustedCost,
       }
     }),
 
@@ -3776,12 +3995,19 @@ export const useGameStore = create<GameState>((set) => ({
     const environments: CabinetEnvironment[] = ['production', 'production', 'production', 'lab', 'management']
     let cabId = 1
 
-    // Professional tier: 8 cols x 4 rows — mostly full with variety
+    // Professional tier: 10 cols x 9 rows — laid out with proper aisles
+    // Row 0: north-facing cabinets
+    // Row 1: (aisle)
+    // Row 2: south-facing cabinets
+    // Row 3: (aisle)
+    // Row 4: north-facing cabinets
+    // Row 5: (aisle)
+    // Row 6: south-facing management/lab
     const positions: [number, number][] = [
-      [0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],
-      [0,1],[1,1],[2,1],[3,1],[4,1],[5,1],[6,1],[7,1],
-      [0,2],[1,2],[2,2],[3,2],[4,2],
-      [0,3],[1,3],[2,3],
+      [1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],
+      [1,2],[2,2],[3,2],[4,2],[5,2],[6,2],[7,2],[8,2],
+      [2,4],[3,4],[4,4],[5,4],[6,4],
+      [3,6],[4,6],[5,6],
     ]
 
     for (let i = 0; i < positions.length; i++) {
@@ -3800,7 +4026,7 @@ export const useGameStore = create<GameState>((set) => ({
         powerStatus: true,
         heatLevel: 35 + Math.floor(i * 1.3),
         serverAge: Math.floor(i * 20),
-        facing: row % 2 === 0 ? 'north' as CabinetFacing : 'south' as CabinetFacing,
+        facing: (row === 0 || row === 4) ? 'north' as CabinetFacing : 'south' as CabinetFacing,
       })
     }
 
@@ -3836,17 +4062,17 @@ export const useGameStore = create<GameState>((set) => ({
 
     // ── Infrastructure: PDUs, cable trays, busways, cross-connects, in-row coolers
     const demoPDUs: PDU[] = [
-      { id: 'pdu-1', col: 3, row: 0, maxCapacityKW: 30, label: 'Metered PDU' },
-      { id: 'pdu-2', col: 6, row: 1, maxCapacityKW: 30, label: 'Metered PDU' },
-      { id: 'pdu-3', col: 2, row: 2, maxCapacityKW: 80, label: 'Intelligent PDU' },
-      { id: 'pdu-4', col: 5, row: 3, maxCapacityKW: 80, label: 'Intelligent PDU' },
+      { id: 'pdu-1', col: 4, row: 1, maxCapacityKW: 30, label: 'Metered PDU' },
+      { id: 'pdu-2', col: 7, row: 1, maxCapacityKW: 30, label: 'Metered PDU' },
+      { id: 'pdu-3', col: 3, row: 3, maxCapacityKW: 80, label: 'Intelligent PDU' },
+      { id: 'pdu-4', col: 6, row: 5, maxCapacityKW: 80, label: 'Intelligent PDU' },
     ]
 
     const demoCableTrays: CableTray[] = [
-      { id: 'tray-1', col: 0, row: 0, capacityUnits: 8 },
-      { id: 'tray-2', col: 2, row: 0, capacityUnits: 8 },
-      { id: 'tray-3', col: 4, row: 1, capacityUnits: 16 },
-      { id: 'tray-4', col: 1, row: 2, capacityUnits: 8 },
+      { id: 'tray-1', col: 1, row: 1, capacityUnits: 8 },
+      { id: 'tray-2', col: 3, row: 1, capacityUnits: 8 },
+      { id: 'tray-3', col: 5, row: 3, capacityUnits: 16 },
+      { id: 'tray-4', col: 2, row: 5, capacityUnits: 8 },
       { id: 'tray-5', col: 3, row: 3, capacityUnits: 16 },
     ]
 
@@ -3867,18 +4093,18 @@ export const useGameStore = create<GameState>((set) => ({
     }
 
     const demoBusways: Busway[] = [
-      { id: 'bus-1', col: 1, row: 0, capacityKW: 50, label: 'Medium Busway' },
-      { id: 'bus-2', col: 5, row: 2, capacityKW: 120, label: 'Heavy Busway' },
+      { id: 'bus-1', col: 2, row: 1, capacityKW: 50, label: 'Medium Busway' },
+      { id: 'bus-2', col: 6, row: 3, capacityKW: 120, label: 'Heavy Busway' },
     ]
 
     const demoCrossConnects: CrossConnect[] = [
-      { id: 'xc-1', col: 4, row: 0, portCount: 24, label: 'Medium Patch Panel' },
-      { id: 'xc-2', col: 7, row: 1, portCount: 48, label: 'HD Patch Panel' },
+      { id: 'xc-1', col: 5, row: 1, portCount: 24, label: 'Medium Patch Panel' },
+      { id: 'xc-2', col: 8, row: 3, portCount: 48, label: 'HD Patch Panel' },
     ]
 
     const demoInRowCoolers: InRowCooling[] = [
-      { id: 'irc-1', col: 3, row: 1, coolingBonus: 2.0, label: 'Standard In-Row Unit' },
-      { id: 'irc-2', col: 6, row: 2, coolingBonus: 3.5, label: 'High-Capacity In-Row' },
+      { id: 'irc-1', col: 4, row: 1, coolingBonus: 2.0, label: 'Standard In-Row Unit' },
+      { id: 'irc-2', col: 7, row: 3, coolingBonus: 3.5, label: 'High-Capacity In-Row' },
     ]
 
     // ── Staff
@@ -5124,7 +5350,7 @@ export const useGameStore = create<GameState>((set) => ({
         infraIncidentBonus = messyCableCount * AISLE_CONFIG.messyCablingPenalty
       }
 
-      // 1. Update heat per cabinet (with customer type and tech modifiers)
+      // 1. Update heat per cabinet (with customer type, spacing, and tech modifiers)
       const newCabinets = state.cabinets.map((cab) => {
         let heat = cab.heatLevel
         const envConfig = ENVIRONMENT_CONFIG[cab.environment]
@@ -5141,6 +5367,9 @@ export const useGameStore = create<GameState>((set) => ({
           if (rowFacings.size > 1) {
             heat += AISLE_CONFIG.heatPenaltyViolation
           }
+
+          // Spacing heat effects: adjacency penalties and airflow bonuses
+          heat += calcSpacingHeatEffect(cab, state.cabinets)
 
           // PDU overload: cabinets on overloaded PDUs generate extra heat
           if (anyPDUOverloaded) {
@@ -5167,7 +5396,7 @@ export const useGameStore = create<GameState>((set) => ({
         }
 
         // Cooling dissipation (base + tech bonus + aisle bonus + in-row cooling; reduced by incident effects)
-        const aisleCoolingBoost = currentAisleBonus * 2 // up to +0.5°C/tick extra cooling
+        const aisleCoolingBoost = currentAisleBonus * 2 // up to +0.6°C/tick extra cooling
         heat -= (coolingConfig.coolingRate + techCoolingBonus + aisleCoolingBoost + inRowBonus + staffCoolingBonus) * incidentCoolingMult
 
         // Incident heat spike
@@ -5226,6 +5455,29 @@ export const useGameStore = create<GameState>((set) => ({
             fireActive = false
             incidentLog = ['Fire burned out on its own.', ...incidentLog].slice(0, 10)
           }
+        }
+      }
+
+      // Fire spread to adjacent cabinets (dense placement = faster spread)
+      if (fireActive && newCabinets.length > 1) {
+        const criticalCabs = newCabinets.filter((c) => c.heatLevel >= SIM.criticalTemp)
+        let spreadCount = 0
+        for (const hotCab of criticalCabs) {
+          if (spreadCount >= SPACING_CONFIG.fireSpreadMaxPerTick) break
+          const adjacents = getAdjacentCabinets(hotCab, newCabinets)
+          for (const adj of adjacents) {
+            if (spreadCount >= SPACING_CONFIG.fireSpreadMaxPerTick) break
+            if (adj.heatLevel < SIM.criticalTemp - 10 && Math.random() < SPACING_CONFIG.fireSpreadChance) {
+              const adjIdx = newCabinets.findIndex((c) => c.id === adj.id)
+              if (adjIdx >= 0) {
+                newCabinets[adjIdx] = { ...newCabinets[adjIdx], heatLevel: Math.min(100, newCabinets[adjIdx].heatLevel + 8) }
+                spreadCount++
+              }
+            }
+          }
+        }
+        if (spreadCount > 0) {
+          incidentLog = [`Fire spreading to adjacent cabinets! (${spreadCount} affected)`, ...incidentLog].slice(0, 10)
         }
       }
 

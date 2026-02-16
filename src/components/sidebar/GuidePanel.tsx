@@ -1,5 +1,5 @@
 import { Github, Bug, GitPullRequest } from 'lucide-react'
-import { useGameStore, ENVIRONMENT_CONFIG, SIM } from '@/stores/gameStore'
+import { useGameStore, ENVIRONMENT_CONFIG, SIM, SPACING_CONFIG } from '@/stores/gameStore'
 
 const REPO_URL = 'https://github.com/kevinreber/data-center-tycoon'
 
@@ -39,6 +39,50 @@ export function GuidePanel() {
             {' '}<span className="text-neon-cyan">FACILITY</span> panel when you need more space.
           </li>
         </ol>
+      </div>
+
+      {/* Layout strategy guide */}
+      <div className="rounded-lg border border-neon-cyan/20 bg-neon-cyan/5 p-3">
+        <p className="text-xs font-bold text-neon-cyan mb-2">LAYOUT STRATEGY</p>
+        <p className="text-xs font-mono text-muted-foreground mb-2">
+          When placing cabinets, colored overlays show airflow zones. Press <strong className="text-neon-green">R</strong> to rotate facing.
+        </p>
+        <div className="space-y-2">
+          <div className="flex gap-2 items-start">
+            <div className="w-3 h-3 rounded-sm shrink-0 mt-0.5" style={{ backgroundColor: '#4488ff' }} />
+            <div className="text-xs font-mono">
+              <strong className="text-[#4488ff]">Cold Aisle</strong>
+              <span className="text-muted-foreground"> &mdash; Intake side. Keep clear for cool air supply. Open front = <span className="text-neon-green">-{SPACING_CONFIG.openFrontCoolingBonus}&deg;C/tick</span> cooling bonus.</span>
+            </div>
+          </div>
+          <div className="flex gap-2 items-start">
+            <div className="w-3 h-3 rounded-sm shrink-0 mt-0.5" style={{ backgroundColor: '#ff8844' }} />
+            <div className="text-xs font-mono">
+              <strong className="text-[#ff8844]">Hot Exhaust</strong>
+              <span className="text-muted-foreground"> &mdash; Exhaust side. Keep clear so heat can escape. Open rear = <span className="text-neon-green">-{SPACING_CONFIG.openRearCoolingBonus}&deg;C/tick</span> cooling bonus.</span>
+            </div>
+          </div>
+          <div className="flex gap-2 items-start">
+            <div className="w-3 h-3 rounded-sm shrink-0 mt-0.5" style={{ backgroundColor: '#aaaa44' }} />
+            <div className="text-xs font-mono">
+              <strong className="text-[#aaaa44]">Access</strong>
+              <span className="text-muted-foreground"> &mdash; Side walkway for DC techs. No access = <span className="text-neon-red">{SPACING_CONFIG.noAccessMaintenanceCostMult}x</span> maintenance cost.</span>
+            </div>
+          </div>
+          <div className="flex gap-2 items-start">
+            <div className="w-3 h-3 rounded-sm shrink-0 mt-0.5" style={{ backgroundColor: '#ff4444' }} />
+            <div className="text-xs font-mono">
+              <strong className="text-[#ff4444]">Blocked</strong>
+              <span className="text-muted-foreground"> &mdash; Airflow obstructed. Causes <span className="text-neon-red">+{SPACING_CONFIG.adjacentHeatPenalty}&deg;C/tick</span> heat per neighbor. Fire can spread!</span>
+            </div>
+          </div>
+        </div>
+        <div className="mt-2 pt-2 border-t border-neon-cyan/10">
+          <p className="text-[10px] font-mono text-muted-foreground">
+            <strong className="text-foreground">Pro tip:</strong> Alternate facing (N/S or E/W) in adjacent rows/columns.
+            Leave 1&ndash;2 tile gaps for proper hot/cold aisles. This earns up to {Math.round(SPACING_CONFIG.maxAisleSpacingBonus * 100)}% cooling bonus.
+          </p>
+        </div>
       </div>
 
       {/* New systems guide */}

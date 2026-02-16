@@ -22,6 +22,7 @@ export function GameCanvas() {
   const trafficVisible = useGameStore((s) => s.trafficVisible)
   const suiteTier = useGameStore((s) => s.suiteTier)
   const placementMode = useGameStore((s) => s.placementMode)
+  const placementFacing = useGameStore((s) => s.placementFacing)
   const pdus = useGameStore((s) => s.pdus)
   const cableTrays = useGameStore((s) => s.cableTrays)
   const pduOverloaded = useGameStore((s) => s.pduOverloaded)
@@ -86,6 +87,27 @@ export function GameCanvas() {
       useGameStore.getState().selectCabinet(null)
     }
   }, [placementMode, handleTileClick, handleTileHover, handleCabinetSelect, sceneReady])
+
+  // Sync placement facing to Phaser (updates zone overlays when user changes direction)
+  useEffect(() => {
+    if (!gameRef.current) return
+    const scene = getScene(gameRef.current)
+    if (!scene) return
+    scene.setPlacementFacing(placementFacing)
+  }, [placementFacing, sceneReady])
+
+  // Keyboard shortcuts during placement mode (R = rotate facing, Esc = cancel)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const state = useGameStore.getState()
+      if (!state.placementMode) return
+      if (e.key === 'r' || e.key === 'R') {
+        state.togglePlacementFacing()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   // Sync suite tier (grid dimensions) to Phaser
   useEffect(() => {
