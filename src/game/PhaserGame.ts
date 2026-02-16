@@ -168,7 +168,11 @@ class DataCenterScene extends Phaser.Scene {
         if (this.placementHighlight) {
           this.placementHighlight.clear()
         }
-        this.clearZoneOverlays()
+        // Only clear zone overlays if no cabinet is selected — selected
+        // cabinets should keep their airflow zone overlays visible.
+        if (!this.selectedCabinetId) {
+          this.clearZoneOverlays()
+        }
         if (this.placementHintText) {
           this.placementHintText.setVisible(false)
         }
