@@ -282,19 +282,38 @@ Late-game sci-fi progression beyond the current 4 suite tiers.
 
 ---
 
-### Operations Progression — Manual to Automated
+### Operations Progression — Manual to Automated ✅
 
 A progression system for incident and infrastructure management, inspired by the journey from manual ops to Kubernetes-style orchestration. Early game forces hands-on management; later tiers unlock automation.
 
-- [ ] **Tier 1 — Manual Ops (default):** Incidents require manual resolution (pay to fix) or expire with lingering damage (destroyed servers stay destroyed, failed leaf switches need manual replacement). No auto-healing.
-- [ ] **Tier 2 — Monitoring & Alerting (tech unlock or reputation gate):** Clearer incident warnings (e.g., flashing HUD alerts, sound cues). Reduced resolution costs. Incidents still require manual action but players get more lead time.
-- [ ] **Tier 3 — Basic Automation (mid-game unlock):** Incidents naturally tick down over their `durationTicks`. Staff can speed up resolution. Hardware auto-restores when incidents expire. (Current behavior after fix.)
-- [ ] **Tier 4 — Full Orchestration (late-game unlock):** Auto-failover, self-healing infrastructure, workload migration during incidents, predictive maintenance. Like going from bare metal to Kubernetes.
-- [ ] Gate progression behind tech tree, reputation tier, or suite tier milestones
-- [ ] Each tier could unlock new UI panels (e.g., Tier 3 unlocks an "Automation" dashboard)
-- [ ] Achievement ideas: "Script Kiddie" (unlock Tier 2), "SRE" (unlock Tier 3), "Platform Engineer" (unlock Tier 4)
+- [x] **Tier 1 — Manual Ops (default):** Base tier with no automation. Incidents require manual resolution or expire naturally.
+- [x] **Tier 2 — Monitoring & Alerting:** Requires 2+ staff, `ups_upgrade` tech, reputation 25+. Benefits: -10% incident spawn, -20% resolve cost, +10% staff effectiveness, +5% auto-resolve speed.
+- [x] **Tier 3 — Basic Automation:** Requires 4+ staff, all 3 resilience techs, reputation 45+, Standard suite. Benefits: -25% incident spawn, -35% resolve cost, +20% auto-resolve speed, +20% staff effectiveness, -15% revenue penalty from incidents.
+- [x] **Tier 4 — Full Orchestration:** Requires 8+ staff, 5 techs (resilience + efficiency), reputation 65+, Professional suite. Benefits: -40% spawn, -50% resolve cost, +40% auto-resolve speed, +35% staff effectiveness, -30% revenue penalty.
+- [x] Gated behind tech tree, reputation, suite tier, staff count, and upgrade cost milestones
+- [x] Ops tier UI section in Operations panel with current benefits, stats, and upgrade path with requirement checklist
+- [x] Achievements: "Script Kiddie" (Monitoring), "SRE" (Automation), "Platform Engineer" (Orchestration), "Lights Out" (20 auto-resolves)
+- [x] Incident resolve cost discount shown in Incidents panel with strikethrough pricing
+- [x] Tutorial tip triggers when next ops tier requirements are met
+- [x] Event logging for auto-resolved and prevented incidents
+- [x] Tests for upgrade mechanics, cost deduction, sequential progression, and resolve cost reduction
 
 **Effort:** Medium-High | **Impact:** High — Transforms incident management from a passive system into a core progression mechanic. Gives players a strong sense of advancement and makes early game meaningfully challenging.
+
+---
+
+### Cooling Infrastructure Redesign
+
+Rethink cooling upgrades as physical, placeable infrastructure rather than instant facility-wide toggles. Players should design their cooling layout to match their cabinet density and heat profile.
+
+- [ ] Water cooling requires physical placement (e.g., CRAH/CRAC units on the grid) with limited range
+- [ ] Cooling coverage zones — cabinets outside a cooler's range get reduced or no cooling benefit
+- [ ] Cooling capacity planning — units have max BTU/kW capacity; overloading degrades performance
+- [ ] Immersion cooling as a third tier — per-cabinet upgrade, extreme heat removal but very expensive
+- [ ] Cooling pipe routing — connect CRAH units to a chiller plant; pipe layout affects efficiency
+- [ ] Cooling failure modes — individual units can break down, creating hot spots until repaired
+
+**Effort:** High | **Impact:** High — Transforms cooling from a one-click upgrade into a core strategic system. Forces players to think about physical layout, capacity planning, and redundancy. Aligns with the game's identity as "The Heat/Water/Power Triangle."
 
 ---
 
@@ -309,15 +328,40 @@ Deeper workload mechanics beyond the current traffic/server model.
 
 ---
 
-### Multi-Site Expansion
+### Multi-Site Expansion (Phase 6 — see BRAINSTORM.md for full design)
 
-Expand from a single data center to a global operation.
+Expand from a single data center to a global data center empire with a world map view, location-based strategy, and inter-site networking. Full detailed design in BRAINSTORM.md Phase 6.
 
-- [ ] Multiple locations (US-East, EU-West, Asia-Pacific) with different power costs, climate, and regulations
-- [ ] Inter-site networking via dark fiber or leased lines; latency matters for multi-region workloads
-- [ ] Edge deployments — small edge PoPs in cities for low-latency content delivery
+#### Phase 6A — World Map UI + Site Selection
+- [ ] World map view (React + SVG) with neon/terminal aesthetic
+- [ ] 12-15 metro regions with distinct profiles (power cost, climate, labor, demand, disaster risk)
+- [ ] Region info panel with research mechanic (pay to reveal full profile)
+- [ ] Purchase and build first expansion site (edge PoP)
+- [ ] Site switcher to toggle floor view between sites
+- [ ] Per-site game state instances (separate cabinets, infrastructure, staff)
 
-**Effort:** Very High | **Impact:** High — Essentially a "game 2" on top of the core. Best saved for a major update.
+#### Phase 6B — Inter-Site Networking + Edge PoPs
+- [ ] Link types: IP transit, leased wavelength, dark fiber, submarine cable
+- [ ] Edge PoP site type with simplified management (1-4 cabinets)
+- [ ] Backhaul requirement (edge PoP → core site link)
+- [ ] Latency modeling between sites based on distance
+- [ ] CDN/content delivery revenue model for edge PoPs
+
+#### Phase 6C — Full Site Types + Regional Incidents
+- [ ] 5 site types: edge_pop, colocation, hyperscale, network_hub, disaster_recovery
+- [ ] Location-specific incidents (earthquakes, hurricanes, grid collapse, monsoons, volcanic eruptions)
+- [ ] Disaster preparedness investments (seismic reinforcement, flood barriers, hurricane hardening)
+- [ ] Construction time for new sites
+
+#### Phase 6D — Global Strategy Layer
+- [ ] Customer demand heat maps on world map (by customer type)
+- [ ] Demand growth over time (emerging vs. saturated markets)
+- [ ] Multi-site contracts requiring presence in multiple regions
+- [ ] Data sovereignty mechanics (GDPR, LGPD — certain contracts require local presence)
+- [ ] Staff transfers between sites (cost + relocation time)
+- [ ] Regional competitor presence and market share per region
+
+**Effort:** Very High | **Impact:** High — Transforms the game from facility management into global infrastructure strategy. Phased delivery: each sub-phase delivers standalone value. Gate: Enterprise tier + $500K+ cash + excellent reputation.
 
 ---
 
@@ -399,7 +443,7 @@ Ideas for further encouraging organized cabinet layouts. Zone Adjacency Bonus (w
 | Phase 5 (Longevity) | 60+ | 60+ | 0 |
 | Rendering & Views | 17 | 17 | 0 |
 | UX / Camera | 6 | 6 | 0 |
-| **Pending Features** | **~25** | **6** | **~19** |
+| **Pending Features** | **~31** | **6** | **~25** |
 
 **Implemented features:** 156+ items across Phases 1–5, rendering, UX, and capacity planning.
-**Remaining features:** ~19 items, mostly high-effort late-game content (multi-site, scaling tiers, 42U racks), visualization (sub-floor view, sound), and advanced simulation (workload migration, AI training jobs, leaderboards).
+**Remaining features:** ~25 items, including cooling infrastructure redesign, high-effort late-game content (multi-site, scaling tiers, 42U racks), visualization (sub-floor view, sound), and advanced simulation (workload migration, AI training jobs, leaderboards).

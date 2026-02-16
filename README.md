@@ -3,6 +3,9 @@
 ## 🛸 Project Vision
 A web-based, 2D isometric Tycoon game (think Roller Coaster Tycoon) where the player builds and manages a data center. The goal is to scale from a single rack to a global AI powerhouse while balancing network topology, power consumption, and environmental impact.
 
+<img width="1619" height="990" alt="image" src="https://github.com/user-attachments/assets/72e1c54c-6041-44f6-bb95-325f67709124" />
+
+
 ## 🕹 Core Gameplay Loop
 1. **Build:** Place racks, cooling units, and power sources in an isometric grid.
 2. **Configure:** Open "Cabinet View" (2D) to snap in servers and switches.
@@ -67,6 +70,7 @@ A web-based, 2D isometric Tycoon game (think Roller Coaster Tycoon) where the pl
 - **Hiring** — Recruit Network Engineers, System Admins, Security Specialists, and Facilities Managers.
 - **Training & Certifications** — Enroll staff in certification programs to boost their effectiveness.
 - **Shift Patterns** — Choose Day Only, Extended, or 24/7 coverage with different cost trade-offs.
+- **Operations Progression** — Advance through 4 ops tiers (Manual → Monitoring → Automation → Orchestration). Higher tiers reduce incident frequency, speed up auto-resolution, lower resolve costs, and boost staff effectiveness. Unlock tiers by hiring staff, researching tech, and building reputation.
 
 ### Monitoring & Analytics
 - **Event Log** — Chronological record of all data center events with severity-based color coding.

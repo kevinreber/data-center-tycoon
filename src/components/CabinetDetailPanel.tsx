@@ -209,7 +209,7 @@ function CabinetDetail({ cabinet }: { cabinet: Cabinet }) {
             <StatRow
               icon={ArrowUpDown}
               label="Facing"
-              value={cabinet.facing === 'north' ? 'North' : 'South'}
+              value={cabinet.facing.charAt(0).toUpperCase() + cabinet.facing.slice(1)}
             />
 
             {cabinet.hasLeafSwitch && (
@@ -286,7 +286,7 @@ function CabinetDetail({ cabinet }: { cabinet: Cabinet }) {
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="top">
-                  Toggle facing ({cabinet.facing === 'north' ? 'N→S' : 'S→N'}) for hot/cold aisle
+                  Rotate facing ({cabinet.facing.charAt(0).toUpperCase()}) for hot/cold aisle
                 </TooltipContent>
               </Tooltip>
             </div>

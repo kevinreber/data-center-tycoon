@@ -34,12 +34,13 @@ function App() {
     totalPower, money, pue, avgHeat, cabinets, spineSwitches,
     gameSpeed, setGameSpeed, tick, revenue, expenses,
     newAchievement, dismissAchievement, loanPayments,
+    contractRevenue, contractPenalties,
     powerOutage, outageTicksRemaining, fireActive, suppressionType,
     isDemo, loadDemoState, exitDemo,
   } = useGameStore()
   const totalNodes = cabinets.length + spineSwitches.length
   const activeNodes = cabinets.filter((c) => c.powerStatus).length + spineSwitches.filter((s) => s.powerStatus).length
-  const netIncome = revenue - expenses - loanPayments
+  const netIncome = revenue + contractRevenue - expenses - loanPayments - contractPenalties
   const tickRef = useRef(tick)
   useEffect(() => { tickRef.current = tick }, [tick])
 
@@ -148,17 +149,60 @@ function App() {
               </Tooltip>
             </div>
 
-            <div className="flex items-center gap-1.5">
-              <DollarSign className="size-3.5 text-neon-yellow" />
-              <span className="text-neon-yellow text-glow-orange font-bold">
-                ${Math.floor(money).toLocaleString()}
-              </span>
-              {(revenue > 0 || expenses > 0) && (
-                <span className={`text-xs ${netIncome >= 0 ? 'text-neon-green' : 'text-neon-red'}`}>
-                  {netIncome >= 0 ? '+' : ''}{netIncome.toFixed(0)}/t
-                </span>
-              )}
-            </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center gap-1.5 cursor-help">
+                  <DollarSign className="size-3.5 text-neon-yellow" />
+                  <span className="text-neon-yellow text-glow-orange font-bold">
+                    ${Math.floor(money).toLocaleString()}
+                  </span>
+                  {(revenue > 0 || expenses > 0) && (
+                    <span className={`text-xs ${netIncome >= 0 ? 'text-neon-green' : 'text-neon-red'}`}>
+                      {netIncome >= 0 ? '+' : ''}{netIncome.toFixed(0)}/t
+                    </span>
+                  )}
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-xs font-mono text-xs">
+                <div className="flex flex-col gap-1">
+                  <p className="font-bold text-neon-yellow">Cash Balance: ${Math.floor(money).toLocaleString()}</p>
+                  <p className="text-muted-foreground">
+                    {netIncome >= 0 ? '+' : ''}{netIncome.toFixed(0)}/t = net income per game tick
+                  </p>
+                  <hr className="border-border" />
+                  <div className="flex justify-between">
+                    <span className="text-neon-green">Revenue</span>
+                    <span className="text-neon-green">+${revenue.toFixed(0)}</span>
+                  </div>
+                  {contractRevenue > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-neon-green">Contracts</span>
+                      <span className="text-neon-green">+${contractRevenue.toFixed(0)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span className="text-neon-red">Expenses</span>
+                    <span className="text-neon-red">-${expenses.toFixed(0)}</span>
+                  </div>
+                  {loanPayments > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-neon-red">Loan payments</span>
+                      <span className="text-neon-red">-${loanPayments.toFixed(0)}</span>
+                    </div>
+                  )}
+                  {contractPenalties > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-neon-red">SLA penalties</span>
+                      <span className="text-neon-red">-${contractPenalties.toFixed(0)}</span>
+                    </div>
+                  )}
+                  <hr className="border-border" />
+                  <p className="text-muted-foreground">
+                    Servers earn $12/tick. Keep heat below 80°C to avoid throttling. Open the Finance panel for full details.
+                  </p>
+                </div>
+              </TooltipContent>
+            </Tooltip>
             <div className="flex items-center gap-1.5">
               <Zap className="size-3.5 text-neon-green" />
               <span className="text-neon-green">
