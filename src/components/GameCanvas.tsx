@@ -96,6 +96,19 @@ export function GameCanvas() {
     scene.setPlacementFacing(placementFacing)
   }, [placementFacing, sceneReady])
 
+  // Keyboard shortcuts during placement mode (R = rotate facing, Esc = cancel)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const state = useGameStore.getState()
+      if (!state.placementMode) return
+      if (e.key === 'r' || e.key === 'R') {
+        state.togglePlacementFacing()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
   // Sync suite tier (grid dimensions) to Phaser
   useEffect(() => {
     if (!gameRef.current) return

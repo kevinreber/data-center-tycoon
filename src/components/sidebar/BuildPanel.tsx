@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useGameStore, RACK_COST, MAX_SERVERS_PER_CABINET, ENVIRONMENT_CONFIG, CUSTOMER_TYPE_CONFIG, getSuiteLimits } from '@/stores/gameStore'
 import type { CabinetEnvironment, CustomerType, CabinetFacing } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
@@ -14,12 +14,17 @@ export function BuildPanel() {
     cabinets, spineSwitches, money,
     upgradeNextCabinet, addLeafToNextCabinet, addSpineSwitch,
     suiteTier,
-    placementMode, enterPlacementMode, exitPlacementMode,
+    placementMode, placementFacing, enterPlacementMode, exitPlacementMode,
   } = useGameStore()
 
   const [selectedEnv, setSelectedEnv] = useState<CabinetEnvironment>('production')
   const [selectedCustomerType, setSelectedCustomerType] = useState<CustomerType>('general')
   const [selectedFacing, setSelectedFacing] = useState<CabinetFacing>('north')
+
+  // Keep local facing in sync with store (updated by R key shortcut)
+  useEffect(() => {
+    setSelectedFacing(placementFacing)
+  }, [placementFacing])
 
   const suiteLimits = getSuiteLimits(suiteTier)
   const canUpgrade = cabinets.some((c) => c.serverCount < MAX_SERVERS_PER_CABINET)
@@ -135,9 +140,12 @@ export function BuildPanel() {
       <div className="flex flex-col gap-2 pt-1 border-t border-border/50">
         {placementMode ? (
           <div className="flex gap-1.5">
-            <div className="flex-1 rounded border border-neon-green/40 bg-neon-green/10 px-2 py-1.5 flex items-center gap-1.5">
-              <MousePointer className="size-3 text-neon-green animate-pulse" />
-              <span className="text-xs font-mono text-neon-green">Click grid tile</span>
+            <div className="flex-1 rounded border border-neon-green/40 bg-neon-green/10 px-2 py-1.5 flex flex-col gap-0.5">
+              <div className="flex items-center gap-1.5">
+                <MousePointer className="size-3 text-neon-green animate-pulse" />
+                <span className="text-xs font-mono text-neon-green">Click grid tile</span>
+              </div>
+              <span className="text-[10px] font-mono text-neon-green/60">R = rotate | Esc = cancel</span>
             </div>
             <Tooltip>
               <TooltipTrigger asChild>

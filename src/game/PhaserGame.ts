@@ -163,6 +163,7 @@ class DataCenterScene extends Phaser.Scene {
         if (this.placementHighlight) {
           this.placementHighlight.clear()
         }
+        this.clearZoneOverlays()
         if (this.placementHintText) {
           this.placementHintText.setVisible(false)
         }
@@ -177,6 +178,7 @@ class DataCenterScene extends Phaser.Scene {
       } else {
         this.hoveredTile = null
         if (this.placementHighlight) this.placementHighlight.clear()
+        this.clearZoneOverlays()
         if (this.placementHintText) this.placementHintText.setVisible(false)
       }
     })
@@ -1467,6 +1469,7 @@ class DataCenterScene extends Phaser.Scene {
   /** Render selection highlight around a cabinet */
   private renderSelection() {
     if (this.selectionGraphics) this.selectionGraphics.destroy()
+    this.clearZoneOverlays()
     if (!this.selectedCabinetId) return
 
     const entry = this.cabEntries.get(this.selectedCabinetId)
@@ -1476,7 +1479,7 @@ class DataCenterScene extends Phaser.Scene {
     this.selectionGraphics.setDepth(50)
 
     const { x, y } = this.isoToScreen(entry.col, entry.row)
-    // Draw a pulsing selection border
+    // Draw selection border
     this.selectionGraphics.lineStyle(2, 0x00ffff, 0.8)
     this.selectionGraphics.beginPath()
     this.selectionGraphics.moveTo(x, y - 4)
@@ -1485,6 +1488,79 @@ class DataCenterScene extends Phaser.Scene {
     this.selectionGraphics.lineTo(x - TILE_W / 2 - 4, y + TILE_H / 2)
     this.selectionGraphics.closePath()
     this.selectionGraphics.strokePath()
+
+    // Show airflow zone overlays around the selected cabinet
+    this.drawCabinetZoneOverlays(entry.col, entry.row, entry.facing)
+  }
+
+  /** Draw airflow zone overlays around a cabinet at the given position/facing */
+  private drawCabinetZoneOverlays(col: number, row: number, facing: CabinetFacing) {
+    if (!this.placementZoneGraphics) {
+      this.placementZoneGraphics = this.add.graphics()
+      this.placementZoneGraphics.setDepth(2)
+    }
+
+    const frontRow = facing === 'north' ? row - 1 : row + 1
+    const rearRow = facing === 'north' ? row + 1 : row - 1
+    const leftCol = col - 1
+    const rightCol = col + 1
+
+    // Front tile (cold / intake side)
+    if (frontRow >= 0 && frontRow < this.cabRows) {
+      const frontOccupied = this.occupiedTiles.has(`${col},${frontRow}`)
+      if (!frontOccupied) {
+        this.drawIsoTile(this.placementZoneGraphics, col, frontRow, 0x0088ff, 0.12, 0x0088ff, 0.25)
+        this.placementZoneLabels.push(
+          this.addZoneLabel(col, frontRow, 'COLD AISLE', '#4488ff')
+        )
+      } else {
+        this.drawIsoTile(this.placementZoneGraphics, col, frontRow, 0xff4400, 0.10, 0xff4400, 0.2)
+        this.placementZoneLabels.push(
+          this.addZoneLabel(col, frontRow, 'INTAKE BLOCKED', '#ff6644')
+        )
+      }
+    }
+
+    // Rear tile (hot / exhaust side)
+    if (rearRow >= 0 && rearRow < this.cabRows) {
+      const rearOccupied = this.occupiedTiles.has(`${col},${rearRow}`)
+      if (!rearOccupied) {
+        this.drawIsoTile(this.placementZoneGraphics, col, rearRow, 0xff4400, 0.10, 0xff4400, 0.2)
+        this.placementZoneLabels.push(
+          this.addZoneLabel(col, rearRow, 'HOT EXHAUST', '#ff8844')
+        )
+      } else {
+        this.drawIsoTile(this.placementZoneGraphics, col, rearRow, 0xff0000, 0.12, 0xff0000, 0.25)
+        this.placementZoneLabels.push(
+          this.addZoneLabel(col, rearRow, 'EXHAUST BLOCKED', '#ff4444')
+        )
+      }
+    }
+
+    // Side tiles (access)
+    for (const sideCol of [leftCol, rightCol]) {
+      if (sideCol < 0 || sideCol >= this.cabCols) continue
+      const sideOccupied = this.occupiedTiles.has(`${sideCol},${row}`)
+      if (!sideOccupied) {
+        this.drawIsoTile(this.placementZoneGraphics, sideCol, row, 0xffcc00, 0.06, 0xffcc00, 0.12)
+        this.placementZoneLabels.push(
+          this.addZoneLabel(sideCol, row, 'ACCESS', '#aaaa44')
+        )
+      }
+    }
+
+    // Draw airflow direction lines from the cabinet
+    const { x: cx, y: cy } = this.isoToScreen(col, row)
+    if (frontRow >= 0 && frontRow < this.cabRows) {
+      const { x: fx, y: fy } = this.isoToScreen(col, frontRow)
+      this.placementZoneGraphics.lineStyle(1.5, 0x0088ff, 0.35)
+      this.placementZoneGraphics.lineBetween(cx, cy + TILE_H / 2, fx, fy + TILE_H / 2)
+    }
+    if (rearRow >= 0 && rearRow < this.cabRows) {
+      const { x: rx, y: ry } = this.isoToScreen(col, rearRow)
+      this.placementZoneGraphics.lineStyle(1.5, 0xff6644, 0.35)
+      this.placementZoneGraphics.lineBetween(cx, cy + TILE_H / 2, rx, ry + TILE_H / 2)
+    }
   }
 
   /** Render heat map overlay showing temperature per cabinet */
@@ -1531,6 +1607,7 @@ class DataCenterScene extends Phaser.Scene {
     this.selectedCabinetId = null
     if (this.selectionGraphics) this.selectionGraphics.destroy()
     this.selectionGraphics = null
+    this.clearZoneOverlays()
   }
 
   /** Reset camera to default position and zoom */

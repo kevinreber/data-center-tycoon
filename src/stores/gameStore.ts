@@ -2468,6 +2468,7 @@ interface GameState {
   addCabinet: (col: number, row: number, environment: CabinetEnvironment, customerType?: CustomerType, facing?: CabinetFacing) => void
   enterPlacementMode: (environment: CabinetEnvironment, customerType: CustomerType, facing?: CabinetFacing) => void
   exitPlacementMode: () => void
+  togglePlacementFacing: () => void
   upgradeNextCabinet: () => void
   addLeafToNextCabinet: () => void
   addSpineSwitch: () => void
@@ -2922,6 +2923,9 @@ export const useGameStore = create<GameState>((set) => ({
 
   exitPlacementMode: () =>
     set({ placementMode: false }),
+
+  togglePlacementFacing: () =>
+    set((state) => ({ placementFacing: state.placementFacing === 'north' ? 'south' : 'north' })),
 
   upgradeNextCabinet: () =>
     set((state) => {
