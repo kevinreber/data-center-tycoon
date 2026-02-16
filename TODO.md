@@ -282,6 +282,22 @@ Late-game sci-fi progression beyond the current 4 suite tiers.
 
 ---
 
+### Operations Progression — Manual to Automated
+
+A progression system for incident and infrastructure management, inspired by the journey from manual ops to Kubernetes-style orchestration. Early game forces hands-on management; later tiers unlock automation.
+
+- [ ] **Tier 1 — Manual Ops (default):** Incidents require manual resolution (pay to fix) or expire with lingering damage (destroyed servers stay destroyed, failed leaf switches need manual replacement). No auto-healing.
+- [ ] **Tier 2 — Monitoring & Alerting (tech unlock or reputation gate):** Clearer incident warnings (e.g., flashing HUD alerts, sound cues). Reduced resolution costs. Incidents still require manual action but players get more lead time.
+- [ ] **Tier 3 — Basic Automation (mid-game unlock):** Incidents naturally tick down over their `durationTicks`. Staff can speed up resolution. Hardware auto-restores when incidents expire. (Current behavior after fix.)
+- [ ] **Tier 4 — Full Orchestration (late-game unlock):** Auto-failover, self-healing infrastructure, workload migration during incidents, predictive maintenance. Like going from bare metal to Kubernetes.
+- [ ] Gate progression behind tech tree, reputation tier, or suite tier milestones
+- [ ] Each tier could unlock new UI panels (e.g., Tier 3 unlocks an "Automation" dashboard)
+- [ ] Achievement ideas: "Script Kiddie" (unlock Tier 2), "SRE" (unlock Tier 3), "Platform Engineer" (unlock Tier 4)
+
+**Effort:** Medium-High | **Impact:** High — Transforms incident management from a passive system into a core progression mechanic. Gives players a strong sense of advancement and makes early game meaningfully challenging.
+
+---
+
 ### Workload Simulation (Advanced)
 
 Deeper workload mechanics beyond the current traffic/server model.

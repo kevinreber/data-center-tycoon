@@ -4427,9 +4427,19 @@ export const useGameStore = create<GameState>((set) => ({
       let incidentLog = [...state.incidentLog]
       const resolvedCount = state.resolvedCount
 
-      // Clean up manually resolved incidents
+      // Clean up resolved incidents and track hardware that needs restoration
       const justResolved = activeIncidents.filter((i) => i.resolved)
       activeIncidents = activeIncidents.filter((i) => !i.resolved)
+
+      // Restore hardware from incidents resolved in the previous tick
+      const restoredLeafCabIds = new Set<string>()
+      const restoredSpineIds = new Set<string>()
+      for (const inc of justResolved) {
+        if (inc.def.effect === 'hardware_failure' && inc.affectedHardwareId) {
+          if (inc.def.hardwareTarget === 'leaf') restoredLeafCabIds.add(inc.affectedHardwareId)
+          if (inc.def.hardwareTarget === 'spine') restoredSpineIds.add(inc.affectedHardwareId)
+        }
+      }
 
       // Spawn new incidents (only if we have equipment and fewer than max active)
       if (state.cabinets.length > 0 && activeIncidents.length < MAX_ACTIVE_INCIDENTS) {
@@ -4485,8 +4495,16 @@ export const useGameStore = create<GameState>((set) => ({
         if (inc.def.hardwareTarget === 'spine') failedSpineIds.add(inc.affectedHardwareId)
         if (inc.def.hardwareTarget === 'leaf') failedLeafCabIds.add(inc.affectedHardwareId)
       }
-      const spineSwitches = failedSpineIds.size > 0
-        ? state.spineSwitches.map(s => failedSpineIds.has(s.id) ? { ...s, powerStatus: false } : s)
+      // Don't restore hardware if another failure incident still targets it
+      for (const id of failedSpineIds) restoredSpineIds.delete(id)
+      for (const id of failedLeafCabIds) restoredLeafCabIds.delete(id)
+
+      const spineSwitches = (failedSpineIds.size > 0 || restoredSpineIds.size > 0)
+        ? state.spineSwitches.map(s => {
+            if (failedSpineIds.has(s.id)) return { ...s, powerStatus: false }
+            if (restoredSpineIds.has(s.id)) return { ...s, powerStatus: true }
+            return s
+          })
         : [...state.spineSwitches]
 
       // Calculate incident effects
@@ -4574,6 +4592,11 @@ export const useGameStore = create<GameState>((set) => ({
             incidentLog = [`Staff resolved: ${i.def.label}`, ...incidentLog].slice(0, 10)
             // Track resolved count for staff
             staffIncidentsResolved++
+            // Track hardware restoration for staff-resolved incidents
+            if (i.def.effect === 'hardware_failure' && i.affectedHardwareId) {
+              if (i.def.hardwareTarget === 'leaf') restoredLeafCabIds.add(i.affectedHardwareId)
+              if (i.def.hardwareTarget === 'spine') restoredSpineIds.add(i.affectedHardwareId)
+            }
             // Add fatigue to responding staff
             const responders = i.def.effect === 'traffic_drop' ? networkEngineers
               : i.def.effect === 'power_surge' ? electricians
@@ -4598,6 +4621,25 @@ export const useGameStore = create<GameState>((set) => ({
           return { ...i, ticksRemaining: remaining }
         })
       }
+
+      // Natural incident tick-down — all unresolved incidents decrease timer each tick
+      // auto_failover tech grants 30% chance of extra tick reduction
+      const hasAutoFailover = state.unlockedTech.includes('auto_failover')
+      activeIncidents = activeIncidents.map((i) => {
+        if (i.resolved) return i
+        const autoBonus = hasAutoFailover && Math.random() < 0.3 ? 1 : 0
+        const remaining = i.ticksRemaining - 1 - autoBonus
+        if (remaining <= 0) {
+          incidentLog = [`Expired: ${i.def.label}`, ...incidentLog].slice(0, 10)
+          // Track hardware restoration for incidents expiring this tick
+          if (i.def.effect === 'hardware_failure' && i.affectedHardwareId) {
+            if (i.def.hardwareTarget === 'leaf') restoredLeafCabIds.add(i.affectedHardwareId)
+            if (i.def.hardwareTarget === 'spine') restoredSpineIds.add(i.affectedHardwareId)
+          }
+          return { ...i, ticksRemaining: 0, resolved: true }
+        }
+        return { ...i, ticksRemaining: remaining }
+      })
 
       // Fatigue recovery: -2 per tick for on-shift staff (slow recovery), -5 for off-shift
       updatedStaff = updatedStaff.map((s) => ({
@@ -4910,9 +4952,10 @@ export const useGameStore = create<GameState>((set) => ({
         // Age servers (depreciation)
         const newAge = cab.powerStatus ? cab.serverAge + 1 : cab.serverAge
 
-        // Disable leaf switch if affected by hardware failure incident
+        // Disable leaf switch if affected by hardware failure incident, restore if just resolved
         const leafFailed = failedLeafCabIds.has(cab.id)
-        return { ...cab, heatLevel: Math.round(heat * 10) / 10, serverAge: newAge, ...(leafFailed ? { hasLeafSwitch: false } : {}) }
+        const leafRestored = restoredLeafCabIds.has(cab.id)
+        return { ...cab, heatLevel: Math.round(heat * 10) / 10, serverAge: newAge, ...(leafFailed ? { hasLeafSwitch: false } : leafRestored ? { hasLeafSwitch: true } : {}) }
       })
 
       // Handle fire suppression
