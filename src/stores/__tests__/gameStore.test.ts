@@ -25,6 +25,9 @@ import {
 const getState = () => useGameStore.getState()
 const setState = (partial: Parameters<typeof useGameStore.setState>[0]) => useGameStore.setState(partial)
 
+// Standard tier layout: cabinet rows at gridRow 1 (south), 3 (north), 5 (south)
+const STD_ROW_0 = 1 // gridRow for first cabinet row (facing south)
+
 // Helper to set up a basic data center with cabinets + equipment for tick tests
 function setupBasicDataCenter() {
   setState({
@@ -32,8 +35,8 @@ function setupBasicDataCenter() {
     money: 999999,
     suiteTier: 'standard',
   })
-  // Add a cabinet via action
-  getState().addCabinet(0, 0, 'production', 'general', 'north')
+  // Add a cabinet via action — must use a valid cabinet row gridRow
+  getState().addCabinet(0, STD_ROW_0, 'production', 'general', 'north')
   // Upgrade it with servers
   getState().upgradeNextCabinet() // adds server to cab-1
   // Add a leaf switch
@@ -636,9 +639,9 @@ describe('Noise & Sound Barriers', () => {
 
   it('noise level is calculated during tick', () => {
     setupBasicDataCenter()
-    // Multiple cabinets generate noise from cooling
+    // Multiple cabinets generate noise from cooling — use valid cabinet row
     for (let i = 1; i < 4; i++) {
-      getState().addCabinet(i, 0, 'production', 'general', 'north')
+      getState().addCabinet(i, STD_ROW_0, 'production', 'general', 'north')
     }
 
     getState().tick()

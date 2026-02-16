@@ -1177,6 +1177,34 @@ interface TutorialTip {
 12. **Network Peering & Transit** (medium effort, networking cost layer)
 13. **Capacity Planning Dashboard** (medium effort, computed projections)
 
+---
+
+## Layout & Physical Design — Future Ideas
+
+These are ideas that expand on the row-based layout system introduced with the realistic data center layout feature. They are explicitly deferred for later exploration.
+
+### Player-Built Rows
+**Impact: High | Effort: Medium**
+Instead of pre-defined rows per suite tier, let the player choose where to place rows on the floor plan. This adds another layer of strategic planning — players decide row count, spacing, and orientation. Could introduce constraints like minimum aisle width, maximum row length, and fire code compliance.
+
+### Flexible Row Placement
+**Impact: Medium | Effort: High**
+Semi-free-form row positioning on a larger floor plan grid. Players could drag and drop rows, adjust row length, and create non-uniform layouts. Would require significant UI work for a row-placement editor and more complex validation logic.
+
+### Row-End Infrastructure Slots
+**Impact: Medium | Effort: Low**
+Dedicated positions at the end of each cabinet row for PDUs, in-row cooling units, network panels, and fire suppression equipment. Provides a natural location for infrastructure that's currently placed on the grid alongside cabinets.
+
+### Aisle Width Upgrades
+**Impact: Low | Effort: Low**
+Wider aisles (2-tile instead of 1-tile) for equipment cart access. Could reduce maintenance time (faster incident resolution), allow forklift access for heavy equipment, and unlock certain large-format cooling units. Trade-off: uses more floor space, reducing maximum cabinet density.
+
+### Raised Floor / Overhead Cable Management
+**Impact: Medium | Effort: Medium**
+Visual and mechanical distinction between under-floor (cold air plenum) and overhead (cable trays, busways) infrastructure. Raised floor could provide better cooling distribution but costs more. Overhead cable management could be a cheaper alternative with different trade-offs (cable mess visibility, maintenance access).
+
+---
+
 ### Phase 5 — Estimated Effort Summary
 
 | Feature | New Types | New Constants | Store Fields | Tick Logic | HUD Panels | Achievements |

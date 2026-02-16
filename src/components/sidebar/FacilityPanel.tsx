@@ -1,7 +1,7 @@
-import { useGameStore, SUITE_TIERS, SUITE_TIER_ORDER, getSuiteLimits, SCENARIO_CATALOG } from '@/stores/gameStore'
+import { useGameStore, SUITE_TIERS, SUITE_TIER_ORDER, getSuiteLimits, SCENARIO_CATALOG, AISLE_CONTAINMENT_CONFIG } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Building, Lock, Target, Check, Clock } from 'lucide-react'
+import { Building, Lock, Target, Check, Clock, Shield } from 'lucide-react'
 import {
   Tooltip,
   TooltipContent,
@@ -11,8 +11,10 @@ import {
 export function FacilityPanel() {
   const {
     cabinets, spineSwitches, money, suiteTier, upgradeSuite,
+    aisleContainments, installAisleContainment,
     activeScenario, scenarioProgress, scenariosCompleted,
     startScenario, abandonScenario,
+    sandboxMode,
   } = useGameStore()
 
   const suiteLimits = getSuiteLimits(suiteTier)
@@ -51,8 +53,12 @@ export function FacilityPanel() {
             <span className="text-foreground tabular-nums">{spineSwitches.length}/{suiteLimits.maxSpines}</span>
           </div>
           <div className="flex justify-between text-xs">
-            <span className="text-muted-foreground">Grid</span>
-            <span className="text-foreground tabular-nums">{suiteLimits.cols}&times;{suiteLimits.rows}</span>
+            <span className="text-muted-foreground">Layout</span>
+            <span className="text-foreground tabular-nums">{suiteLimits.rows} rows &times; {suiteLimits.cols} slots</span>
+          </div>
+          <div className="flex justify-between text-xs">
+            <span className="text-muted-foreground">Aisles</span>
+            <span className="text-foreground tabular-nums">{SUITE_TIERS[suiteTier].layout.aisles.length}</span>
           </div>
 
           {/* Suite progression */}
@@ -103,6 +109,83 @@ export function FacilityPanel() {
             <p className="text-xs italic mt-1" style={{ color: `${suiteConfig.color}80` }}>Maximum facility tier reached.</p>
           )}
         </div>
+      </div>
+
+      {/* Aisle Containment */}
+      <div className="border-t border-border pt-3">
+        <div className="flex items-center gap-2 mb-2">
+          <Shield className="size-3 text-neon-cyan" />
+          <span className="text-xs font-bold text-neon-cyan">AISLE CONTAINMENT</span>
+        </div>
+        {(() => {
+          const layout = SUITE_TIERS[suiteTier].layout
+          const minTierIdx = SUITE_TIER_ORDER.indexOf(AISLE_CONTAINMENT_CONFIG.minSuiteTier)
+          const currentTierIdxC = SUITE_TIER_ORDER.indexOf(suiteTier)
+          const isLocked = currentTierIdxC < minTierIdx
+
+          if (isLocked) {
+            return (
+              <div className="text-xs text-muted-foreground/50 flex items-center gap-1">
+                <Lock className="size-3" />
+                Requires {SUITE_TIERS[AISLE_CONTAINMENT_CONFIG.minSuiteTier].label}
+              </div>
+            )
+          }
+
+          if (layout.aisles.length === 0) {
+            return <p className="text-xs text-muted-foreground/50">No aisles in current layout</p>
+          }
+
+          return (
+            <div className="flex flex-col gap-1.5">
+              <p className="text-[10px] text-muted-foreground">{AISLE_CONTAINMENT_CONFIG.description}</p>
+              <div className="text-[10px] text-muted-foreground/70 mb-1">
+                {AISLE_CONTAINMENT_CONFIG.benefits.map((b, i) => (
+                  <div key={i} className="flex items-center gap-1">
+                    <span className="text-neon-green">+</span> {b}
+                  </div>
+                ))}
+              </div>
+              {layout.aisles.map((aisle) => {
+                const installed = aisleContainments.includes(aisle.id)
+                const aisleColor = aisle.type === 'cold' ? '#00aaff' : aisle.type === 'hot' ? '#ff6644' : '#888888'
+                const typeLabel = aisle.type === 'cold' ? 'Cold' : aisle.type === 'hot' ? 'Hot' : 'Neutral'
+                const canAfford = sandboxMode || money >= AISLE_CONTAINMENT_CONFIG.cost
+                return (
+                  <div key={aisle.id} className="flex items-center justify-between">
+                    <span className="text-xs font-mono" style={{ color: aisleColor }}>
+                      {typeLabel} Aisle {aisle.id + 1}
+                    </span>
+                    {installed ? (
+                      <Badge className="text-[9px] font-mono border" style={{ backgroundColor: `${aisleColor}20`, color: aisleColor, borderColor: `${aisleColor}40` }}>
+                        CONTAINED
+                      </Badge>
+                    ) : (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="xs"
+                            onClick={() => installAisleContainment(aisle.id)}
+                            disabled={!canAfford}
+                            className="font-mono text-[10px]"
+                            style={{ borderColor: `${aisleColor}33` }}
+                          >
+                            Install ${AISLE_CONTAINMENT_CONFIG.cost.toLocaleString()}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="right">
+                          <p>Install containment on this {typeLabel.toLowerCase()} aisle</p>
+                          <p className="text-xs text-muted-foreground mt-1">+{Math.round(AISLE_CONTAINMENT_CONFIG.coolingBonusPerAisle * 100)}% cooling efficiency</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )
+        })()}
       </div>
 
       {/* Scenarios */}

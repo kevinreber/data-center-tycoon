@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
 import type Phaser from 'phaser'
 import { createGame, getScene } from '@/game/PhaserGame'
-import { useGameStore, getSuiteLimits, getPlacementHints } from '@/stores/gameStore'
+import { useGameStore, getSuiteLimits, getPlacementHints, SUITE_TIERS } from '@/stores/gameStore'
 import { Crosshair } from 'lucide-react'
 
 export function GameCanvas() {
@@ -26,6 +26,7 @@ export function GameCanvas() {
   const cableTrays = useGameStore((s) => s.cableTrays)
   const pduOverloaded = useGameStore((s) => s.pduOverloaded)
   const heatMapVisible = useGameStore((s) => s.heatMapVisible)
+  const aisleContainments = useGameStore((s) => s.aisleContainments)
 
   // Tile click handler — called from Phaser when user clicks a grid tile
   const handleTileClick = useCallback((col: number, row: number) => {
@@ -87,13 +88,15 @@ export function GameCanvas() {
     }
   }, [placementMode, handleTileClick, handleTileHover, handleCabinetSelect, sceneReady])
 
-  // Sync suite tier (grid dimensions) to Phaser
+  // Sync suite tier (grid dimensions + row layout) to Phaser
   useEffect(() => {
     if (!gameRef.current) return
     const scene = getScene(gameRef.current)
     if (!scene) return
     const limits = getSuiteLimits(suiteTier)
-    scene.setGridSize(limits.cols, limits.rows, limits.maxSpines)
+    const layout = SUITE_TIERS[suiteTier].layout
+    // Use totalGridRows as the visual row count (includes aisles + corridors)
+    scene.setGridSize(limits.cols, layout.totalGridRows, limits.maxSpines, layout)
   }, [suiteTier, sceneReady])
 
   // Sync cabinets to Phaser
@@ -202,6 +205,14 @@ export function GameCanvas() {
     if (!scene) return
     scene.setHeatMapVisible(heatMapVisible)
   }, [heatMapVisible, sceneReady])
+
+  // Sync aisle containment state to Phaser
+  useEffect(() => {
+    if (!gameRef.current) return
+    const scene = getScene(gameRef.current)
+    if (!scene) return
+    scene.setAisleContainments(aisleContainments)
+  }, [aisleContainments, sceneReady])
 
   const handleCenterGrid = useCallback(() => {
     if (gameRef.current) {

@@ -310,64 +310,162 @@ export const AISLE_CONFIG = {
   degradedCablePenalty: 0.10,   // 10% bandwidth penalty on over-length cables
 }
 
+// ── Row-Based Data Center Layout ──────────────────────────────
+
+/** A physical cabinet row — a horizontal line of cabinet slots */
+export interface DataCenterRow {
+  id: number                  // row index (0-based among cabinet rows)
+  gridRow: number             // actual Y position on the visual grid (accounts for aisle/corridor gaps)
+  facing: CabinetFacing       // all cabinets in this row face the same direction
+  slots: number               // number of cabinet slots in this row
+}
+
+/** Aisle between two adjacent cabinet rows */
+export type AisleType = 'cold' | 'hot' | 'neutral'
+
+export interface Aisle {
+  id: number                  // aisle index
+  gridRow: number             // Y position on the visual grid (between two cabinet rows)
+  type: AisleType             // determined by facing of adjacent cabinet rows
+  betweenRows: [number, number] // the two DataCenterRow IDs on either side
+}
+
+/** Full layout definition for a suite tier */
+export interface DataCenterLayout {
+  cabinetRows: DataCenterRow[]
+  aisles: Aisle[]
+  totalGridRows: number       // total visual rows (cabinet rows + aisle rows + corridors)
+  corridorTop: number         // grid row of top corridor
+  corridorBottom: number      // grid row of bottom corridor
+}
+
+/** Generate the pre-built row layout for a given number of cabinet rows and columns */
+function generateLayout(numRows: number, cols: number): DataCenterLayout {
+  const cabinetRows: DataCenterRow[] = []
+  const aisles: Aisle[] = []
+
+  // Layout structure: corridor + (row + aisle)... + row + corridor
+  // Each cabinet row takes 1 grid row, each aisle takes 1 grid row, corridors take 1 grid row each
+  const corridorTop = 0
+  let gridRow = 1 // start after top corridor
+
+  for (let i = 0; i < numRows; i++) {
+    // Alternate facing: even rows face south, odd rows face north
+    // This creates cold aisles between pairs (fronts face each other)
+    const facing: CabinetFacing = i % 2 === 0 ? 'south' : 'north'
+    cabinetRows.push({ id: i, gridRow, facing, slots: cols })
+    gridRow++
+
+    // Add aisle between this row and the next (not after the last row)
+    if (i < numRows - 1) {
+      const currentFacing = facing
+      const nextFacing: CabinetFacing = (i + 1) % 2 === 0 ? 'south' : 'north'
+      // Determine aisle type from adjacent row facings:
+      // Row facing south (exhaust north) + next row facing north (exhaust south)
+      //   = both exhausts face the aisle = HOT aisle
+      // Row facing north (exhaust south) + next row facing south (exhaust north)
+      //   = both fronts face the aisle = COLD aisle (wait, that's inverted)
+      // Actually: "facing south" means front/intake is south, exhaust is north
+      //   If current exhausts toward the aisle (current facing south = exhaust north = toward aisle below)
+      //   and next exhausts toward the aisle (next facing north = exhaust south = toward aisle above)
+      //   then both exhausts face the aisle → HOT
+      let aisleType: AisleType = 'neutral'
+      if (currentFacing === 'south' && nextFacing === 'north') {
+        // Both fronts face the aisle (current front=south=toward aisle, next front=north=toward aisle)
+        aisleType = 'cold'
+      } else if (currentFacing === 'north' && nextFacing === 'south') {
+        // Both backs face the aisle
+        aisleType = 'hot'
+      }
+      aisles.push({ id: i, gridRow, type: aisleType, betweenRows: [i, i + 1] })
+      gridRow++
+    }
+  }
+
+  const corridorBottom = gridRow
+  const totalGridRows = gridRow + 1
+
+  return { cabinetRows, aisles, totalGridRows, corridorTop, corridorBottom }
+}
+
+/** Aisle containment upgrade config */
+export const AISLE_CONTAINMENT_CONFIG = {
+  cost: 15000,                  // cost per aisle
+  coolingBonusPerAisle: 0.06,   // 6% extra cooling per contained aisle
+  maxContainmentBonus: 0.20,    // max 20% bonus from containment alone
+  minSuiteTier: 'standard' as SuiteTier,
+  description: 'Physical containment panels (doors/curtains) prevent hot/cold air mixing. Improves cooling efficiency.',
+  benefits: [
+    '+6% cooling efficiency per contained aisle',
+    'Reduces thermal bleed between rows',
+    'Lower PUE (Power Usage Effectiveness)',
+    'Required for high-density deployments',
+  ],
+}
+
 // ── Suite Tier Config ──────────────────────────────────────────
 
 export interface SuiteConfig {
   tier: SuiteTier
   label: string
   description: string
-  cols: number              // cabinet grid columns
-  rows: number              // cabinet grid rows
+  cols: number              // cabinet slots per row
+  rows: number              // number of cabinet rows
   maxCabinets: number       // cols * rows
   maxSpines: number         // spine switch slots
   upgradeCost: number       // cost to upgrade to this tier (0 for starter)
   color: string
+  layout: DataCenterLayout  // pre-built row layout
 }
 
 export const SUITE_TIERS: Record<SuiteTier, SuiteConfig> = {
   starter: {
     tier: 'starter',
     label: 'Starter Suite',
-    description: 'A small colocation closet. Enough room to get started.',
+    description: 'A small colocation closet. Two cabinet rows with a cold aisle between them.',
     cols: 4,
     rows: 2,
     maxCabinets: 8,
     maxSpines: 2,
     upgradeCost: 0,
     color: '#88aacc',
+    layout: generateLayout(2, 4),
   },
   standard: {
     tier: 'standard',
     label: 'Standard Suite',
-    description: 'A proper server room with room to grow.',
+    description: 'A proper server room with hot/cold aisle separation.',
     cols: 6,
     rows: 3,
     maxCabinets: 18,
     maxSpines: 4,
     upgradeCost: 40000,
     color: '#00ff88',
+    layout: generateLayout(3, 6),
   },
   professional: {
     tier: 'professional',
     label: 'Professional Suite',
-    description: 'A full-size data hall with enterprise-grade capacity.',
+    description: 'A full-size data hall with multiple aisle pairs and containment options.',
     cols: 8,
     rows: 4,
     maxCabinets: 32,
     maxSpines: 6,
     upgradeCost: 120000,
     color: '#00aaff',
+    layout: generateLayout(4, 8),
   },
   enterprise: {
     tier: 'enterprise',
     label: 'Enterprise Suite',
-    description: 'A massive hyperscale facility. Maximum capacity.',
+    description: 'A massive hyperscale facility. Maximum capacity with full aisle containment.',
     cols: 10,
     rows: 5,
     maxCabinets: 50,
     maxSpines: 8,
     upgradeCost: 350000,
     color: '#ff66ff',
+    layout: generateLayout(5, 10),
   },
 }
 
@@ -1367,49 +1465,46 @@ export function getPlacementHints(
   suiteTier: SuiteTier,
 ): PlacementHint[] {
   const hints: PlacementHint[] = []
-  const limits = getSuiteLimits(suiteTier)
+  const layout = SUITE_TIERS[suiteTier].layout
 
-  // Check adjacent cabinets for heat warnings
-  const neighbors = cabinets.filter(
-    (c) => Math.abs(c.col - col) <= 1 && Math.abs(c.row - row) <= 1 && (c.col !== col || c.row !== row)
-  )
+  // Check if this is a valid cabinet row
+  const cabinetRow = getCabinetRowAtGrid(row, layout)
+  if (!cabinetRow) {
+    // Hovering over an aisle or corridor
+    const aisle = layout.aisles.find(a => a.gridRow === row)
+    if (aisle) {
+      const typeLabel = aisle.type === 'cold' ? 'Cold' : aisle.type === 'hot' ? 'Hot' : 'Neutral'
+      hints.push({ message: `${typeLabel} aisle — technician walkway, no cabinet placement`, type: 'info' })
+    } else {
+      hints.push({ message: 'Main corridor — no cabinet placement', type: 'info' })
+    }
+    return hints
+  }
+
+  // Show row info
+  const facingLabel = cabinetRow.facing === 'north' ? 'North (▲)' : 'South (▼)'
+  hints.push({ message: `Row ${cabinetRow.id + 1} — facing ${facingLabel}`, type: 'info' })
+
+  // Check adjacent cabinets in the same row for heat warnings
+  const rowCabs = cabinets.filter((c) => c.row === row)
+  const neighbors = rowCabs.filter((c) => Math.abs(c.col - col) <= 1 && c.col !== col)
   const hotNeighbors = neighbors.filter((c) => c.heatLevel >= 60)
   const critNeighbors = neighbors.filter((c) => c.heatLevel >= SIM.throttleTemp)
 
   if (critNeighbors.length > 0) {
-    hints.push({ message: 'Adjacent to overheating cabinets — risk of thermal throttle', type: 'warning' })
+    hints.push({ message: 'Adjacent to overheating cabinet — thermal throttle risk', type: 'warning' })
   } else if (hotNeighbors.length > 0) {
-    hints.push({ message: 'Warm neighbors nearby — monitor cooling capacity', type: 'warning' })
+    hints.push({ message: 'Warm neighbor nearby — monitor cooling', type: 'warning' })
   }
 
-  if (neighbors.length === 0) {
-    hints.push({ message: 'Isolated placement — good for airflow', type: 'tip' })
+  // Row fill guidance
+  if (rowCabs.length >= cabinetRow.slots - 1) {
+    hints.push({ message: 'Row nearly full — consider other rows', type: 'info' })
   }
 
-  // Row length guidance (real DCs typically use rows of 4-8)
-  const rowCabs = cabinets.filter((c) => c.row === row)
-  if (rowCabs.length >= limits.cols - 1) {
-    hints.push({ message: 'This row is nearly full — consider starting a new row for airflow', type: 'info' })
-  }
-
-  // Hot/cold aisle pattern hint
+  // First cabinet tip
   if (cabinets.length === 0) {
-    hints.push({ message: 'First cabinet — consider leaving gaps for hot/cold aisle layout', type: 'tip' })
-  } else if (cabinets.length >= 3) {
-    const sameRow = cabinets.filter((c) => c.row === row)
-    const adjacentInRow = sameRow.filter((c) => Math.abs(c.col - col) === 1)
-    if (adjacentInRow.length >= 2) {
-      hints.push({ message: 'Dense row — plan cooling paths between cabinets', type: 'info' })
-    }
-  }
-
-  // Aisle facing hint (reusing rowCabs from above)
-  if (rowCabs.length > 0) {
-    const rowFacings = new Set(rowCabs.map((c) => c.facing))
-    if (rowFacings.size === 1) {
-      const facing = rowCabs[0].facing
-      hints.push({ message: `Row faces ${facing} — match this facing for aisle consistency`, type: 'info' })
-    }
+    hints.push({ message: 'First cabinet! Aisle cooling improves with cabinets on both sides', type: 'tip' })
   }
 
   return hints
@@ -1526,52 +1621,39 @@ function calcCableLength(cabCol: number, cabRow: number, _spineSlot: number, gri
 }
 
 /** Calculate hot/cold aisle cooling bonus based on cabinet layout */
-export function calcAisleBonus(cabinets: Cabinet[]): number {
+export function calcAisleBonus(cabinets: Cabinet[], suiteTier: SuiteTier = 'starter', aisleContainments: number[] = []): number {
   if (cabinets.length < 2) return 0
 
-  // Group cabinets by row
-  const rowMap = new Map<number, Cabinet[]>()
-  for (const cab of cabinets) {
-    const row = cab.row
-    const list = rowMap.get(row) ?? []
-    list.push(cab)
-    rowMap.set(row, list)
-  }
+  const layout = SUITE_TIERS[suiteTier].layout
+  let bonus = 0
 
-  // Check for properly formed aisle pairs (adjacent rows with opposing faces)
-  let properPairs = 0
-  const rows = [...rowMap.keys()].sort((a, b) => a - b)
-  for (let i = 0; i < rows.length - 1; i++) {
-    const thisRow = rowMap.get(rows[i])!
-    const nextRow = rowMap.get(rows[i + 1])!
-    // Adjacent rows (consecutive) with cabinets facing toward each other = hot aisle
-    if (rows[i + 1] - rows[i] === 1) {
-      const thisFacingSouth = thisRow.every((c) => c.facing === 'south')
-      const nextFacingNorth = nextRow.every((c) => c.facing === 'north')
-      if (thisFacingSouth && nextFacingNorth) properPairs++
-      // Or the reverse orientation
-      const thisFacingNorth = thisRow.every((c) => c.facing === 'north')
-      const nextFacingSouth = nextRow.every((c) => c.facing === 'south')
-      if (thisFacingNorth && nextFacingSouth) properPairs++
+  // Each aisle that has cabinets on both adjacent rows gets the pair bonus
+  for (const aisle of layout.aisles) {
+    const rowAbove = layout.cabinetRows.find(r => r.id === aisle.betweenRows[0])
+    const rowBelow = layout.cabinetRows.find(r => r.id === aisle.betweenRows[1])
+    if (!rowAbove || !rowBelow) continue
+
+    const hasAboveCabs = cabinets.some(c => c.row === rowAbove.gridRow)
+    const hasBelowCabs = cabinets.some(c => c.row === rowBelow.gridRow)
+
+    if (hasAboveCabs && hasBelowCabs) {
+      bonus += AISLE_CONFIG.coolingBonusPerPair
+
+      // Containment bonus on top of pair bonus
+      if (aisleContainments.includes(aisle.id)) {
+        bonus += AISLE_CONTAINMENT_CONFIG.coolingBonusPerAisle
+      }
     }
   }
 
-  return Math.min(AISLE_CONFIG.maxCoolingBonus, properPairs * AISLE_CONFIG.coolingBonusPerPair)
+  const maxBonus = AISLE_CONFIG.maxCoolingBonus + AISLE_CONTAINMENT_CONFIG.maxContainmentBonus
+  return Math.min(maxBonus, bonus)
 }
 
-/** Count how many cabinets violate aisle layout (mixed facing in a row) */
-export function countAisleViolations(cabinets: Cabinet[]): number {
-  const rowMap = new Map<number, Set<CabinetFacing>>()
-  for (const cab of cabinets) {
-    const facings = rowMap.get(cab.row) ?? new Set()
-    facings.add(cab.facing)
-    rowMap.set(cab.row, facings)
-  }
-  let violations = 0
-  for (const facings of rowMap.values()) {
-    if (facings.size > 1) violations++ // mixed facings in the same row
-  }
-  return violations
+/** Count aisle violations — with row-enforced facing, violations are always 0 */
+export function countAisleViolations(): number {
+  // Row-level facing enforcement means no mixed-facing violations are possible
+  return 0
 }
 
 /** Check how many cable runs are not routed through trays */
@@ -1595,7 +1677,23 @@ export const MAX_SPINES = 8
 /** Get the effective limits for a given suite tier */
 export function getSuiteLimits(tier: SuiteTier) {
   const config = SUITE_TIERS[tier]
-  return { maxCabinets: config.maxCabinets, maxSpines: config.maxSpines, cols: config.cols, rows: config.rows }
+  return { maxCabinets: config.maxCabinets, maxSpines: config.maxSpines, cols: config.cols, rows: config.rows, layout: config.layout }
+}
+
+/** Find which cabinet row (if any) a grid position belongs to */
+export function getCabinetRowAtGrid(gridRow: number, layout: DataCenterLayout): DataCenterRow | undefined {
+  return layout.cabinetRows.find(r => r.gridRow === gridRow)
+}
+
+/** Get the valid grid rows where cabinets can be placed for a suite tier */
+export function getValidCabinetGridRows(tier: SuiteTier): number[] {
+  return SUITE_TIERS[tier].layout.cabinetRows.map(r => r.gridRow)
+}
+
+/** Get the enforced facing for a given grid row, or null if not a cabinet row */
+export function getRowFacing(gridRow: number, tier: SuiteTier): CabinetFacing | null {
+  const row = getCabinetRowAtGrid(gridRow, SUITE_TIERS[tier].layout)
+  return row ? row.facing : null
 }
 
 const COSTS = {
@@ -2161,8 +2259,9 @@ interface GameState {
   pdus: PDU[]                                 // placed power distribution units
   cableTrays: CableTray[]                     // placed cable trays
   cableRuns: CableRun[]                       // structured cable connections
-  aisleBonus: number                          // current hot/cold aisle cooling bonus (0–0.25)
-  aisleViolations: number                     // number of rows with mixed facings
+  aisleBonus: number                          // current hot/cold aisle cooling bonus (0–0.25+)
+  aisleViolations: number                     // number of rows with mixed facings (always 0 with enforced layout)
+  aisleContainments: number[]                 // aisle IDs that have containment installed
   messyCableCount: number                     // cables not routed through trays
   pduOverloaded: boolean                      // whether any PDU is overloaded
   infraIncidentBonus: number                  // extra incident chance from messy cables
@@ -2407,6 +2506,8 @@ interface GameState {
   scheduleMaintenance: (targetType: MaintenanceTargetType, targetId: string) => void
   // Power redundancy actions
   upgradePowerRedundancy: (level: PowerRedundancy) => void
+  // Aisle containment actions
+  installAisleContainment: (aisleId: number) => void
   // Noise actions
   installSoundBarrier: () => void
   // Spot compute actions
@@ -2569,6 +2670,7 @@ export const useGameStore = create<GameState>((set) => ({
   cableRuns: [],
   aisleBonus: 0,
   aisleViolations: 0,
+  aisleContainments: [] as number[],
   messyCableCount: 0,
   pduOverloaded: false,
   infraIncidentBonus: 0,
@@ -2756,15 +2858,26 @@ export const useGameStore = create<GameState>((set) => ({
 
   // ── Build Actions ───────────────────────────────────────────
 
-  addCabinet: (col: number, row: number, environment: CabinetEnvironment, customerType: CustomerType = 'general', facing: CabinetFacing = 'north') =>
+  addCabinet: (...[col, row, environment, customerType = 'general']: [col: number, row: number, environment: CabinetEnvironment, customerType?: CustomerType, facing?: CabinetFacing]) =>
     set((state) => {
       if (state.money < COSTS.cabinet) return state
       const suiteLimits = getSuiteLimits(state.suiteTier)
       if (state.cabinets.length >= suiteLimits.maxCabinets) return state
-      // Validate grid bounds
-      if (col < 0 || col >= suiteLimits.cols || row < 0 || row >= suiteLimits.rows) return state
-      // Validate tile is not occupied (by cabinets, PDUs, or cable trays)
+
+      // Row-based validation: check that the grid row is a valid cabinet row
+      const layout = suiteLimits.layout
+      const cabinetRow = getCabinetRowAtGrid(row, layout)
+      if (!cabinetRow) return state // Not a cabinet row (aisle or corridor)
+
+      // Validate col is within row slot count
+      if (col < 0 || col >= cabinetRow.slots) return state
+
+      // Validate tile is not occupied
       if (state.cabinets.some((c) => c.col === col && c.row === row)) return state
+
+      // Enforce row-level facing (ignore user's facing selection)
+      const enforcedFacing = cabinetRow.facing
+
       const cab: Cabinet = {
         id: `cab-${nextCabId++}`,
         col,
@@ -2776,11 +2889,11 @@ export const useGameStore = create<GameState>((set) => ({
         powerStatus: true,
         heatLevel: SIM.ambientTemp,
         serverAge: 0,
-        facing,
+        facing: enforcedFacing,
       }
       const newCabinets = [...state.cabinets, cab]
-      const newAisleBonus = calcAisleBonus(newCabinets)
-      const newAisleViolations = countAisleViolations(newCabinets)
+      const newAisleBonus = calcAisleBonus(newCabinets, state.suiteTier, state.aisleContainments)
+      const newAisleViolations = countAisleViolations()
       return {
         cabinets: newCabinets,
         money: state.money - COSTS.cabinet,
@@ -3181,13 +3294,21 @@ export const useGameStore = create<GameState>((set) => ({
 
   toggleCabinetFacing: (cabinetId: string) =>
     set((state) => {
+      // With row-enforced facing, toggling individual cabinet facing is a no-op
+      // Facing is determined by the row layout
+      const cab = state.cabinets.find(c => c.id === cabinetId)
+      if (!cab) return state
+      const layout = SUITE_TIERS[state.suiteTier].layout
+      const cabinetRow = getCabinetRowAtGrid(cab.row, layout)
+      // If somehow the cabinet is not on a valid row, allow toggle for backward compat
+      if (cabinetRow) return state // facing is enforced, no change needed
       const newCabinets = state.cabinets.map((c) =>
         c.id === cabinetId ? { ...c, facing: (c.facing === 'north' ? 'south' : 'north') as CabinetFacing } : c
       )
       return {
         cabinets: newCabinets,
-        aisleBonus: calcAisleBonus(newCabinets),
-        aisleViolations: countAisleViolations(newCabinets),
+        aisleBonus: calcAisleBonus(newCabinets, state.suiteTier, state.aisleContainments),
+        aisleViolations: countAisleViolations(),
       }
     }),
 
@@ -3630,6 +3751,32 @@ export const useGameStore = create<GameState>((set) => ({
       }
     }),
 
+  // ── Aisle Containment Actions ───────────────────────────────────
+
+  installAisleContainment: (aisleId: number) =>
+    set((state) => {
+      const layout = SUITE_TIERS[state.suiteTier].layout
+      // Validate aisle exists
+      const aisle = layout.aisles.find(a => a.id === aisleId)
+      if (!aisle) return state
+      // Already installed
+      if (state.aisleContainments.includes(aisleId)) return state
+      // Check minimum suite tier
+      const minTierIdx = SUITE_TIER_ORDER.indexOf(AISLE_CONTAINMENT_CONFIG.minSuiteTier)
+      const currentTierIdx = SUITE_TIER_ORDER.indexOf(state.suiteTier)
+      if (currentTierIdx < minTierIdx) return state
+      // Check funds
+      if (!state.sandboxMode && state.money < AISLE_CONTAINMENT_CONFIG.cost) return state
+
+      const newContainments = [...state.aisleContainments, aisleId]
+      const newAisleBonus = calcAisleBonus(state.cabinets, state.suiteTier, newContainments)
+      return {
+        aisleContainments: newContainments,
+        aisleBonus: newAisleBonus,
+        money: state.sandboxMode ? state.money : state.money - AISLE_CONTAINMENT_CONFIG.cost,
+      }
+    }),
+
   // ── Noise Actions ───────────────────────────────────────────────
 
   installSoundBarrier: () =>
@@ -3776,12 +3923,19 @@ export const useGameStore = create<GameState>((set) => ({
     const environments: CabinetEnvironment[] = ['production', 'production', 'production', 'lab', 'management']
     let cabId = 1
 
-    // Professional tier: 8 cols x 4 rows — mostly full with variety
+    // Professional tier: 8 cols x 4 rows — uses row-based layout grid positions
+    // Professional layout: Row 0 (gridRow=1), Row 1 (gridRow=3), Row 2 (gridRow=5), Row 3 (gridRow=7)
+    const proLayout = SUITE_TIERS.professional.layout
+    const gridRows = proLayout.cabinetRows.map(r => r.gridRow) // [1, 3, 5, 7]
     const positions: [number, number][] = [
-      [0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],
-      [0,1],[1,1],[2,1],[3,1],[4,1],[5,1],[6,1],[7,1],
-      [0,2],[1,2],[2,2],[3,2],[4,2],
-      [0,3],[1,3],[2,3],
+      // Row 0 (gridRow 1) — full
+      [0,gridRows[0]],[1,gridRows[0]],[2,gridRows[0]],[3,gridRows[0]],[4,gridRows[0]],[5,gridRows[0]],[6,gridRows[0]],[7,gridRows[0]],
+      // Row 1 (gridRow 3) — full
+      [0,gridRows[1]],[1,gridRows[1]],[2,gridRows[1]],[3,gridRows[1]],[4,gridRows[1]],[5,gridRows[1]],[6,gridRows[1]],[7,gridRows[1]],
+      // Row 2 (gridRow 5) — partial
+      [0,gridRows[2]],[1,gridRows[2]],[2,gridRows[2]],[3,gridRows[2]],[4,gridRows[2]],
+      // Row 3 (gridRow 7) — partial
+      [0,gridRows[3]],[1,gridRows[3]],[2,gridRows[3]],
     ]
 
     for (let i = 0; i < positions.length; i++) {
@@ -3789,6 +3943,9 @@ export const useGameStore = create<GameState>((set) => ({
       const env = environments[i % environments.length]
       const cust = env === 'management' ? 'general' : customerTypes[i % customerTypes.length]
       const serverCount = env === 'management' ? 2 : 4
+      // Determine facing from layout
+      const cabRow = getCabinetRowAtGrid(row, proLayout)
+      const facing = cabRow ? cabRow.facing : 'north' as CabinetFacing
       demoCabinets.push({
         id: `cab-${cabId++}`,
         col,
@@ -3800,7 +3957,7 @@ export const useGameStore = create<GameState>((set) => ({
         powerStatus: true,
         heatLevel: 35 + Math.floor(i * 1.3),
         serverAge: Math.floor(i * 20),
-        facing: row % 2 === 0 ? 'north' as CabinetFacing : 'south' as CabinetFacing,
+        facing,
       })
     }
 
@@ -3835,19 +3992,21 @@ export const useGameStore = create<GameState>((set) => ({
     const demoUnlockedTech = ['hot_aisle', 'variable_fans', 'high_density', 'ups_upgrade', 'redundant_cooling']
 
     // ── Infrastructure: PDUs, cable trays, busways, cross-connects, in-row coolers
+    // PDUs placed at aisle rows (between cabinet rows) for realism
+    const aisleRows = proLayout.aisles.map(a => a.gridRow) // [2, 4, 6]
     const demoPDUs: PDU[] = [
-      { id: 'pdu-1', col: 3, row: 0, maxCapacityKW: 30, label: 'Metered PDU' },
-      { id: 'pdu-2', col: 6, row: 1, maxCapacityKW: 30, label: 'Metered PDU' },
-      { id: 'pdu-3', col: 2, row: 2, maxCapacityKW: 80, label: 'Intelligent PDU' },
-      { id: 'pdu-4', col: 5, row: 3, maxCapacityKW: 80, label: 'Intelligent PDU' },
+      { id: 'pdu-1', col: 3, row: aisleRows[0], maxCapacityKW: 30, label: 'Metered PDU' },
+      { id: 'pdu-2', col: 6, row: aisleRows[0], maxCapacityKW: 30, label: 'Metered PDU' },
+      { id: 'pdu-3', col: 2, row: aisleRows[1], maxCapacityKW: 80, label: 'Intelligent PDU' },
+      { id: 'pdu-4', col: 5, row: aisleRows[2], maxCapacityKW: 80, label: 'Intelligent PDU' },
     ]
 
     const demoCableTrays: CableTray[] = [
-      { id: 'tray-1', col: 0, row: 0, capacityUnits: 8 },
-      { id: 'tray-2', col: 2, row: 0, capacityUnits: 8 },
-      { id: 'tray-3', col: 4, row: 1, capacityUnits: 16 },
-      { id: 'tray-4', col: 1, row: 2, capacityUnits: 8 },
-      { id: 'tray-5', col: 3, row: 3, capacityUnits: 16 },
+      { id: 'tray-1', col: 0, row: aisleRows[0], capacityUnits: 8 },
+      { id: 'tray-2', col: 2, row: aisleRows[0], capacityUnits: 8 },
+      { id: 'tray-3', col: 4, row: aisleRows[1], capacityUnits: 16 },
+      { id: 'tray-4', col: 1, row: aisleRows[1], capacityUnits: 8 },
+      { id: 'tray-5', col: 3, row: aisleRows[2], capacityUnits: 16 },
     ]
 
     // Cable runs connecting leaf cabinets to spines (auto-routed style)
@@ -3867,18 +4026,18 @@ export const useGameStore = create<GameState>((set) => ({
     }
 
     const demoBusways: Busway[] = [
-      { id: 'bus-1', col: 1, row: 0, capacityKW: 50, label: 'Medium Busway' },
-      { id: 'bus-2', col: 5, row: 2, capacityKW: 120, label: 'Heavy Busway' },
+      { id: 'bus-1', col: 1, row: aisleRows[0], capacityKW: 50, label: 'Medium Busway' },
+      { id: 'bus-2', col: 5, row: aisleRows[1], capacityKW: 120, label: 'Heavy Busway' },
     ]
 
     const demoCrossConnects: CrossConnect[] = [
-      { id: 'xc-1', col: 4, row: 0, portCount: 24, label: 'Medium Patch Panel' },
-      { id: 'xc-2', col: 7, row: 1, portCount: 48, label: 'HD Patch Panel' },
+      { id: 'xc-1', col: 4, row: aisleRows[0], portCount: 24, label: 'Medium Patch Panel' },
+      { id: 'xc-2', col: 7, row: aisleRows[1], portCount: 48, label: 'HD Patch Panel' },
     ]
 
     const demoInRowCoolers: InRowCooling[] = [
-      { id: 'irc-1', col: 3, row: 1, coolingBonus: 2.0, label: 'Standard In-Row Unit' },
-      { id: 'irc-2', col: 6, row: 2, coolingBonus: 3.5, label: 'High-Capacity In-Row' },
+      { id: 'irc-1', col: 3, row: aisleRows[0], coolingBonus: 2.0, label: 'Standard In-Row Unit' },
+      { id: 'irc-2', col: 6, row: aisleRows[1], coolingBonus: 3.5, label: 'High-Capacity In-Row' },
     ]
 
     // ── Staff
@@ -4198,6 +4357,7 @@ export const useGameStore = create<GameState>((set) => ({
       cableRuns: [],
       aisleBonus: 0,
       aisleViolations: 0,
+      aisleContainments: [],
       messyCableCount: 0,
       pduOverloaded: false,
       infraIncidentBonus: 0,
@@ -4356,6 +4516,7 @@ export const useGameStore = create<GameState>((set) => ({
         crossConnects: state.crossConnects,
         inRowCoolers: state.inRowCoolers,
         sandboxMode: state.sandboxMode,
+        aisleContainments: state.aisleContainments,
         stockPrice: state.stockPrice,
         stockHistory: state.stockHistory,
         valuationMilestonesReached: state.valuationMilestonesReached,
@@ -4436,6 +4597,7 @@ export const useGameStore = create<GameState>((set) => ({
         crossConnects: data.crossConnects ?? state.crossConnects,
         inRowCoolers: data.inRowCoolers ?? state.inRowCoolers,
         sandboxMode: data.sandboxMode ?? state.sandboxMode,
+        aisleContainments: data.aisleContainments ?? state.aisleContainments,
         stockPrice: data.stockPrice ?? state.stockPrice,
         stockHistory: data.stockHistory ?? state.stockHistory,
         valuationMilestonesReached: data.valuationMilestonesReached ?? state.valuationMilestonesReached,
@@ -4528,6 +4690,7 @@ export const useGameStore = create<GameState>((set) => ({
       cableRuns: [],
       aisleBonus: 0,
       aisleViolations: 0,
+      aisleContainments: [],
       messyCableCount: 0,
       pduOverloaded: false,
       infraIncidentBonus: 0,
@@ -5078,8 +5241,8 @@ export const useGameStore = create<GameState>((set) => ({
       }
 
       // ── Infrastructure layout effects ──────────────────────
-      const currentAisleBonus = calcAisleBonus(state.cabinets)
-      const currentAisleViolations = countAisleViolations(state.cabinets)
+      const currentAisleBonus = calcAisleBonus(state.cabinets, state.suiteTier, state.aisleContainments)
+      const currentAisleViolations = countAisleViolations()
 
       // Check PDU overloads
       let anyPDUOverloaded = false
