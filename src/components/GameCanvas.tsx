@@ -40,7 +40,39 @@ export function GameCanvas() {
       gameRef.current = createGame('phaser-container')
     }
 
+    // Listen for mobile zoom/reset custom events from on-screen controls
+    const handleMobileZoom = (e: Event) => {
+      const detail = (e as CustomEvent).detail
+      if (!gameRef.current) return
+      const scene = getScene(gameRef.current)
+      if (scene) scene.zoomBy(detail.delta)
+    }
+
+    const handleMobileReset = () => {
+      if (!gameRef.current) return
+      const scene = getScene(gameRef.current)
+      if (scene) scene.resetCamera()
+    }
+
+    // Defer listener attachment since canvas may not exist yet at mount
+    const attachListeners = () => {
+      const c = document.getElementById('phaser-container')?.querySelector('canvas')
+      if (c) {
+        c.addEventListener('mobile-zoom', handleMobileZoom)
+        c.addEventListener('mobile-reset', handleMobileReset)
+      }
+    }
+    // Try immediately, and also after a short delay for Phaser init
+    attachListeners()
+    const timerId = setTimeout(attachListeners, 500)
+
     return () => {
+      clearTimeout(timerId)
+      const c = document.getElementById('phaser-container')?.querySelector('canvas')
+      if (c) {
+        c.removeEventListener('mobile-zoom', handleMobileZoom)
+        c.removeEventListener('mobile-reset', handleMobileReset)
+      }
       gameRef.current?.destroy(true)
       gameRef.current = null
     }

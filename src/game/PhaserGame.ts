@@ -116,6 +116,12 @@ class DataCenterScene extends Phaser.Scene {
   private panOffsetY = 0
   private zoomLevel = 1
 
+  // Touch gesture state
+  private isTouchDevice = false
+  private touchPanActive = false
+  private pinchStartDist = 0
+  private pinchStartZoom = 1
+
   // Heat map overlay
   private heatMapGraphics: Phaser.GameObjects.Graphics | null = null
   private heatMapVisible = false
@@ -141,8 +147,14 @@ class DataCenterScene extends Phaser.Scene {
     this.drawFloor()
     this.drawGrid()
 
-    // Set up pointer events for placement mode
+    // Detect touch device
+    this.isTouchDevice = this.sys.game.device.input.touch
+
+    // Set up pointer events for placement mode (hover highlight — desktop only)
     this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+      // Skip hover highlights on touch (handled on tap instead)
+      if (this.isTouchDevice && pointer.wasTouch) return
+
       if (!this.placementActive) {
         if (this.placementHighlight) {
           this.placementHighlight.clear()
@@ -165,12 +177,35 @@ class DataCenterScene extends Phaser.Scene {
     })
 
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      // Touch: placement mode — tap to place directly
+      if (this.placementActive && pointer.wasTouch) {
+        const tile = this.screenToIso(pointer.x, pointer.y)
+        if (tile && tile.col >= 0 && tile.col < this.cabCols && tile.row >= 0 && tile.row < this.cabRows) {
+          const key = `${tile.col},${tile.row}`
+          if (!this.occupiedTiles.has(key) && this.onTileClick) {
+            this.drawPlacementHighlight(tile.col, tile.row)
+            this.onTileClick(tile.col, tile.row)
+          }
+        }
+        return
+      }
+
+      // Desktop: placement mode — click hovered tile
       if (this.placementActive && this.hoveredTile) {
         const { col, row } = this.hoveredTile
         const key = `${col},${row}`
         if (!this.occupiedTiles.has(key) && this.onTileClick) {
           this.onTileClick(col, row)
         }
+        return
+      }
+
+      // Touch: single-finger pan (when not in placement mode)
+      if (pointer.wasTouch && !this.placementActive) {
+        this.touchPanActive = true
+        this.isDragging = true
+        this.dragStartX = pointer.x - this.panOffsetX
+        this.dragStartY = pointer.y - this.panOffsetY
         return
       }
 
@@ -191,7 +226,7 @@ class DataCenterScene extends Phaser.Scene {
         }
       }
 
-      // Pan: right-click or middle-click drag
+      // Pan: right-click or middle-click drag (desktop)
       if (pointer.rightButtonDown() || pointer.middleButtonDown()) {
         this.isDragging = true
         this.dragStartX = pointer.x - this.panOffsetX
@@ -199,8 +234,31 @@ class DataCenterScene extends Phaser.Scene {
       }
     })
 
-    this.input.on('pointerup', () => {
+    this.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
+      // Touch: detect tap (short press with minimal movement) for cabinet selection
+      if (pointer.wasTouch && this.touchPanActive && !this.placementActive) {
+        const dx = Math.abs(pointer.x - (this.dragStartX + this.panOffsetX))
+        const dy = Math.abs(pointer.y - (this.dragStartY + this.panOffsetY))
+        const duration = pointer.upTime - pointer.downTime
+        // If the finger barely moved and it was a quick tap, treat as selection
+        if (dx < 10 && dy < 10 && duration < 300) {
+          const tile = this.screenToIso(pointer.x - this.panOffsetX, pointer.y - this.panOffsetY)
+          if (tile) {
+            let foundCab: string | null = null
+            for (const [id, entry] of this.cabEntries) {
+              if (entry.col === tile.col && entry.row === tile.row) {
+                foundCab = id
+                break
+              }
+            }
+            this.selectedCabinetId = foundCab
+            this.renderSelection()
+            if (this.onCabinetSelect) this.onCabinetSelect(foundCab)
+          }
+        }
+      }
       this.isDragging = false
+      this.touchPanActive = false
     })
 
     this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
@@ -211,12 +269,56 @@ class DataCenterScene extends Phaser.Scene {
       }
     })
 
-    // Zoom with scroll wheel
+    // Zoom with scroll wheel (desktop)
     this.input.on('wheel', (_pointer: Phaser.Input.Pointer, _gos: Phaser.GameObjects.GameObject[], _dx: number, dy: number) => {
       const zoomDelta = dy > 0 ? -0.1 : 0.1
       this.zoomLevel = Math.max(0.3, Math.min(2.5, this.zoomLevel + zoomDelta))
       this.cameras.main.setZoom(this.zoomLevel)
     })
+
+    // Pinch-to-zoom for touch devices
+    if (this.isTouchDevice) {
+      this.setupPinchZoom()
+    }
+  }
+
+  /** Set up pinch-to-zoom using native touch events on the canvas */
+  private setupPinchZoom() {
+    const canvas = this.sys.game.canvas
+    canvas.addEventListener('touchstart', (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        e.preventDefault()
+        // Stop single-finger pan when second finger lands
+        this.isDragging = false
+        this.touchPanActive = false
+        const dx = e.touches[0].clientX - e.touches[1].clientX
+        const dy = e.touches[0].clientY - e.touches[1].clientY
+        this.pinchStartDist = Math.sqrt(dx * dx + dy * dy)
+        this.pinchStartZoom = this.zoomLevel
+      }
+    }, { passive: false })
+
+    canvas.addEventListener('touchmove', (e: TouchEvent) => {
+      if (e.touches.length === 2 && this.pinchStartDist > 0) {
+        e.preventDefault()
+        const dx = e.touches[0].clientX - e.touches[1].clientX
+        const dy = e.touches[0].clientY - e.touches[1].clientY
+        const dist = Math.sqrt(dx * dx + dy * dy)
+        const scale = dist / this.pinchStartDist
+        this.zoomLevel = Math.max(0.3, Math.min(2.5, this.pinchStartZoom * scale))
+        this.cameras.main.setZoom(this.zoomLevel)
+      }
+    }, { passive: false })
+
+    canvas.addEventListener('touchend', () => {
+      this.pinchStartDist = 0
+    }, { passive: true })
+  }
+
+  /** Programmatic zoom (used by on-screen +/- buttons) */
+  zoomBy(delta: number) {
+    this.zoomLevel = Math.max(0.3, Math.min(2.5, this.zoomLevel + delta))
+    this.cameras.main.setZoom(this.zoomLevel)
   }
 
   /** Convert screen coordinates back to isometric grid cell */
