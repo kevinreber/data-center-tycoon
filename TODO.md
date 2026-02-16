@@ -298,6 +298,21 @@ A progression system for incident and infrastructure management, inspired by the
 
 ---
 
+### Cooling Infrastructure Redesign
+
+Rethink cooling upgrades as physical, placeable infrastructure rather than instant facility-wide toggles. Players should design their cooling layout to match their cabinet density and heat profile.
+
+- [ ] Water cooling requires physical placement (e.g., CRAH/CRAC units on the grid) with limited range
+- [ ] Cooling coverage zones — cabinets outside a cooler's range get reduced or no cooling benefit
+- [ ] Cooling capacity planning — units have max BTU/kW capacity; overloading degrades performance
+- [ ] Immersion cooling as a third tier — per-cabinet upgrade, extreme heat removal but very expensive
+- [ ] Cooling pipe routing — connect CRAH units to a chiller plant; pipe layout affects efficiency
+- [ ] Cooling failure modes — individual units can break down, creating hot spots until repaired
+
+**Effort:** High | **Impact:** High — Transforms cooling from a one-click upgrade into a core strategic system. Forces players to think about physical layout, capacity planning, and redundancy. Aligns with the game's identity as "The Heat/Water/Power Triangle."
+
+---
+
 ### Workload Simulation (Advanced)
 
 Deeper workload mechanics beyond the current traffic/server model.
@@ -387,7 +402,7 @@ Compare performance metrics with other players.
 | Phase 5 (Longevity) | 60+ | 60+ | 0 |
 | Rendering & Views | 17 | 17 | 0 |
 | UX / Camera | 6 | 6 | 0 |
-| **Pending Features** | **~25** | **6** | **~19** |
+| **Pending Features** | **~31** | **6** | **~25** |
 
 **Implemented features:** 156+ items across Phases 1–5, rendering, UX, and capacity planning.
-**Remaining features:** ~19 items, mostly high-effort late-game content (multi-site, scaling tiers, 42U racks), visualization (sub-floor view, sound), and advanced simulation (workload migration, AI training jobs, leaderboards).
+**Remaining features:** ~25 items, including cooling infrastructure redesign, high-effort late-game content (multi-site, scaling tiers, 42U racks), visualization (sub-floor view, sound), and advanced simulation (workload migration, AI training jobs, leaderboards).
