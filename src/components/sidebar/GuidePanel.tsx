@@ -1,4 +1,4 @@
-import { Github, Bug, GitPullRequest, MessageSquare } from 'lucide-react'
+import { Github, Bug, GitPullRequest } from 'lucide-react'
 import { useGameStore, ENVIRONMENT_CONFIG, SIM } from '@/stores/gameStore'
 
 const REPO_URL = 'https://github.com/kevinreber/data-center-tycoon'
@@ -104,15 +104,6 @@ export function GuidePanel() {
           >
             <GitPullRequest className="size-3.5 shrink-0" />
             <span>Submit a Pull Request</span>
-          </a>
-          <a
-            href={`${REPO_URL}/discussions`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 text-xs font-mono text-[#aa44ff] hover:text-[#cc66ff] transition-colors"
-          >
-            <MessageSquare className="size-3.5 shrink-0" />
-            <span>Join the Discussion</span>
           </a>
         </div>
       </div>
