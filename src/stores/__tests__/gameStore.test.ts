@@ -3,6 +3,7 @@ import { useGameStore } from '@/stores/gameStore'
 import type {
   Season,
   ServerConfig,
+  ActiveIncident,
 } from '@/stores/gameStore'
 import {
   SUPPLY_CHAIN_CONFIG,
@@ -17,6 +18,7 @@ import {
   SERVER_CONFIG_OPTIONS,
   SPOT_COMPUTE_CONFIG,
   TUTORIAL_TIPS,
+  INCIDENT_CATALOG,
 } from '@/stores/gameStore'
 
 // Helper to get/set store state
@@ -1066,5 +1068,115 @@ describe('resetGame clears Phase 5 state', () => {
     expect(state.seenTips).toHaveLength(0)
     expect(state.activeTip).toBeNull()
     expect(state.lifetimeStats.totalRevenueEarned).toBe(0)
+  })
+})
+
+// ============================================================================
+// L. Incident System — Natural Tick-Down & Hardware Restoration
+// ============================================================================
+describe('Incident System', () => {
+  it('incidents should naturally tick down each tick', () => {
+    setupBasicDataCenter()
+    const heatSpikeDef = INCIDENT_CATALOG.find(d => d.type === 'cooling_failure')!
+    const incident: ActiveIncident = {
+      id: 'test-inc-1',
+      def: heatSpikeDef,
+      ticksRemaining: 5,
+      resolved: false,
+    }
+    setState({ activeIncidents: [incident] })
+    getState().tick()
+    const state = getState()
+    const updated = state.activeIncidents.find(i => i.id === 'test-inc-1')
+    // ticksRemaining should have decreased (by at least 1 from natural tick-down)
+    expect(updated).toBeDefined()
+    if (updated && !updated.resolved) {
+      expect(updated.ticksRemaining).toBeLessThan(5)
+    }
+  })
+
+  it('incidents should auto-resolve when ticksRemaining reaches 0', () => {
+    setupBasicDataCenter()
+    const heatSpikeDef = INCIDENT_CATALOG.find(d => d.type === 'cooling_failure')!
+    const incident: ActiveIncident = {
+      id: 'test-inc-2',
+      def: heatSpikeDef,
+      ticksRemaining: 1, // will reach 0 this tick
+      resolved: false,
+    }
+    setState({ activeIncidents: [incident] })
+    getState().tick()
+    const state = getState()
+    const updated = state.activeIncidents.find(i => i.id === 'test-inc-2')
+    // Incident should be resolved (marked resolved=true)
+    expect(updated?.resolved).toBe(true)
+  })
+
+  it('leaf_failure incident should restore hasLeafSwitch after resolution', () => {
+    setupBasicDataCenter()
+    const cab = getState().cabinets[0]
+    expect(cab.hasLeafSwitch).toBe(true)
+
+    const leafDef = INCIDENT_CATALOG.find(d => d.type === 'leaf_failure')!
+    const incident: ActiveIncident = {
+      id: 'test-leaf-fail',
+      def: leafDef,
+      ticksRemaining: 2,
+      resolved: false,
+      affectedHardwareId: cab.id,
+    }
+    setState({ activeIncidents: [incident] })
+
+    // Tick 1: leaf should be disabled, ticksRemaining decreases
+    getState().tick()
+    let state = getState()
+    let updatedCab = state.cabinets.find(c => c.id === cab.id)!
+    expect(updatedCab.hasLeafSwitch).toBe(false)
+
+    // Tick 2: incident should resolve (ticksRemaining reaches 0)
+    getState().tick()
+    state = getState()
+    const inc = state.activeIncidents.find(i => i.id === 'test-leaf-fail')
+    expect(inc?.resolved).toBe(true)
+
+    // Tick 3: resolved incident is cleaned up, leaf switch should be restored
+    getState().tick()
+    state = getState()
+    updatedCab = state.cabinets.find(c => c.id === cab.id)!
+    expect(updatedCab.hasLeafSwitch).toBe(true)
+  })
+
+  it('spine_failure incident should restore powerStatus after resolution', () => {
+    setupBasicDataCenter()
+    const spine = getState().spineSwitches[0]
+    expect(spine.powerStatus).toBe(true)
+
+    const spineDef = INCIDENT_CATALOG.find(d => d.type === 'spine_failure')!
+    const incident: ActiveIncident = {
+      id: 'test-spine-fail',
+      def: spineDef,
+      ticksRemaining: 2,
+      resolved: false,
+      affectedHardwareId: spine.id,
+    }
+    setState({ activeIncidents: [incident] })
+
+    // Tick 1: spine should be disabled
+    getState().tick()
+    let state = getState()
+    let updatedSpine = state.spineSwitches.find(s => s.id === spine.id)!
+    expect(updatedSpine.powerStatus).toBe(false)
+
+    // Tick 2: incident should resolve
+    getState().tick()
+    state = getState()
+    const inc = state.activeIncidents.find(i => i.id === 'test-spine-fail')
+    expect(inc?.resolved).toBe(true)
+
+    // Tick 3: resolved incident is cleaned up, spine should be restored
+    getState().tick()
+    state = getState()
+    updatedSpine = state.spineSwitches.find(s => s.id === spine.id)!
+    expect(updatedSpine.powerStatus).toBe(true)
   })
 })
