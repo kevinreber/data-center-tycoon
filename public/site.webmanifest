@@ -1,6 +1,6 @@
 {
-  "name": "Fabric Tycoon: Data Center Simulator",
-  "short_name": "Fabric Tycoon",
+  "name": "Data Center Tycoon",
+  "short_name": "DC Tycoon",
   "icons": [
     {
       "src": "./web-app-manifest-192x192.png",
