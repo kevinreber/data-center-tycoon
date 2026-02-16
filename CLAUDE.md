@@ -41,7 +41,7 @@ src/
 ├── index.css                   # Global styles, Tailwind imports, neon color theme
 ├── components/
 │   ├── GameCanvas.tsx          # Phaser <-> React bridge; syncs Zustand state to Phaser scene
-│   ├── Sidebar.tsx             # Icon-rail sidebar with 13 slide-out panels
+│   ├── Sidebar.tsx             # Icon-rail sidebar with 17 slide-out panels
 │   ├── HUD.tsx                 # Legacy control panel (build, layers, finance, traffic, equipment)
 │   ├── CabinetDetailPanel.tsx  # Floating detail panel for selected cabinet (stats, actions)
 │   ├── LayersPopup.tsx         # Layer visibility/opacity/color controls popup
@@ -123,7 +123,7 @@ All game state lives in a **single Zustand store** (`useGameStore`). This ~5300-
 - **Customer type configs** (`CUSTOMER_TYPE_CONFIG`): power/heat/revenue/bandwidth multipliers per customer
 - **Infrastructure configs**: PDU options, cable tray options, aisle configuration, busway options, cross-connect options, in-row cooling options
 - **Economy configs**: loan options, depreciation, power market parameters, insurance options, valuation milestones
-- **Progression configs**: tech tree (9 techs), contracts (9 contracts + 4 compliance-gated), achievements (57+), incidents (25+ types), scenarios (5)
+- **Progression configs**: tech tree (9 techs), contracts (9 contracts + 4 compliance-gated), achievements (66+), incidents (17+ types), scenarios (5)
 - **Staff configs** (`STAFF_ROLE_CONFIG`, `STAFF_CERT_CONFIG`, `SHIFT_PATTERN_CONFIG`): roles, certifications, shift costs
 - **Supply chain configs** (`SUPPLY_CHAIN_CONFIG`): lead times, bulk discounts, shortage mechanics
 - **Weather configs** (`SEASON_CONFIG`, `WEATHER_CONDITION_CONFIG`): seasonal/weather ambient modifiers
@@ -134,7 +134,8 @@ All game state lives in a **single Zustand store** (`useGameStore`). This ~5300-
 - **Power redundancy configs** (`POWER_REDUNDANCY_CONFIG`): N, N+1, 2N levels
 - **Noise configs** (`NOISE_CONFIG`): noise generation, complaints, fines, sound barriers
 - **Spot compute configs** (`SPOT_COMPUTE_CONFIG`): dynamic spot market pricing
-- **Tutorial tips** (`TUTORIAL_TIPS`): 27 contextual gameplay tips (including carbon, security, and market tips)
+- **Operations Progression configs** (`OPS_TIER_CONFIG`): 4 operations tiers with auto-resolve, cost, and prevention settings
+- **Tutorial tips** (`TUTORIAL_TIPS`): 30 contextual gameplay tips (including carbon, security, market, and operations tips)
 - **Energy source configs** (`ENERGY_SOURCE_CONFIG`): 4 energy sources with cost/carbon/reliability
 - **Green cert configs** (`GREEN_CERT_CONFIG`): 4 green certifications with requirements and bonuses
 - **Carbon tax schedule** (`CARBON_TAX_SCHEDULE`): escalating carbon tax brackets
@@ -175,6 +176,7 @@ Progression types:
 - `IncidentSeverity` = `'minor' | 'major' | 'critical'`
 - `GeneratorStatus` = `'standby' | 'running' | 'cooldown'`
 - `SuppressionType` = `'none' | 'water_suppression' | 'gas_suppression'`
+- `OperationsTier` = `1 | 2 | 3 | 4`
 
 Staff & HR types:
 - `StaffRole` = `'network_engineer' | 'electrician' | 'cooling_specialist' | 'security_officer'`
@@ -259,6 +261,7 @@ Key interfaces (core):
 | Finance | `takeLoan`, `refreshServers`, `upgradeSuite` |
 | Infrastructure | `placePDU`, `placeCableTray`, `autoRouteCables`, `toggleCabinetFacing`, `placeBusway`, `placeCrossConnect`, `placeInRowCooling` |
 | Incidents | `resolveIncident`, `buyGenerator`, `activateGenerator`, `upgradeSuppression` |
+| Operations Progression | `upgradeOperationsTier` |
 | Contracts | `acceptContract` |
 | Research | `startResearch` |
 | Staff | `hireStaff`, `fireStaff`, `setShiftPattern`, `startTraining` |
@@ -383,7 +386,7 @@ A `setInterval` in `App.tsx` calls `tick()` at the rate determined by `gameSpeed
 17. **Contracts**: Checks SLA compliance, termination/completion logic
 18. **Reputation**: Adjusts score based on SLAs, outages, fires, violations
 19. **Depreciation**: Ages servers, reduces efficiency after 30% of 800-tick lifespan
-20. **Achievements**: Checks 45+ achievement conditions
+20. **Achievements**: Checks 66+ achievement conditions
 21. **Traffic**: ECMP distribution across active spines
 22. **Capacity history**: Records snapshot of current stats each tick (capped at 100 entries)
 23. **Lifetime stats**: Updates running totals (revenue, expenses, peak temp, uptime streaks, etc.)
@@ -501,11 +504,20 @@ A `setInterval` in `App.tsx` calls `tick()` at the rate determined by `gameSpeed
 - **Events**: Price wars (15% revenue reduction), staff poaching (counter-offer or lose), competitor outages
 - **Market share**: Tracked as player vs competitor strength ratio
 
+**Operations Progression:**
+- **4 tiers**: Manual Ops → Monitoring & Alerting → Basic Automation → Full Orchestration
+- **Tier 1 (default)**: Incidents persist until manually resolved (no auto-resolution)
+- **Tier 2**: Reduced resolve costs (-20%), reduced incident damage (-15%)
+- **Tier 3**: Incidents auto-resolve over time, staff accelerates resolution, hardware auto-restores
+- **Tier 4**: 2x auto-resolve speed, 20% incident prevention chance, minor incidents auto-resolve instantly
+- **Gated progression**: Each tier requires reputation, suite tier, and tech tree milestones
+- **Ongoing cost**: Higher tiers have per-tick maintenance costs ($5/$15/$30 per tick)
+
 **Additional Systems:**
 - **Patents**: Patent unlocked technologies for ongoing royalty income
 - **RFP Bidding**: Compete for contract wins/losses
 - **Scenario Challenges**: 5 predefined challenges with special rules and objectives
-- **Tutorial System**: 27 contextual tips triggered during gameplay (including carbon, security, and market tips)
+- **Tutorial System**: 30 contextual tips triggered during gameplay (including carbon, security, market, and operations tips)
 - **Event Logging**: Filterable log of significant events (capped at 200)
 - **Capacity History**: Per-tick snapshot of key metrics (capped at 100)
 - **Lifetime Statistics**: Revenue, expenses, peak temp, uptime streaks, fires survived, etc.

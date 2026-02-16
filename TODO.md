@@ -282,17 +282,21 @@ Late-game sci-fi progression beyond the current 4 suite tiers.
 
 ---
 
-### Operations Progression — Manual to Automated
+### Operations Progression — Manual to Automated ✅
 
 A progression system for incident and infrastructure management, inspired by the journey from manual ops to Kubernetes-style orchestration. Early game forces hands-on management; later tiers unlock automation.
 
-- [ ] **Tier 1 — Manual Ops (default):** Incidents require manual resolution (pay to fix) or expire with lingering damage (destroyed servers stay destroyed, failed leaf switches need manual replacement). No auto-healing.
-- [ ] **Tier 2 — Monitoring & Alerting (tech unlock or reputation gate):** Clearer incident warnings (e.g., flashing HUD alerts, sound cues). Reduced resolution costs. Incidents still require manual action but players get more lead time.
-- [ ] **Tier 3 — Basic Automation (mid-game unlock):** Incidents naturally tick down over their `durationTicks`. Staff can speed up resolution. Hardware auto-restores when incidents expire. (Current behavior after fix.)
-- [ ] **Tier 4 — Full Orchestration (late-game unlock):** Auto-failover, self-healing infrastructure, workload migration during incidents, predictive maintenance. Like going from bare metal to Kubernetes.
-- [ ] Gate progression behind tech tree, reputation tier, or suite tier milestones
-- [ ] Each tier could unlock new UI panels (e.g., Tier 3 unlocks an "Automation" dashboard)
-- [ ] Achievement ideas: "Script Kiddie" (unlock Tier 2), "SRE" (unlock Tier 3), "Platform Engineer" (unlock Tier 4)
+- [x] **Tier 1 — Manual Ops (default):** Incidents persist until manually resolved (pay to fix). No auto-resolution.
+- [x] **Tier 2 — Monitoring & Alerting:** Reduced resolution costs (-20%) and incident damage (-15%). Still requires manual action.
+- [x] **Tier 3 — Basic Automation:** Incidents auto-resolve over time. Staff accelerates resolution. Hardware auto-restores on expiry.
+- [x] **Tier 4 — Full Orchestration:** 2x auto-resolve speed, 20% incident prevention, minor incidents auto-resolve instantly.
+- [x] Gate progression behind reputation, suite tier, and tech tree milestones (sequential upgrades)
+- [x] Operations Progression UI section added to OperationsPanel (tier stats, upgrade button, tooltips)
+- [x] 4 achievements: Eyes Everywhere (T2), SRE (T3), Platform Engineer (T4), Predictive (10 prevented)
+- [x] 2 tutorial tips: ops_manual (when 2+ unresolved at T1), ops_tier_available (when upgrade is possible)
+- [x] Per-tick maintenance costs ($5/$15/$30) and resolve cost multiplier applied to resolveIncident
+- [x] Incident effect damage multiplier reduces penalty severity at higher tiers
+- [x] 10 tests covering tier upgrades, requirements, auto-resolve behavior, cost multiplier, and reset
 
 **Effort:** Medium-High | **Impact:** High — Transforms incident management from a passive system into a core progression mechanic. Gives players a strong sense of advancement and makes early game meaningfully challenging.
 
@@ -427,7 +431,7 @@ Compare performance metrics with other players.
 | Phase 5 (Longevity) | 60+ | 60+ | 0 |
 | Rendering & Views | 17 | 17 | 0 |
 | UX / Camera | 6 | 6 | 0 |
-| **Pending Features** | **~31** | **6** | **~25** |
+| **Pending Features** | **~31** | **7** | **~24** |
 
-**Implemented features:** 156+ items across Phases 1–5, rendering, UX, and capacity planning.
-**Remaining features:** ~25 items, including cooling infrastructure redesign, high-effort late-game content (multi-site, scaling tiers, 42U racks), visualization (sub-floor view, sound), and advanced simulation (workload migration, AI training jobs, leaderboards).
+**Implemented features:** 157+ items across Phases 1–5, rendering, UX, capacity planning, and operations progression.
+**Remaining features:** ~24 items, including cooling infrastructure redesign, high-effort late-game content (multi-site, scaling tiers, 42U racks), visualization (sub-floor view, sound), and advanced simulation (workload migration, AI training jobs, leaderboards).

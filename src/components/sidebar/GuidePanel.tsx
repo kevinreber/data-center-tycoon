@@ -171,6 +171,17 @@ export function GuidePanel() {
         </ul>
       </div>
 
+      <div className="rounded-lg border border-neon-orange/20 bg-neon-orange/5 p-3">
+        <p className="text-xs font-bold text-neon-orange mb-2">OPERATIONS PROGRESSION</p>
+        <ul className="text-xs font-mono text-muted-foreground space-y-1 list-disc list-inside">
+          <li><strong className="text-foreground">4 tiers</strong> &mdash; Manual Ops &rarr; Monitoring &rarr; Automation &rarr; Orchestration.</li>
+          <li><strong className="text-foreground">Auto-resolve</strong> &mdash; Tier 3+ auto-resolves incidents over time; Tier 4 at 2x speed.</li>
+          <li><strong className="text-foreground">Cost reduction</strong> &mdash; Higher tiers reduce manual resolve costs and incident damage.</li>
+          <li><strong className="text-foreground">Prevention</strong> &mdash; Tier 4 has 20% chance to prevent incidents entirely.</li>
+          <li><strong className="text-foreground">Requirements</strong> &mdash; Tiers unlock via reputation, suite tier, and tech tree.</li>
+        </ul>
+      </div>
+
       <div className="rounded-lg border border-[#aa44ff]/20 bg-[#aa44ff]/5 p-3">
         <p className="text-xs font-bold text-[#aa44ff] mb-2">CONTRIBUTE</p>
         <p className="text-xs font-mono text-muted-foreground mb-3">
