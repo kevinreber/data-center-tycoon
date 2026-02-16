@@ -110,7 +110,10 @@ class DataCenterScene extends Phaser.Scene {
 
   // Placement mode
   private placementActive = false
+  private placementFacing: CabinetFacing = 'north'
   private placementHighlight: Phaser.GameObjects.Graphics | null = null
+  private placementZoneGraphics: Phaser.GameObjects.Graphics | null = null
+  private placementZoneLabels: Phaser.GameObjects.Text[] = []
   private placementHintText: Phaser.GameObjects.Text | null = null
   private placementModeLabel: Phaser.GameObjects.Text | null = null
   private hoveredTile: { col: number; row: number } | null = null
@@ -294,6 +297,52 @@ class DataCenterScene extends Phaser.Scene {
     return bestId
   }
 
+  /** Draw a filled isometric diamond tile at the given grid position */
+  private drawIsoTile(g: Phaser.GameObjects.Graphics, tileCol: number, tileRow: number, fillColor: number, fillAlpha: number, strokeColor?: number, strokeAlpha?: number) {
+    const { x, y } = this.isoToScreen(tileCol, tileRow)
+    g.fillStyle(fillColor, fillAlpha)
+    g.beginPath()
+    g.moveTo(x, y)
+    g.lineTo(x + TILE_W / 2, y + TILE_H / 2)
+    g.lineTo(x, y + TILE_H)
+    g.lineTo(x - TILE_W / 2, y + TILE_H / 2)
+    g.closePath()
+    g.fillPath()
+    if (strokeColor !== undefined) {
+      g.lineStyle(1.5, strokeColor, strokeAlpha ?? fillAlpha)
+      g.beginPath()
+      g.moveTo(x, y)
+      g.lineTo(x + TILE_W / 2, y + TILE_H / 2)
+      g.lineTo(x, y + TILE_H)
+      g.lineTo(x - TILE_W / 2, y + TILE_H / 2)
+      g.closePath()
+      g.strokePath()
+    }
+  }
+
+  /** Add a small text label centered on a grid tile */
+  private addZoneLabel(tileCol: number, tileRow: number, text: string, color: string, offsetYPx = 0): Phaser.GameObjects.Text {
+    const { x, y } = this.isoToScreen(tileCol, tileRow)
+    const label = this.add
+      .text(x, y + TILE_H / 2 + offsetYPx, text, {
+        fontFamily: 'monospace',
+        fontSize: '6px',
+        color,
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5)
+      .setAlpha(0.7)
+      .setDepth(4)
+    return label
+  }
+
+  /** Clear zone overlay graphics and labels */
+  private clearZoneOverlays() {
+    if (this.placementZoneGraphics) this.placementZoneGraphics.clear()
+    for (const label of this.placementZoneLabels) label.destroy()
+    this.placementZoneLabels = []
+  }
+
   /** Draw hover highlight on grid tile during placement mode */
   private drawPlacementHighlight(col: number, row: number) {
     if (!this.placementHighlight) {
@@ -301,6 +350,12 @@ class DataCenterScene extends Phaser.Scene {
       this.placementHighlight.setDepth(3)
     }
     this.placementHighlight.clear()
+
+    if (!this.placementZoneGraphics) {
+      this.placementZoneGraphics = this.add.graphics()
+      this.placementZoneGraphics.setDepth(2)
+    }
+    this.clearZoneOverlays()
 
     const { x, y } = this.isoToScreen(col, row)
     const occupied = this.occupiedTiles.has(`${col},${row}`)
@@ -323,31 +378,136 @@ class DataCenterScene extends Phaser.Scene {
     if (occupied) {
       color = 0xff4444; alpha = 0.3
     } else if (adjacentCount >= 3) {
-      color = 0xff6600; alpha = 0.3 // amber — surrounded, poor airflow
+      color = 0xff6600; alpha = 0.3
     } else if (adjacentCount >= 2) {
-      color = 0xffaa00; alpha = 0.25 // yellow — getting crowded
+      color = 0xffaa00; alpha = 0.25
     } else {
-      color = 0x00ff88; alpha = 0.25 // green — good spacing
+      color = 0x00ff88; alpha = 0.25
     }
 
-    this.placementHighlight.fillStyle(color, alpha)
-    this.placementHighlight.beginPath()
-    this.placementHighlight.moveTo(x, y)
-    this.placementHighlight.lineTo(x + TILE_W / 2, y + TILE_H / 2)
-    this.placementHighlight.lineTo(x, y + TILE_H)
-    this.placementHighlight.lineTo(x - TILE_W / 2, y + TILE_H / 2)
-    this.placementHighlight.closePath()
-    this.placementHighlight.fillPath()
+    // Draw main hovered tile
+    this.drawIsoTile(this.placementHighlight, col, row, color, alpha, color, occupied ? 0.5 : 0.7)
 
-    // Border glow
-    this.placementHighlight.lineStyle(2, color, occupied ? 0.5 : 0.7)
-    this.placementHighlight.beginPath()
-    this.placementHighlight.moveTo(x, y)
-    this.placementHighlight.lineTo(x + TILE_W / 2, y + TILE_H / 2)
-    this.placementHighlight.lineTo(x, y + TILE_H)
-    this.placementHighlight.lineTo(x - TILE_W / 2, y + TILE_H / 2)
-    this.placementHighlight.closePath()
-    this.placementHighlight.strokePath()
+    // ── Placement zone overlays (only for valid placements) ──
+    if (!occupied) {
+      const facing = this.placementFacing
+      // Determine front (intake/cold) and rear (exhaust/hot) based on facing
+      // North-facing: front = row-1 (cold intake), rear = row+1 (hot exhaust)
+      // South-facing: front = row+1 (cold intake), rear = row-1 (hot exhaust)
+      const frontRow = facing === 'north' ? row - 1 : row + 1
+      const rearRow = facing === 'north' ? row + 1 : row - 1
+      const leftCol = col - 1
+      const rightCol = col + 1
+
+      // Draw facing arrow on the hovered tile
+      const arrowChar = facing === 'north' ? '▲' : '▼'
+      const arrowColor = facing === 'north' ? '#00ccff' : '#ff8844'
+      this.placementZoneLabels.push(
+        this.addZoneLabel(col, row, arrowChar, arrowColor, -3)
+      )
+      // Small facing label below arrow
+      this.placementZoneLabels.push(
+        this.addZoneLabel(col, row, facing === 'north' ? 'INTAKE ▲' : 'INTAKE ▼', arrowColor, 4)
+      )
+
+      // ── Front tile (cold / intake side) ──
+      if (frontRow >= 0 && frontRow < this.cabRows) {
+        const frontKey = `${col},${frontRow}`
+        const frontOccupied = this.occupiedTiles.has(frontKey)
+        if (!frontOccupied) {
+          // Empty tile on intake side — good cold aisle space
+          this.drawIsoTile(this.placementZoneGraphics, col, frontRow, 0x0088ff, 0.15, 0x0088ff, 0.3)
+          this.placementZoneLabels.push(
+            this.addZoneLabel(col, frontRow, 'COLD AISLE', '#4488ff')
+          )
+        } else {
+          // Occupied — intake is blocked, bad for airflow
+          this.drawIsoTile(this.placementZoneGraphics, col, frontRow, 0xff4400, 0.12, 0xff4400, 0.25)
+          this.placementZoneLabels.push(
+            this.addZoneLabel(col, frontRow, 'BLOCKED!', '#ff6644')
+          )
+        }
+      }
+
+      // ── Rear tile (hot / exhaust side) ──
+      if (rearRow >= 0 && rearRow < this.cabRows) {
+        const rearKey = `${col},${rearRow}`
+        const rearOccupied = this.occupiedTiles.has(rearKey)
+        if (!rearOccupied) {
+          // Empty tile on exhaust side — good hot aisle
+          this.drawIsoTile(this.placementZoneGraphics, col, rearRow, 0xff4400, 0.12, 0xff4400, 0.25)
+          this.placementZoneLabels.push(
+            this.addZoneLabel(col, rearRow, 'HOT EXHAUST', '#ff8844')
+          )
+        } else {
+          // Exhaust blocked — heat will build up
+          this.drawIsoTile(this.placementZoneGraphics, col, rearRow, 0xff0000, 0.15, 0xff0000, 0.3)
+          this.placementZoneLabels.push(
+            this.addZoneLabel(col, rearRow, 'EXHAUST BLOCKED!', '#ff4444')
+          )
+        }
+      }
+
+      // ── Side tiles (access for DC techs / cabling) ──
+      for (const sideCol of [leftCol, rightCol]) {
+        if (sideCol < 0 || sideCol >= this.cabCols) continue
+        const sideKey = `${sideCol},${row}`
+        const sideOccupied = this.occupiedTiles.has(sideKey)
+        if (!sideOccupied) {
+          this.drawIsoTile(this.placementZoneGraphics, sideCol, row, 0xffcc00, 0.08, 0xffcc00, 0.15)
+          this.placementZoneLabels.push(
+            this.addZoneLabel(sideCol, row, 'ACCESS', '#aaaa44')
+          )
+        }
+      }
+
+      // ── Show existing neighbor cabinets' airflow zones ──
+      // This helps users understand how their new cabinet interacts with existing ones
+      for (const entry of this.cabEntries.values()) {
+        const dist = Math.abs(entry.col - col) + Math.abs(entry.row - row)
+        if (dist > 2) continue // only show for nearby cabinets
+
+        // Draw the existing cabinet's exhaust direction
+        const entryFront = entry.facing === 'north' ? entry.row - 1 : entry.row + 1
+        const entryRear = entry.facing === 'north' ? entry.row + 1 : entry.row - 1
+
+        // Draw a small directional arrow from the existing cabinet showing its airflow
+        const neighborExhaustRow = entryRear
+        if (neighborExhaustRow >= 0 && neighborExhaustRow < this.cabRows) {
+          const exhaustKey = `${entry.col},${neighborExhaustRow}`
+          const isHoveredTile = entry.col === col && neighborExhaustRow === row
+          const isOccupied = this.occupiedTiles.has(exhaustKey)
+          // Only draw if the exhaust goes into unoccupied space (or into the hovered tile)
+          if (!isOccupied || isHoveredTile) {
+            // Draw subtle exhaust flow indicator from existing cabinet
+            const { x: ex, y: ey } = this.isoToScreen(entry.col, entry.row)
+            const { x: tx, y: ty } = this.isoToScreen(entry.col, neighborExhaustRow)
+            this.placementZoneGraphics.lineStyle(1, 0xff6644, 0.3)
+            this.placementZoneGraphics.lineBetween(
+              ex, ey + TILE_H / 2,
+              tx, ty + TILE_H / 2,
+            )
+          }
+        }
+
+        // Draw intake flow indicator
+        const neighborIntakeRow = entryFront
+        if (neighborIntakeRow >= 0 && neighborIntakeRow < this.cabRows) {
+          const intakeKey = `${entry.col},${neighborIntakeRow}`
+          const isHoveredTile = entry.col === col && neighborIntakeRow === row
+          const isOccupied = this.occupiedTiles.has(intakeKey)
+          if (!isOccupied || isHoveredTile) {
+            const { x: ex, y: ey } = this.isoToScreen(entry.col, entry.row)
+            const { x: tx, y: ty } = this.isoToScreen(entry.col, neighborIntakeRow)
+            this.placementZoneGraphics.lineStyle(1, 0x0088ff, 0.25)
+            this.placementZoneGraphics.lineBetween(
+              ex, ey + TILE_H / 2,
+              tx, ty + TILE_H / 2,
+            )
+          }
+        }
+      }
+    }
 
     // Show hint text
     if (this.onTileHover && !occupied) {
@@ -1133,6 +1293,7 @@ class DataCenterScene extends Phaser.Scene {
       if (this.placementHighlight) {
         this.placementHighlight.clear()
       }
+      this.clearZoneOverlays()
       if (this.placementHintText) {
         this.placementHintText.setVisible(false)
       }
@@ -1152,6 +1313,15 @@ class DataCenterScene extends Phaser.Scene {
         .setOrigin(0.5)
         .setAlpha(0.8)
         .setDepth(100)
+    }
+  }
+
+  /** Update placement facing direction (synced from React store) */
+  setPlacementFacing(facing: CabinetFacing) {
+    this.placementFacing = facing
+    // Re-draw highlight if we're already hovering a tile
+    if (this.placementActive && this.hoveredTile) {
+      this.drawPlacementHighlight(this.hoveredTile.col, this.hoveredTile.row)
     }
   }
 
