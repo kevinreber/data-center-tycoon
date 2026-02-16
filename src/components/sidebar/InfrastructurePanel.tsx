@@ -227,7 +227,7 @@ export function InfrastructurePanel() {
           </div>
           {aisleViolations > 0 && (
             <p className="text-xs text-neon-orange/80 flex items-center gap-1">
-              <AlertTriangle className="size-3" />Mixed facings in {aisleViolations} row{aisleViolations > 1 ? 's' : ''}
+              <AlertTriangle className="size-3" />Mixed facings in {aisleViolations} group{aisleViolations > 1 ? 's' : ''}
             </p>
           )}
           {cabinets.length > 0 && (
@@ -243,10 +243,10 @@ export function InfrastructurePanel() {
                           variant="ghost"
                           size="xs"
                           onClick={() => toggleCabinetFacing(c.id)}
-                          className={`text-xs p-0 h-auto ${c.facing === 'north' ? 'text-neon-cyan' : 'text-neon-orange'}`}
+                          className={`text-xs p-0 h-auto ${c.facing === 'north' || c.facing === 'east' ? 'text-neon-cyan' : 'text-neon-orange'}`}
                         >
                           <ArrowUpDown className="size-3 mr-0.5" />
-                          {c.facing === 'north' ? '↑ N' : '↓ S'}
+                          {{ north: '↑ N', south: '↓ S', east: '→ E', west: '← W' }[c.facing]}
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent side="right">Click to flip</TooltipContent>

@@ -190,7 +190,7 @@ describe('cabinet placement', () => {
       const hints = getPlacementHints(0, 0, [], 'starter')
       const messages = hints.map((h) => h.message)
       expect(messages.some(m => m.includes('Open placement'))).toBe(true)
-      expect(messages.some(m => m.includes('Leave rows between cabinets'))).toBe(true)
+      expect(messages.some(m => m.includes('Leave gaps between cabinets'))).toBe(true)
     })
 
     it('returns aisle facing hint when row has existing cabinets', () => {

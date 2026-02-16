@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import type { LayerVisibility, LayerOpacity, LayerColors, LayerColorOverrides, TrafficLink, CabinetEnvironment, CabinetFacing, PlacementHint } from '@/stores/gameStore'
-import { DEFAULT_COLORS, ENVIRONMENT_CONFIG, MAX_SERVERS_PER_CABINET } from '@/stores/gameStore'
+import { DEFAULT_COLORS, ENVIRONMENT_CONFIG, MAX_SERVERS_PER_CABINET, getFacingOffsets } from '@/stores/gameStore'
 
 const COLORS = DEFAULT_COLORS
 
@@ -34,6 +34,11 @@ const CABINET_COLORS = { top: 0x667788, side: 0x4a5a6a, front: 0x3d4d5d }
 const SPINE_W = 50
 const SPINE_H = 25
 const SPINE_DEPTH = 16
+
+// Facing direction display helpers
+const FACING_ARROW: Record<CabinetFacing, string> = { north: '▲', south: '▼', east: '►', west: '◄' }
+const FACING_COLOR: Record<CabinetFacing, string> = { north: '#00ccff', south: '#ff8844', east: '#00ccff', west: '#ff8844' }
+const FACING_LABEL: Record<CabinetFacing, string> = { north: 'INTAKE ▲', south: 'INTAKE ▼', east: 'INTAKE ►', west: 'INTAKE ◄' }
 
 
 interface CabinetEntry {
@@ -393,119 +398,82 @@ class DataCenterScene extends Phaser.Scene {
     // ── Placement zone overlays (only for valid placements) ──
     if (!occupied) {
       const facing = this.placementFacing
-      // Determine front (intake/cold) and rear (exhaust/hot) based on facing
-      // North-facing: front = row-1 (cold intake), rear = row+1 (hot exhaust)
-      // South-facing: front = row+1 (cold intake), rear = row-1 (hot exhaust)
-      const frontRow = facing === 'north' ? row - 1 : row + 1
-      const rearRow = facing === 'north' ? row + 1 : row - 1
-      const leftCol = col - 1
-      const rightCol = col + 1
+      const offsets = getFacingOffsets(facing, col, row)
 
       // Draw facing arrow on the hovered tile
-      const arrowChar = facing === 'north' ? '▲' : '▼'
-      const arrowColor = facing === 'north' ? '#00ccff' : '#ff8844'
       this.placementZoneLabels.push(
-        this.addZoneLabel(col, row, arrowChar, arrowColor, -3)
+        this.addZoneLabel(col, row, FACING_ARROW[facing], FACING_COLOR[facing], -3)
       )
-      // Small facing label below arrow
       this.placementZoneLabels.push(
-        this.addZoneLabel(col, row, facing === 'north' ? 'INTAKE ▲' : 'INTAKE ▼', arrowColor, 4)
+        this.addZoneLabel(col, row, FACING_LABEL[facing], FACING_COLOR[facing], 4)
       )
 
       // ── Front tile (cold / intake side) ──
-      if (frontRow >= 0 && frontRow < this.cabRows) {
-        const frontKey = `${col},${frontRow}`
-        const frontOccupied = this.occupiedTiles.has(frontKey)
+      const f = offsets.front
+      if (f.col >= 0 && f.col < this.cabCols && f.row >= 0 && f.row < this.cabRows) {
+        const frontOccupied = this.occupiedTiles.has(`${f.col},${f.row}`)
         if (!frontOccupied) {
-          // Empty tile on intake side — good cold aisle space
-          this.drawIsoTile(this.placementZoneGraphics, col, frontRow, 0x0088ff, 0.15, 0x0088ff, 0.3)
-          this.placementZoneLabels.push(
-            this.addZoneLabel(col, frontRow, 'COLD AISLE', '#4488ff')
-          )
+          this.drawIsoTile(this.placementZoneGraphics, f.col, f.row, 0x0088ff, 0.15, 0x0088ff, 0.3)
+          this.placementZoneLabels.push(this.addZoneLabel(f.col, f.row, 'COLD AISLE', '#4488ff'))
         } else {
-          // Occupied — intake is blocked, bad for airflow
-          this.drawIsoTile(this.placementZoneGraphics, col, frontRow, 0xff4400, 0.12, 0xff4400, 0.25)
-          this.placementZoneLabels.push(
-            this.addZoneLabel(col, frontRow, 'BLOCKED!', '#ff6644')
-          )
+          this.drawIsoTile(this.placementZoneGraphics, f.col, f.row, 0xff4400, 0.12, 0xff4400, 0.25)
+          this.placementZoneLabels.push(this.addZoneLabel(f.col, f.row, 'BLOCKED!', '#ff6644'))
         }
       }
 
       // ── Rear tile (hot / exhaust side) ──
-      if (rearRow >= 0 && rearRow < this.cabRows) {
-        const rearKey = `${col},${rearRow}`
-        const rearOccupied = this.occupiedTiles.has(rearKey)
+      const r = offsets.rear
+      if (r.col >= 0 && r.col < this.cabCols && r.row >= 0 && r.row < this.cabRows) {
+        const rearOccupied = this.occupiedTiles.has(`${r.col},${r.row}`)
         if (!rearOccupied) {
-          // Empty tile on exhaust side — good hot aisle
-          this.drawIsoTile(this.placementZoneGraphics, col, rearRow, 0xff4400, 0.12, 0xff4400, 0.25)
-          this.placementZoneLabels.push(
-            this.addZoneLabel(col, rearRow, 'HOT EXHAUST', '#ff8844')
-          )
+          this.drawIsoTile(this.placementZoneGraphics, r.col, r.row, 0xff4400, 0.12, 0xff4400, 0.25)
+          this.placementZoneLabels.push(this.addZoneLabel(r.col, r.row, 'HOT EXHAUST', '#ff8844'))
         } else {
-          // Exhaust blocked — heat will build up
-          this.drawIsoTile(this.placementZoneGraphics, col, rearRow, 0xff0000, 0.15, 0xff0000, 0.3)
-          this.placementZoneLabels.push(
-            this.addZoneLabel(col, rearRow, 'EXHAUST BLOCKED!', '#ff4444')
-          )
+          this.drawIsoTile(this.placementZoneGraphics, r.col, r.row, 0xff0000, 0.15, 0xff0000, 0.3)
+          this.placementZoneLabels.push(this.addZoneLabel(r.col, r.row, 'EXHAUST BLOCKED!', '#ff4444'))
         }
       }
 
       // ── Side tiles (access for DC techs / cabling) ──
-      for (const sideCol of [leftCol, rightCol]) {
-        if (sideCol < 0 || sideCol >= this.cabCols) continue
-        const sideKey = `${sideCol},${row}`
-        const sideOccupied = this.occupiedTiles.has(sideKey)
+      for (const side of offsets.sides) {
+        if (side.col < 0 || side.col >= this.cabCols || side.row < 0 || side.row >= this.cabRows) continue
+        const sideOccupied = this.occupiedTiles.has(`${side.col},${side.row}`)
         if (!sideOccupied) {
-          this.drawIsoTile(this.placementZoneGraphics, sideCol, row, 0xffcc00, 0.08, 0xffcc00, 0.15)
-          this.placementZoneLabels.push(
-            this.addZoneLabel(sideCol, row, 'ACCESS', '#aaaa44')
-          )
+          this.drawIsoTile(this.placementZoneGraphics, side.col, side.row, 0xffcc00, 0.08, 0xffcc00, 0.15)
+          this.placementZoneLabels.push(this.addZoneLabel(side.col, side.row, 'ACCESS', '#aaaa44'))
         }
       }
 
       // ── Show existing neighbor cabinets' airflow zones ──
-      // This helps users understand how their new cabinet interacts with existing ones
       for (const entry of this.cabEntries.values()) {
         const dist = Math.abs(entry.col - col) + Math.abs(entry.row - row)
-        if (dist > 2) continue // only show for nearby cabinets
+        if (dist > 2) continue
 
-        // Draw the existing cabinet's exhaust direction
-        const entryFront = entry.facing === 'north' ? entry.row - 1 : entry.row + 1
-        const entryRear = entry.facing === 'north' ? entry.row + 1 : entry.row - 1
+        const entryOffsets = getFacingOffsets(entry.facing, entry.col, entry.row)
 
-        // Draw a small directional arrow from the existing cabinet showing its airflow
-        const neighborExhaustRow = entryRear
-        if (neighborExhaustRow >= 0 && neighborExhaustRow < this.cabRows) {
-          const exhaustKey = `${entry.col},${neighborExhaustRow}`
-          const isHoveredTile = entry.col === col && neighborExhaustRow === row
-          const isOccupied = this.occupiedTiles.has(exhaustKey)
-          // Only draw if the exhaust goes into unoccupied space (or into the hovered tile)
+        // Draw exhaust flow indicator
+        const er = entryOffsets.rear
+        if (er.col >= 0 && er.col < this.cabCols && er.row >= 0 && er.row < this.cabRows) {
+          const isHoveredTile = er.col === col && er.row === row
+          const isOccupied = this.occupiedTiles.has(`${er.col},${er.row}`)
           if (!isOccupied || isHoveredTile) {
-            // Draw subtle exhaust flow indicator from existing cabinet
             const { x: ex, y: ey } = this.isoToScreen(entry.col, entry.row)
-            const { x: tx, y: ty } = this.isoToScreen(entry.col, neighborExhaustRow)
+            const { x: tx, y: ty } = this.isoToScreen(er.col, er.row)
             this.placementZoneGraphics.lineStyle(1, 0xff6644, 0.3)
-            this.placementZoneGraphics.lineBetween(
-              ex, ey + TILE_H / 2,
-              tx, ty + TILE_H / 2,
-            )
+            this.placementZoneGraphics.lineBetween(ex, ey + TILE_H / 2, tx, ty + TILE_H / 2)
           }
         }
 
         // Draw intake flow indicator
-        const neighborIntakeRow = entryFront
-        if (neighborIntakeRow >= 0 && neighborIntakeRow < this.cabRows) {
-          const intakeKey = `${entry.col},${neighborIntakeRow}`
-          const isHoveredTile = entry.col === col && neighborIntakeRow === row
-          const isOccupied = this.occupiedTiles.has(intakeKey)
+        const ef = entryOffsets.front
+        if (ef.col >= 0 && ef.col < this.cabCols && ef.row >= 0 && ef.row < this.cabRows) {
+          const isHoveredTile = ef.col === col && ef.row === row
+          const isOccupied = this.occupiedTiles.has(`${ef.col},${ef.row}`)
           if (!isOccupied || isHoveredTile) {
             const { x: ex, y: ey } = this.isoToScreen(entry.col, entry.row)
-            const { x: tx, y: ty } = this.isoToScreen(entry.col, neighborIntakeRow)
+            const { x: tx, y: ty } = this.isoToScreen(ef.col, ef.row)
             this.placementZoneGraphics.lineStyle(1, 0x0088ff, 0.25)
-            this.placementZoneGraphics.lineBetween(
-              ex, ey + TILE_H / 2,
-              tx, ty + TILE_H / 2,
-            )
+            this.placementZoneGraphics.lineBetween(ex, ey + TILE_H / 2, tx, ty + TILE_H / 2)
           }
         }
       }
@@ -919,8 +887,8 @@ class DataCenterScene extends Phaser.Scene {
     // Facing direction indicator (small arrow for hot/cold aisle)
     const oldFacing = this.facingIndicators.get(entry.id)
     if (oldFacing) oldFacing.destroy()
-    const facingArrow = entry.facing === 'north' ? '▲' : '▼'
-    const facingColor = entry.facing === 'north' ? '#00ccff' : '#ff8844'
+    const facingArrow = FACING_ARROW[entry.facing]
+    const facingColor = FACING_COLOR[entry.facing]
     const facingLabel = this.add
       .text(cx + CUBE_W / 2 - 2, topY + 4, facingArrow, {
         fontFamily: 'monospace',
@@ -1500,64 +1468,53 @@ class DataCenterScene extends Phaser.Scene {
       this.placementZoneGraphics.setDepth(2)
     }
 
-    const frontRow = facing === 'north' ? row - 1 : row + 1
-    const rearRow = facing === 'north' ? row + 1 : row - 1
-    const leftCol = col - 1
-    const rightCol = col + 1
+    const offsets = getFacingOffsets(facing, col, row)
+    const f = offsets.front
+    const r = offsets.rear
 
     // Front tile (cold / intake side)
-    if (frontRow >= 0 && frontRow < this.cabRows) {
-      const frontOccupied = this.occupiedTiles.has(`${col},${frontRow}`)
+    if (f.col >= 0 && f.col < this.cabCols && f.row >= 0 && f.row < this.cabRows) {
+      const frontOccupied = this.occupiedTiles.has(`${f.col},${f.row}`)
       if (!frontOccupied) {
-        this.drawIsoTile(this.placementZoneGraphics, col, frontRow, 0x0088ff, 0.12, 0x0088ff, 0.25)
-        this.placementZoneLabels.push(
-          this.addZoneLabel(col, frontRow, 'COLD AISLE', '#4488ff')
-        )
+        this.drawIsoTile(this.placementZoneGraphics, f.col, f.row, 0x0088ff, 0.12, 0x0088ff, 0.25)
+        this.placementZoneLabels.push(this.addZoneLabel(f.col, f.row, 'COLD AISLE', '#4488ff'))
       } else {
-        this.drawIsoTile(this.placementZoneGraphics, col, frontRow, 0xff4400, 0.10, 0xff4400, 0.2)
-        this.placementZoneLabels.push(
-          this.addZoneLabel(col, frontRow, 'INTAKE BLOCKED', '#ff6644')
-        )
+        this.drawIsoTile(this.placementZoneGraphics, f.col, f.row, 0xff4400, 0.10, 0xff4400, 0.2)
+        this.placementZoneLabels.push(this.addZoneLabel(f.col, f.row, 'INTAKE BLOCKED', '#ff6644'))
       }
     }
 
     // Rear tile (hot / exhaust side)
-    if (rearRow >= 0 && rearRow < this.cabRows) {
-      const rearOccupied = this.occupiedTiles.has(`${col},${rearRow}`)
+    if (r.col >= 0 && r.col < this.cabCols && r.row >= 0 && r.row < this.cabRows) {
+      const rearOccupied = this.occupiedTiles.has(`${r.col},${r.row}`)
       if (!rearOccupied) {
-        this.drawIsoTile(this.placementZoneGraphics, col, rearRow, 0xff4400, 0.10, 0xff4400, 0.2)
-        this.placementZoneLabels.push(
-          this.addZoneLabel(col, rearRow, 'HOT EXHAUST', '#ff8844')
-        )
+        this.drawIsoTile(this.placementZoneGraphics, r.col, r.row, 0xff4400, 0.10, 0xff4400, 0.2)
+        this.placementZoneLabels.push(this.addZoneLabel(r.col, r.row, 'HOT EXHAUST', '#ff8844'))
       } else {
-        this.drawIsoTile(this.placementZoneGraphics, col, rearRow, 0xff0000, 0.12, 0xff0000, 0.25)
-        this.placementZoneLabels.push(
-          this.addZoneLabel(col, rearRow, 'EXHAUST BLOCKED', '#ff4444')
-        )
+        this.drawIsoTile(this.placementZoneGraphics, r.col, r.row, 0xff0000, 0.12, 0xff0000, 0.25)
+        this.placementZoneLabels.push(this.addZoneLabel(r.col, r.row, 'EXHAUST BLOCKED', '#ff4444'))
       }
     }
 
     // Side tiles (access)
-    for (const sideCol of [leftCol, rightCol]) {
-      if (sideCol < 0 || sideCol >= this.cabCols) continue
-      const sideOccupied = this.occupiedTiles.has(`${sideCol},${row}`)
+    for (const side of offsets.sides) {
+      if (side.col < 0 || side.col >= this.cabCols || side.row < 0 || side.row >= this.cabRows) continue
+      const sideOccupied = this.occupiedTiles.has(`${side.col},${side.row}`)
       if (!sideOccupied) {
-        this.drawIsoTile(this.placementZoneGraphics, sideCol, row, 0xffcc00, 0.06, 0xffcc00, 0.12)
-        this.placementZoneLabels.push(
-          this.addZoneLabel(sideCol, row, 'ACCESS', '#aaaa44')
-        )
+        this.drawIsoTile(this.placementZoneGraphics, side.col, side.row, 0xffcc00, 0.06, 0xffcc00, 0.12)
+        this.placementZoneLabels.push(this.addZoneLabel(side.col, side.row, 'ACCESS', '#aaaa44'))
       }
     }
 
     // Draw airflow direction lines from the cabinet
     const { x: cx, y: cy } = this.isoToScreen(col, row)
-    if (frontRow >= 0 && frontRow < this.cabRows) {
-      const { x: fx, y: fy } = this.isoToScreen(col, frontRow)
+    if (f.col >= 0 && f.col < this.cabCols && f.row >= 0 && f.row < this.cabRows) {
+      const { x: fx, y: fy } = this.isoToScreen(f.col, f.row)
       this.placementZoneGraphics.lineStyle(1.5, 0x0088ff, 0.35)
       this.placementZoneGraphics.lineBetween(cx, cy + TILE_H / 2, fx, fy + TILE_H / 2)
     }
-    if (rearRow >= 0 && rearRow < this.cabRows) {
-      const { x: rx, y: ry } = this.isoToScreen(col, rearRow)
+    if (r.col >= 0 && r.col < this.cabCols && r.row >= 0 && r.row < this.cabRows) {
+      const { x: rx, y: ry } = this.isoToScreen(r.col, r.row)
       this.placementZoneGraphics.lineStyle(1.5, 0xff6644, 0.35)
       this.placementZoneGraphics.lineBetween(cx, cy + TILE_H / 2, rx, ry + TILE_H / 2)
     }

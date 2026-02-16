@@ -3,7 +3,7 @@ import { useGameStore, RACK_COST, MAX_SERVERS_PER_CABINET, SIM, ENVIRONMENT_CONF
 import type { CabinetEnvironment, CustomerType, SuppressionType, TechBranch, CabinetFacing, StaffRole, StaffSkillLevel, ShiftPattern } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Server, Network, Power, Cpu, Plus, TrendingUp, TrendingDown, DollarSign, ArrowRightLeft, AlertTriangle, Radio, Info, Shield, Clock, Zap, Droplets, Landmark, Siren, Trophy, Wrench, FileText, Check, Fuel, Flame, FlaskConical, Star, RefreshCw, Lock, Building, MousePointer, X, Plug, Cable, ArrowUpDown, Thermometer, Save, Upload, RotateCw, Play, Map, Target, Briefcase, Snowflake, Wifi, Award, Users, UserPlus, GraduationCap, Moon, Sun, Trash2, CloudRain, Package, Volume2, BarChart3, BookOpen, Gauge, Globe, HardDrive, ShieldCheck } from 'lucide-react'
+import { Server, Network, Power, Cpu, Plus, TrendingUp, TrendingDown, DollarSign, ArrowRightLeft, AlertTriangle, Radio, Info, Shield, Clock, Zap, Droplets, Landmark, Siren, Trophy, Wrench, FileText, Check, Fuel, Flame, FlaskConical, Star, RefreshCw, Lock, Building, MousePointer, X, Plug, Cable, Thermometer, Save, Upload, RotateCw, Play, Map, Target, Briefcase, Snowflake, Wifi, Award, Users, UserPlus, GraduationCap, Moon, Sun, Trash2, CloudRain, Package, Volume2, BarChart3, BookOpen, Gauge, Globe, HardDrive, ShieldCheck } from 'lucide-react'
 import {
   Tooltip,
   TooltipContent,
@@ -234,7 +234,7 @@ export function HUD() {
               <div className="flex flex-col gap-1.5">
                 <span className="text-xs text-muted-foreground">Facing:</span>
                 <div className="flex gap-1">
-                  {(['north', 'south'] as CabinetFacing[]).map((dir) => (
+                  {(['north', 'east', 'south', 'west'] as CabinetFacing[]).map((dir) => (
                     <Tooltip key={dir}>
                       <TooltipTrigger asChild>
                         <Button
@@ -247,14 +247,14 @@ export function HUD() {
                               : 'border border-border/50 opacity-50 hover:opacity-80'
                           }`}
                         >
-                          <ArrowUpDown className="size-3 mr-1" />
-                          {dir === 'north' ? 'North' : 'South'}
+                          {{ north: '↑', east: '→', south: '↓', west: '←' }[dir]}{' '}
+                          {dir.charAt(0).toUpperCase()}
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent side="bottom" className="max-w-52">
-                        <p className="font-bold">Face {dir === 'north' ? 'North' : 'South'}</p>
+                        <p className="font-bold">Face {dir.charAt(0).toUpperCase() + dir.slice(1)}</p>
                         <p className="text-xs mt-1">
-                          Cabinet exhaust faces {dir}. Align adjacent rows with opposing faces to create proper hot/cold aisles for cooling efficiency.
+                          Cabinet intake faces {dir}. Align adjacent rows/columns with opposing faces for hot/cold aisle cooling.
                         </p>
                       </TooltipContent>
                     </Tooltip>
@@ -1872,12 +1872,12 @@ export function HUD() {
                               variant="ghost"
                               size="xs"
                               onClick={() => toggleCabinetFacing(c.id)}
-                              className={`text-xs p-0 h-auto ${c.facing === 'north' ? 'text-neon-cyan' : 'text-neon-orange'}`}
+                              className={`text-xs p-0 h-auto ${c.facing === 'north' || c.facing === 'east' ? 'text-neon-cyan' : 'text-neon-orange'}`}
                             >
-                              {c.facing === 'north' ? '↑ N' : '↓ S'}
+                              {{ north: '↑ N', south: '↓ S', east: '→ E', west: '← W' }[c.facing]}
                             </Button>
                           </TooltipTrigger>
-                          <TooltipContent side="bottom">Click to flip facing</TooltipContent>
+                          <TooltipContent side="bottom">Click to rotate facing</TooltipContent>
                         </Tooltip>
                       </div>
                     ))}

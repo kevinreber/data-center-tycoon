@@ -24,6 +24,7 @@ import {
   hasMaintenanceAccess,
   calcSpacingHeatEffect,
   calcAisleBonus,
+  getFacingOffsets,
 } from '@/stores/gameStore'
 
 // Helper to get/set store state
@@ -1316,5 +1317,71 @@ describe('Spacing & Layout', () => {
       expect(cab.col).toBeLessThan(5)
       expect(cab.row).toBeLessThan(5)
     }
+  })
+
+  it('getFacingOffsets returns correct positions for all 4 directions', () => {
+    const n = getFacingOffsets('north', 3, 3)
+    expect(n.front).toEqual({ col: 3, row: 2 }) // front is row-1
+    expect(n.rear).toEqual({ col: 3, row: 4 })  // rear is row+1
+
+    const s = getFacingOffsets('south', 3, 3)
+    expect(s.front).toEqual({ col: 3, row: 4 }) // front is row+1
+    expect(s.rear).toEqual({ col: 3, row: 2 })  // rear is row-1
+
+    const e = getFacingOffsets('east', 3, 3)
+    expect(e.front).toEqual({ col: 4, row: 3 }) // front is col+1
+    expect(e.rear).toEqual({ col: 2, row: 3 })  // rear is col-1
+
+    const w = getFacingOffsets('west', 3, 3)
+    expect(w.front).toEqual({ col: 2, row: 3 }) // front is col-1
+    expect(w.rear).toEqual({ col: 4, row: 3 })  // rear is col+1
+  })
+
+  it('calcAisleBonus supports column-based E/W aisles', () => {
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'standard' })
+
+    // Column 1 facing east, column 3 facing west (gap of 1 column between them)
+    getState().addCabinet(1, 0, 'production', 'general', 'east')
+    getState().addCabinet(1, 1, 'production', 'general', 'east')
+    getState().addCabinet(3, 0, 'production', 'general', 'west')
+    getState().addCabinet(3, 1, 'production', 'general', 'west')
+
+    const bonus = calcAisleBonus(getState().cabinets)
+    expect(bonus).toBeGreaterThan(0) // should get column-based aisle bonus
+  })
+
+  it('calcSpacingHeatEffect works for east-facing cabinet', () => {
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'standard' })
+    getState().addCabinet(3, 3, 'production', 'general', 'east')
+
+    const cabs = getState().cabinets
+    const cab = cabs[0]
+    const effect = calcSpacingHeatEffect(cab, cabs)
+
+    // Isolated east-facing: front (col+1) and rear (col-1) both empty
+    expect(effect).toBeLessThan(0)
+  })
+
+  it('togglePlacementFacing cycles through all 4 directions', () => {
+    expect(getState().placementFacing).toBe('north')
+    getState().togglePlacementFacing()
+    expect(getState().placementFacing).toBe('east')
+    getState().togglePlacementFacing()
+    expect(getState().placementFacing).toBe('south')
+    getState().togglePlacementFacing()
+    expect(getState().placementFacing).toBe('west')
+    getState().togglePlacementFacing()
+    expect(getState().placementFacing).toBe('north')
+  })
+
+  it('can place cabinets with east/west facing', () => {
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'standard' })
+    getState().addCabinet(2, 2, 'production', 'general', 'east')
+    getState().addCabinet(4, 2, 'production', 'general', 'west')
+
+    const cabs = getState().cabinets
+    expect(cabs).toHaveLength(2)
+    expect(cabs[0].facing).toBe('east')
+    expect(cabs[1].facing).toBe('west')
   })
 })

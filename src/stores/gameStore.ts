@@ -244,7 +244,7 @@ export const DEPRECIATION = {
 // ── Infrastructure Layout Types ──────────────────────────────
 
 /** Cabinet facing direction for hot/cold aisle enforcement */
-export type CabinetFacing = 'north' | 'south'
+export type CabinetFacing = 'north' | 'south' | 'east' | 'west'
 
 /** Power Distribution Unit placed on the grid */
 export interface PDU {
@@ -1038,7 +1038,7 @@ export const TUTORIAL_TIPS: TutorialTip[] = [
   { id: 'no_leaf_switch', title: 'No Network', message: 'Cabinets without leaf switches cannot connect to the network fabric.', category: 'network' },
   { id: 'no_spine', title: 'No Backbone', message: 'You need spine switches to complete the network fabric and route traffic.', category: 'network' },
   { id: 'first_incident', title: 'Incident!', message: 'Incidents happen! Resolve them quickly by clicking the resolve button to minimize damage.', category: 'incidents' },
-  { id: 'aisle_hint', title: 'Aisle Layout', message: 'Tip: Alternate cabinet facing (N/S) in adjacent rows for a hot/cold aisle cooling bonus.', category: 'build' },
+  { id: 'aisle_hint', title: 'Aisle Layout', message: 'Tip: Alternate cabinet facing in adjacent rows or columns for a hot/cold aisle cooling bonus. Use N/S for row aisles or E/W for column aisles.', category: 'build' },
   { id: 'first_contract', title: 'Contracts', message: 'Contracts provide bonus revenue but require meeting SLA targets. Monitor your temp and server count!', category: 'contracts' },
   { id: 'first_order_arrived', title: 'Order Delivered!', message: 'Your first supply chain order has arrived! Stock up on inventory before shortages hit to avoid price spikes.', category: 'build' },
   { id: 'weather_hot', title: 'Heat Wave!', message: 'Hot weather is increasing ambient temperature. Your cooling systems need to work harder — consider water cooling.', category: 'cooling' },
@@ -1437,13 +1437,19 @@ export function getPlacementHints(
 
   // Aisle gap guidance
   const rowCabs = cabinets.filter((c) => c.row === row)
+  const colCabs = cabinets.filter((c) => c.col === col)
   const adjacentRowNorth = cabinets.filter((c) => c.row === row - 1)
   const adjacentRowSouth = cabinets.filter((c) => c.row === row + 1)
+  const adjacentColWest = cabinets.filter((c) => c.col === col - 1)
+  const adjacentColEast = cabinets.filter((c) => c.col === col + 1)
   if (adjacentRowNorth.length > 0 && adjacentRowSouth.length > 0) {
     hints.push({ message: 'Between two cabinet rows — consider leaving as an aisle for DC techs', type: 'warning' })
   }
+  if (adjacentColWest.length > 0 && adjacentColEast.length > 0) {
+    hints.push({ message: 'Between two cabinet columns — consider leaving as an aisle', type: 'warning' })
+  }
 
-  // Row facing consistency
+  // Row/column facing consistency
   if (rowCabs.length > 0) {
     const rowFacings = new Set(rowCabs.map((c) => c.facing))
     if (rowFacings.size === 1) {
@@ -1451,10 +1457,17 @@ export function getPlacementHints(
       hints.push({ message: `Row faces ${facing} — match facing for aisle consistency`, type: 'info' })
     }
   }
+  if (colCabs.length > 0) {
+    const colFacings = new Set(colCabs.filter((c) => c.facing === 'east' || c.facing === 'west').map((c) => c.facing))
+    if (colFacings.size === 1) {
+      const facing = [...colFacings][0]
+      hints.push({ message: `Column faces ${facing} — match facing for aisle consistency`, type: 'info' })
+    }
+  }
 
-  // Aisle spacing hint: suggest leaving empty rows between cabinet rows
+  // Aisle spacing hint: suggest leaving gaps between cabinet groups
   if (cabinets.length === 0) {
-    hints.push({ message: 'Leave rows between cabinets for aisles — DC techs need walkway access', type: 'tip' })
+    hints.push({ message: 'Leave gaps between cabinets for aisles — DC techs need walkway access', type: 'tip' })
   } else if (cabinets.length >= 2 && cabinets.length < 6) {
     const cabRows = [...new Set(cabinets.map((c) => c.row))].sort((a, b) => a - b)
     if (cabRows.length >= 2) {
@@ -1583,42 +1596,85 @@ function calcCableLength(cabCol: number, cabRow: number, _spineSlot: number, gri
   return cabRow + 1 + Math.abs(cabCol - Math.floor(gridRows / 2))
 }
 
+/** Get the front (intake) and rear (exhaust) tile offsets for a given facing direction.
+ *  For N/S facing: front/rear are row offsets, sides are column offsets.
+ *  For E/W facing: front/rear are column offsets, sides are row offsets. */
+export function getFacingOffsets(facing: CabinetFacing, col: number, row: number) {
+  switch (facing) {
+    case 'north': return { front: { col, row: row - 1 }, rear: { col, row: row + 1 }, sides: [{ col: col - 1, row }, { col: col + 1, row }] }
+    case 'south': return { front: { col, row: row + 1 }, rear: { col, row: row - 1 }, sides: [{ col: col - 1, row }, { col: col + 1, row }] }
+    case 'east':  return { front: { col: col + 1, row }, rear: { col: col - 1, row }, sides: [{ col, row: row - 1 }, { col, row: row + 1 }] }
+    case 'west':  return { front: { col: col - 1, row }, rear: { col: col + 1, row }, sides: [{ col, row: row - 1 }, { col, row: row + 1 }] }
+  }
+}
+
+/** Check if a facing direction aligns along the row axis (N/S) or column axis (E/W) */
+function isRowAligned(facing: CabinetFacing): boolean {
+  return facing === 'north' || facing === 'south'
+}
+
 /** Calculate hot/cold aisle cooling bonus based on cabinet layout.
- *  Enhanced: rewards actual physical gaps between cabinet rows (proper aisles for walkways). */
+ *  Enhanced: rewards actual physical gaps between cabinet rows/columns (proper aisles for walkways).
+ *  Supports both row-aligned (N/S) and column-aligned (E/W) aisle patterns. */
 export function calcAisleBonus(cabinets: Cabinet[]): number {
   if (cabinets.length < 2) return 0
 
-  // Group cabinets by row
-  const rowMap = new Map<number, Cabinet[]>()
-  for (const cab of cabinets) {
-    const list = rowMap.get(cab.row) ?? []
-    list.push(cab)
-    rowMap.set(cab.row, list)
+  let bonus = 0
+
+  // ── Row-based aisles (N/S facing cabinets) ──
+  const rowAligned = cabinets.filter((c) => isRowAligned(c.facing))
+  if (rowAligned.length >= 2) {
+    const rowMap = new Map<number, Cabinet[]>()
+    for (const cab of rowAligned) {
+      const list = rowMap.get(cab.row) ?? []
+      list.push(cab)
+      rowMap.set(cab.row, list)
+    }
+    const rows = [...rowMap.keys()].sort((a, b) => a - b)
+    for (let i = 0; i < rows.length - 1; i++) {
+      const thisRow = rowMap.get(rows[i])!
+      const nextRow = rowMap.get(rows[i + 1])!
+      const gap = rows[i + 1] - rows[i]
+
+      const thisFacingSouth = thisRow.every((c) => c.facing === 'south')
+      const nextFacingNorth = nextRow.every((c) => c.facing === 'north')
+      const pattern1 = thisFacingSouth && nextFacingNorth
+
+      const thisFacingNorth = thisRow.every((c) => c.facing === 'north')
+      const nextFacingSouth = nextRow.every((c) => c.facing === 'south')
+      const pattern2 = thisFacingNorth && nextFacingSouth
+
+      if (pattern1 || pattern2) {
+        bonus += gap >= 2 ? SPACING_CONFIG.properAisleBonusPerPair : SPACING_CONFIG.narrowAisleBonusPerPair
+      }
+    }
   }
 
-  let bonus = 0
-  const rows = [...rowMap.keys()].sort((a, b) => a - b)
-  for (let i = 0; i < rows.length - 1; i++) {
-    const thisRow = rowMap.get(rows[i])!
-    const nextRow = rowMap.get(rows[i + 1])!
-    const gap = rows[i + 1] - rows[i]
+  // ── Column-based aisles (E/W facing cabinets) ──
+  const colAligned = cabinets.filter((c) => !isRowAligned(c.facing))
+  if (colAligned.length >= 2) {
+    const colMap = new Map<number, Cabinet[]>()
+    for (const cab of colAligned) {
+      const list = colMap.get(cab.col) ?? []
+      list.push(cab)
+      colMap.set(cab.col, list)
+    }
+    const cols = [...colMap.keys()].sort((a, b) => a - b)
+    for (let i = 0; i < cols.length - 1; i++) {
+      const thisCol = colMap.get(cols[i])!
+      const nextCol = colMap.get(cols[i + 1])!
+      const gap = cols[i + 1] - cols[i]
 
-    // Check if both rows face toward each other (proper aisle pattern)
-    const thisFacingSouth = thisRow.every((c) => c.facing === 'south')
-    const nextFacingNorth = nextRow.every((c) => c.facing === 'north')
-    const pattern1 = thisFacingSouth && nextFacingNorth
+      const thisFacingEast = thisCol.every((c) => c.facing === 'east')
+      const nextFacingWest = nextCol.every((c) => c.facing === 'west')
+      const pattern1 = thisFacingEast && nextFacingWest
 
-    const thisFacingNorth = thisRow.every((c) => c.facing === 'north')
-    const nextFacingSouth = nextRow.every((c) => c.facing === 'south')
-    const pattern2 = thisFacingNorth && nextFacingSouth
+      const thisFacingWest = thisCol.every((c) => c.facing === 'west')
+      const nextFacingEast = nextCol.every((c) => c.facing === 'east')
+      const pattern2 = thisFacingWest && nextFacingEast
 
-    if (pattern1 || pattern2) {
-      if (gap >= 2) {
-        // Proper aisle with walkway space — full bonus (DC tech can walk through)
-        bonus += SPACING_CONFIG.properAisleBonusPerPair
-      } else {
-        // Back-to-back rows, no walkway — reduced bonus
-        bonus += SPACING_CONFIG.narrowAisleBonusPerPair
+      if (pattern1 || pattern2) {
+        bonus += gap >= 2 ? SPACING_CONFIG.properAisleBonusPerPair : SPACING_CONFIG.narrowAisleBonusPerPair
       }
     }
   }
@@ -1671,13 +1727,9 @@ export function calcSpacingHeatEffect(cab: Cabinet, cabinets: Cabinet[]): number
   }
 
   // Airflow bonus: cabinet's intake (front) or exhaust (rear) facing an empty tile
-  // North-facing cabinet: front is north (row-1), rear is south (row+1)
-  // South-facing cabinet: front is south (row+1), rear is north (row-1)
-  const frontRow = cab.facing === 'north' ? cab.row - 1 : cab.row + 1
-  const rearRow = cab.facing === 'north' ? cab.row + 1 : cab.row - 1
-
-  const frontOccupied = cabinets.some((c) => c.col === cab.col && c.row === frontRow)
-  const rearOccupied = cabinets.some((c) => c.col === cab.col && c.row === rearRow)
+  const offsets = getFacingOffsets(cab.facing, cab.col, cab.row)
+  const frontOccupied = cabinets.some((c) => c.col === offsets.front.col && c.row === offsets.front.row)
+  const rearOccupied = cabinets.some((c) => c.col === offsets.rear.col && c.row === offsets.rear.row)
 
   if (!frontOccupied) effect -= SPACING_CONFIG.openFrontCoolingBonus
   if (!rearOccupied) effect -= SPACING_CONFIG.openRearCoolingBonus
@@ -1685,8 +1737,12 @@ export function calcSpacingHeatEffect(cab: Cabinet, cabinets: Cabinet[]): number
   return effect
 }
 
-/** Count how many cabinets violate aisle layout (mixed facing in a row) */
+/** Count how many rows/columns violate aisle layout (mixed facing in the same row/column).
+ *  N/S cabinets in the same row should all face the same direction.
+ *  E/W cabinets in the same column should all face the same direction.
+ *  Mixing N/S and E/W in the same row or column is also a violation. */
 export function countAisleViolations(cabinets: Cabinet[]): number {
+  // Check rows: all cabinets in a row should face the same N/S direction (or all be E/W-aligned)
   const rowMap = new Map<number, Set<CabinetFacing>>()
   for (const cab of cabinets) {
     const facings = rowMap.get(cab.row) ?? new Set()
@@ -1695,7 +1751,17 @@ export function countAisleViolations(cabinets: Cabinet[]): number {
   }
   let violations = 0
   for (const facings of rowMap.values()) {
-    if (facings.size > 1) violations++ // mixed facings in the same row
+    if (facings.size > 1) violations++
+  }
+  // Check columns: all E/W cabinets in a column should face the same direction
+  const colMap = new Map<number, Set<CabinetFacing>>()
+  for (const cab of cabinets.filter((c) => !isRowAligned(c.facing))) {
+    const facings = colMap.get(cab.col) ?? new Set()
+    facings.add(cab.facing)
+    colMap.set(cab.col, facings)
+  }
+  for (const facings of colMap.values()) {
+    if (facings.size > 1) violations++
   }
   return violations
 }
@@ -2925,7 +2991,11 @@ export const useGameStore = create<GameState>((set) => ({
     set({ placementMode: false }),
 
   togglePlacementFacing: () =>
-    set((state) => ({ placementFacing: state.placementFacing === 'north' ? 'south' : 'north' })),
+    set((state) => {
+      const cycle: CabinetFacing[] = ['north', 'east', 'south', 'west']
+      const idx = cycle.indexOf(state.placementFacing)
+      return { placementFacing: cycle[(idx + 1) % cycle.length] }
+    }),
 
   upgradeNextCabinet: () =>
     set((state) => {
@@ -3311,9 +3381,12 @@ export const useGameStore = create<GameState>((set) => ({
 
   toggleCabinetFacing: (cabinetId: string) =>
     set((state) => {
-      const newCabinets = state.cabinets.map((c) =>
-        c.id === cabinetId ? { ...c, facing: (c.facing === 'north' ? 'south' : 'north') as CabinetFacing } : c
-      )
+      const cycle: CabinetFacing[] = ['north', 'east', 'south', 'west']
+      const newCabinets = state.cabinets.map((c) => {
+        if (c.id !== cabinetId) return c
+        const idx = cycle.indexOf(c.facing)
+        return { ...c, facing: cycle[(idx + 1) % cycle.length] }
+      })
       return {
         cabinets: newCabinets,
         aisleBonus: calcAisleBonus(newCabinets),

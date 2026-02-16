@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useGameStore, RACK_COST, MAX_SERVERS_PER_CABINET, ENVIRONMENT_CONFIG, CUSTOMER_TYPE_CONFIG, getSuiteLimits } from '@/stores/gameStore'
 import type { CabinetEnvironment, CustomerType, CabinetFacing } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
-import { Server, Network, Plus, MousePointer, X, ArrowUpDown } from 'lucide-react'
+import { Server, Network, Plus, MousePointer, X, ArrowUp, ArrowDown, ArrowLeft, ArrowRight } from 'lucide-react'
 import {
   Tooltip,
   TooltipContent,
@@ -106,29 +106,37 @@ export function BuildPanel() {
 
       {/* Cabinet facing selector */}
       <div className="flex flex-col gap-1.5">
-        <span className="text-xs text-muted-foreground">Facing:</span>
-        <div className="flex gap-1">
-          {(['north', 'south'] as CabinetFacing[]).map((dir) => (
+        <span className="text-xs text-muted-foreground">Facing (intake direction):</span>
+        <div className="grid grid-cols-4 gap-1">
+          {([
+            { dir: 'north' as CabinetFacing, label: 'N', Icon: ArrowUp },
+            { dir: 'east' as CabinetFacing, label: 'E', Icon: ArrowRight },
+            { dir: 'south' as CabinetFacing, label: 'S', Icon: ArrowDown },
+            { dir: 'west' as CabinetFacing, label: 'W', Icon: ArrowLeft },
+          ]).map(({ dir, label, Icon }) => (
             <Tooltip key={dir}>
               <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
                   size="xs"
                   onClick={() => setSelectedFacing(dir)}
-                  className={`font-mono text-xs flex-1 transition-all ${
+                  className={`font-mono text-xs transition-all ${
                     selectedFacing === dir
                       ? 'border-2 border-neon-cyan/60 text-neon-cyan bg-neon-cyan/10'
                       : 'border border-border/50 opacity-50 hover:opacity-80'
                   }`}
                 >
-                  <ArrowUpDown className="size-3 mr-1" />
-                  {dir === 'north' ? 'North' : 'South'}
+                  <Icon className="size-3 mr-0.5" />
+                  {label}
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="right" className="max-w-52">
-                <p className="font-bold">Face {dir === 'north' ? 'North' : 'South'}</p>
+                <p className="font-bold">Face {dir.charAt(0).toUpperCase() + dir.slice(1)}</p>
                 <p className="text-xs mt-1">
-                  Cabinet exhaust faces {dir}. Align adjacent rows with opposing faces to create proper hot/cold aisles for cooling efficiency.
+                  Cabinet intake faces {dir}, exhaust exits the opposite side.
+                  {dir === 'north' || dir === 'south'
+                    ? ' Align adjacent rows with opposing faces (N/S) for hot/cold aisle cooling.'
+                    : ' Align adjacent columns with opposing faces (E/W) for hot/cold aisle cooling.'}
                 </p>
               </TooltipContent>
             </Tooltip>
@@ -139,28 +147,52 @@ export function BuildPanel() {
       {/* Placement / Build Actions */}
       <div className="flex flex-col gap-2 pt-1 border-t border-border/50">
         {placementMode ? (
-          <div className="flex gap-1.5">
-            <div className="flex-1 rounded border border-neon-green/40 bg-neon-green/10 px-2 py-1.5 flex flex-col gap-0.5">
-              <div className="flex items-center gap-1.5">
-                <MousePointer className="size-3 text-neon-green animate-pulse" />
-                <span className="text-xs font-mono text-neon-green">Click grid tile</span>
+          <>
+            <div className="flex gap-1.5">
+              <div className="flex-1 rounded border border-neon-green/40 bg-neon-green/10 px-2 py-1.5 flex flex-col gap-0.5">
+                <div className="flex items-center gap-1.5">
+                  <MousePointer className="size-3 text-neon-green animate-pulse" />
+                  <span className="text-xs font-mono text-neon-green">Click grid tile</span>
+                </div>
+                <span className="text-[10px] font-mono text-neon-green/60">R = rotate | Esc = cancel</span>
               </div>
-              <span className="text-[10px] font-mono text-neon-green/60">R = rotate | Esc = cancel</span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => exitPlacementMode()}
+                    className="font-mono text-xs border-neon-red/30 hover:border-neon-red/60 hover:bg-neon-red/10 text-neon-red px-2"
+                  >
+                    <X className="size-3" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right">Cancel placement (Esc)</TooltipContent>
+              </Tooltip>
             </div>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => exitPlacementMode()}
-                  className="font-mono text-xs border-neon-red/30 hover:border-neon-red/60 hover:bg-neon-red/10 text-neon-red px-2"
-                >
-                  <X className="size-3" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right">Cancel placement (Esc)</TooltipContent>
-            </Tooltip>
-          </div>
+            {/* Zone overlay legend */}
+            <div className="rounded border border-border/30 bg-muted/30 px-2 py-1.5">
+              <p className="text-[10px] font-mono text-muted-foreground mb-1">Zone overlay key:</p>
+              <div className="grid grid-cols-2 gap-x-2 gap-y-0.5">
+                <span className="text-[10px] font-mono flex items-center gap-1">
+                  <span className="inline-block w-2 h-2 rounded-sm" style={{ backgroundColor: '#4488ff' }} />
+                  <span className="text-[#4488ff]">Cold Aisle</span>
+                </span>
+                <span className="text-[10px] font-mono flex items-center gap-1">
+                  <span className="inline-block w-2 h-2 rounded-sm" style={{ backgroundColor: '#ff8844' }} />
+                  <span className="text-[#ff8844]">Hot Exhaust</span>
+                </span>
+                <span className="text-[10px] font-mono flex items-center gap-1">
+                  <span className="inline-block w-2 h-2 rounded-sm" style={{ backgroundColor: '#aaaa44' }} />
+                  <span className="text-[#aaaa44]">Access</span>
+                </span>
+                <span className="text-[10px] font-mono flex items-center gap-1">
+                  <span className="inline-block w-2 h-2 rounded-sm" style={{ backgroundColor: '#ff4444' }} />
+                  <span className="text-[#ff4444]">Blocked</span>
+                </span>
+              </div>
+            </div>
+          </>
         ) : (
           <Tooltip>
             <TooltipTrigger asChild>
