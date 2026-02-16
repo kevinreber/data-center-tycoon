@@ -1194,3 +1194,50 @@ interface TutorialTip {
 | Event Log | 2 | 0 | ~2 fields, 0 actions | Logging | Log panel | 2 |
 | Statistics Dashboard | 1 | 0 | ~15 fields, 0 actions | Stats tracking | Stats panel | 3 |
 | Tooltip Tutorial | 2 | 1 config | ~3 fields, 1 action | Trigger checks | Toast tips | 2 |
+
+---
+
+## Deferred Design Ideas
+
+Ideas that were considered but deferred in favor of other approaches. Kept here for future reference.
+
+### Structured Row Layout (Option A) — Data Center Floor Plan
+
+**Context:** When redesigning the cabinet placement grid for realism (v0.4.0), two approaches were considered:
+- **Option A (this one):** Structured row system with fixed aisle placement
+- **Option B (implemented):** Free-form grid with soft constraints (bonuses/penalties)
+
+**Concept:** Instead of a free-form grid where players choose where to place cabinets with soft incentives, the grid is pre-structured with fixed **cabinet rows** separated by fixed **aisle rows**. Players choose which cabinet row to place in, but aisles are guaranteed.
+
+**Layout pattern:**
+```
+Row 0 (cabinets)  ← facing south (exhaust →)
+--- Hot Aisle ---  ← 1-tile gap (maintenance + exhaust collection)
+Row 1 (cabinets)  ← facing north (exhaust →)
+--- Cold Aisle --- ← 1-tile gap (intake air supply)
+Row 2 (cabinets)  ← facing south (exhaust →)
+--- Hot Aisle ---
+Row 3 (cabinets)  ← facing north (exhaust →)
+```
+
+**Pros:**
+- Guarantees realistic layout — impossible to make bad aisle decisions
+- Simpler to balance (always have proper airflow)
+- More visually consistent and "real data center" looking
+- Easier to implement containment systems (hot/cold aisle containment doors)
+- Better foundation for a future "containment" upgrade system
+
+**Cons:**
+- Less player agency — can't make mistakes and learn from them
+- Less strategic depth — layout decisions are largely made for you
+- Harder to implement variable row widths or custom aisle configurations
+- May feel restrictive for sandbox/creative play
+
+**Why deferred:** Option B (free-form with soft constraints) was chosen because it preserves player agency — you can make bad decisions and learn from them, which is better tycoon gameplay. The penalty/bonus system creates more strategic depth and encourages learning real DC layout principles organically.
+
+**Possible future use:**
+- Could be offered as a "guided layout" toggle in settings for newer players
+- Could be a tutorial scenario ("Design a proper data center from scratch")
+- Could be the default for a future "enterprise" or "colocation" game mode where clients expect structured layouts
+
+**Effort:** Medium | **Impact:** Medium — Would replace the soft-constraint system, not complement it.

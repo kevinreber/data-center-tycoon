@@ -55,13 +55,13 @@ describe('cabinet placement', () => {
     })
 
     it('rejects placement outside grid bounds', () => {
-      // Starter tier grid is 4x2
+      // Starter tier grid is 5x5
       const { addCabinet } = useGameStore.getState()
 
-      addCabinet(5, 0, 'production') // col out of bounds
+      addCabinet(5, 0, 'production') // col out of bounds (max col = 4)
       expect(useGameStore.getState().cabinets).toHaveLength(0)
 
-      addCabinet(0, 3, 'production') // row out of bounds
+      addCabinet(0, 5, 'production') // row out of bounds (max row = 4)
       expect(useGameStore.getState().cabinets).toHaveLength(0)
 
       addCabinet(-1, 0, 'production') // negative col
@@ -189,8 +189,8 @@ describe('cabinet placement', () => {
     it('returns first-cabinet tip when no cabinets exist', () => {
       const hints = getPlacementHints(0, 0, [], 'starter')
       const messages = hints.map((h) => h.message)
-      expect(messages).toContain('Isolated placement — good for airflow')
-      expect(messages).toContain('First cabinet — consider leaving gaps for hot/cold aisle layout')
+      expect(messages.some(m => m.includes('Open placement'))).toBe(true)
+      expect(messages.some(m => m.includes('Leave rows between cabinets'))).toBe(true)
     })
 
     it('returns aisle facing hint when row has existing cabinets', () => {
@@ -209,7 +209,7 @@ describe('cabinet placement', () => {
       }
 
       const hints = getPlacementHints(1, 0, [existingCab], 'starter')
-      const facingHints = hints.filter((h) => h.message.includes('faces north'))
+      const facingHints = hints.filter((h) => h.message.includes('north'))
       expect(facingHints.length).toBeGreaterThan(0)
     })
   })

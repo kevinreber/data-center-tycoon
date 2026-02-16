@@ -19,6 +19,11 @@ import {
   SPOT_COMPUTE_CONFIG,
   TUTORIAL_TIPS,
   INCIDENT_CATALOG,
+  SUITE_TIERS,
+  getAdjacentCabinets,
+  hasMaintenanceAccess,
+  calcSpacingHeatEffect,
+  calcAisleBonus,
 } from '@/stores/gameStore'
 
 // Helper to get/set store state
@@ -1178,5 +1183,138 @@ describe('Incident System', () => {
     state = getState()
     updatedSpine = state.spineSwitches.find(s => s.id === spine.id)!
     expect(updatedSpine.powerStatus).toBe(true)
+  })
+})
+
+// ============================================================================
+// N. Spacing & Layout Mechanics
+// ============================================================================
+describe('Spacing & Layout', () => {
+  it('expanded grid has more tiles than max cabinets', () => {
+    // Starter tier: 5x5 = 25 tiles, 8 max cabinets
+    const starter = SUITE_TIERS.starter
+    expect(starter.cols * starter.rows).toBeGreaterThan(starter.maxCabinets)
+    // Standard tier: 8x7 = 56 tiles, 18 max
+    const standard = SUITE_TIERS.standard
+    expect(standard.cols * standard.rows).toBeGreaterThan(standard.maxCabinets)
+  })
+
+  it('getAdjacentCabinets returns orthogonal neighbors only', () => {
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'standard' })
+    // Place cabinets at (1,1), (1,2), (2,1), (0,0)
+    getState().addCabinet(1, 1, 'production', 'general', 'north')
+    getState().addCabinet(1, 2, 'production', 'general', 'south')
+    getState().addCabinet(2, 1, 'production', 'general', 'north')
+    getState().addCabinet(0, 0, 'production', 'general', 'north') // diagonal to (1,1)
+
+    const cabs = getState().cabinets
+    const centerCab = cabs.find(c => c.col === 1 && c.row === 1)!
+    const adj = getAdjacentCabinets(centerCab, cabs)
+
+    // Should find (1,2) and (2,1) but NOT (0,0) which is diagonal
+    expect(adj).toHaveLength(2)
+    expect(adj.some(c => c.col === 1 && c.row === 2)).toBe(true)
+    expect(adj.some(c => c.col === 2 && c.row === 1)).toBe(true)
+    expect(adj.some(c => c.col === 0 && c.row === 0)).toBe(false)
+  })
+
+  it('hasMaintenanceAccess returns true when cabinet has empty neighbor', () => {
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'standard' })
+    getState().addCabinet(2, 2, 'production', 'general', 'north')
+
+    const cabs = getState().cabinets
+    const cab = cabs[0]
+    // Cabinet at (2,2) in 8x7 grid — all 4 sides are empty
+    expect(hasMaintenanceAccess(cab, cabs, 8, 7)).toBe(true)
+  })
+
+  it('hasMaintenanceAccess returns false when cabinet is fully surrounded', () => {
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'standard' })
+    // Place center cabinet and surround it on all 4 sides
+    getState().addCabinet(2, 2, 'production', 'general', 'north')
+    getState().addCabinet(2, 1, 'production', 'general', 'south')
+    getState().addCabinet(2, 3, 'production', 'general', 'north')
+    getState().addCabinet(1, 2, 'production', 'general', 'north')
+    getState().addCabinet(3, 2, 'production', 'general', 'north')
+
+    const cabs = getState().cabinets
+    const centerCab = cabs.find(c => c.col === 2 && c.row === 2)!
+    expect(hasMaintenanceAccess(centerCab, cabs, 8, 7)).toBe(false)
+  })
+
+  it('calcSpacingHeatEffect increases heat for adjacent cabinets', () => {
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'standard' })
+    getState().addCabinet(2, 2, 'production', 'general', 'north')
+    getState().addCabinet(2, 3, 'production', 'general', 'south')
+    getState().addCabinet(3, 2, 'production', 'general', 'north')
+
+    const cabs = getState().cabinets
+    const centerCab = cabs.find(c => c.col === 2 && c.row === 2)!
+    const effect = calcSpacingHeatEffect(centerCab, cabs)
+
+    // 2 adjacent cabinets × 0.3 penalty = 0.6 base
+    // north-facing, row-1 is empty (front bonus -0.3), row+1 occupied (no rear bonus)
+    // Net should be positive (heat penalty from density > airflow bonus)
+    expect(effect).toBeGreaterThan(0)
+  })
+
+  it('calcSpacingHeatEffect gives airflow bonus for isolated cabinet', () => {
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'standard' })
+    getState().addCabinet(3, 3, 'production', 'general', 'north')
+
+    const cabs = getState().cabinets
+    const cab = cabs[0]
+    const effect = calcSpacingHeatEffect(cab, cabs)
+
+    // No adjacent cabinets, both front (row-1) and rear (row+1) are empty
+    // Effect should be negative (cooling bonus from open airflow)
+    expect(effect).toBeLessThan(0)
+  })
+
+  it('calcAisleBonus gives higher bonus for rows with gap between them', () => {
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'standard' })
+
+    // Row 1 facing south, row 3 facing north (gap of 1 row between them)
+    getState().addCabinet(0, 1, 'production', 'general', 'south')
+    getState().addCabinet(1, 1, 'production', 'general', 'south')
+    getState().addCabinet(0, 3, 'production', 'general', 'north')
+    getState().addCabinet(1, 3, 'production', 'general', 'north')
+
+    const bonusWithGap = calcAisleBonus(getState().cabinets)
+
+    // Reset and place without gap
+    getState().resetGame()
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'standard' })
+    getState().addCabinet(0, 1, 'production', 'general', 'south')
+    getState().addCabinet(1, 1, 'production', 'general', 'south')
+    getState().addCabinet(0, 2, 'production', 'general', 'north')
+    getState().addCabinet(1, 2, 'production', 'general', 'north')
+
+    const bonusWithoutGap = calcAisleBonus(getState().cabinets)
+
+    // Gap bonus (0.12) should be greater than no-gap bonus (0.05)
+    expect(bonusWithGap).toBeGreaterThan(bonusWithoutGap)
+  })
+
+  it('placement on larger grid allows strategic spacing', () => {
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'starter' })
+
+    // Place cabinets with aisle gap in starter tier (5x5 grid)
+    // Row 0: north-facing
+    getState().addCabinet(0, 0, 'production', 'general', 'north')
+    getState().addCabinet(1, 0, 'production', 'general', 'north')
+    // Row 2: south-facing (leaving row 1 as aisle)
+    getState().addCabinet(0, 2, 'production', 'general', 'south')
+    getState().addCabinet(1, 2, 'production', 'general', 'south')
+    // Row 4: north-facing (leaving row 3 as aisle)
+    getState().addCabinet(0, 4, 'production', 'general', 'north')
+    getState().addCabinet(1, 4, 'production', 'general', 'north')
+
+    expect(getState().cabinets).toHaveLength(6)
+    // All cabinets should be within grid bounds
+    for (const cab of getState().cabinets) {
+      expect(cab.col).toBeLessThan(5)
+      expect(cab.row).toBeLessThan(5)
+    }
   })
 })

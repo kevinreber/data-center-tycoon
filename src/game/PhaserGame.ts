@@ -8,8 +8,8 @@ const COLORS = DEFAULT_COLORS
 const TILE_W = 64
 const TILE_H = 32
 // Default grid size — overridden dynamically by suite tier
-const DEFAULT_CAB_COLS = 4
-const DEFAULT_CAB_ROWS = 2
+const DEFAULT_CAB_COLS = 5
+const DEFAULT_CAB_ROWS = 5
 const DEFAULT_SPINE_SLOTS = 2
 const DRAG_THRESHOLD = 5  // pixels before mouse movement counts as a drag
 
@@ -305,9 +305,30 @@ class DataCenterScene extends Phaser.Scene {
     const { x, y } = this.isoToScreen(col, row)
     const occupied = this.occupiedTiles.has(`${col},${row}`)
 
-    // Highlight color: green for valid, red for occupied
-    const color = occupied ? 0xff4444 : 0x00ff88
-    const alpha = occupied ? 0.3 : 0.25
+    // Count orthogonal neighbors to determine density
+    let adjacentCount = 0
+    if (!occupied) {
+      const dirs = [
+        `${col},${row - 1}`, `${col},${row + 1}`,
+        `${col - 1},${row}`, `${col + 1},${row}`,
+      ]
+      for (const key of dirs) {
+        if (this.occupiedTiles.has(key)) adjacentCount++
+      }
+    }
+
+    // Highlight color: green (open), yellow (crowded 2+), amber (dense 3+), red (occupied)
+    let color: number
+    let alpha: number
+    if (occupied) {
+      color = 0xff4444; alpha = 0.3
+    } else if (adjacentCount >= 3) {
+      color = 0xff6600; alpha = 0.3 // amber — surrounded, poor airflow
+    } else if (adjacentCount >= 2) {
+      color = 0xffaa00; alpha = 0.25 // yellow — getting crowded
+    } else {
+      color = 0x00ff88; alpha = 0.25 // green — good spacing
+    }
 
     this.placementHighlight.fillStyle(color, alpha)
     this.placementHighlight.beginPath()
@@ -390,13 +411,33 @@ class DataCenterScene extends Phaser.Scene {
   private drawFloor() {
     this.floorGraphics = this.add.graphics()
 
+    // Detect which rows are "aisle rows" (empty rows between cabinet rows)
+    const cabinetRows = new Set<number>()
+    for (const entry of this.cabEntries.values()) {
+      cabinetRows.add(entry.row)
+    }
+
     for (let r = 0; r < this.cabRows; r++) {
+      // An aisle row is one with no cabinets that sits between two cabinet rows
+      const isAisleRow = !cabinetRows.has(r) && cabinetRows.size > 0 &&
+        [...cabinetRows].some(cr => cr < r) && [...cabinetRows].some(cr => cr > r)
+
       for (let c = 0; c < this.cabCols; c++) {
         const { x, y } = this.isoToScreen(c, r)
         const isAlternate = (r + c) % 2 === 0
-        const fillColor = isAlternate ? 0x0a1520 : 0x0c1825
 
-        this.floorGraphics.fillStyle(fillColor, 0.9)
+        let fillColor: number
+        let alpha: number
+        if (isAisleRow) {
+          // Aisle tiles: slightly brighter with a warm tint (walkway floor)
+          fillColor = isAlternate ? 0x121a14 : 0x141c16
+          alpha = 0.95
+        } else {
+          fillColor = isAlternate ? 0x0a1520 : 0x0c1825
+          alpha = 0.9
+        }
+
+        this.floorGraphics.fillStyle(fillColor, alpha)
         this.floorGraphics.beginPath()
         this.floorGraphics.moveTo(x, y)
         this.floorGraphics.lineTo(x + TILE_W / 2, y + TILE_H / 2)
@@ -404,6 +445,15 @@ class DataCenterScene extends Phaser.Scene {
         this.floorGraphics.lineTo(x - TILE_W / 2, y + TILE_H / 2)
         this.floorGraphics.closePath()
         this.floorGraphics.fillPath()
+
+        // Draw subtle aisle lane markings
+        if (isAisleRow) {
+          this.floorGraphics.lineStyle(0.5, 0x335533, 0.3)
+          this.floorGraphics.lineBetween(
+            x - TILE_W / 4, y + TILE_H / 2,
+            x + TILE_W / 4, y + TILE_H / 2,
+          )
+        }
       }
     }
     this.floorGraphics.setDepth(0)
@@ -719,6 +769,38 @@ class DataCenterScene extends Phaser.Scene {
       .setAlpha(powerMult * 0.6)
       .setDepth(baseDepth + 1)
     this.facingIndicators.set(entry.id, facingLabel)
+
+    // No-access warning: show amber indicator if cabinet has no adjacent empty tile
+    const adjacentDirs = [
+      { col: entry.col, row: entry.row - 1 },
+      { col: entry.col, row: entry.row + 1 },
+      { col: entry.col - 1, row: entry.row },
+      { col: entry.col + 1, row: entry.row },
+    ]
+    let hasAccess = false
+    for (const dir of adjacentDirs) {
+      if (dir.col < 0 || dir.col >= this.cabCols || dir.row < 0 || dir.row >= this.cabRows) continue
+      if (!this.occupiedTiles.has(`${dir.col},${dir.row}`)) {
+        hasAccess = true
+        break
+      }
+    }
+    if (!hasAccess && entry.powerOn) {
+      // Draw a small amber warning dot at the base of the cabinet
+      g.fillStyle(0xff8800, 0.6)
+      g.fillCircle(cx - CUBE_W / 2 + 4, cy - 2, 2)
+      // Warning label
+      const warnLabel = this.add
+        .text(cx, topY + 24, '! NO ACCESS', {
+          fontFamily: 'monospace',
+          fontSize: '4px',
+          color: '#ff8844',
+        })
+        .setOrigin(0.5)
+        .setAlpha(0.5)
+        .setDepth(baseDepth + 1)
+      labels.push(warnLabel)
+    }
 
     g.setDepth(baseDepth)
     this.cabinetGraphics.set(entry.id, g)
@@ -1085,7 +1167,22 @@ class DataCenterScene extends Phaser.Scene {
 
   /** Update the set of occupied tiles (called when cabinet state changes) */
   syncOccupiedTiles(occupied: Set<string>) {
+    const changed = occupied.size !== this.occupiedTiles.size ||
+      [...occupied].some(key => !this.occupiedTiles.has(key))
     this.occupiedTiles = occupied
+    // Refresh floor tiles to update aisle visualization when cabinet layout changes
+    if (changed) {
+      this.refreshFloor()
+    }
+  }
+
+  /** Redraw floor tiles to reflect current aisle layout */
+  private refreshFloor() {
+    if (this.floorGraphics) {
+      this.floorGraphics.destroy()
+      this.floorGraphics = null
+    }
+    this.drawFloor()
   }
 
   // ── Infrastructure Layout API ──────────────────────────────
