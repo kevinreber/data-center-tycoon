@@ -4,6 +4,7 @@ import type {
   Season,
   ServerConfig,
   ActiveIncident,
+  OperationsTier,
 } from '@/stores/gameStore'
 import {
   SUPPLY_CHAIN_CONFIG,
@@ -20,6 +21,7 @@ import {
   TUTORIAL_TIPS,
   INCIDENT_CATALOG,
   SUITE_TIERS,
+  OPS_TIER_CONFIG,
   getAdjacentCabinets,
   hasMaintenanceAccess,
   calcSpacingHeatEffect,
@@ -1081,7 +1083,7 @@ describe('resetGame clears Phase 5 state', () => {
 // L. Incident System — Natural Tick-Down & Hardware Restoration
 // ============================================================================
 describe('Incident System', () => {
-  it('incidents should naturally tick down each tick', () => {
+  it('incidents should naturally tick down each tick (Tier 3+)', () => {
     setupBasicDataCenter()
     const heatSpikeDef = INCIDENT_CATALOG.find(d => d.type === 'cooling_failure')!
     const incident: ActiveIncident = {
@@ -1090,7 +1092,8 @@ describe('Incident System', () => {
       ticksRemaining: 5,
       resolved: false,
     }
-    setState({ activeIncidents: [incident] })
+    // Auto-resolve requires Ops Tier 3
+    setState({ activeIncidents: [incident], operationsTier: 3 as OperationsTier })
     getState().tick()
     const state = getState()
     const updated = state.activeIncidents.find(i => i.id === 'test-inc-1')
@@ -1101,7 +1104,7 @@ describe('Incident System', () => {
     }
   })
 
-  it('incidents should auto-resolve when ticksRemaining reaches 0', () => {
+  it('incidents should auto-resolve when ticksRemaining reaches 0 (Tier 3+)', () => {
     setupBasicDataCenter()
     const heatSpikeDef = INCIDENT_CATALOG.find(d => d.type === 'cooling_failure')!
     const incident: ActiveIncident = {
@@ -1110,7 +1113,8 @@ describe('Incident System', () => {
       ticksRemaining: 1, // will reach 0 this tick
       resolved: false,
     }
-    setState({ activeIncidents: [incident] })
+    // Auto-resolve requires Ops Tier 3
+    setState({ activeIncidents: [incident], operationsTier: 3 as OperationsTier })
     getState().tick()
     const state = getState()
     const updated = state.activeIncidents.find(i => i.id === 'test-inc-2')
@@ -1118,7 +1122,7 @@ describe('Incident System', () => {
     expect(updated?.resolved).toBe(true)
   })
 
-  it('leaf_failure incident should restore hasLeafSwitch after resolution', () => {
+  it('leaf_failure incident should restore hasLeafSwitch after resolution (Tier 3+)', () => {
     setupBasicDataCenter()
     const cab = getState().cabinets[0]
     expect(cab.hasLeafSwitch).toBe(true)
@@ -1131,7 +1135,8 @@ describe('Incident System', () => {
       resolved: false,
       affectedHardwareId: cab.id,
     }
-    setState({ activeIncidents: [incident] })
+    // Auto-resolve requires Ops Tier 3
+    setState({ activeIncidents: [incident], operationsTier: 3 as OperationsTier })
 
     // Tick 1: leaf should be disabled, ticksRemaining decreases
     getState().tick()
@@ -1152,7 +1157,7 @@ describe('Incident System', () => {
     expect(updatedCab.hasLeafSwitch).toBe(true)
   })
 
-  it('spine_failure incident should restore powerStatus after resolution', () => {
+  it('spine_failure incident should restore powerStatus after resolution (Tier 3+)', () => {
     setupBasicDataCenter()
     const spine = getState().spineSwitches[0]
     expect(spine.powerStatus).toBe(true)
@@ -1165,7 +1170,8 @@ describe('Incident System', () => {
       resolved: false,
       affectedHardwareId: spine.id,
     }
-    setState({ activeIncidents: [incident] })
+    // Auto-resolve requires Ops Tier 3
+    setState({ activeIncidents: [incident], operationsTier: 3 as OperationsTier })
 
     // Tick 1: spine should be disabled
     getState().tick()
@@ -1383,5 +1389,139 @@ describe('Spacing & Layout', () => {
     expect(cabs).toHaveLength(2)
     expect(cabs[0].facing).toBe('east')
     expect(cabs[1].facing).toBe('west')
+  })
+})
+
+// ============================================================================
+// Operations Progression
+// ============================================================================
+describe('Operations Progression', () => {
+  it('starts at Tier 1 by default', () => {
+    expect(getState().operationsTier).toBe(1)
+    expect(getState().opsAutoResolved).toBe(0)
+    expect(getState().opsIncidentsPrevented).toBe(0)
+  })
+
+  it('upgradeOperationsTier upgrades sequentially', () => {
+    setState({ sandboxMode: true, money: 999999, reputationScore: 80 })
+    getState().upgradeOperationsTier(2)
+    expect(getState().operationsTier).toBe(2)
+    expect(getState().opsCostPerTick).toBe(OPS_TIER_CONFIG[2].maintenanceCostPerTick)
+  })
+
+  it('cannot skip tiers', () => {
+    setState({ sandboxMode: true, money: 999999, reputationScore: 80, suiteTier: 'professional', unlockedTech: ['auto_failover'] })
+    // Try to jump from Tier 1 to Tier 3
+    getState().upgradeOperationsTier(3 as OperationsTier)
+    expect(getState().operationsTier).toBe(1) // still Tier 1
+  })
+
+  it('requires sufficient reputation', () => {
+    setState({ sandboxMode: true, money: 999999, reputationScore: 10 })
+    getState().upgradeOperationsTier(2)
+    expect(getState().operationsTier).toBe(1) // Tier 2 requires rep 30
+  })
+
+  it('requires minimum suite tier for Tier 3', () => {
+    setState({ sandboxMode: true, money: 999999, reputationScore: 80, unlockedTech: ['auto_failover'] })
+    getState().upgradeOperationsTier(2)
+    expect(getState().operationsTier).toBe(2)
+    // Now try to upgrade to Tier 3 with starter suite (should fail — needs standard)
+    getState().upgradeOperationsTier(3 as OperationsTier)
+    expect(getState().operationsTier).toBe(2) // still Tier 2
+  })
+
+  it('requires auto_failover tech for Tier 3', () => {
+    setState({ sandboxMode: true, money: 999999, reputationScore: 80, suiteTier: 'standard' })
+    getState().upgradeOperationsTier(2)
+    expect(getState().operationsTier).toBe(2)
+    // Try Tier 3 without auto_failover tech
+    getState().upgradeOperationsTier(3 as OperationsTier)
+    expect(getState().operationsTier).toBe(2) // still Tier 2
+  })
+
+  it('charges money for upgrade (non-sandbox)', () => {
+    setState({ sandboxMode: false, money: 20000, reputationScore: 80 })
+    const moneyBefore = getState().money
+    getState().upgradeOperationsTier(2)
+    expect(getState().operationsTier).toBe(2)
+    expect(getState().money).toBe(moneyBefore - OPS_TIER_CONFIG[2].unlockCost)
+  })
+
+  it('insufficient money prevents upgrade', () => {
+    setState({ sandboxMode: false, money: 100, reputationScore: 80 })
+    getState().upgradeOperationsTier(2)
+    expect(getState().operationsTier).toBe(1)
+  })
+
+  it('Tier 1: incidents do not auto-resolve in tick', () => {
+    setupBasicDataCenter()
+    // Inject an incident manually
+    const incident: ActiveIncident = {
+      id: 'test-inc-1',
+      def: INCIDENT_CATALOG.find(d => d.effect === 'revenue_penalty')!,
+      ticksRemaining: 10,
+      resolved: false,
+    }
+    setState({ activeIncidents: [incident], operationsTier: 1 as OperationsTier, staff: [] })
+    getState().tick()
+    // At Tier 1, no auto-resolve, so ticksRemaining should stay at 10
+    const updated = getState().activeIncidents.find(i => i.id === 'test-inc-1')
+    expect(updated).toBeDefined()
+    expect(updated!.ticksRemaining).toBe(10)
+    expect(updated!.resolved).toBe(false)
+  })
+
+  it('Tier 3: incidents auto-resolve over time', () => {
+    setupBasicDataCenter()
+    const incident: ActiveIncident = {
+      id: 'test-inc-2',
+      def: INCIDENT_CATALOG.find(d => d.effect === 'revenue_penalty')!,
+      ticksRemaining: 2,
+      resolved: false,
+    }
+    setState({
+      activeIncidents: [incident],
+      operationsTier: 3 as OperationsTier,
+      unlockedTech: [],
+      staff: [],
+    })
+    getState().tick()
+    // At Tier 3 with autoResolveSpeed=1, ticksRemaining should decrease by 1
+    const updated = getState().activeIncidents.find(i => i.id === 'test-inc-2')
+    // After 1 tick: ticksRemaining = 2 - 1 = 1
+    expect(updated).toBeDefined()
+    expect(updated!.ticksRemaining).toBe(1)
+  })
+
+  it('resolveIncident applies cost multiplier from ops tier', () => {
+    setupBasicDataCenter()
+    const incidentDef = INCIDENT_CATALOG.find(d => d.effect === 'revenue_penalty' && d.resolveCost > 0)!
+    const incident: ActiveIncident = {
+      id: 'test-inc-3',
+      def: incidentDef,
+      ticksRemaining: 10,
+      resolved: false,
+    }
+    // At Tier 2, cost multiplier is 0.8
+    setState({
+      activeIncidents: [incident],
+      operationsTier: 2 as OperationsTier,
+      sandboxMode: false,
+      money: 100000,
+    })
+    const moneyBefore = getState().money
+    getState().resolveIncident('test-inc-3')
+    const expectedCost = Math.round(incidentDef.resolveCost * 0.8)
+    expect(getState().money).toBe(moneyBefore - expectedCost)
+    expect(getState().resolvedCount).toBe(1)
+  })
+
+  it('resetGame resets operations tier to 1', () => {
+    setState({ operationsTier: 4 as OperationsTier, opsAutoResolved: 50, opsIncidentsPrevented: 10 })
+    getState().resetGame()
+    expect(getState().operationsTier).toBe(1)
+    expect(getState().opsAutoResolved).toBe(0)
+    expect(getState().opsIncidentsPrevented).toBe(0)
   })
 })

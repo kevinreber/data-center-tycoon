@@ -13,6 +13,9 @@ export type StaffRole = 'network_engineer' | 'electrician' | 'cooling_specialist
 export type StaffSkillLevel = 1 | 2 | 3
 export type ShiftPattern = 'day_only' | 'day_night' | 'round_the_clock'
 
+// ── Operations Progression Types ─────────────────────────────────
+export type OperationsTier = 1 | 2 | 3 | 4
+
 // ── Phase 4B: Carbon & Environmental Types ──────────────────────
 export type EnergySource = 'grid_mixed' | 'grid_green' | 'onsite_solar' | 'onsite_wind'
 export type GreenCert = 'energy_star' | 'leed_silver' | 'leed_gold' | 'carbon_neutral'
@@ -1063,6 +1066,9 @@ export const TUTORIAL_TIPS: TutorialTip[] = [
   { id: 'competitor_appeared', title: 'New Competitor!', message: 'A rival data center company has entered the market. They will compete for contracts — act fast to secure deals!', category: 'market' },
   { id: 'competitor_bidding', title: 'Competition!', message: 'A competitor is bidding on a contract you may want. Accept quickly before they win it!', category: 'market' },
   { id: 'price_war', title: 'Price War!', message: 'A competitor has started a price war! Contract revenue is temporarily reduced across the market.', category: 'market' },
+  // Operations Progression tips
+  { id: 'ops_manual', title: 'Manual Operations', message: 'Your data center runs on manual ops — incidents persist until you pay to resolve them. Upgrade your Operations tier in the Operations panel to unlock auto-resolution!', category: 'incidents' },
+  { id: 'ops_tier_available', title: 'Ops Upgrade Available', message: 'You qualify for an Operations tier upgrade! Higher tiers reduce incident costs, damage, and eventually auto-resolve incidents.', category: 'incidents' },
 ]
 
 // ── Procedural Name Generation ──────────────────────────────────
@@ -1174,6 +1180,93 @@ export const INCIDENT_CATALOG: IncidentDef[] = [
 /** Chance per tick of an incident occurring (when fewer than max active) */
 const INCIDENT_CHANCE = 0.02
 const MAX_ACTIVE_INCIDENTS = 3
+
+// ── Operations Progression Configs ──────────────────────────────
+
+export interface OperationsTierConfig {
+  tier: OperationsTier
+  label: string
+  description: string
+  unlockCost: number
+  minReputation: number
+  minSuiteTier: SuiteTier
+  requiredTech: string | null
+  // Effects
+  incidentAutoResolve: boolean       // whether incidents tick down naturally
+  resolveCostMultiplier: number      // multiplier on manual resolve cost
+  incidentEffectMultiplier: number   // multiplier on incident damage/effects
+  preventionChance: number           // chance per tick to prevent a new incident
+  autoResolveMinor: boolean          // auto-resolve minor incidents immediately
+  autoResolveSpeed: number           // multiplier on tick-down speed (1 = normal)
+  maintenanceCostPerTick: number     // ongoing ops cost
+}
+
+export const OPS_TIER_CONFIG: Record<OperationsTier, OperationsTierConfig> = {
+  1: {
+    tier: 1,
+    label: 'Manual Ops',
+    description: 'Incidents must be manually resolved by paying the resolution cost. Unresolved incidents persist until fixed.',
+    unlockCost: 0,
+    minReputation: 0,
+    minSuiteTier: 'starter',
+    requiredTech: null,
+    incidentAutoResolve: false,
+    resolveCostMultiplier: 1.0,
+    incidentEffectMultiplier: 1.0,
+    preventionChance: 0,
+    autoResolveMinor: false,
+    autoResolveSpeed: 0,
+    maintenanceCostPerTick: 0,
+  },
+  2: {
+    tier: 2,
+    label: 'Monitoring & Alerting',
+    description: 'Better visibility into incidents. Reduced resolution costs and damage. Incidents still require manual action.',
+    unlockCost: 15000,
+    minReputation: 30,
+    minSuiteTier: 'starter',
+    requiredTech: null,
+    incidentAutoResolve: false,
+    resolveCostMultiplier: 0.8,
+    incidentEffectMultiplier: 0.85,
+    preventionChance: 0,
+    autoResolveMinor: false,
+    autoResolveSpeed: 0,
+    maintenanceCostPerTick: 5,
+  },
+  3: {
+    tier: 3,
+    label: 'Basic Automation',
+    description: 'Incidents auto-resolve over time. Staff accelerates resolution. Hardware auto-restores on expiry.',
+    unlockCost: 40000,
+    minReputation: 50,
+    minSuiteTier: 'standard',
+    requiredTech: 'auto_failover',
+    incidentAutoResolve: true,
+    resolveCostMultiplier: 0.6,
+    incidentEffectMultiplier: 0.75,
+    preventionChance: 0,
+    autoResolveMinor: false,
+    autoResolveSpeed: 1,
+    maintenanceCostPerTick: 15,
+  },
+  4: {
+    tier: 4,
+    label: 'Full Orchestration',
+    description: 'Predictive maintenance prevents some incidents. Minor incidents auto-resolve instantly. Self-healing infrastructure.',
+    unlockCost: 100000,
+    minReputation: 70,
+    minSuiteTier: 'professional',
+    requiredTech: 'auto_failover',
+    incidentAutoResolve: true,
+    resolveCostMultiplier: 0.3,
+    incidentEffectMultiplier: 0.5,
+    preventionChance: 0.20,
+    autoResolveMinor: true,
+    autoResolveSpeed: 2,
+    maintenanceCostPerTick: 30,
+  },
+}
 
 // ── Contract / Tenant System Types ──────────────────────────────
 
@@ -1316,6 +1409,11 @@ export const ACHIEVEMENT_CATALOG: AchievementDef[] = [
   { id: 'monopoly', label: 'Monopoly', description: 'Win 5 contracts that competitors bid on.', icon: '🏅' },
   { id: 'underdog', label: 'Underdog', description: 'Win a contract against a competitor with higher reputation.', icon: '💪' },
   { id: 'rivalry', label: 'Rivalry', description: 'Outperform all competitors for 100 consecutive ticks.', icon: '🏆' },
+  // Operations Progression achievements
+  { id: 'ops_monitoring', label: 'Eyes Everywhere', description: 'Upgrade to Monitoring & Alerting (Ops Tier 2).', icon: '👁️' },
+  { id: 'ops_automation', label: 'SRE', description: 'Upgrade to Basic Automation (Ops Tier 3).', icon: '🤖' },
+  { id: 'ops_orchestration', label: 'Platform Engineer', description: 'Upgrade to Full Orchestration (Ops Tier 4).', icon: '🎛️' },
+  { id: 'ops_prevented', label: 'Predictive', description: 'Prevent 10 incidents with predictive maintenance.', icon: '🔮' },
 ]
 
 export interface EnvironmentConfig {
@@ -2289,6 +2387,12 @@ interface GameState {
   incidentLog: string[]   // recent incident messages
   resolvedCount: number   // total incidents resolved (for achievements)
 
+  // Operations Progression
+  operationsTier: OperationsTier
+  opsAutoResolved: number          // lifetime auto-resolved incident count
+  opsCostPerTick: number           // operations tier maintenance cost
+  opsIncidentsPrevented: number    // lifetime prevented incident count
+
   // Achievements
   achievements: Achievement[]
   newAchievement: Achievement | null  // most recently unlocked (for toast)
@@ -2561,6 +2665,8 @@ interface GameState {
   placeCableTray: (col: number, row: number, optionIndex: number) => void
   autoRouteCables: () => void
   toggleCabinetFacing: (cabinetId: string) => void
+  // Operations Progression actions
+  upgradeOperationsTier: (tier: OperationsTier) => void
   // Insurance actions
   buyInsurance: (type: InsurancePolicyType) => void
   cancelInsurance: (type: InsurancePolicyType) => void
@@ -2688,6 +2794,12 @@ export const useGameStore = create<GameState>((set) => ({
   activeIncidents: [],
   incidentLog: [],
   resolvedCount: 0,
+
+  // Operations Progression
+  operationsTier: 1 as OperationsTier,
+  opsAutoResolved: 0,
+  opsCostPerTick: 0,
+  opsIncidentsPrevented: 0,
 
   // Achievements
   achievements: [],
@@ -3145,7 +3257,9 @@ export const useGameStore = create<GameState>((set) => ({
     set((state) => {
       const incident = state.activeIncidents.find((i) => i.id === id)
       if (!incident || incident.resolved) return state
-      if (state.money < incident.def.resolveCost) return state
+      const opsConfig = OPS_TIER_CONFIG[state.operationsTier]
+      const adjustedCost = Math.round(incident.def.resolveCost * opsConfig.resolveCostMultiplier)
+      if (!state.sandboxMode && state.money < adjustedCost) return state
 
       // Restore hardware if this was a hardware_failure incident
       let cabinets = state.cabinets
@@ -3168,7 +3282,7 @@ export const useGameStore = create<GameState>((set) => ({
         ),
         cabinets,
         spineSwitches,
-        money: state.money - incident.def.resolveCost,
+        money: state.sandboxMode ? state.money : state.money - adjustedCost,
         resolvedCount: state.resolvedCount + 1,
         incidentLog: [`Resolved: ${incident.def.label}`, ...state.incidentLog].slice(0, 10),
         ...calcStats(cabinets, spineSwitches),
@@ -3391,6 +3505,25 @@ export const useGameStore = create<GameState>((set) => ({
         cabinets: newCabinets,
         aisleBonus: calcAisleBonus(newCabinets),
         aisleViolations: countAisleViolations(newCabinets),
+      }
+    }),
+
+  // ── Operations Progression Actions ────────────────────────────
+
+  upgradeOperationsTier: (tier: OperationsTier) =>
+    set((state) => {
+      if (tier <= state.operationsTier) return state
+      if (tier !== (state.operationsTier + 1) as OperationsTier) return state // must upgrade sequentially
+      const config = OPS_TIER_CONFIG[tier]
+      if (!state.sandboxMode && state.money < config.unlockCost) return state
+      if (state.reputationScore < config.minReputation) return state
+      const tierOrder: SuiteTier[] = ['starter', 'standard', 'professional', 'enterprise']
+      if (tierOrder.indexOf(state.suiteTier) < tierOrder.indexOf(config.minSuiteTier)) return state
+      if (config.requiredTech && !state.unlockedTech.includes(config.requiredTech)) return state
+      return {
+        operationsTier: tier,
+        money: state.sandboxMode ? state.money : state.money - config.unlockCost,
+        opsCostPerTick: config.maintenanceCostPerTick,
       }
     }),
 
@@ -4227,6 +4360,11 @@ export const useGameStore = create<GameState>((set) => ({
       activeIncidents: [],
       incidentLog: ['Cooling sensor alarm cleared', 'Power fluctuation resolved', 'Network loop detected and resolved'],
       resolvedCount: 8,
+      // Operations Progression — demo at Tier 3 (Basic Automation)
+      operationsTier: 3 as OperationsTier,
+      opsAutoResolved: 12,
+      opsCostPerTick: OPS_TIER_CONFIG[3].maintenanceCostPerTick,
+      opsIncidentsPrevented: 0,
       contractOffers: [],
       activeContracts: demoActiveContracts,
       contractLog: ['DevForge contract completed', 'StartupCo contract completed', 'PixelDream contract completed', 'ShopEngine contract completed'],
@@ -4393,6 +4531,10 @@ export const useGameStore = create<GameState>((set) => ({
       activeIncidents: [],
       incidentLog: [],
       resolvedCount: 0,
+      operationsTier: 1 as OperationsTier,
+      opsAutoResolved: 0,
+      opsCostPerTick: 0,
+      opsIncidentsPrevented: 0,
       achievements: [],
       newAchievement: null,
       contractOffers: [],
@@ -4723,6 +4865,11 @@ export const useGameStore = create<GameState>((set) => ({
       activeIncidents: [],
       incidentLog: [],
       resolvedCount: 0,
+      // Operations Progression
+      operationsTier: 1 as OperationsTier,
+      opsAutoResolved: 0,
+      opsCostPerTick: 0,
+      opsIncidentsPrevented: 0,
       achievements: [],
       newAchievement: null,
       contractOffers: [],
@@ -4882,6 +5029,9 @@ export const useGameStore = create<GameState>((set) => ({
       let activeIncidents = [...state.activeIncidents]
       let incidentLog = [...state.incidentLog]
       const resolvedCount = state.resolvedCount
+      const opsConfig = OPS_TIER_CONFIG[state.operationsTier]
+      let opsAutoResolved = state.opsAutoResolved
+      let opsIncidentsPrevented = state.opsIncidentsPrevented
 
       // Clean up resolved incidents and track hardware that needs restoration
       const justResolved = activeIncidents.filter((i) => i.resolved)
@@ -4903,6 +5053,11 @@ export const useGameStore = create<GameState>((set) => ({
         const sizeMultiplier = Math.min(2, state.cabinets.length / 8)
         const cablingPenalty = state.infraIncidentBonus
         if (Math.random() < INCIDENT_CHANCE * sizeMultiplier + cablingPenalty) {
+          // Tier 4: Predictive maintenance can prevent incidents
+          if (opsConfig.preventionChance > 0 && Math.random() < opsConfig.preventionChance) {
+            opsIncidentsPrevented++
+            incidentLog = ['Ops: Predictive maintenance prevented an incident', ...incidentLog].slice(0, 10)
+          } else {
           let selectedDef = INCIDENT_CATALOG[Math.floor(Math.random() * INCIDENT_CATALOG.length)]
           let affectedHwId: string | undefined
 
@@ -4938,8 +5093,15 @@ export const useGameStore = create<GameState>((set) => ({
             resolved: false,
             ...(affectedHwId ? { affectedHardwareId: affectedHwId } : {}),
           }
-          activeIncidents.push(incident)
-          incidentLog = [`New: ${selectedDef.label} — ${selectedDef.description}`, ...incidentLog].slice(0, 10)
+          // Tier 4: Auto-resolve minor incidents immediately
+          if (opsConfig.autoResolveMinor && selectedDef.severity === 'minor') {
+            incidentLog = [`Ops auto-resolved: ${selectedDef.label}`, ...incidentLog].slice(0, 10)
+            opsAutoResolved++
+          } else {
+            activeIncidents.push(incident)
+            incidentLog = [`New: ${selectedDef.label} — ${selectedDef.description}`, ...incidentLog].slice(0, 10)
+          }
+          } // close preventionChance else
         }
       }
 
@@ -4963,21 +5125,23 @@ export const useGameStore = create<GameState>((set) => ({
           })
         : [...state.spineSwitches]
 
-      // Calculate incident effects
+      // Calculate incident effects (ops tier reduces damage via incidentEffectMultiplier)
       let incidentRevenueMult = 1
       let incidentPowerMult = 1
       let incidentCoolingMult = 1
       let incidentHeatAdd = 0
       let incidentTrafficMult = 1
+      const opsEffectMult = opsConfig.incidentEffectMultiplier
 
       for (const inc of activeIncidents) {
         if (inc.resolved) continue
         switch (inc.def.effect) {
-          case 'revenue_penalty': incidentRevenueMult *= inc.def.effectMagnitude; break
-          case 'power_surge': incidentPowerMult *= inc.def.effectMagnitude; break
-          case 'cooling_failure': incidentCoolingMult *= inc.def.effectMagnitude; break
-          case 'heat_spike': incidentHeatAdd += inc.def.effectMagnitude; break
-          case 'traffic_drop': incidentTrafficMult *= inc.def.effectMagnitude; break
+          // For multiplier effects < 1 (penalties), interpolate toward 1.0 to reduce damage
+          case 'revenue_penalty': incidentRevenueMult *= 1 - (1 - inc.def.effectMagnitude) * opsEffectMult; break
+          case 'power_surge': incidentPowerMult *= 1 + (inc.def.effectMagnitude - 1) * opsEffectMult; break
+          case 'cooling_failure': incidentCoolingMult *= 1 - (1 - inc.def.effectMagnitude) * opsEffectMult; break
+          case 'heat_spike': incidentHeatAdd += inc.def.effectMagnitude * opsEffectMult; break
+          case 'traffic_drop': incidentTrafficMult *= 1 - (1 - inc.def.effectMagnitude) * opsEffectMult; break
         }
       }
 
@@ -5078,24 +5242,30 @@ export const useGameStore = create<GameState>((set) => ({
         })
       }
 
-      // Natural incident tick-down — all unresolved incidents decrease timer each tick
+      // Natural incident tick-down — only at Ops Tier 3+ (Basic Automation and above)
+      // At Tier 1-2, incidents do NOT auto-resolve — player must pay to resolve manually
       // auto_failover tech grants 30% chance of extra tick reduction
       const hasAutoFailover = state.unlockedTech.includes('auto_failover')
-      activeIncidents = activeIncidents.map((i) => {
-        if (i.resolved) return i
-        const autoBonus = hasAutoFailover && Math.random() < 0.3 ? 1 : 0
-        const remaining = i.ticksRemaining - 1 - autoBonus
-        if (remaining <= 0) {
-          incidentLog = [`Expired: ${i.def.label}`, ...incidentLog].slice(0, 10)
-          // Track hardware restoration for incidents expiring this tick
-          if (i.def.effect === 'hardware_failure' && i.affectedHardwareId) {
-            if (i.def.hardwareTarget === 'leaf') restoredLeafCabIds.add(i.affectedHardwareId)
-            if (i.def.hardwareTarget === 'spine') restoredSpineIds.add(i.affectedHardwareId)
+      if (opsConfig.incidentAutoResolve) {
+        activeIncidents = activeIncidents.map((i) => {
+          if (i.resolved) return i
+          const autoBonus = hasAutoFailover && Math.random() < 0.3 ? 1 : 0
+          // autoResolveSpeed: 1 = normal, 2 = double speed (Tier 4)
+          const speedTicks = opsConfig.autoResolveSpeed
+          const remaining = i.ticksRemaining - speedTicks - autoBonus
+          if (remaining <= 0) {
+            incidentLog = [`Auto-resolved: ${i.def.label}`, ...incidentLog].slice(0, 10)
+            opsAutoResolved++
+            // Track hardware restoration for incidents expiring this tick
+            if (i.def.effect === 'hardware_failure' && i.affectedHardwareId) {
+              if (i.def.hardwareTarget === 'leaf') restoredLeafCabIds.add(i.affectedHardwareId)
+              if (i.def.hardwareTarget === 'spine') restoredSpineIds.add(i.affectedHardwareId)
+            }
+            return { ...i, ticksRemaining: 0, resolved: true }
           }
-          return { ...i, ticksRemaining: 0, resolved: true }
-        }
-        return { ...i, ticksRemaining: remaining }
-      })
+          return { ...i, ticksRemaining: remaining }
+        })
+      }
 
       // Fatigue recovery: -2 per tick for on-shift staff (slow recovery), -5 for off-shift
       updatedStaff = updatedStaff.map((s) => ({
@@ -6353,7 +6523,7 @@ export const useGameStore = create<GameState>((set) => ({
       // ── Lifetime stats ────────────────────────────────────────────
       const lifetimeStats = { ...state.lifetimeStats }
       lifetimeStats.totalRevenueEarned += revenue + contractRevenue + spotRevenue + meetMeRevenue
-      lifetimeStats.totalExpensesPaid += expenses + loanPayments + contractPenalties + insuranceCost + staffCostPerTick + peeringCostPerTick + powerRedundancyCost + meetMeMaintenanceCost + carbonTaxPerTick + waterCostPerTick + securityMaintenanceCost
+      lifetimeStats.totalExpensesPaid += expenses + loanPayments + contractPenalties + insuranceCost + staffCostPerTick + peeringCostPerTick + powerRedundancyCost + meetMeMaintenanceCost + opsConfig.maintenanceCostPerTick + carbonTaxPerTick + waterCostPerTick + securityMaintenanceCost
       lifetimeStats.totalMoneyEarned += revenue + contractRevenue + spotRevenue + meetMeRevenue + patentIncome
       lifetimeStats.peakTemperatureReached = Math.max(lifetimeStats.peakTemperatureReached, stats.avgHeat)
       lifetimeStats.peakRevenueTick = Math.max(lifetimeStats.peakRevenueTick, revenue)
@@ -6405,6 +6575,19 @@ export const useGameStore = create<GameState>((set) => ({
           if (tip.id === 'competitor_appeared' && competitors.length === 1 && state.competitors.length === 0) trigger = true
           if (tip.id === 'competitor_bidding' && competitorBids.length > 0 && state.competitorBids.length === 0) trigger = true
           if (tip.id === 'price_war' && priceWarActive && !state.priceWarActive) trigger = true
+          // Operations Progression tips
+          if (tip.id === 'ops_manual' && state.operationsTier === 1 && activeIncidents.filter(i => !i.resolved).length >= 2) trigger = true
+          if (tip.id === 'ops_tier_available') {
+            const nextTier = (state.operationsTier + 1) as OperationsTier
+            if (nextTier <= 4) {
+              const nextConfig = OPS_TIER_CONFIG[nextTier]
+              const tierOrder: SuiteTier[] = ['starter', 'standard', 'professional', 'enterprise']
+              if (state.reputationScore >= nextConfig.minReputation
+                && tierOrder.indexOf(state.suiteTier) >= tierOrder.indexOf(nextConfig.minSuiteTier)
+                && (!nextConfig.requiredTech || state.unlockedTech.includes(nextConfig.requiredTech))
+                && state.money >= nextConfig.unlockCost) trigger = true
+            }
+          }
           if (trigger) { activeTip = tip; break }
         }
       }
@@ -6472,13 +6655,18 @@ export const useGameStore = create<GameState>((set) => ({
       // Underdog: won a contract and any competitor has higher reputation
       if (competitorContractsWon > 0 && competitors.some((c) => c.reputationScore > state.reputationScore)) unlock('underdog')
       if (competitorOutperformTicks >= 100) unlock('rivalry')
+      // Operations Progression achievements
+      if (state.operationsTier >= 2) unlock('ops_monitoring')
+      if (state.operationsTier >= 3) unlock('ops_automation')
+      if (state.operationsTier >= 4) unlock('ops_orchestration')
+      if (opsIncidentsPrevented >= 10) unlock('ops_prevented')
 
       // Apply Phase 4 bonuses to contract revenue
       const adjustedContractRevenue = +(contractRevenue * (1 + complianceRevenueBonus + greenCertRevenueBonus) * priceWarPenalty).toFixed(2)
 
-      // Recalculate final money with all income/expenses (Phase 4 + 5 included)
+      // Recalculate final money with all income/expenses (Phase 4 + 5 + ops included)
       const phase5Income = spotRevenue + meetMeRevenue
-      const phase5Expenses = peeringCostPerTick + powerRedundancyCost + meetMeMaintenanceCost + (noiseComplaints > state.noiseComplaints && noiseComplaints % NOISE_CONFIG.fineThreshold === 0 ? NOISE_CONFIG.fineAmount : 0)
+      const phase5Expenses = peeringCostPerTick + powerRedundancyCost + meetMeMaintenanceCost + opsConfig.maintenanceCostPerTick + (noiseComplaints > state.noiseComplaints && noiseComplaints % NOISE_CONFIG.fineThreshold === 0 ? NOISE_CONFIG.fineAmount : 0)
       const phase4Expenses = carbonTaxPerTick + waterCostPerTick + securityMaintenanceCost
       const finalNewMoney = state.sandboxMode
         ? 999999999
@@ -6621,6 +6809,10 @@ export const useGameStore = create<GameState>((set) => ({
         priceWarActive,
         priceWarTicksRemaining,
         poachTarget,
+        // Operations Progression
+        opsAutoResolved,
+        opsIncidentsPrevented,
+        opsCostPerTick: opsConfig.maintenanceCostPerTick,
         // Updated contract revenue (with Phase 4 bonuses)
         contractRevenue: +adjustedContractRevenue.toFixed(2),
       }

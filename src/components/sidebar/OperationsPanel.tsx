@@ -1,13 +1,20 @@
-import { useGameStore, COOLING_CONFIG, ENVIRONMENT_CONFIG, GENERATOR_OPTIONS, SUPPRESSION_CONFIG } from '@/stores/gameStore'
-import type { SuppressionType } from '@/stores/gameStore'
+import { useGameStore, COOLING_CONFIG, ENVIRONMENT_CONFIG, GENERATOR_OPTIONS, SUPPRESSION_CONFIG, OPS_TIER_CONFIG } from '@/stores/gameStore'
+import type { SuppressionType, OperationsTier, SuiteTier } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Power, Droplets, Shield, Fuel, Flame } from 'lucide-react'
+import { Power, Droplets, Shield, Fuel, Flame, Cpu } from 'lucide-react'
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+
+const TIER_COLORS: Record<OperationsTier, string> = {
+  1: '#888888',
+  2: '#00aaff',
+  3: '#ff6644',
+  4: '#cc66ff',
+}
 
 export function OperationsPanel() {
   const {
@@ -16,12 +23,132 @@ export function OperationsPanel() {
     generators, generatorFuelCost, powerOutage, outageTicksRemaining,
     buyGenerator, activateGenerator,
     suppressionType, fireActive, upgradeSuppression,
+    operationsTier, opsAutoResolved, opsCostPerTick, opsIncidentsPrevented,
+    upgradeOperationsTier, reputationScore, suiteTier, unlockedTech, sandboxMode,
   } = useGameStore()
+
+  const currentConfig = OPS_TIER_CONFIG[operationsTier]
+  const nextTier = (operationsTier < 4 ? operationsTier + 1 : null) as OperationsTier | null
+  const nextConfig = nextTier ? OPS_TIER_CONFIG[nextTier] : null
+
+  const tierOrder: SuiteTier[] = ['starter', 'standard', 'professional', 'enterprise']
+  const canUpgrade = nextConfig && (
+    sandboxMode || money >= nextConfig.unlockCost
+  ) && reputationScore >= nextConfig.minReputation
+    && tierOrder.indexOf(suiteTier) >= tierOrder.indexOf(nextConfig.minSuiteTier)
+    && (!nextConfig.requiredTech || unlockedTech.includes(nextConfig.requiredTech))
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Power */}
+      {/* Operations Progression */}
       <div>
+        <div className="flex items-center gap-2 mb-2">
+          <Cpu className="size-3" style={{ color: TIER_COLORS[operationsTier] }} />
+          <span className="text-xs font-bold" style={{ color: TIER_COLORS[operationsTier] }}>OPS TIER</span>
+          <Badge
+            className="ml-auto font-mono text-xs border"
+            style={{
+              backgroundColor: `${TIER_COLORS[operationsTier]}20`,
+              color: TIER_COLORS[operationsTier],
+              borderColor: `${TIER_COLORS[operationsTier]}40`,
+            }}
+          >
+            T{operationsTier}: {currentConfig.label}
+          </Badge>
+        </div>
+        <p className="text-xs text-muted-foreground mb-2">{currentConfig.description}</p>
+        <div className="flex flex-col gap-1">
+          <div className="flex justify-between text-xs">
+            <span className="text-muted-foreground">Resolve Cost</span>
+            <span style={{ color: TIER_COLORS[operationsTier] }}>
+              {currentConfig.resolveCostMultiplier < 1
+                ? `-${Math.round((1 - currentConfig.resolveCostMultiplier) * 100)}%`
+                : 'Normal'}
+            </span>
+          </div>
+          <div className="flex justify-between text-xs">
+            <span className="text-muted-foreground">Damage Reduction</span>
+            <span style={{ color: TIER_COLORS[operationsTier] }}>
+              {currentConfig.incidentEffectMultiplier < 1
+                ? `-${Math.round((1 - currentConfig.incidentEffectMultiplier) * 100)}%`
+                : 'None'}
+            </span>
+          </div>
+          <div className="flex justify-between text-xs">
+            <span className="text-muted-foreground">Auto-Resolve</span>
+            <span style={{ color: TIER_COLORS[operationsTier] }}>
+              {currentConfig.incidentAutoResolve
+                ? currentConfig.autoResolveSpeed > 1 ? `${currentConfig.autoResolveSpeed}x speed` : 'Yes'
+                : 'No'}
+            </span>
+          </div>
+          {currentConfig.preventionChance > 0 && (
+            <div className="flex justify-between text-xs">
+              <span className="text-muted-foreground">Prevention</span>
+              <span style={{ color: TIER_COLORS[operationsTier] }}>
+                {Math.round(currentConfig.preventionChance * 100)}% chance
+              </span>
+            </div>
+          )}
+          {opsCostPerTick > 0 && (
+            <div className="flex justify-between text-xs">
+              <span className="text-muted-foreground">Ops Cost</span>
+              <span className="text-neon-orange tabular-nums">${opsCostPerTick}/t</span>
+            </div>
+          )}
+        </div>
+        {/* Stats */}
+        {(opsAutoResolved > 0 || opsIncidentsPrevented > 0) && (
+          <div className="flex flex-col gap-1 mt-2 pt-2 border-t border-border/50">
+            {opsAutoResolved > 0 && (
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Auto-resolved</span>
+                <span className="text-neon-green tabular-nums">{opsAutoResolved}</span>
+              </div>
+            )}
+            {opsIncidentsPrevented > 0 && (
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Prevented</span>
+                <span className="text-neon-green tabular-nums">{opsIncidentsPrevented}</span>
+              </div>
+            )}
+          </div>
+        )}
+        {/* Upgrade button */}
+        {nextConfig && (
+          <div className="mt-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => upgradeOperationsTier(nextTier!)}
+                  disabled={!canUpgrade}
+                  className="justify-between font-mono text-xs w-full transition-all"
+                  style={{
+                    borderColor: canUpgrade ? `${TIER_COLORS[nextTier!]}50` : undefined,
+                  }}
+                >
+                  <span className="truncate">T{nextTier}: {nextConfig.label}</span>
+                  <span className="text-muted-foreground">${nextConfig.unlockCost.toLocaleString()}</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right" className="max-w-60">
+                <p className="font-bold mb-1">{nextConfig.label}</p>
+                <p className="mb-1">{nextConfig.description}</p>
+                <p className="text-xs text-muted-foreground">
+                  Requires: Rep {nextConfig.minReputation}+
+                  {nextConfig.minSuiteTier !== 'starter' && `, ${nextConfig.minSuiteTier} suite`}
+                  {nextConfig.requiredTech && `, ${nextConfig.requiredTech} tech`}
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        )}
+      </div>
+
+      {/* Power */}
+      <div className="border-t border-border pt-3">
         <div className="flex items-center gap-2 mb-2">
           <Power className="size-3 text-neon-green" />
           <span className="text-xs font-bold text-neon-green">POWER</span>
