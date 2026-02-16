@@ -282,17 +282,21 @@ Late-game sci-fi progression beyond the current 4 suite tiers.
 
 ---
 
-### Operations Progression — Manual to Automated
+### Operations Progression — Manual to Automated ✅
 
 A progression system for incident and infrastructure management, inspired by the journey from manual ops to Kubernetes-style orchestration. Early game forces hands-on management; later tiers unlock automation.
 
-- [ ] **Tier 1 — Manual Ops (default):** Incidents require manual resolution (pay to fix) or expire with lingering damage (destroyed servers stay destroyed, failed leaf switches need manual replacement). No auto-healing.
-- [ ] **Tier 2 — Monitoring & Alerting (tech unlock or reputation gate):** Clearer incident warnings (e.g., flashing HUD alerts, sound cues). Reduced resolution costs. Incidents still require manual action but players get more lead time.
-- [ ] **Tier 3 — Basic Automation (mid-game unlock):** Incidents naturally tick down over their `durationTicks`. Staff can speed up resolution. Hardware auto-restores when incidents expire. (Current behavior after fix.)
-- [ ] **Tier 4 — Full Orchestration (late-game unlock):** Auto-failover, self-healing infrastructure, workload migration during incidents, predictive maintenance. Like going from bare metal to Kubernetes.
-- [ ] Gate progression behind tech tree, reputation tier, or suite tier milestones
-- [ ] Each tier could unlock new UI panels (e.g., Tier 3 unlocks an "Automation" dashboard)
-- [ ] Achievement ideas: "Script Kiddie" (unlock Tier 2), "SRE" (unlock Tier 3), "Platform Engineer" (unlock Tier 4)
+- [x] **Tier 1 — Manual Ops (default):** Base tier with no automation. Incidents require manual resolution or expire naturally.
+- [x] **Tier 2 — Monitoring & Alerting:** Requires 2+ staff, `ups_upgrade` tech, reputation 25+. Benefits: -10% incident spawn, -20% resolve cost, +10% staff effectiveness, +5% auto-resolve speed.
+- [x] **Tier 3 — Basic Automation:** Requires 4+ staff, all 3 resilience techs, reputation 45+, Standard suite. Benefits: -25% incident spawn, -35% resolve cost, +20% auto-resolve speed, +20% staff effectiveness, -15% revenue penalty from incidents.
+- [x] **Tier 4 — Full Orchestration:** Requires 8+ staff, 5 techs (resilience + efficiency), reputation 65+, Professional suite. Benefits: -40% spawn, -50% resolve cost, +40% auto-resolve speed, +35% staff effectiveness, -30% revenue penalty.
+- [x] Gated behind tech tree, reputation, suite tier, staff count, and upgrade cost milestones
+- [x] Ops tier UI section in Operations panel with current benefits, stats, and upgrade path with requirement checklist
+- [x] Achievements: "Script Kiddie" (Monitoring), "SRE" (Automation), "Platform Engineer" (Orchestration), "Lights Out" (20 auto-resolves)
+- [x] Incident resolve cost discount shown in Incidents panel with strikethrough pricing
+- [x] Tutorial tip triggers when next ops tier requirements are met
+- [x] Event logging for auto-resolved and prevented incidents
+- [x] Tests for upgrade mechanics, cost deduction, sequential progression, and resolve cost reduction
 
 **Effort:** Medium-High | **Impact:** High — Transforms incident management from a passive system into a core progression mechanic. Gives players a strong sense of advancement and makes early game meaningfully challenging.
 

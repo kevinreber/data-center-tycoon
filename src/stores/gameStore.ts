@@ -25,6 +25,9 @@ export type ComplianceCertId = 'soc2_type1' | 'soc2_type2' | 'hipaa' | 'pci_dss'
 // ── Phase 4D: Competitor AI Types ───────────────────────────────
 export type CompetitorPersonality = 'budget' | 'premium' | 'green' | 'aggressive' | 'steady'
 
+// ── Operations Progression Types ────────────────────────────────
+export type OpsTier = 'manual' | 'monitoring' | 'automation' | 'orchestration'
+
 // ── Save Slot Types ──────────────────────────────────────────
 
 export const MAX_SAVE_SLOTS = 3
@@ -196,6 +199,69 @@ export const TECH_BRANCH_COLORS: Record<TechBranch, string> = {
   performance: '#ff6644',
   resilience: '#44ff88',
 }
+
+// ── Operations Progression Config ──────────────────────────────
+export interface OpsTierConfig {
+  id: OpsTier
+  label: string
+  description: string
+  color: string
+  unlockRequirements: {
+    minStaff: number
+    requiredTechs: string[]
+    minReputation: number
+    minSuiteTier: SuiteTier
+  }
+  benefits: {
+    incidentSpawnReduction: number     // 0–1, fraction reduction in incident spawn chance
+    autoResolveSpeedBonus: number      // 0–1, probability of extra tick reduction per tick
+    revenuePenaltyReduction: number    // 0–1, reduces revenue impact from incidents
+    staffEffectivenessBonus: number    // 0–1, bonus to staff resolution effectiveness
+    resolveCostReduction: number       // 0–1, discount on manual resolution cost
+  }
+  upgradeCost: number
+}
+
+export const OPS_TIER_CONFIG: OpsTierConfig[] = [
+  {
+    id: 'manual',
+    label: 'Manual Ops',
+    description: 'Hands-on incident management. All issues require manual resolution or expire with lingering damage.',
+    color: '#888888',
+    unlockRequirements: { minStaff: 0, requiredTechs: [], minReputation: 0, minSuiteTier: 'starter' },
+    benefits: { incidentSpawnReduction: 0, autoResolveSpeedBonus: 0, revenuePenaltyReduction: 0, staffEffectivenessBonus: 0, resolveCostReduction: 0 },
+    upgradeCost: 0,
+  },
+  {
+    id: 'monitoring',
+    label: 'Monitoring & Alerting',
+    description: 'Proactive monitoring with dashboards and alerting. Reduced resolution costs and improved staff response.',
+    color: '#00ccff',
+    unlockRequirements: { minStaff: 2, requiredTechs: ['ups_upgrade'], minReputation: 25, minSuiteTier: 'starter' },
+    benefits: { incidentSpawnReduction: 0.10, autoResolveSpeedBonus: 0.05, revenuePenaltyReduction: 0.05, staffEffectivenessBonus: 0.10, resolveCostReduction: 0.20 },
+    upgradeCost: 15000,
+  },
+  {
+    id: 'automation',
+    label: 'Basic Automation',
+    description: 'Automated runbooks and self-healing scripts. Staff-assisted auto-resolution with reduced incident frequency.',
+    color: '#44ff88',
+    unlockRequirements: { minStaff: 4, requiredTechs: ['ups_upgrade', 'redundant_cooling', 'auto_failover'], minReputation: 45, minSuiteTier: 'standard' },
+    benefits: { incidentSpawnReduction: 0.25, autoResolveSpeedBonus: 0.20, revenuePenaltyReduction: 0.15, staffEffectivenessBonus: 0.20, resolveCostReduction: 0.35 },
+    upgradeCost: 50000,
+  },
+  {
+    id: 'orchestration',
+    label: 'Full Orchestration',
+    description: 'Kubernetes-style orchestration with auto-failover, predictive maintenance, and self-healing infrastructure.',
+    color: '#ff66ff',
+    unlockRequirements: { minStaff: 8, requiredTechs: ['ups_upgrade', 'redundant_cooling', 'auto_failover', 'hot_aisle', 'variable_fans'], minReputation: 65, minSuiteTier: 'professional' },
+    benefits: { incidentSpawnReduction: 0.40, autoResolveSpeedBonus: 0.40, revenuePenaltyReduction: 0.30, staffEffectivenessBonus: 0.35, resolveCostReduction: 0.50 },
+    upgradeCost: 120000,
+  },
+]
+
+export const OPS_TIER_ORDER: OpsTier[] = ['manual', 'monitoring', 'automation', 'orchestration']
 
 // ── Reputation System Types ───────────────────────────────────
 
@@ -1063,6 +1129,8 @@ export const TUTORIAL_TIPS: TutorialTip[] = [
   { id: 'competitor_appeared', title: 'New Competitor!', message: 'A rival data center company has entered the market. They will compete for contracts — act fast to secure deals!', category: 'market' },
   { id: 'competitor_bidding', title: 'Competition!', message: 'A competitor is bidding on a contract you may want. Accept quickly before they win it!', category: 'market' },
   { id: 'price_war', title: 'Price War!', message: 'A competitor has started a price war! Contract revenue is temporarily reduced across the market.', category: 'market' },
+  // Operations Progression tips
+  { id: 'ops_upgrade_available', title: 'Ops Upgrade Ready', message: 'You meet the requirements to upgrade your operations tier! Check the Operations panel to unlock better automation and reduced incident costs.', category: 'incidents' },
 ]
 
 // ── Procedural Name Generation ──────────────────────────────────
@@ -1316,6 +1384,11 @@ export const ACHIEVEMENT_CATALOG: AchievementDef[] = [
   { id: 'monopoly', label: 'Monopoly', description: 'Win 5 contracts that competitors bid on.', icon: '🏅' },
   { id: 'underdog', label: 'Underdog', description: 'Win a contract against a competitor with higher reputation.', icon: '💪' },
   { id: 'rivalry', label: 'Rivalry', description: 'Outperform all competitors for 100 consecutive ticks.', icon: '🏆' },
+  // Operations Progression achievements
+  { id: 'script_kiddie', label: 'Script Kiddie', description: 'Unlock Monitoring & Alerting ops tier.', icon: '📡' },
+  { id: 'sre', label: 'SRE', description: 'Unlock Basic Automation ops tier.', icon: '🤖' },
+  { id: 'platform_engineer', label: 'Platform Engineer', description: 'Unlock Full Orchestration ops tier.', icon: '🚀' },
+  { id: 'lights_out', label: 'Lights Out', description: 'Auto-resolve 20 incidents via ops automation.', icon: '💡' },
 ]
 
 export interface EnvironmentConfig {
@@ -2521,6 +2594,11 @@ interface GameState {
   priceWarTicksRemaining: number
   poachTarget: string | null            // staff ID being poached
 
+  // Operations Progression
+  opsTier: OpsTier
+  opsAutoResolvedCount: number          // lifetime incidents auto-resolved by ops automation
+  opsPreventedCount: number             // lifetime incidents prevented by ops automation
+
   // Save / Load
   hasSaved: boolean
   activeSlotId: number | null
@@ -2613,6 +2691,8 @@ interface GameState {
   startComplianceAudit: (certId: ComplianceCertId) => void
   // Phase 4D — Competitor AI actions
   counterPoachOffer: () => void
+  // Operations Progression actions
+  upgradeOpsTier: () => void
   // Tutorial actions
   dismissTip: (tipId: string) => void
   toggleTutorial: () => void
@@ -2934,6 +3014,11 @@ export const useGameStore = create<GameState>((set) => ({
   priceWarTicksRemaining: 0,
   poachTarget: null as string | null,
 
+  // Operations Progression
+  opsTier: 'manual' as OpsTier,
+  opsAutoResolvedCount: 0,
+  opsPreventedCount: 0,
+
   // Demo mode
   isDemo: false,
 
@@ -3145,7 +3230,11 @@ export const useGameStore = create<GameState>((set) => ({
     set((state) => {
       const incident = state.activeIncidents.find((i) => i.id === id)
       if (!incident || incident.resolved) return state
-      if (state.money < incident.def.resolveCost) return state
+      // Apply ops tier resolve cost reduction
+      const opsConfig = OPS_TIER_CONFIG.find((c) => c.id === state.opsTier)
+      const costReduction = opsConfig?.benefits.resolveCostReduction ?? 0
+      const effectiveCost = Math.round(incident.def.resolveCost * (1 - costReduction))
+      if (state.money < effectiveCost) return state
 
       // Restore hardware if this was a hardware_failure incident
       let cabinets = state.cabinets
@@ -3168,9 +3257,9 @@ export const useGameStore = create<GameState>((set) => ({
         ),
         cabinets,
         spineSwitches,
-        money: state.money - incident.def.resolveCost,
+        money: state.money - effectiveCost,
         resolvedCount: state.resolvedCount + 1,
-        incidentLog: [`Resolved: ${incident.def.label}`, ...state.incidentLog].slice(0, 10),
+        incidentLog: [`Resolved: ${incident.def.label}${costReduction > 0 ? ` (${Math.round(costReduction * 100)}% ops discount)` : ''}`, ...state.incidentLog].slice(0, 10),
         ...calcStats(cabinets, spineSwitches),
         trafficStats: calcTraffic(cabinets, spineSwitches, state.demandMultiplier),
       }
@@ -3972,6 +4061,29 @@ export const useGameStore = create<GameState>((set) => ({
       return {
         money: state.money - counterCost,
         poachTarget: null,
+      }
+    }),
+
+  // ── Operations Progression Actions ─────────────────────────────
+
+  upgradeOpsTier: () =>
+    set((state) => {
+      const currentIdx = OPS_TIER_ORDER.indexOf(state.opsTier)
+      if (currentIdx >= OPS_TIER_ORDER.length - 1) return state // already at max tier
+      const nextTierId = OPS_TIER_ORDER[currentIdx + 1]
+      const nextConfig = OPS_TIER_CONFIG.find((c) => c.id === nextTierId)
+      if (!nextConfig) return state
+      // Check requirements
+      const { minStaff, requiredTechs, minReputation, minSuiteTier } = nextConfig.unlockRequirements
+      if (state.staff.length < minStaff) return state
+      if (!requiredTechs.every((t) => state.unlockedTech.includes(t))) return state
+      if (state.reputationScore < minReputation) return state
+      const suiteTierOrder: SuiteTier[] = ['starter', 'standard', 'professional', 'enterprise']
+      if (suiteTierOrder.indexOf(state.suiteTier) < suiteTierOrder.indexOf(minSuiteTier)) return state
+      if (state.money < nextConfig.upgradeCost) return state
+      return {
+        opsTier: nextTierId,
+        money: state.money - nextConfig.upgradeCost,
       }
     }),
 
@@ -4841,6 +4953,10 @@ export const useGameStore = create<GameState>((set) => ({
       activeTip: null,
       tutorialEnabled: true,
       activeSlotId: null,
+      // Operations Progression
+      opsTier: 'manual' as OpsTier,
+      opsAutoResolvedCount: 0,
+      opsPreventedCount: 0,
     })
   },
 
@@ -4897,12 +5013,23 @@ export const useGameStore = create<GameState>((set) => ({
         }
       }
 
+      // ── Operations tier benefits ──────────────────────────────
+      const opsTierConfig = OPS_TIER_CONFIG.find((c) => c.id === state.opsTier)
+      const opsSpawnReduction = opsTierConfig?.benefits.incidentSpawnReduction ?? 0
+      const opsAutoResolveBonus = opsTierConfig?.benefits.autoResolveSpeedBonus ?? 0
+      const opsRevenuePenaltyReduction = opsTierConfig?.benefits.revenuePenaltyReduction ?? 0
+      const opsStaffBonus = opsTierConfig?.benefits.staffEffectivenessBonus ?? 0
+      let opsAutoResolvedCount = state.opsAutoResolvedCount
+      let opsPreventedCount = state.opsPreventedCount
+
       // Spawn new incidents (only if we have equipment and fewer than max active)
       if (state.cabinets.length > 0 && activeIncidents.length < MAX_ACTIVE_INCIDENTS) {
-        // Scale chance with facility size + messy cable penalty
+        // Scale chance with facility size + messy cable penalty, reduced by ops tier
         const sizeMultiplier = Math.min(2, state.cabinets.length / 8)
         const cablingPenalty = state.infraIncidentBonus
-        if (Math.random() < INCIDENT_CHANCE * sizeMultiplier + cablingPenalty) {
+        const baseSpawnChance = INCIDENT_CHANCE * sizeMultiplier + cablingPenalty
+        const adjustedSpawnChance = baseSpawnChance * (1 - opsSpawnReduction)
+        if (Math.random() < adjustedSpawnChance) {
           let selectedDef = INCIDENT_CATALOG[Math.floor(Math.random() * INCIDENT_CATALOG.length)]
           let affectedHwId: string | undefined
 
@@ -4940,6 +5067,9 @@ export const useGameStore = create<GameState>((set) => ({
           }
           activeIncidents.push(incident)
           incidentLog = [`New: ${selectedDef.label} — ${selectedDef.description}`, ...incidentLog].slice(0, 10)
+        } else if (opsSpawnReduction > 0 && Math.random() < baseSpawnChance) {
+          // Incident was prevented by ops tier
+          opsPreventedCount++
         }
       }
 
@@ -4973,7 +5103,12 @@ export const useGameStore = create<GameState>((set) => ({
       for (const inc of activeIncidents) {
         if (inc.resolved) continue
         switch (inc.def.effect) {
-          case 'revenue_penalty': incidentRevenueMult *= inc.def.effectMagnitude; break
+          case 'revenue_penalty': {
+            // Ops tier reduces the severity of revenue penalties
+            const reducedMag = inc.def.effectMagnitude + (1 - inc.def.effectMagnitude) * opsRevenuePenaltyReduction
+            incidentRevenueMult *= reducedMag
+            break
+          }
           case 'power_surge': incidentPowerMult *= inc.def.effectMagnitude; break
           case 'cooling_failure': incidentCoolingMult *= inc.def.effectMagnitude; break
           case 'heat_spike': incidentHeatAdd += inc.def.effectMagnitude; break
@@ -5022,15 +5157,15 @@ export const useGameStore = create<GameState>((set) => ({
       const networkEngineers = onShiftStaff.filter((s) => s.role === 'network_engineer')
       const electricians = onShiftStaff.filter((s) => s.role === 'electrician')
 
-      // Calculate per-incident-type speed multipliers from staff
+      // Calculate per-incident-type speed multipliers from staff (boosted by ops tier)
       const staffTrafficResolution = networkEngineers.reduce((sum, s) => {
         const bonus = s.skillLevel === 1 ? 0.25 : s.skillLevel === 2 ? 0.40 : 0.60
         return sum + bonus
-      }, 0) * shiftCoverage
+      }, 0) * shiftCoverage * (1 + opsStaffBonus)
       const staffPowerResolution = electricians.reduce((sum, s) => {
         const bonus = s.skillLevel === 1 ? 0.25 : s.skillLevel === 2 ? 0.40 : 0.60
         return sum + bonus
-      }, 0) * shiftCoverage
+      }, 0) * shiftCoverage * (1 + opsStaffBonus)
 
       // Apply staff-based incident speed reduction (in addition to tech bonuses)
       if (onShiftStaff.length > 0) {
@@ -5040,7 +5175,7 @@ export const useGameStore = create<GameState>((set) => ({
           if (i.def.effect === 'traffic_drop') staffSpeedBonus = staffTrafficResolution
           else if (i.def.effect === 'power_surge') staffSpeedBonus = staffPowerResolution
           // Generic small bonus from any staff for other incident types
-          else staffSpeedBonus = Math.min(0.3, onShiftStaff.length * 0.05) * shiftCoverage
+          else staffSpeedBonus = Math.min(0.3, onShiftStaff.length * 0.05) * shiftCoverage * (1 + opsStaffBonus)
           const extraReduction = Math.random() < Math.min(0.8, staffSpeedBonus) ? 1 : 0
           if (extraReduction === 0) return i
           const remaining = i.ticksRemaining - extraReduction
@@ -5080,13 +5215,20 @@ export const useGameStore = create<GameState>((set) => ({
 
       // Natural incident tick-down — all unresolved incidents decrease timer each tick
       // auto_failover tech grants 30% chance of extra tick reduction
+      // ops tier grants additional auto-resolve speed bonus
       const hasAutoFailover = state.unlockedTech.includes('auto_failover')
       activeIncidents = activeIncidents.map((i) => {
         if (i.resolved) return i
         const autoBonus = hasAutoFailover && Math.random() < 0.3 ? 1 : 0
-        const remaining = i.ticksRemaining - 1 - autoBonus
+        const opsBonus = opsAutoResolveBonus > 0 && Math.random() < opsAutoResolveBonus ? 1 : 0
+        const remaining = i.ticksRemaining - 1 - autoBonus - opsBonus
         if (remaining <= 0) {
-          incidentLog = [`Expired: ${i.def.label}`, ...incidentLog].slice(0, 10)
+          if (opsBonus > 0) {
+            incidentLog = [`Auto-resolved: ${i.def.label}`, ...incidentLog].slice(0, 10)
+            opsAutoResolvedCount++
+          } else {
+            incidentLog = [`Expired: ${i.def.label}`, ...incidentLog].slice(0, 10)
+          }
           // Track hardware restoration for incidents expiring this tick
           if (i.def.effect === 'hardware_failure' && i.affectedHardwareId) {
             if (i.def.hardwareTarget === 'leaf') restoredLeafCabIds.add(i.affectedHardwareId)
@@ -6343,6 +6485,8 @@ export const useGameStore = create<GameState>((set) => ({
       if (competitors.length > state.competitors.length) logEvent('system', 'New competitor entered the market', 'info')
       if (intrusionsBlocked > state.intrusionsBlocked) logEvent('incident', 'Security intrusion blocked', 'success')
       if (complianceCerts.some((c) => !c.auditInProgress && c.grantedAtTick === newTickCount)) logEvent('achievement', 'Compliance certification granted!', 'success')
+      if (opsAutoResolvedCount > state.opsAutoResolvedCount) logEvent('system', 'Ops automation auto-resolved an incident', 'success')
+      if (opsPreventedCount > state.opsPreventedCount) logEvent('system', 'Ops monitoring prevented an incident', 'info')
 
       // ── Capacity history ──────────────────────────────────────────
       const capacityHistory = [...state.capacityHistory, {
@@ -6405,6 +6549,16 @@ export const useGameStore = create<GameState>((set) => ({
           if (tip.id === 'competitor_appeared' && competitors.length === 1 && state.competitors.length === 0) trigger = true
           if (tip.id === 'competitor_bidding' && competitorBids.length > 0 && state.competitorBids.length === 0) trigger = true
           if (tip.id === 'price_war' && priceWarActive && !state.priceWarActive) trigger = true
+          // Operations Progression tips
+          if (tip.id === 'ops_upgrade_available' && state.opsTier !== 'orchestration') {
+            const nextIdx = OPS_TIER_ORDER.indexOf(state.opsTier) + 1
+            if (nextIdx < OPS_TIER_ORDER.length) {
+              const nextConfig = OPS_TIER_CONFIG[nextIdx]
+              const { minStaff, requiredTechs, minReputation, minSuiteTier } = nextConfig.unlockRequirements
+              const suiteTierOrder: SuiteTier[] = ['starter', 'standard', 'professional', 'enterprise']
+              if (updatedStaff.length >= minStaff && requiredTechs.every((t) => state.unlockedTech.includes(t)) && reputationScore >= minReputation && suiteTierOrder.indexOf(state.suiteTier) >= suiteTierOrder.indexOf(minSuiteTier)) trigger = true
+            }
+          }
           if (trigger) { activeTip = tip; break }
         }
       }
@@ -6472,6 +6626,11 @@ export const useGameStore = create<GameState>((set) => ({
       // Underdog: won a contract and any competitor has higher reputation
       if (competitorContractsWon > 0 && competitors.some((c) => c.reputationScore > state.reputationScore)) unlock('underdog')
       if (competitorOutperformTicks >= 100) unlock('rivalry')
+      // Operations Progression achievements
+      if (state.opsTier === 'monitoring' || OPS_TIER_ORDER.indexOf(state.opsTier) >= 1) unlock('script_kiddie')
+      if (state.opsTier === 'automation' || OPS_TIER_ORDER.indexOf(state.opsTier) >= 2) unlock('sre')
+      if (state.opsTier === 'orchestration') unlock('platform_engineer')
+      if (opsAutoResolvedCount >= 20) unlock('lights_out')
 
       // Apply Phase 4 bonuses to contract revenue
       const adjustedContractRevenue = +(contractRevenue * (1 + complianceRevenueBonus + greenCertRevenueBonus) * priceWarPenalty).toFixed(2)
@@ -6623,6 +6782,9 @@ export const useGameStore = create<GameState>((set) => ({
         poachTarget,
         // Updated contract revenue (with Phase 4 bonuses)
         contractRevenue: +adjustedContractRevenue.toFixed(2),
+        // Operations Progression
+        opsAutoResolvedCount,
+        opsPreventedCount,
       }
     }),
 }))

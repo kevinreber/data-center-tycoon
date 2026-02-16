@@ -4,6 +4,7 @@ import type {
   Season,
   ServerConfig,
   ActiveIncident,
+  StaffMember,
 } from '@/stores/gameStore'
 import {
   SUPPLY_CHAIN_CONFIG,
@@ -20,6 +21,7 @@ import {
   TUTORIAL_TIPS,
   INCIDENT_CATALOG,
   SUITE_TIERS,
+  OPS_TIER_CONFIG,
   getAdjacentCabinets,
   hasMaintenanceAccess,
   calcSpacingHeatEffect,
@@ -1383,5 +1385,141 @@ describe('Spacing & Layout', () => {
     expect(cabs).toHaveLength(2)
     expect(cabs[0].facing).toBe('east')
     expect(cabs[1].facing).toBe('west')
+  })
+})
+
+// ============================================================================
+// Operations Progression
+// ============================================================================
+function makeStaff(id: string, role: StaffMember['role'], skillLevel: StaffMember['skillLevel'] = 1): StaffMember {
+  return { id, name: `Staff ${id}`, role, skillLevel, salaryPerTick: 4, hiredAtTick: 0, fatigueLevel: 0, onShift: true, incidentsResolved: 0, certifications: [] }
+}
+
+describe('Operations Progression', () => {
+  it('starts at manual ops tier', () => {
+    expect(getState().opsTier).toBe('manual')
+    expect(getState().opsAutoResolvedCount).toBe(0)
+    expect(getState().opsPreventedCount).toBe(0)
+  })
+
+  it('cannot upgrade without meeting requirements', () => {
+    setState({ sandboxMode: true, money: 999999 })
+    // Missing staff and tech requirements
+    getState().upgradeOpsTier()
+    expect(getState().opsTier).toBe('manual')
+  })
+
+  it('can upgrade to monitoring when requirements are met', () => {
+    setState({
+      sandboxMode: true,
+      money: 999999,
+      staff: [makeStaff('s-1', 'network_engineer'), makeStaff('s-2', 'electrician')],
+      unlockedTech: ['ups_upgrade'],
+      reputationScore: 30,
+      suiteTier: 'starter',
+    })
+    getState().upgradeOpsTier()
+    expect(getState().opsTier).toBe('monitoring')
+  })
+
+  it('deducts upgrade cost when upgrading', () => {
+    setState({
+      sandboxMode: false,
+      money: 20000,
+      staff: [makeStaff('s-1', 'network_engineer'), makeStaff('s-2', 'electrician')],
+      unlockedTech: ['ups_upgrade'],
+      reputationScore: 30,
+      suiteTier: 'starter',
+    })
+    const moneyBefore = getState().money
+    getState().upgradeOpsTier()
+    expect(getState().opsTier).toBe('monitoring')
+    const monitoringConfig = OPS_TIER_CONFIG.find((c) => c.id === 'monitoring')!
+    expect(getState().money).toBe(moneyBefore - monitoringConfig.upgradeCost)
+  })
+
+  it('cannot upgrade without enough money', () => {
+    setState({
+      sandboxMode: false,
+      money: 100, // not enough
+      staff: [makeStaff('s-1', 'network_engineer'), makeStaff('s-2', 'electrician')],
+      unlockedTech: ['ups_upgrade'],
+      reputationScore: 30,
+    })
+    getState().upgradeOpsTier()
+    expect(getState().opsTier).toBe('manual')
+  })
+
+  it('cannot skip tiers — must upgrade sequentially', () => {
+    // Try to set up for automation tier directly (skipping monitoring)
+    setState({
+      sandboxMode: true,
+      money: 999999,
+      staff: Array.from({ length: 4 }, (_, i) => makeStaff(`s-${i}`, 'network_engineer', 2)),
+      unlockedTech: ['ups_upgrade', 'redundant_cooling', 'auto_failover'],
+      reputationScore: 50,
+      suiteTier: 'standard',
+    })
+    // First upgrade goes to monitoring (not automation)
+    getState().upgradeOpsTier()
+    expect(getState().opsTier).toBe('monitoring')
+    // Second upgrade goes to automation
+    getState().upgradeOpsTier()
+    expect(getState().opsTier).toBe('automation')
+  })
+
+  it('resolveIncident applies ops tier cost reduction', () => {
+    setupBasicDataCenter()
+    const incident = INCIDENT_CATALOG.find((d) => d.effect === 'revenue_penalty')!
+    setState({
+      opsTier: 'automation',
+      activeIncidents: [{
+        id: 'inc-test',
+        def: incident,
+        ticksRemaining: 10,
+        resolved: false,
+      }],
+    })
+    const moneyBefore = getState().money
+    getState().resolveIncident('inc-test')
+    const automationConfig = OPS_TIER_CONFIG.find((c) => c.id === 'automation')!
+    const expectedCost = Math.round(incident.resolveCost * (1 - automationConfig.benefits.resolveCostReduction))
+    expect(getState().money).toBe(moneyBefore - expectedCost)
+  })
+
+  it('OPS_TIER_CONFIG has 4 tiers in order', () => {
+    expect(OPS_TIER_CONFIG).toHaveLength(4)
+    expect(OPS_TIER_CONFIG[0].id).toBe('manual')
+    expect(OPS_TIER_CONFIG[1].id).toBe('monitoring')
+    expect(OPS_TIER_CONFIG[2].id).toBe('automation')
+    expect(OPS_TIER_CONFIG[3].id).toBe('orchestration')
+  })
+
+  it('resetGame resets ops tier to manual', () => {
+    setState({ opsTier: 'orchestration', opsAutoResolvedCount: 50, opsPreventedCount: 30 })
+    getState().resetGame()
+    expect(getState().opsTier).toBe('manual')
+    expect(getState().opsAutoResolvedCount).toBe(0)
+    expect(getState().opsPreventedCount).toBe(0)
+  })
+
+  it('cannot upgrade past orchestration', () => {
+    setState({
+      sandboxMode: true,
+      money: 999999,
+      opsTier: 'orchestration',
+    })
+    getState().upgradeOpsTier()
+    expect(getState().opsTier).toBe('orchestration')
+  })
+
+  it('each tier has increasing benefits', () => {
+    for (let i = 1; i < OPS_TIER_CONFIG.length; i++) {
+      const prev = OPS_TIER_CONFIG[i - 1]
+      const curr = OPS_TIER_CONFIG[i]
+      expect(curr.benefits.incidentSpawnReduction).toBeGreaterThanOrEqual(prev.benefits.incidentSpawnReduction)
+      expect(curr.benefits.autoResolveSpeedBonus).toBeGreaterThanOrEqual(prev.benefits.autoResolveSpeedBonus)
+      expect(curr.benefits.resolveCostReduction).toBeGreaterThanOrEqual(prev.benefits.resolveCostReduction)
+    }
   })
 })

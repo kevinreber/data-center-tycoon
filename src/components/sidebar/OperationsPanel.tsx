@@ -1,13 +1,20 @@
-import { useGameStore, COOLING_CONFIG, ENVIRONMENT_CONFIG, GENERATOR_OPTIONS, SUPPRESSION_CONFIG } from '@/stores/gameStore'
-import type { SuppressionType } from '@/stores/gameStore'
+import { useGameStore, COOLING_CONFIG, ENVIRONMENT_CONFIG, GENERATOR_OPTIONS, SUPPRESSION_CONFIG, OPS_TIER_CONFIG, OPS_TIER_ORDER } from '@/stores/gameStore'
+import type { SuppressionType, OpsTier, SuiteTier } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Power, Droplets, Shield, Fuel, Flame } from 'lucide-react'
+import { Power, Droplets, Shield, Fuel, Flame, Cpu } from 'lucide-react'
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+
+const SUITE_TIER_ORDER: SuiteTier[] = ['starter', 'standard', 'professional', 'enterprise']
+
+function getNextOpsTier(current: OpsTier): OpsTier | null {
+  const idx = OPS_TIER_ORDER.indexOf(current)
+  return idx < OPS_TIER_ORDER.length - 1 ? OPS_TIER_ORDER[idx + 1] : null
+}
 
 export function OperationsPanel() {
   const {
@@ -16,12 +23,163 @@ export function OperationsPanel() {
     generators, generatorFuelCost, powerOutage, outageTicksRemaining,
     buyGenerator, activateGenerator,
     suppressionType, fireActive, upgradeSuppression,
+    opsTier, opsAutoResolvedCount, opsPreventedCount,
+    upgradeOpsTier,
+    staff, unlockedTech, reputationScore, suiteTier,
   } = useGameStore()
+
+  const currentConfig = OPS_TIER_CONFIG.find((c) => c.id === opsTier)!
+  const nextTierId = getNextOpsTier(opsTier)
+  const nextConfig = nextTierId ? OPS_TIER_CONFIG.find((c) => c.id === nextTierId) : null
+
+  // Check if next tier requirements are met
+  const canUpgrade = nextConfig ? (
+    staff.length >= nextConfig.unlockRequirements.minStaff &&
+    nextConfig.unlockRequirements.requiredTechs.every((t) => unlockedTech.includes(t)) &&
+    reputationScore >= nextConfig.unlockRequirements.minReputation &&
+    SUITE_TIER_ORDER.indexOf(suiteTier) >= SUITE_TIER_ORDER.indexOf(nextConfig.unlockRequirements.minSuiteTier) &&
+    money >= nextConfig.upgradeCost
+  ) : false
+
+  const reqsMet = nextConfig ? {
+    staff: staff.length >= nextConfig.unlockRequirements.minStaff,
+    techs: nextConfig.unlockRequirements.requiredTechs.every((t) => unlockedTech.includes(t)),
+    reputation: reputationScore >= nextConfig.unlockRequirements.minReputation,
+    suite: SUITE_TIER_ORDER.indexOf(suiteTier) >= SUITE_TIER_ORDER.indexOf(nextConfig.unlockRequirements.minSuiteTier),
+    money: money >= nextConfig.upgradeCost,
+  } : null
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Power */}
+      {/* Operations Tier */}
       <div>
+        <div className="flex items-center gap-2 mb-2">
+          <Cpu className="size-3" style={{ color: currentConfig.color }} />
+          <span className="text-xs font-bold" style={{ color: currentConfig.color }}>OPS TIER</span>
+          <Badge
+            className="ml-auto font-mono text-xs border"
+            style={{
+              backgroundColor: `${currentConfig.color}20`,
+              color: currentConfig.color,
+              borderColor: `${currentConfig.color}40`,
+            }}
+          >
+            {currentConfig.label}
+          </Badge>
+        </div>
+        <p className="text-xs text-muted-foreground mb-2">{currentConfig.description}</p>
+
+        {/* Current tier benefits */}
+        {opsTier !== 'manual' && (
+          <div className="flex flex-col gap-1 mb-2">
+            {currentConfig.benefits.incidentSpawnReduction > 0 && (
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Incident prevention</span>
+                <span style={{ color: currentConfig.color }}>-{Math.round(currentConfig.benefits.incidentSpawnReduction * 100)}%</span>
+              </div>
+            )}
+            {currentConfig.benefits.autoResolveSpeedBonus > 0 && (
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Auto-resolve speed</span>
+                <span style={{ color: currentConfig.color }}>+{Math.round(currentConfig.benefits.autoResolveSpeedBonus * 100)}%</span>
+              </div>
+            )}
+            {currentConfig.benefits.resolveCostReduction > 0 && (
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Resolve cost discount</span>
+                <span style={{ color: currentConfig.color }}>-{Math.round(currentConfig.benefits.resolveCostReduction * 100)}%</span>
+              </div>
+            )}
+            {currentConfig.benefits.staffEffectivenessBonus > 0 && (
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Staff effectiveness</span>
+                <span style={{ color: currentConfig.color }}>+{Math.round(currentConfig.benefits.staffEffectivenessBonus * 100)}%</span>
+              </div>
+            )}
+            {currentConfig.benefits.revenuePenaltyReduction > 0 && (
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Revenue impact reduction</span>
+                <span style={{ color: currentConfig.color }}>-{Math.round(currentConfig.benefits.revenuePenaltyReduction * 100)}%</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Stats */}
+        {(opsAutoResolvedCount > 0 || opsPreventedCount > 0) && (
+          <div className="flex flex-col gap-1 mb-2">
+            {opsAutoResolvedCount > 0 && (
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Auto-resolved</span>
+                <span className="text-neon-green tabular-nums">{opsAutoResolvedCount}</span>
+              </div>
+            )}
+            {opsPreventedCount > 0 && (
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Prevented</span>
+                <span className="text-neon-green tabular-nums">{opsPreventedCount}</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Next tier upgrade */}
+        {nextConfig && (
+          <div className="mt-1">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={upgradeOpsTier}
+                  disabled={!canUpgrade}
+                  className="justify-between font-mono text-xs w-full transition-all"
+                  style={{
+                    borderColor: canUpgrade ? `${nextConfig.color}50` : undefined,
+                    ...(canUpgrade ? { color: nextConfig.color } : {}),
+                  }}
+                >
+                  <span className="truncate">{nextConfig.label}</span>
+                  <span className="text-muted-foreground">${nextConfig.upgradeCost.toLocaleString()}</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right" className="max-w-64">
+                <p className="font-bold mb-1">{nextConfig.label}</p>
+                <p className="text-xs mb-2">{nextConfig.description}</p>
+                <p className="text-xs font-bold mb-1">Requirements:</p>
+                <ul className="text-xs space-y-0.5">
+                  <li className={reqsMet?.staff ? 'text-neon-green' : 'text-neon-red'}>
+                    {reqsMet?.staff ? '✓' : '✗'} {nextConfig.unlockRequirements.minStaff}+ staff hired
+                  </li>
+                  <li className={reqsMet?.techs ? 'text-neon-green' : 'text-neon-red'}>
+                    {reqsMet?.techs ? '✓' : '✗'} Techs: {nextConfig.unlockRequirements.requiredTechs.join(', ') || 'None'}
+                  </li>
+                  <li className={reqsMet?.reputation ? 'text-neon-green' : 'text-neon-red'}>
+                    {reqsMet?.reputation ? '✓' : '✗'} Reputation {nextConfig.unlockRequirements.minReputation}+
+                  </li>
+                  {nextConfig.unlockRequirements.minSuiteTier !== 'starter' && (
+                    <li className={reqsMet?.suite ? 'text-neon-green' : 'text-neon-red'}>
+                      {reqsMet?.suite ? '✓' : '✗'} Suite: {nextConfig.unlockRequirements.minSuiteTier}+
+                    </li>
+                  )}
+                  <li className={reqsMet?.money ? 'text-neon-green' : 'text-neon-red'}>
+                    {reqsMet?.money ? '✓' : '✗'} ${nextConfig.upgradeCost.toLocaleString()} funds
+                  </li>
+                </ul>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        )}
+
+        {opsTier === 'orchestration' && (
+          <p className="text-xs mt-1 italic" style={{ color: `${currentConfig.color}80` }}>
+            Full orchestration active. Self-healing infrastructure online.
+          </p>
+        )}
+      </div>
+
+      {/* Power */}
+      <div className="border-t border-border pt-3">
         <div className="flex items-center gap-2 mb-2">
           <Power className="size-3 text-neon-green" />
           <span className="text-xs font-bold text-neon-green">POWER</span>
