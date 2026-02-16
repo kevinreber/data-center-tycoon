@@ -1,4 +1,4 @@
-import { useGameStore, SIM, DEPRECIATION, POWER_DRAW, ENVIRONMENT_CONFIG, CUSTOMER_TYPE_CONFIG, MAX_SERVERS_PER_CABINET } from '@/stores/gameStore'
+import { useGameStore, SIM, DEPRECIATION, POWER_DRAW, ENVIRONMENT_CONFIG, CUSTOMER_TYPE_CONFIG, MAX_SERVERS_PER_CABINET, ZONE_BONUS_CONFIG } from '@/stores/gameStore'
 import type { Cabinet } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/tooltip'
 import {
   X, Power, Thermometer, Clock, RefreshCw, Server,
-  Network, ArrowUpDown, Cpu, Zap, DollarSign,
+  Network, ArrowUpDown, Cpu, Zap, DollarSign, LayoutGrid,
 } from 'lucide-react'
 
 function ServerSlot({ index, filled, powerOn }: { index: number; filled: boolean; powerOn: boolean }) {
@@ -81,10 +81,11 @@ function StatRow({ icon: Icon, label, value, color, sub }: {
 function CabinetDetail({ cabinet }: { cabinet: Cabinet }) {
   const {
     toggleCabinetPower, refreshServers, money,
-    selectCabinet, coolingType, trafficStats,
+    selectCabinet, coolingType, trafficStats, zones,
   } = useGameStore()
 
   const envConfig = ENVIRONMENT_CONFIG[cabinet.environment]
+  const cabinetZones = zones.filter((z) => z.cabinetIds.includes(cabinet.id))
   const custConfig = CUSTOMER_TYPE_CONFIG[cabinet.customerType]
 
   // Power calculations
@@ -208,7 +209,7 @@ function CabinetDetail({ cabinet }: { cabinet: Cabinet }) {
             <StatRow
               icon={ArrowUpDown}
               label="Facing"
-              value={cabinet.facing === 'north' ? 'North' : 'South'}
+              value={cabinet.facing.charAt(0).toUpperCase() + cabinet.facing.slice(1)}
             />
 
             {cabinet.hasLeafSwitch && (
@@ -225,6 +226,27 @@ function CabinetDetail({ cabinet }: { cabinet: Cabinet }) {
               label="Grid Position"
               value={`(${cabinet.col}, ${cabinet.row})`}
             />
+
+            {cabinetZones.length > 0 ? (
+              cabinetZones.map((z) => {
+                const cfg = z.type === 'environment'
+                  ? ZONE_BONUS_CONFIG.environmentBonus[z.key as keyof typeof ZONE_BONUS_CONFIG.environmentBonus]
+                  : ZONE_BONUS_CONFIG.customerBonus[z.key as keyof typeof ZONE_BONUS_CONFIG.customerBonus]
+                return (
+                  <StatRow
+                    key={z.id}
+                    icon={LayoutGrid}
+                    label={cfg.label}
+                    value={cfg.revenueBonus > 0 ? `+${Math.round(cfg.revenueBonus * 100)}% rev` : `-${Math.round(cfg.heatReduction * 100)}% heat`}
+                    color="#00ffff"
+                  />
+                )
+              })
+            ) : (
+              <div className="text-[10px] text-muted-foreground/50 italic mt-0.5">
+                Not in a zone
+              </div>
+            )}
           </div>
 
           {/* Actions */}

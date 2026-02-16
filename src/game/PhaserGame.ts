@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import type { LayerVisibility, LayerOpacity, LayerColors, LayerColorOverrides, TrafficLink, CabinetEnvironment, CabinetFacing, PlacementHint, DataCenterLayout } from '@/stores/gameStore'
-import { DEFAULT_COLORS, ENVIRONMENT_CONFIG, MAX_SERVERS_PER_CABINET } from '@/stores/gameStore'
+import { DEFAULT_COLORS, ENVIRONMENT_CONFIG, MAX_SERVERS_PER_CABINET, getFacingOffsets } from '@/stores/gameStore'
 
 const COLORS = DEFAULT_COLORS
 
@@ -8,8 +8,8 @@ const COLORS = DEFAULT_COLORS
 const TILE_W = 64
 const TILE_H = 32
 // Default grid size — overridden dynamically by suite tier
-const DEFAULT_CAB_COLS = 4
-const DEFAULT_CAB_ROWS = 2
+const DEFAULT_CAB_COLS = 5
+const DEFAULT_CAB_ROWS = 5
 const DEFAULT_SPINE_SLOTS = 2
 const DRAG_THRESHOLD = 5  // pixels before mouse movement counts as a drag
 
@@ -34,6 +34,11 @@ const CABINET_COLORS = { top: 0x667788, side: 0x4a5a6a, front: 0x3d4d5d }
 const SPINE_W = 50
 const SPINE_H = 25
 const SPINE_DEPTH = 16
+
+// Facing direction display helpers
+const FACING_ARROW: Record<CabinetFacing, string> = { north: '▲', south: '▼', east: '►', west: '◄' }
+const FACING_COLOR: Record<CabinetFacing, string> = { north: '#00ccff', south: '#ff8844', east: '#00ccff', west: '#ff8844' }
+const FACING_LABEL: Record<CabinetFacing, string> = { north: 'INTAKE ▲', south: 'INTAKE ▼', east: 'INTAKE ►', west: 'INTAKE ◄' }
 
 
 interface CabinetEntry {
@@ -118,7 +123,10 @@ class DataCenterScene extends Phaser.Scene {
 
   // Placement mode
   private placementActive = false
+  private placementFacing: CabinetFacing = 'north'
   private placementHighlight: Phaser.GameObjects.Graphics | null = null
+  private placementZoneGraphics: Phaser.GameObjects.Graphics | null = null
+  private placementZoneLabels: Phaser.GameObjects.Text[] = []
   private placementHintText: Phaser.GameObjects.Text | null = null
   private placementModeLabel: Phaser.GameObjects.Text | null = null
   private hoveredTile: { col: number; row: number } | null = null
@@ -137,6 +145,9 @@ class DataCenterScene extends Phaser.Scene {
   private panOffsetY = 0
   private zoomLevel = 1
 
+  // Zone outlines
+  private zoneGraphics: Phaser.GameObjects.Graphics | null = null
+
   // Heat map overlay
   private heatMapGraphics: Phaser.GameObjects.Graphics | null = null
   private heatMapVisible = false
@@ -150,13 +161,31 @@ class DataCenterScene extends Phaser.Scene {
     super({ key: 'DataCenterScene' })
   }
 
-  create() {
+  /** Compute offsets to center all content (spine area + grid) both horizontally and vertically */
+  private computeLayout() {
     const w = this.scale.width
-    this.offsetX = w / 2
-    this.offsetY = 150
+    const h = this.scale.height
 
+    // Horizontal centering
+    this.offsetX = w / 2
     this.spineOffsetX = w / 2
-    this.spineOffsetY = 40
+
+    // Vertical centering:
+    // Content spans from spine label (spineOffsetY - 20) to grid diamond bottom.
+    // Keep the relative gap between spine and grid constant.
+    const SPINE_GRID_GAP = 110
+    const LABEL_OVERHEAD = 20 // spine label sits above spineOffsetY
+    const gridHeight = (this.cabCols + this.cabRows) * (TILE_H / 2)
+
+    const totalHeight = LABEL_OVERHEAD + SPINE_GRID_GAP + gridHeight
+    const startY = Math.max(10, (h - totalHeight) / 2)
+
+    this.spineOffsetY = startY + LABEL_OVERHEAD
+    this.offsetY = this.spineOffsetY + SPINE_GRID_GAP
+  }
+
+  create() {
+    this.computeLayout()
 
     this.drawSpineFloor()
     this.drawFloor()
@@ -169,6 +198,11 @@ class DataCenterScene extends Phaser.Scene {
       if (!this.placementActive) {
         if (this.placementHighlight) {
           this.placementHighlight.clear()
+        }
+        // Only clear zone overlays if no cabinet is selected — selected
+        // cabinets should keep their airflow zone overlays visible.
+        if (!this.selectedCabinetId) {
+          this.clearZoneOverlays()
         }
         if (this.placementHintText) {
           this.placementHintText.setVisible(false)
@@ -184,6 +218,7 @@ class DataCenterScene extends Phaser.Scene {
       } else {
         this.hoveredTile = null
         if (this.placementHighlight) this.placementHighlight.clear()
+        this.clearZoneOverlays()
         if (this.placementHintText) this.placementHintText.setVisible(false)
       }
     })
@@ -310,6 +345,52 @@ class DataCenterScene extends Phaser.Scene {
     return bestId
   }
 
+  /** Draw a filled isometric diamond tile at the given grid position */
+  private drawIsoTile(g: Phaser.GameObjects.Graphics, tileCol: number, tileRow: number, fillColor: number, fillAlpha: number, strokeColor?: number, strokeAlpha?: number) {
+    const { x, y } = this.isoToScreen(tileCol, tileRow)
+    g.fillStyle(fillColor, fillAlpha)
+    g.beginPath()
+    g.moveTo(x, y)
+    g.lineTo(x + TILE_W / 2, y + TILE_H / 2)
+    g.lineTo(x, y + TILE_H)
+    g.lineTo(x - TILE_W / 2, y + TILE_H / 2)
+    g.closePath()
+    g.fillPath()
+    if (strokeColor !== undefined) {
+      g.lineStyle(1.5, strokeColor, strokeAlpha ?? fillAlpha)
+      g.beginPath()
+      g.moveTo(x, y)
+      g.lineTo(x + TILE_W / 2, y + TILE_H / 2)
+      g.lineTo(x, y + TILE_H)
+      g.lineTo(x - TILE_W / 2, y + TILE_H / 2)
+      g.closePath()
+      g.strokePath()
+    }
+  }
+
+  /** Add a small text label centered on a grid tile */
+  private addZoneLabel(tileCol: number, tileRow: number, text: string, color: string, offsetYPx = 0): Phaser.GameObjects.Text {
+    const { x, y } = this.isoToScreen(tileCol, tileRow)
+    const label = this.add
+      .text(x, y + TILE_H / 2 + offsetYPx, text, {
+        fontFamily: 'monospace',
+        fontSize: '6px',
+        color,
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5)
+      .setAlpha(0.7)
+      .setDepth(4)
+    return label
+  }
+
+  /** Clear zone overlay graphics and labels */
+  private clearZoneOverlays() {
+    if (this.placementZoneGraphics) this.placementZoneGraphics.clear()
+    for (const label of this.placementZoneLabels) label.destroy()
+    this.placementZoneLabels = []
+  }
+
   /** Draw hover highlight on grid tile during placement mode */
   private drawPlacementHighlight(col: number, row: number) {
     if (!this.placementHighlight) {
@@ -318,32 +399,136 @@ class DataCenterScene extends Phaser.Scene {
     }
     this.placementHighlight.clear()
 
+    if (!this.placementZoneGraphics) {
+      this.placementZoneGraphics = this.add.graphics()
+      this.placementZoneGraphics.setDepth(2)
+    }
+    this.clearZoneOverlays()
+
     const { x, y } = this.isoToScreen(col, row)
     const isValidRow = this.isCabinetRow(row)
     const occupied = this.occupiedTiles.has(`${col},${row}`)
 
-    // Highlight color: green for valid, red for occupied, dim gray for non-cabinet rows
-    const color = !isValidRow ? 0x556677 : occupied ? 0xff4444 : 0x00ff88
-    const alpha = !isValidRow ? 0.15 : occupied ? 0.3 : 0.25
+    // Non-cabinet rows (aisles, corridors) show dim gray
+    if (!isValidRow) {
+      const color = 0x556677
+      const alpha = 0.15
+      // Draw dim overlay for non-placeable row
+      this.drawIsoTile(this.placementZoneGraphics!, col, row, color, alpha)
+      return
+    }
 
-    this.placementHighlight.fillStyle(color, alpha)
-    this.placementHighlight.beginPath()
-    this.placementHighlight.moveTo(x, y)
-    this.placementHighlight.lineTo(x + TILE_W / 2, y + TILE_H / 2)
-    this.placementHighlight.lineTo(x, y + TILE_H)
-    this.placementHighlight.lineTo(x - TILE_W / 2, y + TILE_H / 2)
-    this.placementHighlight.closePath()
-    this.placementHighlight.fillPath()
+    // Count orthogonal neighbors to determine density
+    let adjacentCount = 0
+    if (!occupied) {
+      const dirs = [
+        `${col},${row - 1}`, `${col},${row + 1}`,
+        `${col - 1},${row}`, `${col + 1},${row}`,
+      ]
+      for (const key of dirs) {
+        if (this.occupiedTiles.has(key)) adjacentCount++
+      }
+    }
 
-    // Border glow
-    this.placementHighlight.lineStyle(2, color, occupied ? 0.5 : 0.7)
-    this.placementHighlight.beginPath()
-    this.placementHighlight.moveTo(x, y)
-    this.placementHighlight.lineTo(x + TILE_W / 2, y + TILE_H / 2)
-    this.placementHighlight.lineTo(x, y + TILE_H)
-    this.placementHighlight.lineTo(x - TILE_W / 2, y + TILE_H / 2)
-    this.placementHighlight.closePath()
-    this.placementHighlight.strokePath()
+    // Highlight color: green (open), yellow (crowded 2+), amber (dense 3+), red (occupied)
+    let color: number
+    let alpha: number
+    if (occupied) {
+      color = 0xff4444; alpha = 0.3
+    } else if (adjacentCount >= 3) {
+      color = 0xff6600; alpha = 0.3
+    } else if (adjacentCount >= 2) {
+      color = 0xffaa00; alpha = 0.25
+    } else {
+      color = 0x00ff88; alpha = 0.25
+    }
+
+    // Draw main hovered tile
+    this.drawIsoTile(this.placementHighlight, col, row, color, alpha, color, occupied ? 0.5 : 0.7)
+
+    // ── Placement zone overlays (only for valid placements) ──
+    if (!occupied) {
+      const facing = this.placementFacing
+      const offsets = getFacingOffsets(facing, col, row)
+
+      // Draw facing arrow on the hovered tile
+      this.placementZoneLabels.push(
+        this.addZoneLabel(col, row, FACING_ARROW[facing], FACING_COLOR[facing], -3)
+      )
+      this.placementZoneLabels.push(
+        this.addZoneLabel(col, row, FACING_LABEL[facing], FACING_COLOR[facing], 4)
+      )
+
+      // ── Front tile (cold / intake side) ──
+      const f = offsets.front
+      if (f.col >= 0 && f.col < this.cabCols && f.row >= 0 && f.row < this.cabRows) {
+        const frontOccupied = this.occupiedTiles.has(`${f.col},${f.row}`)
+        if (!frontOccupied) {
+          this.drawIsoTile(this.placementZoneGraphics, f.col, f.row, 0x0088ff, 0.15, 0x0088ff, 0.3)
+          this.placementZoneLabels.push(this.addZoneLabel(f.col, f.row, 'COLD AISLE', '#4488ff'))
+        } else {
+          this.drawIsoTile(this.placementZoneGraphics, f.col, f.row, 0xff4400, 0.12, 0xff4400, 0.25)
+          this.placementZoneLabels.push(this.addZoneLabel(f.col, f.row, 'BLOCKED!', '#ff6644'))
+        }
+      }
+
+      // ── Rear tile (hot / exhaust side) ──
+      const r = offsets.rear
+      if (r.col >= 0 && r.col < this.cabCols && r.row >= 0 && r.row < this.cabRows) {
+        const rearOccupied = this.occupiedTiles.has(`${r.col},${r.row}`)
+        if (!rearOccupied) {
+          this.drawIsoTile(this.placementZoneGraphics, r.col, r.row, 0xff4400, 0.12, 0xff4400, 0.25)
+          this.placementZoneLabels.push(this.addZoneLabel(r.col, r.row, 'HOT EXHAUST', '#ff8844'))
+        } else {
+          this.drawIsoTile(this.placementZoneGraphics, r.col, r.row, 0xff0000, 0.15, 0xff0000, 0.3)
+          this.placementZoneLabels.push(this.addZoneLabel(r.col, r.row, 'EXHAUST BLOCKED!', '#ff4444'))
+        }
+      }
+
+      // ── Side tiles (access for DC techs / cabling) ──
+      for (const side of offsets.sides) {
+        if (side.col < 0 || side.col >= this.cabCols || side.row < 0 || side.row >= this.cabRows) continue
+        const sideOccupied = this.occupiedTiles.has(`${side.col},${side.row}`)
+        if (!sideOccupied) {
+          this.drawIsoTile(this.placementZoneGraphics, side.col, side.row, 0xffcc00, 0.08, 0xffcc00, 0.15)
+          this.placementZoneLabels.push(this.addZoneLabel(side.col, side.row, 'ACCESS', '#aaaa44'))
+        }
+      }
+
+      // ── Show existing neighbor cabinets' airflow zones ──
+      for (const entry of this.cabEntries.values()) {
+        const dist = Math.abs(entry.col - col) + Math.abs(entry.row - row)
+        if (dist > 2) continue
+
+        const entryOffsets = getFacingOffsets(entry.facing, entry.col, entry.row)
+
+        // Draw exhaust flow indicator
+        const er = entryOffsets.rear
+        if (er.col >= 0 && er.col < this.cabCols && er.row >= 0 && er.row < this.cabRows) {
+          const isHoveredTile = er.col === col && er.row === row
+          const isOccupied = this.occupiedTiles.has(`${er.col},${er.row}`)
+          if (!isOccupied || isHoveredTile) {
+            const { x: ex, y: ey } = this.isoToScreen(entry.col, entry.row)
+            const { x: tx, y: ty } = this.isoToScreen(er.col, er.row)
+            this.placementZoneGraphics.lineStyle(1, 0xff6644, 0.3)
+            this.placementZoneGraphics.lineBetween(ex, ey + TILE_H / 2, tx, ty + TILE_H / 2)
+          }
+        }
+
+        // Draw intake flow indicator
+        const ef = entryOffsets.front
+        if (ef.col >= 0 && ef.col < this.cabCols && ef.row >= 0 && ef.row < this.cabRows) {
+          const isHoveredTile = ef.col === col && ef.row === row
+          const isOccupied = this.occupiedTiles.has(`${ef.col},${ef.row}`)
+          if (!isOccupied || isHoveredTile) {
+            const { x: ex, y: ey } = this.isoToScreen(entry.col, entry.row)
+            const { x: tx, y: ty } = this.isoToScreen(ef.col, ef.row)
+            this.placementZoneGraphics.lineStyle(1, 0x0088ff, 0.25)
+            this.placementZoneGraphics.lineBetween(ex, ey + TILE_H / 2, tx, ty + TILE_H / 2)
+          }
+        }
+      }
+    }
 
     // Show hint text
     if (this.onTileHover && !occupied && isValidRow) {
@@ -431,7 +616,7 @@ class DataCenterScene extends Phaser.Scene {
   private drawFloor() {
     this.floorGraphics = this.add.graphics()
 
-    // Build sets for quick lookup of row types
+    // Build sets for quick lookup of row types from layout
     const cabinetGridRows = new Set<number>()
     const aisleGridRows = new Map<number, 'cold' | 'hot' | 'neutral'>()
     const corridorGridRows = new Set<number>()
@@ -475,6 +660,15 @@ class DataCenterScene extends Phaser.Scene {
         this.floorGraphics.lineTo(x - TILE_W / 2, y + TILE_H / 2)
         this.floorGraphics.closePath()
         this.floorGraphics.fillPath()
+
+        // Draw subtle aisle lane markings
+        if (aisleGridRows.has(r)) {
+          this.floorGraphics.lineStyle(0.5, 0x335533, 0.3)
+          this.floorGraphics.lineBetween(
+            x - TILE_W / 4, y + TILE_H / 2,
+            x + TILE_W / 4, y + TILE_H / 2,
+          )
+        }
       }
     }
     this.floorGraphics.setDepth(0)
@@ -911,8 +1105,8 @@ class DataCenterScene extends Phaser.Scene {
     // Facing direction indicator (small arrow for hot/cold aisle)
     const oldFacing = this.facingIndicators.get(entry.id)
     if (oldFacing) oldFacing.destroy()
-    const facingArrow = entry.facing === 'north' ? '▲' : '▼'
-    const facingColor = entry.facing === 'north' ? '#00ccff' : '#ff8844'
+    const facingArrow = FACING_ARROW[entry.facing]
+    const facingColor = FACING_COLOR[entry.facing]
     const facingLabel = this.add
       .text(cx + CUBE_W / 2 - 2, topY + 4, facingArrow, {
         fontFamily: 'monospace',
@@ -923,6 +1117,38 @@ class DataCenterScene extends Phaser.Scene {
       .setAlpha(powerMult * 0.6)
       .setDepth(baseDepth + 1)
     this.facingIndicators.set(entry.id, facingLabel)
+
+    // No-access warning: show amber indicator if cabinet has no adjacent empty tile
+    const adjacentDirs = [
+      { col: entry.col, row: entry.row - 1 },
+      { col: entry.col, row: entry.row + 1 },
+      { col: entry.col - 1, row: entry.row },
+      { col: entry.col + 1, row: entry.row },
+    ]
+    let hasAccess = false
+    for (const dir of adjacentDirs) {
+      if (dir.col < 0 || dir.col >= this.cabCols || dir.row < 0 || dir.row >= this.cabRows) continue
+      if (!this.occupiedTiles.has(`${dir.col},${dir.row}`)) {
+        hasAccess = true
+        break
+      }
+    }
+    if (!hasAccess && entry.powerOn) {
+      // Draw a small amber warning dot at the base of the cabinet
+      g.fillStyle(0xff8800, 0.6)
+      g.fillCircle(cx - CUBE_W / 2 + 4, cy - 2, 2)
+      // Warning label
+      const warnLabel = this.add
+        .text(cx, topY + 24, '! NO ACCESS', {
+          fontFamily: 'monospace',
+          fontSize: '4px',
+          color: '#ff8844',
+        })
+        .setOrigin(0.5)
+        .setAlpha(0.5)
+        .setDepth(baseDepth + 1)
+      labels.push(warnLabel)
+    }
 
     g.setDepth(baseDepth)
     this.cabinetGraphics.set(entry.id, g)
@@ -1201,12 +1427,8 @@ class DataCenterScene extends Phaser.Scene {
     this.spineSlots = spineSlots
     if (layout) this.layout = layout
 
-    // Recalculate offsets
-    const w = this.scale.width
-    this.offsetX = w / 2
-    this.offsetY = 150
-    this.spineOffsetX = w / 2
-    this.spineOffsetY = 40
+    // Recalculate offsets (centered both horizontally and vertically)
+    this.computeLayout()
 
     // Clear and redraw floor/grid/aisles/corridors
     if (this.floorGraphics) { this.floorGraphics.destroy(); this.floorGraphics = null }
@@ -1263,6 +1485,7 @@ class DataCenterScene extends Phaser.Scene {
       if (this.placementHighlight) {
         this.placementHighlight.clear()
       }
+      this.clearZoneOverlays()
       if (this.placementHintText) {
         this.placementHintText.setVisible(false)
       }
@@ -1286,6 +1509,15 @@ class DataCenterScene extends Phaser.Scene {
     }
   }
 
+  /** Update placement facing direction (synced from React store) */
+  setPlacementFacing(facing: CabinetFacing) {
+    this.placementFacing = facing
+    // Re-draw highlight if we're already hovering a tile
+    if (this.placementActive && this.hoveredTile) {
+      this.drawPlacementHighlight(this.hoveredTile.col, this.hoveredTile.row)
+    }
+  }
+
   /** Register callback for tile clicks during placement mode */
   setOnTileClick(callback: ((col: number, row: number) => void) | null) {
     this.onTileClick = callback
@@ -1298,7 +1530,22 @@ class DataCenterScene extends Phaser.Scene {
 
   /** Update the set of occupied tiles (called when cabinet state changes) */
   syncOccupiedTiles(occupied: Set<string>) {
+    const changed = occupied.size !== this.occupiedTiles.size ||
+      [...occupied].some(key => !this.occupiedTiles.has(key))
     this.occupiedTiles = occupied
+    // Refresh floor tiles to update aisle visualization when cabinet layout changes
+    if (changed) {
+      this.refreshFloor()
+    }
+  }
+
+  /** Redraw floor tiles to reflect current aisle layout */
+  private refreshFloor() {
+    if (this.floorGraphics) {
+      this.floorGraphics.destroy()
+      this.floorGraphics = null
+    }
+    this.drawFloor()
   }
 
   // ── Infrastructure Layout API ──────────────────────────────
@@ -1419,6 +1666,7 @@ class DataCenterScene extends Phaser.Scene {
   /** Render selection highlight around a cabinet */
   private renderSelection() {
     if (this.selectionGraphics) this.selectionGraphics.destroy()
+    this.clearZoneOverlays()
     if (!this.selectedCabinetId) return
 
     const entry = this.cabEntries.get(this.selectedCabinetId)
@@ -1428,7 +1676,7 @@ class DataCenterScene extends Phaser.Scene {
     this.selectionGraphics.setDepth(50)
 
     const { x, y } = this.isoToScreen(entry.col, entry.row)
-    // Draw a pulsing selection border
+    // Draw selection border
     this.selectionGraphics.lineStyle(2, 0x00ffff, 0.8)
     this.selectionGraphics.beginPath()
     this.selectionGraphics.moveTo(x, y - 4)
@@ -1437,6 +1685,68 @@ class DataCenterScene extends Phaser.Scene {
     this.selectionGraphics.lineTo(x - TILE_W / 2 - 4, y + TILE_H / 2)
     this.selectionGraphics.closePath()
     this.selectionGraphics.strokePath()
+
+    // Show airflow zone overlays around the selected cabinet
+    this.drawCabinetZoneOverlays(entry.col, entry.row, entry.facing)
+  }
+
+  /** Draw airflow zone overlays around a cabinet at the given position/facing */
+  private drawCabinetZoneOverlays(col: number, row: number, facing: CabinetFacing) {
+    if (!this.placementZoneGraphics) {
+      this.placementZoneGraphics = this.add.graphics()
+      this.placementZoneGraphics.setDepth(2)
+    }
+
+    const offsets = getFacingOffsets(facing, col, row)
+    const f = offsets.front
+    const r = offsets.rear
+
+    // Front tile (cold / intake side)
+    if (f.col >= 0 && f.col < this.cabCols && f.row >= 0 && f.row < this.cabRows) {
+      const frontOccupied = this.occupiedTiles.has(`${f.col},${f.row}`)
+      if (!frontOccupied) {
+        this.drawIsoTile(this.placementZoneGraphics, f.col, f.row, 0x0088ff, 0.12, 0x0088ff, 0.25)
+        this.placementZoneLabels.push(this.addZoneLabel(f.col, f.row, 'COLD AISLE', '#4488ff'))
+      } else {
+        this.drawIsoTile(this.placementZoneGraphics, f.col, f.row, 0xff4400, 0.10, 0xff4400, 0.2)
+        this.placementZoneLabels.push(this.addZoneLabel(f.col, f.row, 'INTAKE BLOCKED', '#ff6644'))
+      }
+    }
+
+    // Rear tile (hot / exhaust side)
+    if (r.col >= 0 && r.col < this.cabCols && r.row >= 0 && r.row < this.cabRows) {
+      const rearOccupied = this.occupiedTiles.has(`${r.col},${r.row}`)
+      if (!rearOccupied) {
+        this.drawIsoTile(this.placementZoneGraphics, r.col, r.row, 0xff4400, 0.10, 0xff4400, 0.2)
+        this.placementZoneLabels.push(this.addZoneLabel(r.col, r.row, 'HOT EXHAUST', '#ff8844'))
+      } else {
+        this.drawIsoTile(this.placementZoneGraphics, r.col, r.row, 0xff0000, 0.12, 0xff0000, 0.25)
+        this.placementZoneLabels.push(this.addZoneLabel(r.col, r.row, 'EXHAUST BLOCKED', '#ff4444'))
+      }
+    }
+
+    // Side tiles (access)
+    for (const side of offsets.sides) {
+      if (side.col < 0 || side.col >= this.cabCols || side.row < 0 || side.row >= this.cabRows) continue
+      const sideOccupied = this.occupiedTiles.has(`${side.col},${side.row}`)
+      if (!sideOccupied) {
+        this.drawIsoTile(this.placementZoneGraphics, side.col, side.row, 0xffcc00, 0.06, 0xffcc00, 0.12)
+        this.placementZoneLabels.push(this.addZoneLabel(side.col, side.row, 'ACCESS', '#aaaa44'))
+      }
+    }
+
+    // Draw airflow direction lines from the cabinet
+    const { x: cx, y: cy } = this.isoToScreen(col, row)
+    if (f.col >= 0 && f.col < this.cabCols && f.row >= 0 && f.row < this.cabRows) {
+      const { x: fx, y: fy } = this.isoToScreen(f.col, f.row)
+      this.placementZoneGraphics.lineStyle(1.5, 0x0088ff, 0.35)
+      this.placementZoneGraphics.lineBetween(cx, cy + TILE_H / 2, fx, fy + TILE_H / 2)
+    }
+    if (r.col >= 0 && r.col < this.cabCols && r.row >= 0 && r.row < this.cabRows) {
+      const { x: rx, y: ry } = this.isoToScreen(r.col, r.row)
+      this.placementZoneGraphics.lineStyle(1.5, 0xff6644, 0.35)
+      this.placementZoneGraphics.lineBetween(cx, cy + TILE_H / 2, rx, ry + TILE_H / 2)
+    }
   }
 
   /** Render heat map overlay showing temperature per cabinet */
@@ -1483,15 +1793,95 @@ class DataCenterScene extends Phaser.Scene {
     this.selectedCabinetId = null
     if (this.selectionGraphics) this.selectionGraphics.destroy()
     this.selectionGraphics = null
+    this.clearZoneOverlays()
   }
 
-  /** Reset camera to default position and zoom */
+  /** Set zone outlines for rendering */
+  setZones(zones: { tiles: { col: number; row: number }[]; color: string }[]) {
+    if (this.zoneGraphics) {
+      this.zoneGraphics.destroy()
+      this.zoneGraphics = null
+    }
+
+    if (zones.length === 0) return
+
+    this.zoneGraphics = this.add.graphics()
+    this.zoneGraphics.setDepth(2) // above floor/grid, below placement highlight and cabinets
+
+    for (const zone of zones) {
+      const tileSet = new Set(zone.tiles.map((t) => `${t.col},${t.row}`))
+      const colorNum = parseInt(zone.color.replace('#', ''), 16)
+
+      // Draw a subtle filled highlight on each zone tile
+      for (const tile of zone.tiles) {
+        const { x, y } = this.isoToScreen(tile.col, tile.row)
+        this.zoneGraphics.fillStyle(colorNum, 0.08)
+        this.zoneGraphics.beginPath()
+        this.zoneGraphics.moveTo(x, y)
+        this.zoneGraphics.lineTo(x + TILE_W / 2, y + TILE_H / 2)
+        this.zoneGraphics.lineTo(x, y + TILE_H)
+        this.zoneGraphics.lineTo(x - TILE_W / 2, y + TILE_H / 2)
+        this.zoneGraphics.closePath()
+        this.zoneGraphics.fillPath()
+      }
+
+      // Draw outline on boundary edges only (edges not shared with another tile in the same zone)
+      this.zoneGraphics.lineStyle(2, colorNum, 0.6)
+      for (const tile of zone.tiles) {
+        const { x, y } = this.isoToScreen(tile.col, tile.row)
+        // Check 4 neighbors; draw edge if neighbor is NOT in the zone
+        // Top-right edge (col+1 neighbor)
+        if (!tileSet.has(`${tile.col + 1},${tile.row}`)) {
+          this.zoneGraphics.beginPath()
+          this.zoneGraphics.moveTo(x, y)
+          this.zoneGraphics.lineTo(x + TILE_W / 2, y + TILE_H / 2)
+          this.zoneGraphics.strokePath()
+        }
+        // Bottom-right edge (row+1 neighbor)
+        if (!tileSet.has(`${tile.col},${tile.row + 1}`)) {
+          this.zoneGraphics.beginPath()
+          this.zoneGraphics.moveTo(x + TILE_W / 2, y + TILE_H / 2)
+          this.zoneGraphics.lineTo(x, y + TILE_H)
+          this.zoneGraphics.strokePath()
+        }
+        // Bottom-left edge (col-1 neighbor)
+        if (!tileSet.has(`${tile.col - 1},${tile.row}`)) {
+          this.zoneGraphics.beginPath()
+          this.zoneGraphics.moveTo(x, y + TILE_H)
+          this.zoneGraphics.lineTo(x - TILE_W / 2, y + TILE_H / 2)
+          this.zoneGraphics.strokePath()
+        }
+        // Top-left edge (row-1 neighbor)
+        if (!tileSet.has(`${tile.col},${tile.row - 1}`)) {
+          this.zoneGraphics.beginPath()
+          this.zoneGraphics.moveTo(x - TILE_W / 2, y + TILE_H / 2)
+          this.zoneGraphics.lineTo(x, y)
+          this.zoneGraphics.strokePath()
+        }
+      }
+    }
+  }
+
+  /** Reset camera to default position and zoom, centered on content */
   resetCamera() {
-    this.panOffsetX = 0
-    this.panOffsetY = 0
     this.zoomLevel = 1
-    this.cameras.main.setScroll(0, 0)
     this.cameras.main.setZoom(1)
+
+    // Compute content center in world space and scroll so it's at viewport center
+    const w = this.scale.width
+    const h = this.scale.height
+
+    const contentCenterX = this.offsetX
+    const contentTop = this.spineOffsetY - 20
+    const gridBottom = this.offsetY + (this.cabCols + this.cabRows) * (TILE_H / 2)
+    const contentCenterY = (contentTop + gridBottom) / 2
+
+    const scrollX = contentCenterX - w / 2
+    const scrollY = contentCenterY - h / 2
+
+    this.panOffsetX = -scrollX
+    this.panOffsetY = -scrollY
+    this.cameras.main.setScroll(scrollX, scrollY)
   }
 }
 

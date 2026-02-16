@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
 import type Phaser from 'phaser'
 import { createGame, getScene } from '@/game/PhaserGame'
-import { useGameStore, getSuiteLimits, getPlacementHints, SUITE_TIERS } from '@/stores/gameStore'
+import { useGameStore, getSuiteLimits, getPlacementHints, SUITE_TIERS, ENVIRONMENT_CONFIG, CUSTOMER_TYPE_CONFIG } from '@/stores/gameStore'
 import { Crosshair } from 'lucide-react'
 
 export function GameCanvas() {
@@ -22,11 +22,13 @@ export function GameCanvas() {
   const trafficVisible = useGameStore((s) => s.trafficVisible)
   const suiteTier = useGameStore((s) => s.suiteTier)
   const placementMode = useGameStore((s) => s.placementMode)
+  const placementFacing = useGameStore((s) => s.placementFacing)
   const pdus = useGameStore((s) => s.pdus)
   const cableTrays = useGameStore((s) => s.cableTrays)
   const pduOverloaded = useGameStore((s) => s.pduOverloaded)
   const heatMapVisible = useGameStore((s) => s.heatMapVisible)
   const aisleContainments = useGameStore((s) => s.aisleContainments)
+  const zones = useGameStore((s) => s.zones)
 
   // Tile click handler — called from Phaser when user clicks a grid tile
   const handleTileClick = useCallback((col: number, row: number) => {
@@ -38,7 +40,7 @@ export function GameCanvas() {
   // Tile hover handler — returns placement hints for the hovered tile
   const handleTileHover = useCallback((col: number, row: number) => {
     const state = useGameStore.getState()
-    return getPlacementHints(col, row, state.cabinets, state.suiteTier)
+    return getPlacementHints(col, row, state.cabinets, state.suiteTier, state.placementEnvironment, state.placementCustomerType)
   }, [])
 
   // Cabinet selection handler — called from Phaser when user clicks a cabinet
@@ -87,6 +89,27 @@ export function GameCanvas() {
       useGameStore.getState().selectCabinet(null)
     }
   }, [placementMode, handleTileClick, handleTileHover, handleCabinetSelect, sceneReady])
+
+  // Sync placement facing to Phaser (updates zone overlays when user changes direction)
+  useEffect(() => {
+    if (!gameRef.current) return
+    const scene = getScene(gameRef.current)
+    if (!scene) return
+    scene.setPlacementFacing(placementFacing)
+  }, [placementFacing, sceneReady])
+
+  // Keyboard shortcuts during placement mode (R = rotate facing, Esc = cancel)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const state = useGameStore.getState()
+      if (!state.placementMode) return
+      if (e.key === 'r' || e.key === 'R') {
+        state.togglePlacementFacing()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   // Sync suite tier (grid dimensions + row layout) to Phaser
   useEffect(() => {
@@ -213,6 +236,20 @@ export function GameCanvas() {
     if (!scene) return
     scene.setAisleContainments(aisleContainments)
   }, [aisleContainments, sceneReady])
+
+  // Sync zone outlines to Phaser
+  useEffect(() => {
+    if (!gameRef.current) return
+    const scene = getScene(gameRef.current)
+    if (!scene) return
+    const zoneData = zones.map((z) => {
+      const color = z.type === 'environment'
+        ? ENVIRONMENT_CONFIG[z.key as keyof typeof ENVIRONMENT_CONFIG].color
+        : CUSTOMER_TYPE_CONFIG[z.key as keyof typeof CUSTOMER_TYPE_CONFIG].color
+      return { tiles: z.tiles, color }
+    })
+    scene.setZones(zoneData)
+  }, [zones, sceneReady])
 
   const handleCenterGrid = useCallback(() => {
     if (gameRef.current) {

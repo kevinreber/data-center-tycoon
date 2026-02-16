@@ -1,7 +1,7 @@
-import { useGameStore, PDU_OPTIONS, CABLE_TRAY_OPTIONS, AISLE_CONFIG, getSuiteLimits, getPDULoad, isPDUOverloaded, BUSWAY_OPTIONS, CROSSCONNECT_OPTIONS, INROW_COOLING_OPTIONS } from '@/stores/gameStore'
+import { useGameStore, PDU_OPTIONS, CABLE_TRAY_OPTIONS, AISLE_CONFIG, getSuiteLimits, getPDULoad, isPDUOverloaded, BUSWAY_OPTIONS, CROSSCONNECT_OPTIONS, INROW_COOLING_OPTIONS, ZONE_BONUS_CONFIG, ENVIRONMENT_CONFIG, CUSTOMER_TYPE_CONFIG } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Plug, Cable, Network, Thermometer, AlertTriangle, Info, ArrowUpDown, Zap, Wifi, Snowflake } from 'lucide-react'
+import { Plug, Cable, Network, Thermometer, AlertTriangle, Info, ArrowUpDown, Zap, Wifi, Snowflake, LayoutGrid } from 'lucide-react'
 import {
   Tooltip,
   TooltipContent,
@@ -16,6 +16,7 @@ export function InfrastructurePanel() {
     placePDU, placeCableTray, autoRouteCables, toggleCabinetFacing,
     busways, crossConnects, inRowCoolers,
     placeBusway, placeCrossConnect, placeInRowCooling,
+    zones, zoneBonusRevenue,
   } = useGameStore()
 
   const suiteLimits = getSuiteLimits(suiteTier)
@@ -227,7 +228,7 @@ export function InfrastructurePanel() {
           </div>
           {aisleViolations > 0 && (
             <p className="text-xs text-neon-orange/80 flex items-center gap-1">
-              <AlertTriangle className="size-3" />Mixed facings in {aisleViolations} row{aisleViolations > 1 ? 's' : ''}
+              <AlertTriangle className="size-3" />Mixed facings in {aisleViolations} group{aisleViolations > 1 ? 's' : ''}
             </p>
           )}
           {cabinets.length > 0 && (
@@ -243,10 +244,10 @@ export function InfrastructurePanel() {
                           variant="ghost"
                           size="xs"
                           onClick={() => toggleCabinetFacing(c.id)}
-                          className={`text-xs p-0 h-auto ${c.facing === 'north' ? 'text-neon-cyan' : 'text-neon-orange'}`}
+                          className={`text-xs p-0 h-auto ${c.facing === 'north' || c.facing === 'east' ? 'text-neon-cyan' : 'text-neon-orange'}`}
                         >
                           <ArrowUpDown className="size-3 mr-0.5" />
-                          {c.facing === 'north' ? '↑ N' : '↓ S'}
+                          {{ north: '↑ N', south: '↓ S', east: '→ E', west: '← W' }[c.facing]}
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent side="right">Click to flip</TooltipContent>
@@ -257,6 +258,58 @@ export function InfrastructurePanel() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Zone Adjacency Bonuses */}
+      <div className="border-t border-border pt-3">
+        <div className="flex items-center gap-2 mb-2">
+          <LayoutGrid className="size-3 text-neon-cyan" />
+          <span className="text-xs font-bold text-neon-cyan">ZONES</span>
+          {zones.length > 0 && (
+            <Badge className="ml-auto bg-neon-cyan/20 text-neon-cyan border-neon-cyan/30 font-mono text-xs">
+              {zones.length}
+            </Badge>
+          )}
+        </div>
+        {zones.length === 0 ? (
+          <p className="text-xs text-muted-foreground/60 italic">
+            Place {ZONE_BONUS_CONFIG.minClusterSize}+ adjacent cabinets of the same type to form a zone and earn bonuses.
+          </p>
+        ) : (
+          <div className="flex flex-col gap-1.5">
+            {zoneBonusRevenue > 0 && (
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Zone Revenue</span>
+                <span className="text-neon-green tabular-nums">+${zoneBonusRevenue.toFixed(2)}/t</span>
+              </div>
+            )}
+            {zones.map((z) => {
+              const cfg = z.type === 'environment'
+                ? ZONE_BONUS_CONFIG.environmentBonus[z.key as keyof typeof ZONE_BONUS_CONFIG.environmentBonus]
+                : ZONE_BONUS_CONFIG.customerBonus[z.key as keyof typeof ZONE_BONUS_CONFIG.customerBonus]
+              const color = z.type === 'environment'
+                ? ENVIRONMENT_CONFIG[z.key as keyof typeof ENVIRONMENT_CONFIG].color
+                : CUSTOMER_TYPE_CONFIG[z.key as keyof typeof CUSTOMER_TYPE_CONFIG].color
+              return (
+                <Tooltip key={z.id}>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center justify-between text-xs cursor-help rounded px-1 py-0.5 hover:bg-white/5">
+                      <span className="flex items-center gap-1.5">
+                        <span className="size-2 rounded-full" style={{ backgroundColor: color }} />
+                        <span style={{ color }}>{cfg.label}</span>
+                      </span>
+                      <span className="text-muted-foreground tabular-nums">{z.cabinetIds.length} cabs</span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="right" className="max-w-52">
+                    {cfg.description}
+                    <br /><span className="text-neon-cyan">{z.cabinetIds.length} cabinets in zone</span>
+                  </TooltipContent>
+                </Tooltip>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       {/* Infrastructure Entities */}

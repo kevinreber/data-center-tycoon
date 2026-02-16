@@ -1,5 +1,5 @@
 import { Github, Bug, GitPullRequest } from 'lucide-react'
-import { useGameStore, ENVIRONMENT_CONFIG, SIM } from '@/stores/gameStore'
+import { useGameStore, ENVIRONMENT_CONFIG, SIM, SPACING_CONFIG, COOLING_CONFIG, INROW_COOLING_OPTIONS, OPS_TIER_CONFIG } from '@/stores/gameStore'
 
 const REPO_URL = 'https://github.com/kevinreber/data-center-tycoon'
 
@@ -41,6 +41,108 @@ export function GuidePanel() {
         </ol>
       </div>
 
+      {/* Layout strategy guide */}
+      <div className="rounded-lg border border-neon-cyan/20 bg-neon-cyan/5 p-3">
+        <p className="text-xs font-bold text-neon-cyan mb-2">LAYOUT &amp; AISLES</p>
+        <p className="text-xs font-mono text-muted-foreground mb-2">
+          Your facility has pre-built <strong className="text-foreground">cabinet rows</strong> with cold aisles between them.
+          Cabinet facing (N/S) is enforced by the row layout &mdash; no manual rotation needed.
+          Colored overlays show airflow zones during placement.
+        </p>
+        <div className="space-y-2">
+          <div className="flex gap-2 items-start">
+            <div className="w-3 h-3 rounded-sm shrink-0 mt-0.5" style={{ backgroundColor: '#4488ff' }} />
+            <div className="text-xs font-mono">
+              <strong className="text-[#4488ff]">Cold Aisle</strong>
+              <span className="text-muted-foreground"> &mdash; Intake side. Keep clear for cool air supply. Open front = <span className="text-neon-green">-{SPACING_CONFIG.openFrontCoolingBonus}&deg;C/tick</span> cooling bonus.</span>
+            </div>
+          </div>
+          <div className="flex gap-2 items-start">
+            <div className="w-3 h-3 rounded-sm shrink-0 mt-0.5" style={{ backgroundColor: '#ff8844' }} />
+            <div className="text-xs font-mono">
+              <strong className="text-[#ff8844]">Hot Exhaust</strong>
+              <span className="text-muted-foreground"> &mdash; Exhaust side. Keep clear so heat can escape. Open rear = <span className="text-neon-green">-{SPACING_CONFIG.openRearCoolingBonus}&deg;C/tick</span> cooling bonus.</span>
+            </div>
+          </div>
+          <div className="flex gap-2 items-start">
+            <div className="w-3 h-3 rounded-sm shrink-0 mt-0.5" style={{ backgroundColor: '#aaaa44' }} />
+            <div className="text-xs font-mono">
+              <strong className="text-[#aaaa44]">Access</strong>
+              <span className="text-muted-foreground"> &mdash; Side walkway for DC techs. No access = <span className="text-neon-red">{SPACING_CONFIG.noAccessMaintenanceCostMult}x</span> maintenance cost.</span>
+            </div>
+          </div>
+          <div className="flex gap-2 items-start">
+            <div className="w-3 h-3 rounded-sm shrink-0 mt-0.5" style={{ backgroundColor: '#ff4444' }} />
+            <div className="text-xs font-mono">
+              <strong className="text-[#ff4444]">Blocked</strong>
+              <span className="text-muted-foreground"> &mdash; Airflow obstructed. Causes <span className="text-neon-red">+{SPACING_CONFIG.adjacentHeatPenalty}&deg;C/tick</span> heat per neighbor. Fire can spread!</span>
+            </div>
+          </div>
+        </div>
+        <div className="mt-2 pt-2 border-t border-neon-cyan/10">
+          <p className="text-[10px] font-mono text-muted-foreground">
+            <strong className="text-foreground">Pro tip:</strong> The row layout handles hot/cold aisle separation automatically.
+            Fill both sides of an aisle to earn up to {Math.round(SPACING_CONFIG.maxAisleSpacingBonus * 100)}% cooling bonus.
+            At Standard tier+, upgrade aisles with <strong className="text-foreground">containment</strong> for even better cooling.
+          </p>
+        </div>
+      </div>
+
+      {/* Cooling & thermal management strategy */}
+      <div className="rounded-lg border border-neon-red/20 bg-neon-red/5 p-3">
+        <p className="text-xs font-bold text-neon-red mb-2">COOLING &amp; THERMAL MANAGEMENT</p>
+        <p className="text-xs font-mono text-muted-foreground mb-2">
+          Every server generates <span className="text-neon-red">+{SIM.heatPerServer}&deg;C/tick</span> of heat.
+          Air cooling is always active and removes <span className="text-neon-cyan">-{COOLING_CONFIG.air.coolingRate}&deg;C/tick</span> automatically &mdash; but
+          it can&rsquo;t keep up as you add more servers.
+        </p>
+
+        <div className="space-y-2 mb-2">
+          <p className="text-[10px] font-mono font-bold text-neon-yellow">WHY COOLING MATTERS</p>
+          <ul className="text-xs font-mono text-muted-foreground space-y-1 list-disc list-inside">
+            <li>
+              Above <span className="text-neon-yellow">{SIM.throttleTemp}&deg;C</span>: servers are <strong className="text-neon-red">thermally throttled</strong> and earn only <strong className="text-neon-red">50% revenue</strong>
+            </li>
+            <li>
+              Above <span className="text-neon-red">{SIM.criticalTemp}&deg;C</span>: risk of <strong className="text-neon-red">fire</strong> that can destroy equipment
+            </li>
+            <li>
+              Higher heat = higher <strong className="text-foreground">cooling power overhead</strong>, eating into your profits
+            </li>
+          </ul>
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-[10px] font-mono font-bold text-neon-cyan">COOLING STRATEGIES (CHEAPEST FIRST)</p>
+          <ol className="text-xs font-mono text-muted-foreground space-y-1.5 list-decimal list-inside">
+            <li>
+              <strong className="text-foreground">Fill both sides of aisles</strong> (free)
+              <span className="text-muted-foreground"> &mdash; Populate cabinet rows on both sides of each aisle for up to {Math.round(SPACING_CONFIG.maxAisleSpacingBonus * 100)}% cooling bonus. Upgrade with containment ($15k/aisle) for extra efficiency.</span>
+            </li>
+            <li>
+              <strong className="text-foreground">Management cabinets</strong> (${(2000).toLocaleString()}/cab)
+              <span className="text-muted-foreground"> &mdash; Each management server cuts cooling overhead by 3% (max 30%). Great long-term investment.</span>
+            </li>
+            <li>
+              <strong className="text-foreground">In-row cooling units</strong> (${INROW_COOLING_OPTIONS[0].cost.toLocaleString()}&ndash;${INROW_COOLING_OPTIONS[2].cost.toLocaleString()})
+              <span className="text-muted-foreground"> &mdash; Place next to hot cabinets for targeted {INROW_COOLING_OPTIONS[0].coolingBonus}&ndash;{INROW_COOLING_OPTIONS[2].coolingBonus}&deg;C/tick extra cooling.</span>
+            </li>
+            <li>
+              <strong className="text-foreground">Water cooling upgrade</strong> (${COOLING_CONFIG.water.upgradeCost.toLocaleString()})
+              <span className="text-muted-foreground"> &mdash; Facility-wide upgrade: {COOLING_CONFIG.water.coolingRate}&deg;C/tick removal and {Math.round(COOLING_CONFIG.water.overheadReduction * 100)}% lower PUE overhead. Best for 8+ cabinets.</span>
+            </li>
+          </ol>
+        </div>
+
+        <div className="mt-2 pt-2 border-t border-neon-red/10">
+          <p className="text-[10px] font-mono text-muted-foreground">
+            <strong className="text-foreground">Rule of thumb:</strong> With air cooling, 1 cabinet handles ~1 server comfortably.
+            At 3&ndash;4 servers per cabinet, you&rsquo;ll need layout bonuses or in-row cooling to stay under {SIM.throttleTemp}&deg;C.
+            Water cooling is the long-term solution for any serious operation.
+          </p>
+        </div>
+      </div>
+
       {/* New systems guide */}
       <div className="rounded-lg border border-[#44cc44]/20 bg-[#44cc44]/5 p-3">
         <p className="text-xs font-bold text-[#44cc44] mb-2">CARBON &amp; ENVIRONMENT</p>
@@ -70,6 +172,29 @@ export function GuidePanel() {
           <li><strong className="text-foreground">Price wars</strong> &mdash; Competitors may slash prices, reducing market revenue.</li>
           <li><strong className="text-foreground">Staff poaching</strong> &mdash; Counter-offer or lose staff to rivals.</li>
         </ul>
+      </div>
+
+      <div className="rounded-lg border border-neon-yellow/20 bg-neon-yellow/5 p-3">
+        <p className="text-xs font-bold text-neon-yellow mb-2">OPERATIONS PROGRESSION</p>
+        <p className="text-xs font-mono text-muted-foreground mb-2">
+          Level up your operations maturity to handle incidents like a pro. Find it in the <span className="text-neon-cyan">OPERATIONS</span> panel.
+        </p>
+        <div className="space-y-1.5">
+          {OPS_TIER_CONFIG.map((tier) => (
+            <div key={tier.id} className="flex gap-2 items-start">
+              <div className="w-3 h-3 rounded-sm shrink-0 mt-0.5" style={{ backgroundColor: tier.color }} />
+              <div className="text-xs font-mono">
+                <strong style={{ color: tier.color }}>{tier.label}</strong>
+                <span className="text-muted-foreground"> &mdash; {tier.description}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-2 pt-2 border-t border-neon-yellow/10">
+          <p className="text-[10px] font-mono text-muted-foreground">
+            <strong className="text-foreground">Key benefits:</strong> Fewer incidents, faster auto-resolve, cheaper resolve costs, and boosted staff effectiveness. Unlock higher tiers by hiring staff, researching tech, and building reputation.
+          </p>
+        </div>
       </div>
 
       <div className="rounded-lg border border-[#aa44ff]/20 bg-[#aa44ff]/5 p-3">

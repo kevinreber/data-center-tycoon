@@ -25,6 +25,9 @@ export type ComplianceCertId = 'soc2_type1' | 'soc2_type2' | 'hipaa' | 'pci_dss'
 // ── Phase 4D: Competitor AI Types ───────────────────────────────
 export type CompetitorPersonality = 'budget' | 'premium' | 'green' | 'aggressive' | 'steady'
 
+// ── Operations Progression Types ────────────────────────────────
+export type OpsTier = 'manual' | 'monitoring' | 'automation' | 'orchestration'
+
 // ── Save Slot Types ──────────────────────────────────────────
 
 export const MAX_SAVE_SLOTS = 3
@@ -197,6 +200,69 @@ export const TECH_BRANCH_COLORS: Record<TechBranch, string> = {
   resilience: '#44ff88',
 }
 
+// ── Operations Progression Config ──────────────────────────────
+export interface OpsTierConfig {
+  id: OpsTier
+  label: string
+  description: string
+  color: string
+  unlockRequirements: {
+    minStaff: number
+    requiredTechs: string[]
+    minReputation: number
+    minSuiteTier: SuiteTier
+  }
+  benefits: {
+    incidentSpawnReduction: number     // 0–1, fraction reduction in incident spawn chance
+    autoResolveSpeedBonus: number      // 0–1, probability of extra tick reduction per tick
+    revenuePenaltyReduction: number    // 0–1, reduces revenue impact from incidents
+    staffEffectivenessBonus: number    // 0–1, bonus to staff resolution effectiveness
+    resolveCostReduction: number       // 0–1, discount on manual resolution cost
+  }
+  upgradeCost: number
+}
+
+export const OPS_TIER_CONFIG: OpsTierConfig[] = [
+  {
+    id: 'manual',
+    label: 'Manual Ops',
+    description: 'Hands-on incident management. All issues require manual resolution or expire with lingering damage.',
+    color: '#888888',
+    unlockRequirements: { minStaff: 0, requiredTechs: [], minReputation: 0, minSuiteTier: 'starter' },
+    benefits: { incidentSpawnReduction: 0, autoResolveSpeedBonus: 0, revenuePenaltyReduction: 0, staffEffectivenessBonus: 0, resolveCostReduction: 0 },
+    upgradeCost: 0,
+  },
+  {
+    id: 'monitoring',
+    label: 'Monitoring & Alerting',
+    description: 'Proactive monitoring with dashboards and alerting. Reduced resolution costs and improved staff response.',
+    color: '#00ccff',
+    unlockRequirements: { minStaff: 2, requiredTechs: ['ups_upgrade'], minReputation: 25, minSuiteTier: 'starter' },
+    benefits: { incidentSpawnReduction: 0.10, autoResolveSpeedBonus: 0.05, revenuePenaltyReduction: 0.05, staffEffectivenessBonus: 0.10, resolveCostReduction: 0.20 },
+    upgradeCost: 15000,
+  },
+  {
+    id: 'automation',
+    label: 'Basic Automation',
+    description: 'Automated runbooks and self-healing scripts. Staff-assisted auto-resolution with reduced incident frequency.',
+    color: '#44ff88',
+    unlockRequirements: { minStaff: 4, requiredTechs: ['ups_upgrade', 'redundant_cooling', 'auto_failover'], minReputation: 45, minSuiteTier: 'standard' },
+    benefits: { incidentSpawnReduction: 0.25, autoResolveSpeedBonus: 0.20, revenuePenaltyReduction: 0.15, staffEffectivenessBonus: 0.20, resolveCostReduction: 0.35 },
+    upgradeCost: 50000,
+  },
+  {
+    id: 'orchestration',
+    label: 'Full Orchestration',
+    description: 'Kubernetes-style orchestration with auto-failover, predictive maintenance, and self-healing infrastructure.',
+    color: '#ff66ff',
+    unlockRequirements: { minStaff: 8, requiredTechs: ['ups_upgrade', 'redundant_cooling', 'auto_failover', 'hot_aisle', 'variable_fans'], minReputation: 65, minSuiteTier: 'professional' },
+    benefits: { incidentSpawnReduction: 0.40, autoResolveSpeedBonus: 0.40, revenuePenaltyReduction: 0.30, staffEffectivenessBonus: 0.35, resolveCostReduction: 0.50 },
+    upgradeCost: 120000,
+  },
+]
+
+export const OPS_TIER_ORDER: OpsTier[] = ['manual', 'monitoring', 'automation', 'orchestration']
+
 // ── Reputation System Types ───────────────────────────────────
 
 export type ReputationTier = 'unknown' | 'poor' | 'average' | 'good' | 'excellent' | 'legendary'
@@ -244,7 +310,7 @@ export const DEPRECIATION = {
 // ── Infrastructure Layout Types ──────────────────────────────
 
 /** Cabinet facing direction for hot/cold aisle enforcement */
-export type CabinetFacing = 'north' | 'south'
+export type CabinetFacing = 'north' | 'south' | 'east' | 'west'
 
 /** Power Distribution Unit placed on the grid */
 export interface PDU {
@@ -361,17 +427,10 @@ function generateLayout(numRows: number, cols: number): DataCenterLayout {
       const currentFacing = facing
       const nextFacing: CabinetFacing = (i + 1) % 2 === 0 ? 'south' : 'north'
       // Determine aisle type from adjacent row facings:
-      // Row facing south (exhaust north) + next row facing north (exhaust south)
-      //   = both exhausts face the aisle = HOT aisle
-      // Row facing north (exhaust south) + next row facing south (exhaust north)
-      //   = both fronts face the aisle = COLD aisle (wait, that's inverted)
-      // Actually: "facing south" means front/intake is south, exhaust is north
-      //   If current exhausts toward the aisle (current facing south = exhaust north = toward aisle below)
-      //   and next exhausts toward the aisle (next facing north = exhaust south = toward aisle above)
-      //   then both exhausts face the aisle → HOT
+      // "facing south" means front/intake is south, exhaust is north
       let aisleType: AisleType = 'neutral'
       if (currentFacing === 'south' && nextFacing === 'north') {
-        // Both fronts face the aisle (current front=south=toward aisle, next front=north=toward aisle)
+        // Both fronts face the aisle
         aisleType = 'cold'
       } else if (currentFacing === 'north' && nextFacing === 'south') {
         // Both backs face the aisle
@@ -403,6 +462,30 @@ export const AISLE_CONTAINMENT_CONFIG = {
   ],
 }
 
+/** Realistic spacing & adjacency configuration */
+export const SPACING_CONFIG = {
+  // Heat penalties for dense placement
+  adjacentHeatPenalty: 0.3,       // +0.3°C/tick per orthogonally adjacent cabinet
+  surroundedHeatBonus: 0.8,      // additional +0.8°C/tick if surrounded on 3+ sides (trapped hot air)
+
+  // Enhanced aisle bonuses (rewards leaving gaps between cabinet rows)
+  properAisleBonusPerPair: 0.12, // 12% cooling bonus per row pair with 1+ tile gap AND opposing faces
+  narrowAisleBonusPerPair: 0.05, // 5% bonus for back-to-back rows with opposing faces (no gap)
+  maxAisleSpacingBonus: 0.30,    // cap at 30% total cooling overhead reduction
+
+  // Airflow bonuses (cabinet front/rear facing empty space)
+  openFrontCoolingBonus: 0.3,    // +0.3°C/tick extra cooling if intake side faces empty tile
+  openRearCoolingBonus: 0.2,     // +0.2°C/tick extra cooling if exhaust side faces empty tile
+
+  // Maintenance access
+  noAccessMaintenanceCostMult: 2.0, // 2x maintenance cost if no adjacent empty tile
+  noAccessResolutionMult: 1.5,      // 1.5x incident resolution time if cabinet has no access
+
+  // Fire spread between adjacent cabinets
+  fireSpreadChance: 0.12,        // 12% chance per tick that fire spreads to each adjacent cabinet
+  fireSpreadMaxPerTick: 2,       // max cabinets fire can spread to per tick
+}
+
 // ── Suite Tier Config ──────────────────────────────────────────
 
 export interface SuiteConfig {
@@ -411,7 +494,7 @@ export interface SuiteConfig {
   description: string
   cols: number              // cabinet slots per row
   rows: number              // number of cabinet rows
-  maxCabinets: number       // cols * rows
+  maxCabinets: number       // max cabinets across all rows
   maxSpines: number         // spine switch slots
   upgradeCost: number       // cost to upgrade to this tier (0 for starter)
   color: string
@@ -423,49 +506,49 @@ export const SUITE_TIERS: Record<SuiteTier, SuiteConfig> = {
     tier: 'starter',
     label: 'Starter Suite',
     description: 'A small colocation closet. Two cabinet rows with a cold aisle between them.',
-    cols: 4,
+    cols: 5,
     rows: 2,
     maxCabinets: 8,
     maxSpines: 2,
     upgradeCost: 0,
     color: '#88aacc',
-    layout: generateLayout(2, 4),
+    layout: generateLayout(2, 5),
   },
   standard: {
     tier: 'standard',
     label: 'Standard Suite',
     description: 'A proper server room with hot/cold aisle separation.',
-    cols: 6,
+    cols: 8,
     rows: 3,
     maxCabinets: 18,
     maxSpines: 4,
     upgradeCost: 40000,
     color: '#00ff88',
-    layout: generateLayout(3, 6),
+    layout: generateLayout(3, 8),
   },
   professional: {
     tier: 'professional',
     label: 'Professional Suite',
     description: 'A full-size data hall with multiple aisle pairs and containment options.',
-    cols: 8,
+    cols: 10,
     rows: 4,
     maxCabinets: 32,
     maxSpines: 6,
     upgradeCost: 120000,
     color: '#00aaff',
-    layout: generateLayout(4, 8),
+    layout: generateLayout(4, 10),
   },
   enterprise: {
     tier: 'enterprise',
     label: 'Enterprise Suite',
     description: 'A massive hyperscale facility. Maximum capacity with full aisle containment.',
-    cols: 10,
+    cols: 14,
     rows: 5,
     maxCabinets: 50,
     maxSpines: 8,
     upgradeCost: 350000,
     color: '#ff66ff',
-    layout: generateLayout(5, 10),
+    layout: generateLayout(5, 14),
   },
 }
 
@@ -1112,7 +1195,8 @@ export const TUTORIAL_TIPS: TutorialTip[] = [
   { id: 'no_leaf_switch', title: 'No Network', message: 'Cabinets without leaf switches cannot connect to the network fabric.', category: 'network' },
   { id: 'no_spine', title: 'No Backbone', message: 'You need spine switches to complete the network fabric and route traffic.', category: 'network' },
   { id: 'first_incident', title: 'Incident!', message: 'Incidents happen! Resolve them quickly by clicking the resolve button to minimize damage.', category: 'incidents' },
-  { id: 'aisle_hint', title: 'Aisle Layout', message: 'Tip: Alternate cabinet facing (N/S) in adjacent rows for a hot/cold aisle cooling bonus.', category: 'build' },
+  { id: 'aisle_hint', title: 'Aisle Layout', message: 'Tip: Alternate cabinet facing in adjacent rows or columns for a hot/cold aisle cooling bonus. Use N/S for row aisles or E/W for column aisles.', category: 'build' },
+  { id: 'zone_hint', title: 'Zone Bonus', message: 'Tip: Place 3+ cabinets of the same type adjacent to each other to form a zone and earn bonus revenue or reduced heat.', category: 'build' },
   { id: 'first_contract', title: 'Contracts', message: 'Contracts provide bonus revenue but require meeting SLA targets. Monitor your temp and server count!', category: 'contracts' },
   { id: 'first_order_arrived', title: 'Order Delivered!', message: 'Your first supply chain order has arrived! Stock up on inventory before shortages hit to avoid price spikes.', category: 'build' },
   { id: 'weather_hot', title: 'Heat Wave!', message: 'Hot weather is increasing ambient temperature. Your cooling systems need to work harder — consider water cooling.', category: 'cooling' },
@@ -1137,6 +1221,8 @@ export const TUTORIAL_TIPS: TutorialTip[] = [
   { id: 'competitor_appeared', title: 'New Competitor!', message: 'A rival data center company has entered the market. They will compete for contracts — act fast to secure deals!', category: 'market' },
   { id: 'competitor_bidding', title: 'Competition!', message: 'A competitor is bidding on a contract you may want. Accept quickly before they win it!', category: 'market' },
   { id: 'price_war', title: 'Price War!', message: 'A competitor has started a price war! Contract revenue is temporarily reduced across the market.', category: 'market' },
+  // Operations Progression tips
+  { id: 'ops_upgrade_available', title: 'Ops Upgrade Ready', message: 'You meet the requirements to upgrade your operations tier! Check the Operations panel to unlock better automation and reduced incident costs.', category: 'incidents' },
 ]
 
 // ── Procedural Name Generation ──────────────────────────────────
@@ -1353,6 +1439,7 @@ export const ACHIEVEMENT_CATALOG: AchievementDef[] = [
   { id: 'first_pdu', label: 'Power Planned', description: 'Place your first PDU.', icon: '🔌' },
   { id: 'first_cable_tray', label: 'Cable Management', description: 'Place your first cable tray.', icon: '🔧' },
   { id: 'proper_aisles', label: 'Hot/Cold Aisles', description: 'Achieve a hot/cold aisle cooling bonus.', icon: '🌡️' },
+  { id: 'first_zone', label: 'Zoned In', description: 'Form your first zone of 3+ adjacent same-type cabinets.', icon: '🗂️' },
   { id: 'clean_cabling', label: 'Clean Cabling', description: 'Route all cables through trays with zero messy runs.', icon: '✨' },
   // New feature achievements
   { id: 'first_insurance', label: 'Insured', description: 'Purchase your first insurance policy.', icon: '🛡️' },
@@ -1390,6 +1477,11 @@ export const ACHIEVEMENT_CATALOG: AchievementDef[] = [
   { id: 'monopoly', label: 'Monopoly', description: 'Win 5 contracts that competitors bid on.', icon: '🏅' },
   { id: 'underdog', label: 'Underdog', description: 'Win a contract against a competitor with higher reputation.', icon: '💪' },
   { id: 'rivalry', label: 'Rivalry', description: 'Outperform all competitors for 100 consecutive ticks.', icon: '🏆' },
+  // Operations Progression achievements
+  { id: 'script_kiddie', label: 'Script Kiddie', description: 'Unlock Monitoring & Alerting ops tier.', icon: '📡' },
+  { id: 'sre', label: 'SRE', description: 'Unlock Basic Automation ops tier.', icon: '🤖' },
+  { id: 'platform_engineer', label: 'Platform Engineer', description: 'Unlock Full Orchestration ops tier.', icon: '🚀' },
+  { id: 'lights_out', label: 'Lights Out', description: 'Auto-resolve 20 incidents via ops automation.', icon: '💡' },
 ]
 
 export interface EnvironmentConfig {
@@ -1463,6 +1555,8 @@ export function getPlacementHints(
   row: number,
   cabinets: Cabinet[],
   suiteTier: SuiteTier,
+  placementEnv?: CabinetEnvironment,
+  placementCust?: CustomerType,
 ): PlacementHint[] {
   const hints: PlacementHint[] = []
   const layout = SUITE_TIERS[suiteTier].layout
@@ -1484,6 +1578,28 @@ export function getPlacementHints(
   // Show row info
   const facingLabel = cabinetRow.facing === 'north' ? 'North (▲)' : 'South (▼)'
   hints.push({ message: `Row ${cabinetRow.id + 1} — facing ${facingLabel}`, type: 'info' })
+
+  // Zone adjacency hint: check if placing next to same environment/customer type cabinets
+  if (placementEnv) {
+    const adjacentSameEnv = cabinets.filter(
+      (c) => c.environment === placementEnv && ((c.col === col && Math.abs(c.row - row) === 1) || (c.row === row && Math.abs(c.col - col) === 1))
+    )
+    const adjacentSameCust = placementCust ? cabinets.filter(
+      (c) => c.customerType === placementCust && c.environment === 'production' && ((c.col === col && Math.abs(c.row - row) === 1) || (c.row === row && Math.abs(c.col - col) === 1))
+    ) : []
+
+    if (adjacentSameEnv.length >= 2) {
+      const envCfg = ZONE_BONUS_CONFIG.environmentBonus[placementEnv]
+      hints.push({ message: `Zone bonus! 3+ adjacent ${envCfg.label} cabinets: ${envCfg.description}`, type: 'tip' })
+    } else if (adjacentSameEnv.length === 1) {
+      hints.push({ message: `Place one more ${ENVIRONMENT_CONFIG[placementEnv].name} cabinet adjacent to form a zone`, type: 'info' })
+    }
+
+    if (adjacentSameCust.length >= 2 && placementEnv === 'production') {
+      const custCfg = ZONE_BONUS_CONFIG.customerBonus[placementCust!]
+      hints.push({ message: `Zone bonus! 3+ adjacent ${custCfg.label} cabinets: ${custCfg.description}`, type: 'tip' })
+    }
+  }
 
   // Check adjacent cabinets in the same row for heat warnings
   const rowCabs = cabinets.filter((c) => c.row === row)
@@ -1620,7 +1736,21 @@ function calcCableLength(cabCol: number, cabRow: number, _spineSlot: number, gri
   return cabRow + 1 + Math.abs(cabCol - Math.floor(gridRows / 2))
 }
 
-/** Calculate hot/cold aisle cooling bonus based on cabinet layout */
+/** Get the front (intake) and rear (exhaust) tile offsets for a given facing direction.
+ *  For N/S facing: front/rear are row offsets, sides are column offsets.
+ *  For E/W facing: front/rear are column offsets, sides are row offsets. */
+export function getFacingOffsets(facing: CabinetFacing, col: number, row: number) {
+  switch (facing) {
+    case 'north': return { front: { col, row: row - 1 }, rear: { col, row: row + 1 }, sides: [{ col: col - 1, row }, { col: col + 1, row }] }
+    case 'south': return { front: { col, row: row + 1 }, rear: { col, row: row - 1 }, sides: [{ col: col - 1, row }, { col: col + 1, row }] }
+    case 'east':  return { front: { col: col + 1, row }, rear: { col: col - 1, row }, sides: [{ col, row: row - 1 }, { col, row: row + 1 }] }
+    case 'west':  return { front: { col: col - 1, row }, rear: { col: col + 1, row }, sides: [{ col, row: row - 1 }, { col, row: row + 1 }] }
+  }
+}
+
+/** Calculate hot/cold aisle cooling bonus based on cabinet layout and containment.
+ *  Uses row-based layout for pair bonuses and adds containment bonus per contained aisle.
+ *  Also supports column-aligned (E/W) aisle patterns from main's spacing system. */
 export function calcAisleBonus(cabinets: Cabinet[], suiteTier: SuiteTier = 'starter', aisleContainments: number[] = []): number {
   if (cabinets.length < 2) return 0
 
@@ -1637,7 +1767,8 @@ export function calcAisleBonus(cabinets: Cabinet[], suiteTier: SuiteTier = 'star
     const hasBelowCabs = cabinets.some(c => c.row === rowBelow.gridRow)
 
     if (hasAboveCabs && hasBelowCabs) {
-      bonus += AISLE_CONFIG.coolingBonusPerPair
+      // Physical gap between rows = proper aisle bonus
+      bonus += SPACING_CONFIG.properAisleBonusPerPair
 
       // Containment bonus on top of pair bonus
       if (aisleContainments.includes(aisle.id)) {
@@ -1646,7 +1777,7 @@ export function calcAisleBonus(cabinets: Cabinet[], suiteTier: SuiteTier = 'star
     }
   }
 
-  const maxBonus = AISLE_CONFIG.maxCoolingBonus + AISLE_CONTAINMENT_CONFIG.maxContainmentBonus
+  const maxBonus = SPACING_CONFIG.maxAisleSpacingBonus + AISLE_CONTAINMENT_CONFIG.maxContainmentBonus
   return Math.min(maxBonus, bonus)
 }
 
@@ -1656,9 +1787,186 @@ export function countAisleViolations(): number {
   return 0
 }
 
+/** Get orthogonally adjacent cabinets (N/S/E/W only, no diagonals) */
+export function getAdjacentCabinets(cab: Cabinet, cabinets: Cabinet[]): Cabinet[] {
+  return cabinets.filter((c) =>
+    c.id !== cab.id && (
+      (c.col === cab.col && Math.abs(c.row - cab.row) === 1) ||
+      (c.row === cab.row && Math.abs(c.col - cab.col) === 1)
+    )
+  )
+}
+
+/** Check if a cabinet has maintenance access (at least 1 orthogonally adjacent empty tile) */
+export function hasMaintenanceAccess(cab: Cabinet, cabinets: Cabinet[], gridCols: number, gridRows: number): boolean {
+  const directions = [
+    { col: cab.col, row: cab.row - 1 },
+    { col: cab.col, row: cab.row + 1 },
+    { col: cab.col - 1, row: cab.row },
+    { col: cab.col + 1, row: cab.row },
+  ]
+  for (const dir of directions) {
+    if (dir.col < 0 || dir.col >= gridCols || dir.row < 0 || dir.row >= gridRows) continue
+    const occupied = cabinets.some((c) => c.col === dir.col && c.row === dir.row)
+    if (!occupied) return true
+  }
+  return false
+}
+
+/** Calculate spacing heat effect for a cabinet (penalty from adjacent cabinets, bonus from open faces).
+ *  Returns a net °C/tick adjustment (positive = more heat, negative = better cooling). */
+export function calcSpacingHeatEffect(cab: Cabinet, cabinets: Cabinet[]): number {
+  if (!cab.powerStatus) return 0
+
+  const adjacent = getAdjacentCabinets(cab, cabinets)
+  let effect = 0
+
+  // Adjacent heat penalty: each neighboring cabinet traps hot air
+  effect += adjacent.length * SPACING_CONFIG.adjacentHeatPenalty
+
+  // Surrounded penalty: 3+ neighbors means severely restricted airflow
+  if (adjacent.length >= 3) {
+    effect += SPACING_CONFIG.surroundedHeatBonus
+  }
+
+  // Airflow bonus: cabinet's intake (front) or exhaust (rear) facing an empty tile
+  const offsets = getFacingOffsets(cab.facing, cab.col, cab.row)
+  const frontOccupied = cabinets.some((c) => c.col === offsets.front.col && c.row === offsets.front.row)
+  const rearOccupied = cabinets.some((c) => c.col === offsets.rear.col && c.row === offsets.rear.row)
+
+  if (!frontOccupied) effect -= SPACING_CONFIG.openFrontCoolingBonus
+  if (!rearOccupied) effect -= SPACING_CONFIG.openRearCoolingBonus
+
+  return effect
+}
+
 /** Check how many cable runs are not routed through trays */
 export function countMessyCables(cableRuns: CableRun[]): number {
   return cableRuns.filter((c) => !c.usesTrays).length
+}
+
+// ── Zone Adjacency Bonus ────────────────────────────────────────
+
+export interface Zone {
+  id: string
+  type: 'environment' | 'customer'
+  key: CabinetEnvironment | CustomerType       // which env or customer type
+  cabinetIds: string[]                          // cabinet IDs in this zone
+  tiles: { col: number; row: number }[]         // tile positions for rendering
+  bonus: number                                 // revenue/heat multiplier bonus (0–1)
+}
+
+export const ZONE_BONUS_CONFIG = {
+  minClusterSize: 3,                            // minimum adjacent cabinets to form a zone
+  // Environment zone bonuses (applied per-cabinet in the zone)
+  environmentBonus: {
+    production: { revenueBonus: 0.08, heatReduction: 0, label: 'Production Zone', description: '+8% revenue from shared infrastructure efficiency' },
+    lab: { revenueBonus: 0, heatReduction: 0.10, label: 'Lab Zone', description: '-10% heat from consolidated cooling' },
+    management: { revenueBonus: 0, heatReduction: 0.05, label: 'Management Zone', description: '-5% heat from centralized monitoring' },
+  } as Record<CabinetEnvironment, { revenueBonus: number; heatReduction: number; label: string; description: string }>,
+  // Customer type zone bonuses
+  customerBonus: {
+    general: { revenueBonus: 0.05, heatReduction: 0, label: 'General Zone', description: '+5% revenue from dedicated infrastructure' },
+    ai_training: { revenueBonus: 0.10, heatReduction: 0, label: 'AI Training Zone', description: '+10% revenue from optimized GPU interconnects' },
+    streaming: { revenueBonus: 0.07, heatReduction: 0, label: 'Streaming Zone', description: '+7% revenue from CDN co-location' },
+    crypto: { revenueBonus: 0.06, heatReduction: 0, label: 'Crypto Zone', description: '+6% revenue from shared mining pools' },
+    enterprise: { revenueBonus: 0.08, heatReduction: 0, label: 'Enterprise Zone', description: '+8% revenue from dedicated SLA infrastructure' },
+  } as Record<CustomerType, { revenueBonus: number; heatReduction: number; label: string; description: string }>,
+}
+
+/** Find connected clusters of cabinets sharing the same key using flood-fill adjacency */
+function findClusters(cabinets: Cabinet[], keyFn: (c: Cabinet) => string): Map<string, Cabinet[][]> {
+  const result = new Map<string, Cabinet[][]>()
+  const visited = new Set<string>()
+
+  // Build a lookup map: "col,row" → cabinet
+  const tileMap = new Map<string, Cabinet>()
+  for (const cab of cabinets) {
+    tileMap.set(`${cab.col},${cab.row}`, cab)
+  }
+
+  for (const cab of cabinets) {
+    const posKey = `${cab.col},${cab.row}`
+    if (visited.has(posKey)) continue
+    visited.add(posKey)
+
+    const groupKey = keyFn(cab)
+    const cluster: Cabinet[] = [cab]
+    const queue = [cab]
+
+    // BFS flood-fill for adjacent (4-directional) cabinets with same key
+    while (queue.length > 0) {
+      const current = queue.pop()!
+      const adjacentPositions = [
+        `${current.col - 1},${current.row}`,
+        `${current.col + 1},${current.row}`,
+        `${current.col},${current.row - 1}`,
+        `${current.col},${current.row + 1}`,
+      ]
+      for (const adjPos of adjacentPositions) {
+        if (visited.has(adjPos)) continue
+        const neighbor = tileMap.get(adjPos)
+        if (neighbor && keyFn(neighbor) === groupKey) {
+          visited.add(adjPos)
+          cluster.push(neighbor)
+          queue.push(neighbor)
+        }
+      }
+    }
+
+    if (!result.has(groupKey)) result.set(groupKey, [])
+    result.get(groupKey)!.push(cluster)
+  }
+
+  return result
+}
+
+/** Calculate all zone adjacency bonuses from cabinet layout */
+export function calcZones(cabinets: Cabinet[]): Zone[] {
+  if (cabinets.length < ZONE_BONUS_CONFIG.minClusterSize) return []
+
+  const zones: Zone[] = []
+  let zoneId = 1
+
+  // Environment zones
+  const envClusters = findClusters(cabinets, (c) => c.environment)
+  for (const [envKey, clusters] of envClusters) {
+    const bonusCfg = ZONE_BONUS_CONFIG.environmentBonus[envKey as CabinetEnvironment]
+    for (const cluster of clusters) {
+      if (cluster.length >= ZONE_BONUS_CONFIG.minClusterSize) {
+        const bonus = bonusCfg.revenueBonus + bonusCfg.heatReduction
+        zones.push({
+          id: `zone-env-${zoneId++}`,
+          type: 'environment',
+          key: envKey as CabinetEnvironment,
+          cabinetIds: cluster.map((c) => c.id),
+          tiles: cluster.map((c) => ({ col: c.col, row: c.row })),
+          bonus,
+        })
+      }
+    }
+  }
+
+  // Customer type zones (only among production cabinets — lab/mgmt don't serve customers)
+  const prodCabinets = cabinets.filter((c) => c.environment === 'production')
+  const custClusters = findClusters(prodCabinets, (c) => c.customerType)
+  for (const [custKey, clusters] of custClusters) {
+    const bonusCfg = ZONE_BONUS_CONFIG.customerBonus[custKey as CustomerType]
+    for (const cluster of clusters) {
+      if (cluster.length >= ZONE_BONUS_CONFIG.minClusterSize) {
+        zones.push({
+          id: `zone-cust-${zoneId++}`,
+          type: 'customer',
+          key: custKey as CustomerType,
+          cabinetIds: cluster.map((c) => c.id),
+          tiles: cluster.map((c) => ({ col: c.col, row: c.row })),
+          bonus: bonusCfg.revenueBonus + bonusCfg.heatReduction,
+        })
+      }
+    }
+  }
+
+  return zones
 }
 
 // ── Existing Constants ────────────────────────────────────────────
@@ -2266,6 +2574,10 @@ interface GameState {
   pduOverloaded: boolean                      // whether any PDU is overloaded
   infraIncidentBonus: number                  // extra incident chance from messy cables
 
+  // Zone adjacency bonuses
+  zones: Zone[]                               // active zones from cabinet clustering
+  zoneBonusRevenue: number                    // total zone revenue bonus last tick
+
   // Cabinet selection
   selectedCabinetId: string | null            // currently selected cabinet (clicked in canvas)
 
@@ -2428,6 +2740,11 @@ interface GameState {
   priceWarTicksRemaining: number
   poachTarget: string | null            // staff ID being poached
 
+  // Operations Progression
+  opsTier: OpsTier
+  opsAutoResolvedCount: number          // lifetime incidents auto-resolved by ops automation
+  opsPreventedCount: number             // lifetime incidents prevented by ops automation
+
   // Save / Load
   hasSaved: boolean
   activeSlotId: number | null
@@ -2441,6 +2758,7 @@ interface GameState {
   addCabinet: (col: number, row: number, environment: CabinetEnvironment, customerType?: CustomerType, facing?: CabinetFacing) => void
   enterPlacementMode: (environment: CabinetEnvironment, customerType: CustomerType, facing?: CabinetFacing) => void
   exitPlacementMode: () => void
+  togglePlacementFacing: () => void
   upgradeNextCabinet: () => void
   addLeafToNextCabinet: () => void
   addSpineSwitch: () => void
@@ -2521,6 +2839,8 @@ interface GameState {
   startComplianceAudit: (certId: ComplianceCertId) => void
   // Phase 4D — Competitor AI actions
   counterPoachOffer: () => void
+  // Operations Progression actions
+  upgradeOpsTier: () => void
   // Tutorial actions
   dismissTip: (tipId: string) => void
   toggleTutorial: () => void
@@ -2674,6 +2994,10 @@ export const useGameStore = create<GameState>((set) => ({
   messyCableCount: 0,
   pduOverloaded: false,
   infraIncidentBonus: 0,
+
+  // Zone adjacency bonuses
+  zones: [],
+  zoneBonusRevenue: 0,
 
   // Cabinet selection
   selectedCabinetId: null,
@@ -2843,6 +3167,11 @@ export const useGameStore = create<GameState>((set) => ({
   priceWarTicksRemaining: 0,
   poachTarget: null as string | null,
 
+  // Operations Progression
+  opsTier: 'manual' as OpsTier,
+  opsAutoResolvedCount: 0,
+  opsPreventedCount: 0,
+
   // Demo mode
   isDemo: false,
 
@@ -2894,12 +3223,14 @@ export const useGameStore = create<GameState>((set) => ({
       const newCabinets = [...state.cabinets, cab]
       const newAisleBonus = calcAisleBonus(newCabinets, state.suiteTier, state.aisleContainments)
       const newAisleViolations = countAisleViolations()
+      const newZones = calcZones(newCabinets)
       return {
         cabinets: newCabinets,
         money: state.money - COSTS.cabinet,
         placementMode: false,
         aisleBonus: newAisleBonus,
         aisleViolations: newAisleViolations,
+        zones: newZones,
         ...calcStats(newCabinets, state.spineSwitches),
       }
     }),
@@ -2909,6 +3240,13 @@ export const useGameStore = create<GameState>((set) => ({
 
   exitPlacementMode: () =>
     set({ placementMode: false }),
+
+  togglePlacementFacing: () =>
+    set((state) => {
+      const cycle: CabinetFacing[] = ['north', 'east', 'south', 'west']
+      const idx = cycle.indexOf(state.placementFacing)
+      return { placementFacing: cycle[(idx + 1) % cycle.length] }
+    }),
 
   upgradeNextCabinet: () =>
     set((state) => {
@@ -3058,7 +3396,11 @@ export const useGameStore = create<GameState>((set) => ({
     set((state) => {
       const incident = state.activeIncidents.find((i) => i.id === id)
       if (!incident || incident.resolved) return state
-      if (state.money < incident.def.resolveCost) return state
+      // Apply ops tier resolve cost reduction
+      const opsConfig = OPS_TIER_CONFIG.find((c) => c.id === state.opsTier)
+      const costReduction = opsConfig?.benefits.resolveCostReduction ?? 0
+      const effectiveCost = Math.round(incident.def.resolveCost * (1 - costReduction))
+      if (state.money < effectiveCost) return state
 
       // Restore hardware if this was a hardware_failure incident
       let cabinets = state.cabinets
@@ -3081,9 +3423,9 @@ export const useGameStore = create<GameState>((set) => ({
         ),
         cabinets,
         spineSwitches,
-        money: state.money - incident.def.resolveCost,
+        money: state.money - effectiveCost,
         resolvedCount: state.resolvedCount + 1,
-        incidentLog: [`Resolved: ${incident.def.label}`, ...state.incidentLog].slice(0, 10),
+        incidentLog: [`Resolved: ${incident.def.label}${costReduction > 0 ? ` (${Math.round(costReduction * 100)}% ops discount)` : ''}`, ...state.incidentLog].slice(0, 10),
         ...calcStats(cabinets, spineSwitches),
         trafficStats: calcTraffic(cabinets, spineSwitches, state.demandMultiplier),
       }
@@ -3717,21 +4059,37 @@ export const useGameStore = create<GameState>((set) => ({
     set((state) => {
       const config = MAINTENANCE_CONFIG.find((c) => c.targetType === targetType)
       if (!config) return state
-      if (!state.sandboxMode && state.money < config.cost) return state
+
+      // Maintenance access check: cabinets without adjacent empty space cost more
+      let costMult = 1.0
+      let durationMult = 1.0
+      if (targetType === 'cabinet') {
+        const targetCab = state.cabinets.find((c) => c.id === targetId)
+        if (targetCab) {
+          const suiteLimits = getSuiteLimits(state.suiteTier)
+          if (!hasMaintenanceAccess(targetCab, state.cabinets, suiteLimits.cols, suiteLimits.rows)) {
+            costMult = SPACING_CONFIG.noAccessMaintenanceCostMult
+            durationMult = SPACING_CONFIG.noAccessResolutionMult
+          }
+        }
+      }
+
+      const adjustedCost = Math.round(config.cost * costMult)
+      if (!state.sandboxMode && state.money < adjustedCost) return state
       if (state.maintenanceWindows.filter((w) => w.status !== 'completed').length >= 3) return state
       const window: MaintenanceWindow = {
         id: `maint-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         targetType,
         targetId,
         scheduledTick: state.tickCount + 1,
-        durationTicks: config.durationTicks,
-        cost: config.cost,
+        durationTicks: Math.ceil(config.durationTicks * durationMult),
+        cost: adjustedCost,
         status: 'scheduled',
         benefitApplied: false,
       }
       return {
         maintenanceWindows: [...state.maintenanceWindows, window],
-        money: state.sandboxMode ? state.money : state.money - config.cost,
+        money: state.sandboxMode ? state.money : state.money - adjustedCost,
       }
     }),
 
@@ -3903,6 +4261,29 @@ export const useGameStore = create<GameState>((set) => ({
       }
     }),
 
+  // ── Operations Progression Actions ─────────────────────────────
+
+  upgradeOpsTier: () =>
+    set((state) => {
+      const currentIdx = OPS_TIER_ORDER.indexOf(state.opsTier)
+      if (currentIdx >= OPS_TIER_ORDER.length - 1) return state // already at max tier
+      const nextTierId = OPS_TIER_ORDER[currentIdx + 1]
+      const nextConfig = OPS_TIER_CONFIG.find((c) => c.id === nextTierId)
+      if (!nextConfig) return state
+      // Check requirements
+      const { minStaff, requiredTechs, minReputation, minSuiteTier } = nextConfig.unlockRequirements
+      if (state.staff.length < minStaff) return state
+      if (!requiredTechs.every((t) => state.unlockedTech.includes(t))) return state
+      if (state.reputationScore < minReputation) return state
+      const suiteTierOrder: SuiteTier[] = ['starter', 'standard', 'professional', 'enterprise']
+      if (suiteTierOrder.indexOf(state.suiteTier) < suiteTierOrder.indexOf(minSuiteTier)) return state
+      if (state.money < nextConfig.upgradeCost) return state
+      return {
+        opsTier: nextTierId,
+        money: state.money - nextConfig.upgradeCost,
+      }
+    }),
+
   // ── Tutorial Actions ────────────────────────────────────────────
 
   dismissTip: (tipId: string) =>
@@ -3923,12 +4304,12 @@ export const useGameStore = create<GameState>((set) => ({
     const environments: CabinetEnvironment[] = ['production', 'production', 'production', 'lab', 'management']
     let cabId = 1
 
-    // Professional tier: 8 cols x 4 rows — uses row-based layout grid positions
+    // Professional tier: 10 cols x 4 rows — uses row-based layout grid positions
     // Professional layout: Row 0 (gridRow=1), Row 1 (gridRow=3), Row 2 (gridRow=5), Row 3 (gridRow=7)
     const proLayout = SUITE_TIERS.professional.layout
     const gridRows = proLayout.cabinetRows.map(r => r.gridRow) // [1, 3, 5, 7]
     const positions: [number, number][] = [
-      // Row 0 (gridRow 1) — full
+      // Row 0 (gridRow 1) — full (10 cols)
       [0,gridRows[0]],[1,gridRows[0]],[2,gridRows[0]],[3,gridRows[0]],[4,gridRows[0]],[5,gridRows[0]],[6,gridRows[0]],[7,gridRows[0]],
       // Row 1 (gridRow 3) — full
       [0,gridRows[1]],[1,gridRows[1]],[2,gridRows[1]],[3,gridRows[1]],[4,gridRows[1]],[5,gridRows[1]],[6,gridRows[1]],[7,gridRows[1]],
@@ -4361,6 +4742,8 @@ export const useGameStore = create<GameState>((set) => ({
       messyCableCount: 0,
       pduOverloaded: false,
       infraIncidentBonus: 0,
+      zones: [],
+      zoneBonusRevenue: 0,
       placementMode: false,
       insurancePolicies: [],
       insuranceCost: 0,
@@ -4694,6 +5077,8 @@ export const useGameStore = create<GameState>((set) => ({
       messyCableCount: 0,
       pduOverloaded: false,
       infraIncidentBonus: 0,
+      zones: [],
+      zoneBonusRevenue: 0,
       selectedCabinetId: null,
       placementMode: false,
       insurancePolicies: [],
@@ -4778,6 +5163,10 @@ export const useGameStore = create<GameState>((set) => ({
       activeTip: null,
       tutorialEnabled: true,
       activeSlotId: null,
+      // Operations Progression
+      opsTier: 'manual' as OpsTier,
+      opsAutoResolvedCount: 0,
+      opsPreventedCount: 0,
     })
   },
 
@@ -4834,12 +5223,23 @@ export const useGameStore = create<GameState>((set) => ({
         }
       }
 
+      // ── Operations tier benefits ──────────────────────────────
+      const opsTierConfig = OPS_TIER_CONFIG.find((c) => c.id === state.opsTier)
+      const opsSpawnReduction = opsTierConfig?.benefits.incidentSpawnReduction ?? 0
+      const opsAutoResolveBonus = opsTierConfig?.benefits.autoResolveSpeedBonus ?? 0
+      const opsRevenuePenaltyReduction = opsTierConfig?.benefits.revenuePenaltyReduction ?? 0
+      const opsStaffBonus = opsTierConfig?.benefits.staffEffectivenessBonus ?? 0
+      let opsAutoResolvedCount = state.opsAutoResolvedCount
+      let opsPreventedCount = state.opsPreventedCount
+
       // Spawn new incidents (only if we have equipment and fewer than max active)
       if (state.cabinets.length > 0 && activeIncidents.length < MAX_ACTIVE_INCIDENTS) {
-        // Scale chance with facility size + messy cable penalty
+        // Scale chance with facility size + messy cable penalty, reduced by ops tier
         const sizeMultiplier = Math.min(2, state.cabinets.length / 8)
         const cablingPenalty = state.infraIncidentBonus
-        if (Math.random() < INCIDENT_CHANCE * sizeMultiplier + cablingPenalty) {
+        const baseSpawnChance = INCIDENT_CHANCE * sizeMultiplier + cablingPenalty
+        const adjustedSpawnChance = baseSpawnChance * (1 - opsSpawnReduction)
+        if (Math.random() < adjustedSpawnChance) {
           let selectedDef = INCIDENT_CATALOG[Math.floor(Math.random() * INCIDENT_CATALOG.length)]
           let affectedHwId: string | undefined
 
@@ -4877,6 +5277,9 @@ export const useGameStore = create<GameState>((set) => ({
           }
           activeIncidents.push(incident)
           incidentLog = [`New: ${selectedDef.label} — ${selectedDef.description}`, ...incidentLog].slice(0, 10)
+        } else if (opsSpawnReduction > 0 && Math.random() < baseSpawnChance) {
+          // Incident was prevented by ops tier
+          opsPreventedCount++
         }
       }
 
@@ -4910,7 +5313,12 @@ export const useGameStore = create<GameState>((set) => ({
       for (const inc of activeIncidents) {
         if (inc.resolved) continue
         switch (inc.def.effect) {
-          case 'revenue_penalty': incidentRevenueMult *= inc.def.effectMagnitude; break
+          case 'revenue_penalty': {
+            // Ops tier reduces the severity of revenue penalties
+            const reducedMag = inc.def.effectMagnitude + (1 - inc.def.effectMagnitude) * opsRevenuePenaltyReduction
+            incidentRevenueMult *= reducedMag
+            break
+          }
           case 'power_surge': incidentPowerMult *= inc.def.effectMagnitude; break
           case 'cooling_failure': incidentCoolingMult *= inc.def.effectMagnitude; break
           case 'heat_spike': incidentHeatAdd += inc.def.effectMagnitude; break
@@ -4959,15 +5367,15 @@ export const useGameStore = create<GameState>((set) => ({
       const networkEngineers = onShiftStaff.filter((s) => s.role === 'network_engineer')
       const electricians = onShiftStaff.filter((s) => s.role === 'electrician')
 
-      // Calculate per-incident-type speed multipliers from staff
+      // Calculate per-incident-type speed multipliers from staff (boosted by ops tier)
       const staffTrafficResolution = networkEngineers.reduce((sum, s) => {
         const bonus = s.skillLevel === 1 ? 0.25 : s.skillLevel === 2 ? 0.40 : 0.60
         return sum + bonus
-      }, 0) * shiftCoverage
+      }, 0) * shiftCoverage * (1 + opsStaffBonus)
       const staffPowerResolution = electricians.reduce((sum, s) => {
         const bonus = s.skillLevel === 1 ? 0.25 : s.skillLevel === 2 ? 0.40 : 0.60
         return sum + bonus
-      }, 0) * shiftCoverage
+      }, 0) * shiftCoverage * (1 + opsStaffBonus)
 
       // Apply staff-based incident speed reduction (in addition to tech bonuses)
       if (onShiftStaff.length > 0) {
@@ -4977,7 +5385,7 @@ export const useGameStore = create<GameState>((set) => ({
           if (i.def.effect === 'traffic_drop') staffSpeedBonus = staffTrafficResolution
           else if (i.def.effect === 'power_surge') staffSpeedBonus = staffPowerResolution
           // Generic small bonus from any staff for other incident types
-          else staffSpeedBonus = Math.min(0.3, onShiftStaff.length * 0.05) * shiftCoverage
+          else staffSpeedBonus = Math.min(0.3, onShiftStaff.length * 0.05) * shiftCoverage * (1 + opsStaffBonus)
           const extraReduction = Math.random() < Math.min(0.8, staffSpeedBonus) ? 1 : 0
           if (extraReduction === 0) return i
           const remaining = i.ticksRemaining - extraReduction
@@ -5017,13 +5425,20 @@ export const useGameStore = create<GameState>((set) => ({
 
       // Natural incident tick-down — all unresolved incidents decrease timer each tick
       // auto_failover tech grants 30% chance of extra tick reduction
+      // ops tier grants additional auto-resolve speed bonus
       const hasAutoFailover = state.unlockedTech.includes('auto_failover')
       activeIncidents = activeIncidents.map((i) => {
         if (i.resolved) return i
         const autoBonus = hasAutoFailover && Math.random() < 0.3 ? 1 : 0
-        const remaining = i.ticksRemaining - 1 - autoBonus
+        const opsBonus = opsAutoResolveBonus > 0 && Math.random() < opsAutoResolveBonus ? 1 : 0
+        const remaining = i.ticksRemaining - 1 - autoBonus - opsBonus
         if (remaining <= 0) {
-          incidentLog = [`Expired: ${i.def.label}`, ...incidentLog].slice(0, 10)
+          if (opsBonus > 0) {
+            incidentLog = [`Auto-resolved: ${i.def.label}`, ...incidentLog].slice(0, 10)
+            opsAutoResolvedCount++
+          } else {
+            incidentLog = [`Expired: ${i.def.label}`, ...incidentLog].slice(0, 10)
+          }
           // Track hardware restoration for incidents expiring this tick
           if (i.def.effect === 'hardware_failure' && i.affectedHardwareId) {
             if (i.def.hardwareTarget === 'leaf') restoredLeafCabIds.add(i.affectedHardwareId)
@@ -5243,6 +5658,21 @@ export const useGameStore = create<GameState>((set) => ({
       // ── Infrastructure layout effects ──────────────────────
       const currentAisleBonus = calcAisleBonus(state.cabinets, state.suiteTier, state.aisleContainments)
       const currentAisleViolations = countAisleViolations()
+      const currentZones = calcZones(state.cabinets)
+
+      // Build lookup: cabinet ID → zone bonuses for quick per-cabinet access in revenue/heat loops
+      const cabinetZoneBonuses = new Map<string, { revenueBonus: number; heatReduction: number }>()
+      for (const zone of currentZones) {
+        const cfg = zone.type === 'environment'
+          ? ZONE_BONUS_CONFIG.environmentBonus[zone.key as CabinetEnvironment]
+          : ZONE_BONUS_CONFIG.customerBonus[zone.key as CustomerType]
+        for (const cabId of zone.cabinetIds) {
+          const existing = cabinetZoneBonuses.get(cabId) ?? { revenueBonus: 0, heatReduction: 0 }
+          existing.revenueBonus += cfg.revenueBonus
+          existing.heatReduction += cfg.heatReduction
+          cabinetZoneBonuses.set(cabId, existing)
+        }
+      }
 
       // Check PDU overloads
       let anyPDUOverloaded = false
@@ -5287,7 +5717,7 @@ export const useGameStore = create<GameState>((set) => ({
         infraIncidentBonus = messyCableCount * AISLE_CONFIG.messyCablingPenalty
       }
 
-      // 1. Update heat per cabinet (with customer type and tech modifiers)
+      // 1. Update heat per cabinet (with customer type, spacing, and tech modifiers)
       const newCabinets = state.cabinets.map((cab) => {
         let heat = cab.heatLevel
         const envConfig = ENVIRONMENT_CONFIG[cab.environment]
@@ -5304,6 +5734,9 @@ export const useGameStore = create<GameState>((set) => ({
           if (rowFacings.size > 1) {
             heat += AISLE_CONFIG.heatPenaltyViolation
           }
+
+          // Spacing heat effects: adjacency penalties and airflow bonuses
+          heat += calcSpacingHeatEffect(cab, state.cabinets)
 
           // PDU overload: cabinets on overloaded PDUs generate extra heat
           if (anyPDUOverloaded) {
@@ -5329,9 +5762,14 @@ export const useGameStore = create<GameState>((set) => ({
           }
         }
 
-        // Cooling dissipation (base + tech bonus + aisle bonus + in-row cooling; reduced by incident effects)
-        const aisleCoolingBoost = currentAisleBonus * 2 // up to +0.5°C/tick extra cooling
-        heat -= (coolingConfig.coolingRate + techCoolingBonus + aisleCoolingBoost + inRowBonus + staffCoolingBonus) * incidentCoolingMult
+        // Zone adjacency heat reduction
+        const zoneBonus = cabinetZoneBonuses.get(cab.id)
+        const zoneHeatReduction = zoneBonus ? zoneBonus.heatReduction : 0
+
+        // Cooling dissipation (base + tech bonus + aisle bonus + in-row cooling + zone bonus; reduced by incident effects)
+        const aisleCoolingBoost = currentAisleBonus * 2 // up to +0.6°C/tick extra cooling
+        const zoneHeatBoost = zoneHeatReduction * SIM.heatPerServer // scale zone heat reduction relative to heat generation
+        heat -= (coolingConfig.coolingRate + techCoolingBonus + aisleCoolingBoost + inRowBonus + staffCoolingBonus + zoneHeatBoost) * incidentCoolingMult
 
         // Incident heat spike
         heat += incidentHeatAdd
@@ -5392,6 +5830,29 @@ export const useGameStore = create<GameState>((set) => ({
         }
       }
 
+      // Fire spread to adjacent cabinets (dense placement = faster spread)
+      if (fireActive && newCabinets.length > 1) {
+        const criticalCabs = newCabinets.filter((c) => c.heatLevel >= SIM.criticalTemp)
+        let spreadCount = 0
+        for (const hotCab of criticalCabs) {
+          if (spreadCount >= SPACING_CONFIG.fireSpreadMaxPerTick) break
+          const adjacents = getAdjacentCabinets(hotCab, newCabinets)
+          for (const adj of adjacents) {
+            if (spreadCount >= SPACING_CONFIG.fireSpreadMaxPerTick) break
+            if (adj.heatLevel < SIM.criticalTemp - 10 && Math.random() < SPACING_CONFIG.fireSpreadChance) {
+              const adjIdx = newCabinets.findIndex((c) => c.id === adj.id)
+              if (adjIdx >= 0) {
+                newCabinets[adjIdx] = { ...newCabinets[adjIdx], heatLevel: Math.min(100, newCabinets[adjIdx].heatLevel + 8) }
+                spreadCount++
+              }
+            }
+          }
+        }
+        if (spreadCount > 0) {
+          incidentLog = [`Fire spreading to adjacent cabinets! (${spreadCount} affected)`, ...incidentLog].slice(0, 10)
+        }
+      }
+
       // 2. Calculate stats with updated heat
       const stats = calcStats(newCabinets, spineSwitches)
 
@@ -5425,6 +5886,12 @@ export const useGameStore = create<GameState>((set) => ({
           baseRevenue *= (1 + techRevenueBonus)
           if (cab.customerType === 'ai_training') baseRevenue *= (1 + techAiBonus)
 
+          // Zone adjacency bonus: cabinets in organized zones earn more
+          const cabZoneBonus = cabinetZoneBonuses.get(cab.id)
+          if (cabZoneBonus && cabZoneBonus.revenueBonus > 0) {
+            baseRevenue *= (1 + cabZoneBonus.revenueBonus)
+          }
+
           // PDU overload penalty: cabinets on tripped PDUs earn nothing
           if (anyPDUOverloaded) {
             const cabinetPDUs = state.pdus.filter((pdu) => {
@@ -5446,6 +5913,20 @@ export const useGameStore = create<GameState>((set) => ({
         }
       }
       revenue *= incidentRevenueMult * outagePenalty
+
+      // Calculate zone bonus revenue for display (difference vs. what revenue would be without zone bonuses)
+      let zoneBonusRevenue = 0
+      for (const cab of newCabinets) {
+        if (cab.powerStatus) {
+          const cabZoneBonus = cabinetZoneBonuses.get(cab.id)
+          if (cabZoneBonus && cabZoneBonus.revenueBonus > 0) {
+            const envCfg = ENVIRONMENT_CONFIG[cab.environment]
+            const custCfg = CUSTOMER_TYPE_CONFIG[cab.customerType]
+            const baseRev = cab.serverCount * SIM.revenuePerServer * envCfg.revenueMultiplier * custCfg.revenueMultiplier
+            zoneBonusRevenue += baseRev * cabZoneBonus.revenueBonus
+          }
+        }
+      }
 
       // Reputation bonus on contract revenue
       const repTier = getReputationTier(state.reputationScore)
@@ -5651,6 +6132,7 @@ export const useGameStore = create<GameState>((set) => ({
       if (state.pdus.length >= 1) unlock('first_pdu')
       if (state.cableTrays.length >= 1) unlock('first_cable_tray')
       if (currentAisleBonus > 0) unlock('proper_aisles')
+      if (currentZones.length > 0) unlock('first_zone')
       if (cableRuns.length > 0 && messyCableCount === 0) unlock('clean_cabling')
 
       // ── Insurance system ──────────────────────────────────────
@@ -6254,6 +6736,8 @@ export const useGameStore = create<GameState>((set) => ({
       if (competitors.length > state.competitors.length) logEvent('system', 'New competitor entered the market', 'info')
       if (intrusionsBlocked > state.intrusionsBlocked) logEvent('incident', 'Security intrusion blocked', 'success')
       if (complianceCerts.some((c) => !c.auditInProgress && c.grantedAtTick === newTickCount)) logEvent('achievement', 'Compliance certification granted!', 'success')
+      if (opsAutoResolvedCount > state.opsAutoResolvedCount) logEvent('system', 'Ops automation auto-resolved an incident', 'success')
+      if (opsPreventedCount > state.opsPreventedCount) logEvent('system', 'Ops monitoring prevented an incident', 'info')
 
       // ── Capacity history ──────────────────────────────────────────
       const capacityHistory = [...state.capacityHistory, {
@@ -6292,6 +6776,7 @@ export const useGameStore = create<GameState>((set) => ({
           if (tip.id === 'no_spine' && newCabinets.some((c) => c.hasLeafSwitch) && spineSwitches.length === 0) trigger = true
           if (tip.id === 'first_incident' && activeIncidents.length > 0 && state.activeIncidents.length === 0) trigger = true
           if (tip.id === 'aisle_hint' && newCabinets.length >= 4 && state.aisleBonus === 0) trigger = true
+          if (tip.id === 'zone_hint' && newCabinets.length >= 3 && currentZones.length === 0) trigger = true
           if (tip.id === 'first_contract' && state.contractOffers.length > 0 && state.activeContracts.length === 0 && completedContracts === 0) trigger = true
           if (tip.id === 'first_order_arrived' && pendingOrders.some(o => o.status === 'delivered')) trigger = true
           if (tip.id === 'weather_hot' && weatherAmbientModifier >= 3) trigger = true
@@ -6316,6 +6801,16 @@ export const useGameStore = create<GameState>((set) => ({
           if (tip.id === 'competitor_appeared' && competitors.length === 1 && state.competitors.length === 0) trigger = true
           if (tip.id === 'competitor_bidding' && competitorBids.length > 0 && state.competitorBids.length === 0) trigger = true
           if (tip.id === 'price_war' && priceWarActive && !state.priceWarActive) trigger = true
+          // Operations Progression tips
+          if (tip.id === 'ops_upgrade_available' && state.opsTier !== 'orchestration') {
+            const nextIdx = OPS_TIER_ORDER.indexOf(state.opsTier) + 1
+            if (nextIdx < OPS_TIER_ORDER.length) {
+              const nextConfig = OPS_TIER_CONFIG[nextIdx]
+              const { minStaff, requiredTechs, minReputation, minSuiteTier } = nextConfig.unlockRequirements
+              const suiteTierOrder: SuiteTier[] = ['starter', 'standard', 'professional', 'enterprise']
+              if (updatedStaff.length >= minStaff && requiredTechs.every((t) => state.unlockedTech.includes(t)) && reputationScore >= minReputation && suiteTierOrder.indexOf(state.suiteTier) >= suiteTierOrder.indexOf(minSuiteTier)) trigger = true
+            }
+          }
           if (trigger) { activeTip = tip; break }
         }
       }
@@ -6383,6 +6878,11 @@ export const useGameStore = create<GameState>((set) => ({
       // Underdog: won a contract and any competitor has higher reputation
       if (competitorContractsWon > 0 && competitors.some((c) => c.reputationScore > state.reputationScore)) unlock('underdog')
       if (competitorOutperformTicks >= 100) unlock('rivalry')
+      // Operations Progression achievements
+      if (state.opsTier === 'monitoring' || OPS_TIER_ORDER.indexOf(state.opsTier) >= 1) unlock('script_kiddie')
+      if (state.opsTier === 'automation' || OPS_TIER_ORDER.indexOf(state.opsTier) >= 2) unlock('sre')
+      if (state.opsTier === 'orchestration') unlock('platform_engineer')
+      if (opsAutoResolvedCount >= 20) unlock('lights_out')
 
       // Apply Phase 4 bonuses to contract revenue
       const adjustedContractRevenue = +(contractRevenue * (1 + complianceRevenueBonus + greenCertRevenueBonus) * priceWarPenalty).toFixed(2)
@@ -6442,6 +6942,8 @@ export const useGameStore = create<GameState>((set) => ({
         // Infrastructure state
         aisleBonus: currentAisleBonus,
         aisleViolations: currentAisleViolations,
+        zones: currentZones,
+        zoneBonusRevenue: +zoneBonusRevenue.toFixed(2),
         pduOverloaded: anyPDUOverloaded,
         cableRuns,
         messyCableCount,
@@ -6534,6 +7036,9 @@ export const useGameStore = create<GameState>((set) => ({
         poachTarget,
         // Updated contract revenue (with Phase 4 bonuses)
         contractRevenue: +adjustedContractRevenue.toFixed(2),
+        // Operations Progression
+        opsAutoResolvedCount,
+        opsPreventedCount,
       }
     }),
 }))

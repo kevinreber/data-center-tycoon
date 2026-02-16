@@ -137,13 +137,17 @@ These features enrich the world and add strategic layers, but the game can ship 
 
 These features add polish, replayability, and community value. They're best tackled once core gameplay is strong.
 
-### Multi-Site Expansion
+### Multi-Site Expansion (see Phase 6 Detailed Design below)
 
 | Feature | Description | Impact | Effort | Why it matters |
 |---------|-------------|--------|--------|----------------|
-| Multiple locations | Build data centers in different regions (US-East, EU-West, Asia-Pacific) with different power costs, climate, and regulations | Medium | High | Massive scope expansion. Exciting but essentially a "game 2" built on top of the core. Save for late development. |
-| Inter-site networking | Connect sites via dark fiber or leased lines; latency matters for workloads that span regions | Low | High | Only relevant once multi-site exists. Cool but very complex. |
-| Edge deployments | Small edge PoPs in cities for low-latency content delivery, feeding into main facilities | Low | Medium | Interesting concept but requires multi-site to be meaningful. |
+| World map view | Stylized global map showing all sites, demand heat maps, inter-site connections; neon/terminal aesthetic with glowing nodes and animated links | High | High | Transforms the game from facility management into global infrastructure strategy. The visual anchor for the entire multi-site system. |
+| Metro regions with trade-offs | 12-15 named locations with distinct profiles (power cost, climate, disaster risk, labor market, customer demand, regulations, tax incentives) | High | High | Location-based strategy is the core of multi-site. Bay Area = premium customers + earthquake risk; Iceland = free cooling + high latency. Every location is a trade-off. |
+| Site types (Edge/Colo/Hyperscale/IXP/DR) | Multiple facility types serving different strategic purposes — from lightweight edge PoPs to full hyperscale campuses | High | High | Not every site needs to be a full DC. Edge PoPs are cheap entry points; IXPs generate peering revenue; DR sites enable compliance contracts. |
+| Inter-site networking (DCN) | Dark fiber, leased wavelengths, IP transit, submarine cables connecting sites; latency modeling matters for multi-region contracts | Medium | High | The connective tissue of multi-site. Enables multi-region contracts and DR failover. |
+| Customer demand geography | Demand heat maps showing where customer types concentrate; proximity to demand = latency bonuses + contract priority | Medium | Medium | Drives strategic site selection — build where the customers are, or build cheap and accept higher latency. |
+| Location-specific incidents | Earthquakes (Bay Area), hurricanes (Gulf), grid instability (Texas), volcanic activity (Iceland), monsoons (Singapore) | Medium | Medium | Gives location choice real consequences. Cheap Nordic cooling is great until a volcanic event threatens your site. |
+| Edge PoPs & CDN | Lightweight 1-2 cabinet sites for low-latency content delivery; per-Gbps transit fees; backhaul to core sites | Medium | Medium | Easiest entry point to multi-site thinking. Teaches players network topology at a global scale before committing to full expansion. |
 
 ### Social & Meta
 
@@ -1222,3 +1226,538 @@ Visual and mechanical distinction between under-floor (cold air plenum) and over
 | Event Log | 2 | 0 | ~2 fields, 0 actions | Logging | Log panel | 2 |
 | Statistics Dashboard | 1 | 0 | ~15 fields, 0 actions | Stats tracking | Stats panel | 3 |
 | Tooltip Tutorial | 2 | 1 config | ~3 fields, 1 action | Trigger checks | Toast tips | 2 |
+
+---
+
+## Phase 6 — Detailed Design: Multi-Site Expansion (World Map & Global Strategy)
+
+**Goal:** Transform the game from managing a single data center into building a global data center empire. Players expand from one facility to a network of strategically placed sites — hyperscale campuses, colocation facilities, edge PoPs, and network hubs — connected by inter-site networking. A world map view provides the strategic overview, while the existing isometric floor view remains the per-site management interface.
+
+**Progression gate:** Enterprise suite tier + $500K+ cash + reputation "excellent" or higher. First expansion is domestic (same continent), international unlocks later at higher reputation/money thresholds. Edge PoPs unlock earliest as the gentlest introduction to multi-site thinking.
+
+---
+
+### 6A. World Map View
+
+**Goal:** A new top-level view mode that sits alongside the existing isometric floor view. The world map is the strategic command center for multi-site operations.
+
+#### View Architecture
+
+The game gains a **view switcher** with two modes:
+
+1. **Floor View** (existing) — Manage a single site's cabinets, infrastructure, staff, etc.
+2. **World Map View** (new) — See all sites globally, plan expansion, manage inter-site networking, monitor demand
+
+#### Visual Design
+
+The world map should match the game's neon/terminal aesthetic:
+- Dark background with a stylized continental outline (glowing border lines, not photorealistic)
+- Site nodes rendered as glowing dots (color-coded by site type)
+- Inter-site connections as animated lines (color = utilization, animated pulse = active traffic)
+- Demand heat map overlay (toggleable) showing customer concentration by region
+- Weather/disaster overlays showing active events per region
+- Minimalist — think "war room command screen," not Google Maps
+
+#### Implementation Notes
+
+Two viable approaches:
+- **Phaser scene** — A second Phaser scene (`WorldMapScene`) alongside `DataCenterScene`, swapped via the view toggle. Keeps all rendering in one engine; consistent visual style.
+- **React component** — A full-screen React component with SVG/Canvas for the map. Simpler to build, easier to integrate with UI panels, but different rendering pipeline.
+
+Recommendation: Start with a **React + SVG approach** for faster iteration. The world map is mostly static geography with overlaid data points — it doesn't need Phaser's game loop. If performance becomes an issue with many animated connections, migrate to a Phaser scene later.
+
+#### Data Models
+
+```typescript
+type RegionId = string  // e.g. 'us_east', 'eu_west', 'apac_singapore'
+
+interface WorldMapState {
+  regions: Region[]
+  sites: Site[]
+  interSiteLinks: InterSiteLink[]
+  selectedRegionId: RegionId | null
+  selectedSiteId: string | null
+  demandHeatMapVisible: boolean
+  weatherOverlayVisible: boolean
+  activeSiteId: string              // which site the floor view is showing
+}
+```
+
+---
+
+### 6B. Metro Regions & Location Profiles
+
+**Goal:** Define 12-15 named metro regions around the world, each with a distinct profile that creates meaningful trade-offs for site placement decisions.
+
+#### Data Models
+
+```typescript
+interface Region {
+  id: RegionId
+  name: string                      // e.g. "Northern Virginia (Ashburn)"
+  continent: Continent
+  coordinates: { x: number; y: number }  // position on world map (normalized 0-1)
+  profile: RegionProfile
+  demandProfile: DemandProfile
+  disasterProfile: DisasterProfile
+  description: string               // flavor text for the region
+}
+
+type Continent = 'north_america' | 'south_america' | 'europe' | 'asia_pacific' | 'middle_east_africa'
+
+interface RegionProfile {
+  powerCostMultiplier: number       // multiplier on base $/kWh (0.5–2.0)
+  laborCostMultiplier: number       // multiplier on staff salaries (0.7–1.8)
+  landCostMultiplier: number        // multiplier on site purchase price (0.5–3.0)
+  coolingEfficiency: number         // ambient temp modifier (-10 to +15°C)
+  networkConnectivity: number       // 0–1, fiber availability / IX proximity
+  regulatoryBurden: number          // 0–1, permit costs and compliance overhead
+  carbonTaxMultiplier: number       // multiplier on carbon tax rate (0–2.0)
+  taxIncentiveDiscount: number      // 0–0.3, operating cost reduction from local incentives
+  solarEfficiency: number           // 0–1, baseline solar availability
+  windEfficiency: number            // 0–1, baseline wind availability
+}
+
+interface DemandProfile {
+  general: number                   // 0–1, demand level per customer type
+  ai_training: number
+  streaming: number
+  crypto: number
+  enterprise: number
+  government: number                // new customer type, region-specific
+}
+
+interface DisasterProfile {
+  earthquake: number                // 0–1, probability multiplier
+  hurricane: number
+  tornado: number
+  flood: number
+  volcanic: number
+  gridInstability: number
+  extremeHeat: number
+  extremeCold: number
+  politicalRisk: number             // regulatory changes, instability
+}
+```
+
+#### Region Catalog
+
+| Region | Power | Labor | Land | Cooling | Network | Key Demand | Key Risk | Notes |
+|--------|-------|-------|------|---------|---------|-----------|----------|-------|
+| **Northern Virginia (Ashburn)** | 0.8x | 1.2x | 1.5x | +5°C | 0.95 | Enterprise, Streaming | Saturated market | "Data Center Alley" — highest IX density in the world |
+| **Bay Area (Santa Clara)** | 1.3x | 1.8x | 3.0x | +8°C | 0.90 | AI Training, Enterprise | Earthquake (0.7) | Premium AI/tech customers, expensive everything |
+| **Dallas/Fort Worth** | 0.7x | 0.9x | 0.6x | +12°C | 0.80 | General, Streaming | Tornado (0.4), Grid instability (0.5) | Cheap land, central US network hub |
+| **Chicago** | 0.9x | 1.1x | 1.2x | +2°C | 0.85 | Enterprise, Streaming | Extreme cold (0.3) | Major financial hub, CME/CBOE proximity |
+| **Portland/Oregon** | 0.6x | 1.0x | 0.8x | +3°C | 0.75 | AI Training, Crypto | Earthquake (0.3) | Cheap hydropower, tax incentives |
+| **São Paulo** | 1.1x | 0.7x | 0.7x | +10°C | 0.60 | General, Enterprise | Political risk (0.4), Flood (0.3) | LATAM gateway, data sovereignty demand |
+| **London** | 1.4x | 1.5x | 2.5x | +2°C | 0.90 | Enterprise, Streaming | Flood (0.2) | European finance hub, GDPR compliance |
+| **Amsterdam** | 1.2x | 1.3x | 1.8x | +1°C | 0.95 | Enterprise, Streaming | Flood (0.3) | AMS-IX — one of the world's largest IXPs |
+| **Frankfurt** | 1.3x | 1.4x | 2.0x | +3°C | 0.90 | Enterprise, General | — | DE-CIX, European backbone |
+| **Nordics (Stockholm/Helsinki)** | 0.5x | 1.2x | 0.7x | -8°C | 0.70 | Crypto, AI Training | Volcanic (0.1, Iceland nearby), Extreme cold (0.4) | Near-free cooling, cheap hydro/geothermal, remote |
+| **Singapore** | 1.5x | 1.3x | 2.5x | +15°C | 0.85 | Enterprise, Streaming | Monsoon/flood (0.3) | APAC gateway, strict regulations, hot climate |
+| **Tokyo** | 1.6x | 1.5x | 3.0x | +8°C | 0.85 | Enterprise, AI Training | Earthquake (0.8) | Premium market, highest disaster risk |
+| **Mumbai** | 0.8x | 0.5x | 0.5x | +14°C | 0.55 | General, Streaming | Monsoon/flood (0.5), Extreme heat (0.6) | Massive growth market, cheap labor, hot and wet |
+| **Dubai** | 1.0x | 1.0x | 1.5x | +18°C | 0.70 | Enterprise, Government | Extreme heat (0.8) | Middle East hub, government contracts, brutal cooling costs |
+| **Johannesburg** | 0.7x | 0.6x | 0.4x | +6°C | 0.40 | General, Government | Grid instability (0.6) | African gateway, poor grid reliability, cheap land |
+
+#### Gameplay Integration
+
+- Regions are **visible on the world map** with their profiles shown on hover/click.
+- Players **research regions** before committing to build (costs money, reveals full profile).
+- Some regions have **data sovereignty laws** requiring local presence to serve certain contract types (e.g., EU GDPR contracts require an EU site, Brazilian LGPD requires São Paulo).
+- **Tax incentives** expire after a set number of ticks, creating urgency to build while incentives last.
+
+---
+
+### 6C. Site Types
+
+**Goal:** Not every facility needs to be a full data center. Different site types serve different strategic purposes at different price points and complexity levels.
+
+#### Data Models
+
+```typescript
+type SiteType = 'edge_pop' | 'colocation' | 'hyperscale' | 'network_hub' | 'disaster_recovery'
+
+interface Site {
+  id: string
+  name: string                      // player-named
+  type: SiteType
+  regionId: RegionId
+  purchasedAtTick: number
+  constructionTicksRemaining: number  // 0 = operational
+  operational: boolean
+  siteState: SiteGameState          // per-site instance of core game state
+}
+
+interface SiteTypeConfig {
+  type: SiteType
+  label: string
+  description: string
+  purchaseCost: number              // base cost (modified by region land cost)
+  constructionTicks: number         // time to build
+  maxSuiteTier: SuiteTier           // highest tier this site type supports
+  maxCabinets: number
+  maxStaff: number
+  revenueModel: string              // description of how it generates money
+  maintenanceCostPerTick: number    // base operating overhead
+}
+```
+
+#### Site Type Configs
+
+| Type | Purchase Cost | Build Time | Max Tier | Max Cabinets | Revenue Model | Maintenance |
+|------|-------------|-----------|----------|-------------|---------------|-------------|
+| **Edge PoP** | $25,000 | 10 ticks | Starter | 4 | Per-Gbps transit fees, latency bonuses on contracts | $5/tick |
+| **Colocation** | $150,000 | 30 ticks | Standard | 18 | Standard customer contracts + meet-me room interconnection | $20/tick |
+| **Hyperscale Campus** | $500,000 | 60 ticks | Enterprise | 50 | Volume contracts, AI training, bulk compute | $50/tick |
+| **Network Hub / IXP** | $200,000 | 25 ticks | Standard | 8 | Interconnection revenue, transit fees, peering agreements | $30/tick |
+| **Disaster Recovery** | $300,000 | 40 ticks | Professional | 32 | Enables DR contracts, required for certain compliance certs | $40/tick |
+
+#### Site Type Details
+
+**Edge PoP:**
+- Smallest and cheapest footprint. 1-4 cabinets in leased space.
+- Primary purpose: reduce latency to end users in a metro area.
+- Revenue from per-Gbps transit fees and latency-sensitive contract bonuses.
+- Requires backhaul connection to a core site (colo or hyperscale).
+- Simplest management — no complex infrastructure, minimal staff.
+- **Best introduction to multi-site:** cheap enough to experiment, teaches network topology thinking.
+
+**Colocation Facility:**
+- Mid-size facility for regional presence.
+- Serves local customers with standard contracts + meet-me room revenue.
+- Full infrastructure management (PDUs, cooling, cabling) but at standard tier cap.
+- Good for establishing presence in high-demand regions without hyperscale investment.
+
+**Hyperscale Campus:**
+- Full-size data center with all features unlocked.
+- Same management complexity as the player's primary site.
+- Highest revenue potential but also highest cost and management overhead.
+- Only worth building in regions with strong demand or strategic importance.
+
+**Network Hub / IXP:**
+- Specialized for interconnection and peering.
+- Limited cabinet space but premium meet-me room facilities.
+- Generates revenue primarily through interconnection ports and transit agreements.
+- Most valuable in regions with high network connectivity scores (Ashburn, Amsterdam).
+- Provides latency benefits to all other sites connected through it.
+
+**Disaster Recovery Site:**
+- Mirror of a primary site, mostly idle.
+- Required by certain compliance certifications (SOC 2 Type II, FedRAMP) for DR contracts.
+- Data replication from primary site consumes inter-site bandwidth.
+- Activates during major incidents at the primary site — workloads fail over.
+- Revenue comes from enabling premium DR-required contracts, not direct compute.
+
+#### Progression
+
+```
+Reputation "excellent" + Enterprise tier + $500K → Unlock first Edge PoP
+First Edge PoP operational → Unlock Colocation and Network Hub
+Any Colocation operational → Unlock Hyperscale Campus and DR Site
+3+ sites operational → Unlock international expansion (cross-continent)
+```
+
+---
+
+### 6D. Inter-Site Networking (DCN)
+
+**Goal:** The connections between sites are a strategic layer. Players choose connection types based on bandwidth needs, latency requirements, and budget.
+
+#### Data Models
+
+```typescript
+type LinkType = 'ip_transit' | 'leased_wavelength' | 'dark_fiber' | 'submarine_cable'
+
+interface InterSiteLink {
+  id: string
+  type: LinkType
+  siteAId: string
+  siteBId: string
+  bandwidthGbps: number
+  latencyMs: number
+  costPerTick: number
+  installedAtTick: number
+  utilization: number               // 0–1, current bandwidth usage
+}
+
+interface LinkTypeConfig {
+  type: LinkType
+  label: string
+  description: string
+  bandwidthGbps: number
+  latencyMs: number                 // base latency (modified by distance)
+  installCost: number
+  costPerTick: number
+  maxDistance: number                // max distance between sites (0 = unlimited)
+  reliability: number               // 0–1, uptime probability
+}
+```
+
+#### Link Type Configs
+
+| Type | Bandwidth | Base Latency | Install Cost | Cost/tick | Max Distance | Reliability | Notes |
+|------|-----------|-------------|-------------|----------|-------------|-------------|-------|
+| **IP Transit** | 10 Gbps | 30ms | $5,000 | $8/tick | Unlimited | 0.95 | Cheapest, highest latency, uses public internet |
+| **Leased Wavelength** | 40 Gbps | 15ms | $50,000 | $25/tick | Same continent | 0.98 | Leased capacity on existing fiber |
+| **Dark Fiber** | 100 Gbps | 5ms | $200,000 | $15/tick | Same continent | 0.99 | Own the fiber. Highest capacity, lowest latency |
+| **Submarine Cable** | 100 Gbps | 80ms | $500,000 | $40/tick | Cross-continent only | 0.97 | Required for intercontinental links. Expensive but essential |
+
+#### Latency Modeling
+
+Latency between two sites = `baseLinkLatency + distanceModifier`
+
+Distance categories:
+- **Same metro** (e.g., two sites in Northern Virginia): +0ms
+- **Same region** (e.g., Virginia to Chicago): +5-15ms
+- **Same continent** (e.g., Virginia to Portland): +20-40ms
+- **Cross-continent** (e.g., Virginia to London): +60-120ms
+- **Cross-Pacific** (e.g., Virginia to Tokyo): +100-180ms
+
+#### Gameplay Integration
+
+- **Multi-region contracts** require latency below a threshold to qualifying regions (e.g., "Serve US and EU users with <80ms latency").
+- **DR failover** requires sufficient bandwidth between primary and DR sites to replicate data.
+- **Edge PoP backhaul** — every edge PoP must have at least one link back to a core site.
+- **Link failures** — submarine cable cuts, fiber breaks as incident types affecting inter-site links.
+- **Bandwidth overage** — exceeding link capacity incurs burst charges ($2/Gbps over limit per tick).
+
+---
+
+### 6E. Customer Demand Geography
+
+**Goal:** Drive strategic site selection by showing players where different customer types are concentrated. Proximity to demand = better contracts.
+
+#### Demand Heat Maps
+
+The world map displays toggleable demand overlays:
+- Each customer type has a geographic demand distribution.
+- Demand is concentrated in certain regions but exists everywhere at lower levels.
+- Demand **grows over time** — emerging markets (Mumbai, São Paulo) see faster demand growth than saturated markets (Ashburn, London).
+
+#### Demand Concentration by Customer Type
+
+| Customer Type | Primary Regions | Secondary Regions | Growth Rate |
+|--------------|----------------|-------------------|-------------|
+| **General** | Everywhere | — | Slow, steady |
+| **AI Training** | Bay Area, Portland, Nordics | Tokyo, London | Fast |
+| **Streaming** | N. Virginia, London, Singapore, São Paulo | All metros | Medium |
+| **Crypto** | Nordics, Portland, Dallas | Dubai, Johannesburg | Volatile |
+| **Enterprise** | N. Virginia, London, Frankfurt, Tokyo, Singapore | Chicago, Mumbai | Medium |
+| **Government** | N. Virginia, London, Tokyo, Dubai | São Paulo, Frankfurt | Slow |
+
+#### Proximity Bonuses
+
+Sites near high-demand regions for their customer types receive:
+- **Contract priority** — more contracts of that type appear for bidding.
+- **Latency bonus** — revenue multiplier for being close to end users (up to +20%).
+- **Competitive advantage** — easier to win bids against competitors in that region.
+
+Sites far from demand centers can still serve customers, but at reduced revenue (latency penalty, -5% to -15%) and fewer contract opportunities.
+
+---
+
+### 6F. Location-Specific Incidents
+
+**Goal:** Each region has unique disaster types that make location selection feel consequential. These are in addition to the standard incident pool that affects all sites.
+
+#### Regional Incident Catalog
+
+| Region | Incident | Severity | Effect | Frequency |
+|--------|----------|----------|--------|-----------|
+| **Bay Area** | Earthquake | Critical | Structural damage to cabinets (destroy 10-30%), power outage, 50-100 tick recovery | Rare (0.3% per tick) |
+| **Bay Area** | Wildfire smoke | Minor | Increased cooling load (+5°C ambient) for 20-40 ticks, air filter replacement cost | Seasonal (summer) |
+| **Dallas** | Tornado | Major | Destroys outdoor equipment (generators, solar), 20-40 tick repair | Low (0.2% per tick) |
+| **Dallas/Texas** | Grid collapse | Critical | Complete power outage, generators are only option, 30-60 ticks | Low (0.15% per tick) |
+| **Gulf/Florida** | Hurricane | Critical | Multi-day event: ramp-up warning → full impact → recovery. Flood damage, power loss | Seasonal (summer/autumn) |
+| **Iceland/Nordics** | Volcanic eruption | Critical | Ash clouds ground flights (supply chain halt), potential lava flow threat | Very rare (0.05% per tick) |
+| **Iceland** | Submarine cable cut | Major | Loss of intercontinental connectivity for 40-80 ticks (reroute via other links) | Low |
+| **Singapore** | Monsoon flooding | Major | Ground floor flooding, power equipment damage if not elevated, 15-30 ticks | Seasonal |
+| **Tokyo** | Earthquake | Critical | Similar to Bay Area but higher frequency (0.5% per tick) | Higher than Bay Area |
+| **Mumbai** | Monsoon + extreme heat | Major | Dual threat: flooding and cooling stress simultaneously | Seasonal |
+| **Dubai** | Extreme heat event | Major | Ambient temp +25°C for 15-30 ticks, cooling costs spike dramatically | Seasonal (summer) |
+| **Johannesburg** | Grid load shedding | Major | Scheduled rolling blackouts, 10-20 ticks, generators required | Frequent (0.5% per tick) |
+| **London** | Thames flooding | Minor | Basement/ground floor water damage risk | Low |
+| **Amsterdam** | Flood risk | Major | Below sea level — severe flooding if defenses fail | Very rare but catastrophic |
+
+#### Disaster Preparedness
+
+Players can mitigate regional risks through investment:
+- **Seismic reinforcement** (earthquake regions): $100K, reduces structural damage by 60%
+- **Flood barriers** (flood regions): $50K, prevents ground-floor flooding
+- **Hurricane hardening** (gulf/coastal): $75K, reduces wind/water damage
+- **Elevated equipment** (flood/monsoon): $25K, protects power equipment from water
+
+These create another layer of trade-offs: do you invest in disaster prep upfront, or gamble and save the money?
+
+---
+
+### 6G. Global Resource Sharing
+
+**Goal:** Define which resources are shared across all sites and which are per-site, to keep multi-site manageable without losing depth.
+
+#### Shared (Global) Resources
+
+| Resource | Why Global | Notes |
+|----------|-----------|-------|
+| **Money** | Single treasury | All sites draw from and contribute to the same bank account |
+| **Tech tree** | Research once, apply everywhere | Unlocked techs benefit all sites instantly |
+| **Reputation** | Public-facing metric | One reputation score, but regional modifiers apply |
+| **Compliance certs** | Company-wide certification | Audit once at company level, but each site must meet requirements |
+| **Competitor relationships** | Market-level competition | Competitors operate globally, competing across regions |
+| **Patents** | IP is company-wide | Patent royalties pool into global revenue |
+
+#### Per-Site Resources
+
+| Resource | Why Per-Site | Notes |
+|----------|------------|-------|
+| **Cabinets & infrastructure** | Physical equipment | Each site has its own floor, PDUs, cooling, cabling |
+| **Staff** | People are located somewhere | Staff assigned to a site; can transfer (cost + relocation time) |
+| **Contracts** | Serve from specific locations | Contracts bound to a site (or multi-site for premium ones) |
+| **Incidents** | Local events | Incidents affect one site (except market-wide events like price wars) |
+| **Weather** | Regional climate | Each site has its own weather based on region |
+| **Power/cooling** | Local utilities | Power costs, cooling efficiency are per-site based on region |
+| **Meet-me rooms** | Physical infrastructure | Each site has its own interconnection facilities |
+
+#### Staff Transfers
+
+Staff can be reassigned between sites:
+- **Transfer cost**: 2x monthly salary (relocation expenses)
+- **Transfer time**: 5-15 ticks depending on distance (same continent vs. international)
+- **Staff unavailable** during transfer — neither site benefits
+- Creates strategic decisions: do you hire locally (faster, but regional salary rates) or transfer experienced staff?
+
+---
+
+### 6H. Multi-Site Contracts
+
+**Goal:** Premium contracts that require presence in multiple regions, providing strong incentive to expand globally.
+
+#### Contract Types
+
+| Contract | Regions Required | Revenue/tick | Duration | Requirements | Description |
+|----------|-----------------|-------------|----------|-------------|-------------|
+| **CDN Distribution** | Any 3 sites | $150/tick | 500 ticks | Edge PoP in each region, <30ms latency | Distribute content globally |
+| **Global Enterprise SaaS** | US + EU sites | $200/tick | 600 ticks | Colo or Hyperscale in both, SOC 2 | Multi-region enterprise hosting |
+| **GDPR-Compliant EU Hosting** | EU site required | $120/tick | 400 ticks | EU site, data sovereignty compliance | EU data must stay in EU |
+| **Asia-Pacific Expansion** | APAC site required | $180/tick | 500 ticks | Singapore or Tokyo site | Serve APAC enterprise customers |
+| **Global DR Contract** | Primary + DR site | $250/tick | 800 ticks | Hyperscale + DR, 2N power, FedRAMP | Mission-critical global failover |
+| **Transcontinental AI Training** | 2+ continents | $300/tick | 400 ticks | GPU servers, dark fiber links | Distributed AI training across sites |
+
+---
+
+### 6I. Implementation Phases
+
+Multi-site is the largest feature in the game's roadmap. Break it into sub-phases to ship incrementally:
+
+#### Phase 6A — World Map UI + Site Selection (Foundation)
+- Add the world map view (React + SVG component)
+- Define 12-15 metro regions with full profiles
+- Region info panel on hover/click
+- "Research Region" action (costs money, reveals full profile)
+- Purchase first site (edge PoP only)
+- Site switcher to toggle floor view between sites
+- Each site is a separate instance of core game state
+
+**Effort:** High | **Delivers:** The visual foundation and basic expansion
+
+#### Phase 6B — Inter-Site Networking + Edge PoPs
+- Implement link types (IP transit, leased wavelength, dark fiber)
+- Edge PoP site type with simplified management
+- Backhaul requirement (edge → core link)
+- Latency modeling between sites
+- Basic bandwidth tracking on inter-site links
+- CDN/content delivery revenue model for edge PoPs
+
+**Effort:** High | **Delivers:** Functional multi-site with lightweight edge expansion
+
+#### Phase 6C — Full Site Types + Regional Incidents
+- Colocation, Hyperscale, Network Hub, DR site types
+- Per-region incident catalogs
+- Disaster preparedness investments
+- Construction time for new sites
+- Site-specific weather based on region climate
+
+**Effort:** High | **Delivers:** Full site variety with regional risk/reward
+
+#### Phase 6D — Global Strategy Layer
+- Customer demand heat maps on world map
+- Demand growth over time
+- Multi-site contracts
+- Submarine cables for intercontinental links
+- Data sovereignty mechanics
+- Staff transfers between sites
+- Regional competitor presence
+- International expansion unlock gate
+
+**Effort:** Very High | **Delivers:** The complete global strategy endgame
+
+### Phase 6 — Estimated Effort Summary
+
+| Sub-phase | New Types | New Constants | Store Fields | Tick Logic | UI | Achievements |
+|-----------|-----------|--------------|-------------|------------|-----|-------------|
+| 6A: World Map + Sites | 5+ | 15+ region configs | ~15 fields, 5 actions | Site switching, construction | World map component, region panel, site switcher | 4 |
+| 6B: DCN + Edge | 3 | 4 link configs | ~8 fields, 4 actions | Latency calc, bandwidth tracking, edge revenue | Link management panel, network overlay on map | 3 |
+| 6C: Site Types + Disasters | 3 | 5 site configs, 15+ incidents | ~10 fields, 5 actions | Regional incidents, disaster prep, construction | Site type selector, disaster prep panel | 4 |
+| 6D: Global Strategy | 4 | 6+ contract configs | ~12 fields, 6 actions | Demand growth, multi-site contracts, transfers | Demand heat map, contract panel updates, transfer UI | 5 |
+
+### Risk Assessment
+
+**Why this is worth it despite the effort:**
+- Transforms a "manage one building" game into "build an empire" — this is the transition from mid-game to true endgame.
+- Location-based trade-offs add strategic depth that can't be replicated by adding more systems to a single site.
+- PoP/Edge/CDN concepts teach real-world infrastructure strategy in an accessible way.
+- Each sub-phase delivers standalone value — even Phase 6A alone (world map + one expansion) adds significant gameplay.
+
+**What could go wrong:**
+- **Scope creep** — each sub-phase is large. Strict scoping per phase is critical.
+- **Performance** — managing multiple site states simultaneously could get heavy. Solution: only fully simulate the active site; background sites run a simplified tick (revenue/expenses/incidents only).
+- **UI complexity** — players need to manage multiple sites without feeling overwhelmed. Solution: world map shows site summaries (health, revenue, alerts); only drill into floor view for active management.
+- **Balance** — multi-site revenue must be balanced so that expanding is rewarding but not trivially better than optimizing one site. Single-site mastery should remain viable.
+
+---
+
+## Deferred Design Ideas
+
+Ideas that were considered but deferred in favor of other approaches. Kept here for future reference.
+
+### Structured Row Layout (Option A) — Data Center Floor Plan
+
+**Context:** When redesigning the cabinet placement grid for realism (v0.4.0), two approaches were considered:
+- **Option A (this one):** Structured row system with fixed aisle placement
+- **Option B (implemented):** Free-form grid with soft constraints (bonuses/penalties)
+
+**Concept:** Instead of a free-form grid where players choose where to place cabinets with soft incentives, the grid is pre-structured with fixed **cabinet rows** separated by fixed **aisle rows**. Players choose which cabinet row to place in, but aisles are guaranteed.
+
+**Layout pattern:**
+```
+Row 0 (cabinets)  ← facing south (exhaust →)
+--- Hot Aisle ---  ← 1-tile gap (maintenance + exhaust collection)
+Row 1 (cabinets)  ← facing north (exhaust →)
+--- Cold Aisle --- ← 1-tile gap (intake air supply)
+Row 2 (cabinets)  ← facing south (exhaust →)
+--- Hot Aisle ---
+Row 3 (cabinets)  ← facing north (exhaust →)
+```
+
+**Pros:**
+- Guarantees realistic layout — impossible to make bad aisle decisions
+- Simpler to balance (always have proper airflow)
+- More visually consistent and "real data center" looking
+- Easier to implement containment systems (hot/cold aisle containment doors)
+- Better foundation for a future "containment" upgrade system
+
+**Cons:**
+- Less player agency — can't make mistakes and learn from them
+- Less strategic depth — layout decisions are largely made for you
+- Harder to implement variable row widths or custom aisle configurations
+- May feel restrictive for sandbox/creative play
+
+**Why deferred:** Option B (free-form with soft constraints) was chosen because it preserves player agency — you can make bad decisions and learn from them, which is better tycoon gameplay. The penalty/bonus system creates more strategic depth and encourages learning real DC layout principles organically.
+
+**Possible future use:**
+- Could be offered as a "guided layout" toggle in settings for newer players
+- Could be a tutorial scenario ("Design a proper data center from scratch")
+- Could be the default for a future "enterprise" or "colocation" game mode where clients expect structured layouts
+
+**Effort:** Medium | **Impact:** Medium — Would replace the soft-constraint system, not complement it.

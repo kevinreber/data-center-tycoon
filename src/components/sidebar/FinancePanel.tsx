@@ -11,7 +11,7 @@ import {
 export function FinancePanel() {
   const {
     cabinets, revenue, expenses, powerCost, coolingCost, mgmtBonus,
-    contractRevenue, contractPenalties,
+    contractRevenue, contractPenalties, zoneBonusRevenue,
     loanPayments, loans, takeLoan,
     generatorFuelCost,
     powerPriceMultiplier, powerPriceSpikeActive,
@@ -51,6 +51,12 @@ export function FinancePanel() {
             <div className="flex justify-between text-xs">
               <span className="text-muted-foreground ml-3">Contracts</span>
               <span className="text-neon-green tabular-nums">+${contractRevenue.toFixed(0)}</span>
+            </div>
+          )}
+          {zoneBonusRevenue > 0 && (
+            <div className="flex justify-between text-xs">
+              <span className="text-neon-cyan ml-3">Zone Bonuses</span>
+              <span className="text-neon-cyan tabular-nums">+${zoneBonusRevenue.toFixed(0)}</span>
             </div>
           )}
           <div className="border-t border-border my-0.5" />

@@ -61,10 +61,10 @@ describe('cabinet placement', () => {
     })
 
     it('rejects placement outside grid bounds', () => {
-      // Starter tier: 4 cols, cabinet rows at gridRow 1 and 3
+      // Starter tier: 5 cols, cabinet rows at gridRow 1 and 3
       const { addCabinet } = useGameStore.getState()
 
-      addCabinet(5, STARTER_ROW_0, 'production') // col out of bounds (max 3)
+      addCabinet(5, STARTER_ROW_0, 'production') // col out of bounds (max 4)
       expect(useGameStore.getState().cabinets).toHaveLength(0)
 
       addCabinet(0, 10, 'production') // row beyond grid

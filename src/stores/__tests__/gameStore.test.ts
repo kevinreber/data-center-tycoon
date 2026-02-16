@@ -4,6 +4,7 @@ import type {
   Season,
   ServerConfig,
   ActiveIncident,
+  StaffMember,
 } from '@/stores/gameStore'
 import {
   SUPPLY_CHAIN_CONFIG,
@@ -19,6 +20,13 @@ import {
   SPOT_COMPUTE_CONFIG,
   TUTORIAL_TIPS,
   INCIDENT_CATALOG,
+  SUITE_TIERS,
+  OPS_TIER_CONFIG,
+  getAdjacentCabinets,
+  hasMaintenanceAccess,
+  calcSpacingHeatEffect,
+  calcAisleBonus,
+  getFacingOffsets,
 } from '@/stores/gameStore'
 
 // Helper to get/set store state
@@ -27,6 +35,8 @@ const setState = (partial: Parameters<typeof useGameStore.setState>[0]) => useGa
 
 // Standard tier layout: cabinet rows at gridRow 1 (south), 3 (north), 5 (south)
 const STD_ROW_0 = 1 // gridRow for first cabinet row (facing south)
+const STD_ROW_1 = 3 // gridRow for second cabinet row (facing north)
+const STD_ROW_2 = 5 // gridRow for third cabinet row (facing south)
 
 // Helper to set up a basic data center with cabinets + equipment for tick tests
 function setupBasicDataCenter() {
@@ -1181,5 +1191,443 @@ describe('Incident System', () => {
     state = getState()
     updatedSpine = state.spineSwitches.find(s => s.id === spine.id)!
     expect(updatedSpine.powerStatus).toBe(true)
+  })
+})
+
+// ============================================================================
+// Zone Adjacency Bonuses
+// ============================================================================
+describe('Zone Adjacency Bonuses', () => {
+  it('no zones with fewer than 3 cabinets', () => {
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'standard' })
+    getState().addCabinet(0, STD_ROW_0, 'production', 'general', 'south')
+    getState().addCabinet(1, STD_ROW_0, 'production', 'general', 'south')
+    expect(getState().zones).toHaveLength(0)
+  })
+
+  it('3 adjacent same-environment cabinets form an environment zone', () => {
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'standard' })
+    getState().addCabinet(0, STD_ROW_0, 'production', 'general', 'south')
+    getState().addCabinet(1, STD_ROW_0, 'production', 'general', 'south')
+    getState().addCabinet(2, STD_ROW_0, 'production', 'general', 'south')
+
+    const zones = getState().zones
+    const envZones = zones.filter(z => z.type === 'environment')
+    expect(envZones.length).toBeGreaterThanOrEqual(1)
+    expect(envZones[0].key).toBe('production')
+    expect(envZones[0].cabinetIds).toHaveLength(3)
+  })
+
+  it('non-adjacent cabinets do not form a zone', () => {
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'standard' })
+    getState().addCabinet(0, STD_ROW_0, 'production', 'general', 'south')
+    getState().addCabinet(2, STD_ROW_0, 'production', 'general', 'south') // gap at col 1
+    getState().addCabinet(4, STD_ROW_0, 'production', 'general', 'south') // gap at col 3
+    expect(getState().zones).toHaveLength(0)
+  })
+
+  it('mixed environments do not form a single zone', () => {
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'standard' })
+    getState().addCabinet(0, STD_ROW_0, 'production', 'general', 'south')
+    getState().addCabinet(1, STD_ROW_0, 'lab', 'general', 'south')
+    getState().addCabinet(2, STD_ROW_0, 'production', 'general', 'south')
+    // No cluster of 3 same-env adjacent cabinets
+    const envZones = getState().zones.filter(z => z.type === 'environment')
+    expect(envZones).toHaveLength(0)
+  })
+
+  it('customer type zones form among production cabinets', () => {
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'standard' })
+    getState().addCabinet(0, STD_ROW_0, 'production', 'ai_training', 'south')
+    getState().addCabinet(1, STD_ROW_0, 'production', 'ai_training', 'south')
+    getState().addCabinet(2, STD_ROW_0, 'production', 'ai_training', 'south')
+
+    const custZones = getState().zones.filter(z => z.type === 'customer')
+    expect(custZones.length).toBeGreaterThanOrEqual(1)
+    expect(custZones[0].key).toBe('ai_training')
+  })
+
+  it('zone bonus revenue is applied during tick', () => {
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'standard' })
+    // Place 3 adjacent production cabinets with servers on valid cabinet row
+    getState().addCabinet(0, STD_ROW_0, 'production', 'general', 'south')
+    getState().addCabinet(1, STD_ROW_0, 'production', 'general', 'south')
+    getState().addCabinet(2, STD_ROW_0, 'production', 'general', 'south')
+    // Add servers to all cabinets
+    getState().upgradeNextCabinet()
+    getState().upgradeNextCabinet()
+    getState().upgradeNextCabinet()
+    // Add spine for traffic
+    getState().addSpineSwitch()
+
+    expect(getState().zones.length).toBeGreaterThan(0)
+
+    getState().tick()
+    expect(getState().zoneBonusRevenue).toBeGreaterThan(0)
+  })
+
+  it('separate rows form independent zones (no cross-row adjacency)', () => {
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'standard' })
+    // Row 0 (gridRow 1): 3 adjacent lab cabinets
+    getState().addCabinet(0, STD_ROW_0, 'lab', 'general', 'south')
+    getState().addCabinet(1, STD_ROW_0, 'lab', 'general', 'south')
+    getState().addCabinet(2, STD_ROW_0, 'lab', 'general', 'south')
+    // Row 1 (gridRow 3): 3 adjacent lab cabinets (not grid-adjacent to row 0)
+    getState().addCabinet(0, STD_ROW_1, 'lab', 'general', 'north')
+    getState().addCabinet(1, STD_ROW_1, 'lab', 'general', 'north')
+    getState().addCabinet(2, STD_ROW_1, 'lab', 'general', 'north')
+
+    const envZones = getState().zones.filter(z => z.type === 'environment' && z.key === 'lab')
+    // Each row forms its own zone since rows are 2 gridRows apart (aisle between)
+    expect(envZones).toHaveLength(2)
+    expect(envZones[0].cabinetIds).toHaveLength(3)
+    expect(envZones[1].cabinetIds).toHaveLength(3)
+  })
+
+  it('zones recalculate during tick with infrastructure effects', () => {
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'standard' })
+    getState().addCabinet(0, STD_ROW_0, 'production', 'enterprise', 'south')
+    getState().addCabinet(1, STD_ROW_0, 'production', 'enterprise', 'south')
+    getState().addCabinet(2, STD_ROW_0, 'production', 'enterprise', 'south')
+
+    getState().tick()
+    const zones = getState().zones
+    expect(zones.length).toBeGreaterThan(0)
+    // Should have both env and customer zones
+    expect(zones.some(z => z.type === 'environment')).toBe(true)
+    expect(zones.some(z => z.type === 'customer')).toBe(true)
+  })
+})
+
+// ============================================================================
+// N. Spacing & Layout Mechanics
+// ============================================================================
+describe('Spacing & Layout', () => {
+  it('expanded grid has more cabinet slots than max cabinets', () => {
+    // Starter tier: 5 cols × 2 rows = 10 slots, 8 max cabinets
+    const starter = SUITE_TIERS.starter
+    expect(starter.cols * starter.rows).toBeGreaterThan(starter.maxCabinets)
+    // Standard tier: 8 cols × 3 rows = 24 slots, 18 max
+    const standard = SUITE_TIERS.standard
+    expect(standard.cols * standard.rows).toBeGreaterThan(standard.maxCabinets)
+  })
+
+  it('getAdjacentCabinets returns orthogonal neighbors only', () => {
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'standard' })
+    // Place cabinets: (0,STD_ROW_0), (1,STD_ROW_0), (2,STD_ROW_0) in same row
+    // and (0,STD_ROW_1) which is not adjacent (2 grid rows away, diagonal to (1,STD_ROW_0))
+    getState().addCabinet(0, STD_ROW_0, 'production', 'general', 'south')
+    getState().addCabinet(1, STD_ROW_0, 'production', 'general', 'south')
+    getState().addCabinet(2, STD_ROW_0, 'production', 'general', 'south')
+    getState().addCabinet(0, STD_ROW_1, 'production', 'general', 'north')
+
+    const cabs = getState().cabinets
+    const centerCab = cabs.find(c => c.col === 1 && c.row === STD_ROW_0)!
+    const adj = getAdjacentCabinets(centerCab, cabs)
+
+    // Should find (0,STD_ROW_0) and (2,STD_ROW_0) but NOT (0,STD_ROW_1) which is 2 rows away
+    expect(adj).toHaveLength(2)
+    expect(adj.some(c => c.col === 0 && c.row === STD_ROW_0)).toBe(true)
+    expect(adj.some(c => c.col === 2 && c.row === STD_ROW_0)).toBe(true)
+    expect(adj.some(c => c.col === 0 && c.row === STD_ROW_1)).toBe(false)
+  })
+
+  it('hasMaintenanceAccess returns true when cabinet has empty neighbor', () => {
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'standard' })
+    getState().addCabinet(2, STD_ROW_0, 'production', 'general', 'south')
+
+    const cabs = getState().cabinets
+    const cab = cabs[0]
+    const totalGridRows = SUITE_TIERS.standard.layout.totalGridRows
+    // Cabinet at (2,STD_ROW_0) — neighbors on left and right are empty
+    expect(hasMaintenanceAccess(cab, cabs, 8, totalGridRows)).toBe(true)
+  })
+
+  it('row-based layout ensures maintenance access via aisles', () => {
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'standard' })
+    // Fill an entire row — cabinet above/below are aisles, so access is always available
+    for (let col = 0; col < 8; col++) {
+      getState().addCabinet(col, STD_ROW_0, 'production', 'general', 'south')
+    }
+
+    const cabs = getState().cabinets
+    const totalGridRows = SUITE_TIERS.standard.layout.totalGridRows
+    // Even a center cabinet with neighbors on both sides has maintenance access
+    // because the aisle row above/below provides clearance
+    const centerCab = cabs.find(c => c.col === 4)!
+    expect(hasMaintenanceAccess(centerCab, cabs, 8, totalGridRows)).toBe(true)
+  })
+
+  it('calcSpacingHeatEffect increases heat for adjacent cabinets', () => {
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'standard' })
+    // Place 3 cabinets in same row: center at col 2 with neighbors at cols 1 and 3
+    getState().addCabinet(1, STD_ROW_0, 'production', 'general', 'south')
+    getState().addCabinet(2, STD_ROW_0, 'production', 'general', 'south')
+    getState().addCabinet(3, STD_ROW_0, 'production', 'general', 'south')
+
+    const cabs = getState().cabinets
+    const centerCab = cabs.find(c => c.col === 2 && c.row === STD_ROW_0)!
+    const effect = calcSpacingHeatEffect(centerCab, cabs)
+
+    // 2 adjacent cabinets (left + right) × 0.3 penalty = 0.6 base
+    // south-facing: front is row+1 (empty aisle → bonus), rear is row-1 (empty corridor → bonus)
+    // But net should still be positive since 2 adjacent > airflow bonuses
+    expect(effect).toBeGreaterThan(0)
+  })
+
+  it('calcSpacingHeatEffect gives airflow bonus for isolated cabinet', () => {
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'standard' })
+    getState().addCabinet(3, 3, 'production', 'general', 'north')
+
+    const cabs = getState().cabinets
+    const cab = cabs[0]
+    const effect = calcSpacingHeatEffect(cab, cabs)
+
+    // No adjacent cabinets, both front (row-1) and rear (row+1) are empty
+    // Effect should be negative (cooling bonus from open airflow)
+    expect(effect).toBeLessThan(0)
+  })
+
+  it('calcAisleBonus increases with more populated row pairs', () => {
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'standard' })
+
+    // One pair: cabinets on rows 0 and 1 (gridRow 1 and 3) sharing an aisle
+    getState().addCabinet(0, STD_ROW_0, 'production', 'general', 'south')
+    getState().addCabinet(0, STD_ROW_1, 'production', 'general', 'north')
+
+    const bonusOnePair = calcAisleBonus(getState().cabinets, 'standard')
+
+    // Two pairs: add cabinets on row 2 (gridRow 5) sharing aisle with row 1
+    getState().addCabinet(0, STD_ROW_2, 'production', 'general', 'south')
+
+    const bonusTwoPairs = calcAisleBonus(getState().cabinets, 'standard')
+
+    // More active aisle pairs → higher bonus
+    expect(bonusTwoPairs).toBeGreaterThan(bonusOnePair)
+    expect(bonusOnePair).toBeGreaterThan(0)
+  })
+
+  it('placement on larger grid allows strategic spacing', () => {
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'starter' })
+
+    // Starter tier: 2 cabinet rows (gridRow 1 facing south, gridRow 3 facing north)
+    // 5 columns, aisle at gridRow 2, corridors at gridRows 0 and 4
+    getState().addCabinet(0, 1, 'production', 'general', 'south')
+    getState().addCabinet(1, 1, 'production', 'general', 'south')
+    getState().addCabinet(0, 3, 'production', 'general', 'north')
+    getState().addCabinet(1, 3, 'production', 'general', 'north')
+
+    expect(getState().cabinets).toHaveLength(4)
+    // All cabinets should be within grid bounds
+    const layout = SUITE_TIERS.starter.layout
+    for (const cab of getState().cabinets) {
+      expect(cab.col).toBeLessThan(5)
+      expect(cab.row).toBeLessThan(layout.totalGridRows)
+    }
+  })
+
+  it('getFacingOffsets returns correct positions for all 4 directions', () => {
+    const n = getFacingOffsets('north', 3, 3)
+    expect(n.front).toEqual({ col: 3, row: 2 }) // front is row-1
+    expect(n.rear).toEqual({ col: 3, row: 4 })  // rear is row+1
+
+    const s = getFacingOffsets('south', 3, 3)
+    expect(s.front).toEqual({ col: 3, row: 4 }) // front is row+1
+    expect(s.rear).toEqual({ col: 3, row: 2 })  // rear is row-1
+
+    const e = getFacingOffsets('east', 3, 3)
+    expect(e.front).toEqual({ col: 4, row: 3 }) // front is col+1
+    expect(e.rear).toEqual({ col: 2, row: 3 })  // rear is col-1
+
+    const w = getFacingOffsets('west', 3, 3)
+    expect(w.front).toEqual({ col: 2, row: 3 }) // front is col-1
+    expect(w.rear).toEqual({ col: 4, row: 3 })  // rear is col+1
+  })
+
+  it('calcAisleBonus uses layout-based aisle detection', () => {
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'standard' })
+
+    // Standard tier: aisles between rows 0-1 and 1-2
+    // Populate all 3 cabinet rows to activate both aisles
+    getState().addCabinet(0, STD_ROW_0, 'production', 'general', 'south')
+    getState().addCabinet(0, STD_ROW_1, 'production', 'general', 'north')
+    getState().addCabinet(0, STD_ROW_2, 'production', 'general', 'south')
+
+    const bonus = calcAisleBonus(getState().cabinets, 'standard')
+    // 2 active aisle pairs × 0.12 = 0.24
+    expect(bonus).toBeGreaterThan(0)
+  })
+
+  it('calcSpacingHeatEffect works for isolated cabinet on different row', () => {
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'standard' })
+    getState().addCabinet(3, STD_ROW_1, 'production', 'general', 'north')
+
+    const cabs = getState().cabinets
+    const cab = cabs[0]
+    const effect = calcSpacingHeatEffect(cab, cabs)
+
+    // Isolated north-facing: front (row-1) and rear (row+1) both empty
+    expect(effect).toBeLessThan(0)
+  })
+
+  it('togglePlacementFacing cycles through all 4 directions', () => {
+    expect(getState().placementFacing).toBe('north')
+    getState().togglePlacementFacing()
+    expect(getState().placementFacing).toBe('east')
+    getState().togglePlacementFacing()
+    expect(getState().placementFacing).toBe('south')
+    getState().togglePlacementFacing()
+    expect(getState().placementFacing).toBe('west')
+    getState().togglePlacementFacing()
+    expect(getState().placementFacing).toBe('north')
+  })
+
+  it('row layout enforces facing regardless of user input', () => {
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'standard' })
+    // User specifies 'east' and 'west' but layout enforces row facing
+    getState().addCabinet(2, STD_ROW_0, 'production', 'general', 'east')
+    getState().addCabinet(4, STD_ROW_0, 'production', 'general', 'west')
+
+    const cabs = getState().cabinets
+    expect(cabs).toHaveLength(2)
+    // Row 0 (gridRow 1) faces south — east/west input is overridden
+    expect(cabs[0].facing).toBe('south')
+    expect(cabs[1].facing).toBe('south')
+  })
+})
+
+// ============================================================================
+// Operations Progression
+// ============================================================================
+function makeStaff(id: string, role: StaffMember['role'], skillLevel: StaffMember['skillLevel'] = 1): StaffMember {
+  return { id, name: `Staff ${id}`, role, skillLevel, salaryPerTick: 4, hiredAtTick: 0, fatigueLevel: 0, onShift: true, incidentsResolved: 0, certifications: [] }
+}
+
+describe('Operations Progression', () => {
+  it('starts at manual ops tier', () => {
+    expect(getState().opsTier).toBe('manual')
+    expect(getState().opsAutoResolvedCount).toBe(0)
+    expect(getState().opsPreventedCount).toBe(0)
+  })
+
+  it('cannot upgrade without meeting requirements', () => {
+    setState({ sandboxMode: true, money: 999999 })
+    // Missing staff and tech requirements
+    getState().upgradeOpsTier()
+    expect(getState().opsTier).toBe('manual')
+  })
+
+  it('can upgrade to monitoring when requirements are met', () => {
+    setState({
+      sandboxMode: true,
+      money: 999999,
+      staff: [makeStaff('s-1', 'network_engineer'), makeStaff('s-2', 'electrician')],
+      unlockedTech: ['ups_upgrade'],
+      reputationScore: 30,
+      suiteTier: 'starter',
+    })
+    getState().upgradeOpsTier()
+    expect(getState().opsTier).toBe('monitoring')
+  })
+
+  it('deducts upgrade cost when upgrading', () => {
+    setState({
+      sandboxMode: false,
+      money: 20000,
+      staff: [makeStaff('s-1', 'network_engineer'), makeStaff('s-2', 'electrician')],
+      unlockedTech: ['ups_upgrade'],
+      reputationScore: 30,
+      suiteTier: 'starter',
+    })
+    const moneyBefore = getState().money
+    getState().upgradeOpsTier()
+    expect(getState().opsTier).toBe('monitoring')
+    const monitoringConfig = OPS_TIER_CONFIG.find((c) => c.id === 'monitoring')!
+    expect(getState().money).toBe(moneyBefore - monitoringConfig.upgradeCost)
+  })
+
+  it('cannot upgrade without enough money', () => {
+    setState({
+      sandboxMode: false,
+      money: 100, // not enough
+      staff: [makeStaff('s-1', 'network_engineer'), makeStaff('s-2', 'electrician')],
+      unlockedTech: ['ups_upgrade'],
+      reputationScore: 30,
+    })
+    getState().upgradeOpsTier()
+    expect(getState().opsTier).toBe('manual')
+  })
+
+  it('cannot skip tiers — must upgrade sequentially', () => {
+    // Try to set up for automation tier directly (skipping monitoring)
+    setState({
+      sandboxMode: true,
+      money: 999999,
+      staff: Array.from({ length: 4 }, (_, i) => makeStaff(`s-${i}`, 'network_engineer', 2)),
+      unlockedTech: ['ups_upgrade', 'redundant_cooling', 'auto_failover'],
+      reputationScore: 50,
+      suiteTier: 'standard',
+    })
+    // First upgrade goes to monitoring (not automation)
+    getState().upgradeOpsTier()
+    expect(getState().opsTier).toBe('monitoring')
+    // Second upgrade goes to automation
+    getState().upgradeOpsTier()
+    expect(getState().opsTier).toBe('automation')
+  })
+
+  it('resolveIncident applies ops tier cost reduction', () => {
+    setupBasicDataCenter()
+    const incident = INCIDENT_CATALOG.find((d) => d.effect === 'revenue_penalty')!
+    setState({
+      opsTier: 'automation',
+      activeIncidents: [{
+        id: 'inc-test',
+        def: incident,
+        ticksRemaining: 10,
+        resolved: false,
+      }],
+    })
+    const moneyBefore = getState().money
+    getState().resolveIncident('inc-test')
+    const automationConfig = OPS_TIER_CONFIG.find((c) => c.id === 'automation')!
+    const expectedCost = Math.round(incident.resolveCost * (1 - automationConfig.benefits.resolveCostReduction))
+    expect(getState().money).toBe(moneyBefore - expectedCost)
+  })
+
+  it('OPS_TIER_CONFIG has 4 tiers in order', () => {
+    expect(OPS_TIER_CONFIG).toHaveLength(4)
+    expect(OPS_TIER_CONFIG[0].id).toBe('manual')
+    expect(OPS_TIER_CONFIG[1].id).toBe('monitoring')
+    expect(OPS_TIER_CONFIG[2].id).toBe('automation')
+    expect(OPS_TIER_CONFIG[3].id).toBe('orchestration')
+  })
+
+  it('resetGame resets ops tier to manual', () => {
+    setState({ opsTier: 'orchestration', opsAutoResolvedCount: 50, opsPreventedCount: 30 })
+    getState().resetGame()
+    expect(getState().opsTier).toBe('manual')
+    expect(getState().opsAutoResolvedCount).toBe(0)
+    expect(getState().opsPreventedCount).toBe(0)
+  })
+
+  it('cannot upgrade past orchestration', () => {
+    setState({
+      sandboxMode: true,
+      money: 999999,
+      opsTier: 'orchestration',
+    })
+    getState().upgradeOpsTier()
+    expect(getState().opsTier).toBe('orchestration')
+  })
+
+  it('each tier has increasing benefits', () => {
+    for (let i = 1; i < OPS_TIER_CONFIG.length; i++) {
+      const prev = OPS_TIER_CONFIG[i - 1]
+      const curr = OPS_TIER_CONFIG[i]
+      expect(curr.benefits.incidentSpawnReduction).toBeGreaterThanOrEqual(prev.benefits.incidentSpawnReduction)
+      expect(curr.benefits.autoResolveSpeedBonus).toBeGreaterThanOrEqual(prev.benefits.autoResolveSpeedBonus)
+      expect(curr.benefits.resolveCostReduction).toBeGreaterThanOrEqual(prev.benefits.resolveCostReduction)
+    }
   })
 })

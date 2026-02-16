@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useGameStore, RACK_COST, MAX_SERVERS_PER_CABINET, ENVIRONMENT_CONFIG, CUSTOMER_TYPE_CONFIG, SUITE_TIERS, getSuiteLimits } from '@/stores/gameStore'
 import type { CabinetEnvironment, CustomerType } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
-import { Server, Network, Plus, MousePointer, X, Rows3 } from 'lucide-react'
+import { Server, Network, Plus, MousePointer, Rows3 } from 'lucide-react'
 import {
   Tooltip,
   TooltipContent,
@@ -14,7 +14,7 @@ export function BuildPanel() {
     cabinets, spineSwitches, money,
     upgradeNextCabinet, addLeafToNextCabinet, addSpineSwitch,
     suiteTier,
-    placementMode, enterPlacementMode, exitPlacementMode,
+    placementMode, enterPlacementMode,
   } = useGameStore()
 
   const [selectedEnv, setSelectedEnv] = useState<CabinetEnvironment>('production')
@@ -141,19 +141,28 @@ export function BuildPanel() {
               <MousePointer className="size-3 text-neon-green animate-pulse" />
               <span className="text-xs font-mono text-neon-green">Click a row slot</span>
             </div>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => exitPlacementMode()}
-                  className="font-mono text-xs border-neon-red/30 hover:border-neon-red/60 hover:bg-neon-red/10 text-neon-red px-2"
-                >
-                  <X className="size-3" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right">Cancel placement (Esc)</TooltipContent>
-            </Tooltip>
+            {/* Zone overlay legend */}
+            <div className="rounded border border-border/30 bg-muted/30 px-2 py-1.5">
+              <p className="text-[10px] font-mono text-muted-foreground mb-1">Zone overlay key:</p>
+              <div className="grid grid-cols-2 gap-x-2 gap-y-0.5">
+                <span className="text-[10px] font-mono flex items-center gap-1">
+                  <span className="inline-block w-2 h-2 rounded-sm" style={{ backgroundColor: '#4488ff' }} />
+                  <span className="text-[#4488ff]">Cold Aisle</span>
+                </span>
+                <span className="text-[10px] font-mono flex items-center gap-1">
+                  <span className="inline-block w-2 h-2 rounded-sm" style={{ backgroundColor: '#ff8844' }} />
+                  <span className="text-[#ff8844]">Hot Exhaust</span>
+                </span>
+                <span className="text-[10px] font-mono flex items-center gap-1">
+                  <span className="inline-block w-2 h-2 rounded-sm" style={{ backgroundColor: '#aaaa44' }} />
+                  <span className="text-[#aaaa44]">Access</span>
+                </span>
+                <span className="text-[10px] font-mono flex items-center gap-1">
+                  <span className="inline-block w-2 h-2 rounded-sm" style={{ backgroundColor: '#ff4444' }} />
+                  <span className="text-[#ff4444]">Blocked</span>
+                </span>
+              </div>
+            </div>
           </div>
         ) : (
           <Tooltip>
