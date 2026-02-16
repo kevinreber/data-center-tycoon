@@ -142,9 +142,10 @@ All game state lives in a **single Zustand store** (`useGameStore`). This ~5300-
 - **Security feature configs** (`SECURITY_FEATURE_CONFIG`): 7 security features with defense bonuses
 - **Compliance cert configs** (`COMPLIANCE_CERT_CONFIG`): 5 compliance certifications with audit mechanics
 - **Competitor configs** (`COMPETITOR_PERSONALITIES`): 5 AI competitor personality profiles
+- **Operations Progression configs** (`OPS_TIER_CONFIG`): 4 ops tiers with unlock requirements, benefits, and upgrade costs
 - **Traffic constants** (`TRAFFIC`): bandwidth per server, link capacity
 - **Pure calculation functions**: `calcStats()`, `calcTraffic()`, `calcTrafficWithCapacity()`, `coolingOverheadFactor()`, `calcManagementBonus()`, `calcAisleBonus()`, `getPlacementHints()`, and more
-- **Store actions**: build, power, visual, simulation, finance, infrastructure, incidents, contracts, research, staff, supply chain, interconnection, peering, maintenance, save/load, and more
+- **Store actions**: build, power, visual, simulation, finance, infrastructure, incidents, contracts, research, staff, supply chain, interconnection, peering, maintenance, operations progression, save/load, and more
 
 **Pattern for accessing state in components:**
 ```typescript
@@ -219,6 +220,10 @@ Security & compliance types:
 
 Competitor AI types:
 - `CompetitorPersonality` = `'budget' | 'premium' | 'green' | 'aggressive' | 'steady'`
+
+Operations Progression types:
+- `OpsTier` = `'manual' | 'monitoring' | 'automation' | 'orchestration'`
+- `OpsTierConfig` interface: unlock requirements (minStaff, requiredTechs, minReputation, minSuiteTier), benefits (incidentSpawnReduction, autoResolveSpeedBonus, revenuePenaltyReduction, staffEffectivenessBonus, resolveCostReduction), upgradeCost
 - `Competitor`, `CompetitorBid` interfaces
 
 Power & insurance types:
@@ -277,6 +282,7 @@ Key interfaces (core):
 | Scenarios | `startScenario`, `abandonScenario` |
 | Carbon/Environment | `setEnergySource`, `applyForGreenCert`, `disposeEWaste` |
 | Security/Compliance | `upgradeSecurityTier`, `startComplianceAudit` |
+| Operations | `upgradeOpsTier` |
 | Competitor AI | `counterPoachOffer` |
 | Tutorial | `dismissTip`, `toggleTutorial` |
 | Save/Load | `saveGame`, `loadGame`, `deleteGame`, `resetGame`, `refreshSaveSlots` |
@@ -367,7 +373,7 @@ A `setInterval` in `App.tsx` calls `tick()` at the rate determined by `gameSpeed
 1. **Time-of-day**: Advances `gameHour` (0–23), applies demand curve and random traffic spikes
 2. **Weather**: Season rotation, weather condition changes, ambient temperature modifiers
 3. **Supply chain**: Ticks pending orders, delivery processing, supply shortage events
-4. **Incidents**: Spawns random incidents (20+ types), ticks active incidents, applies effects
+4. **Incidents & Ops Tier**: Spawns random incidents (20+ types, reduced by ops tier), ticks active incidents, applies effects (revenue penalties reduced by ops tier), ops tier auto-resolve bonus, prevented incident tracking
 5. **Tech tree**: Ticks active research progress
 6. **Power market**: Updates spot pricing with random walk, mean reversion, and price spikes
 7. **Generators**: Manages fuel consumption, startup/cooldown, auto-activation during outages
@@ -421,6 +427,14 @@ A `setInterval` in `App.tsx` calls `tick()` at the rate determined by `gameSpeed
 - **Server configurations**: 5 types (balanced, cpu_optimized, gpu_accelerated, storage_dense, memory_optimized) with different cost/power/heat/revenue profiles
 
 ### Advanced Systems
+
+**Operations Progression:**
+- 4 ops tiers: manual → monitoring → automation → orchestration
+- Each tier requires minimum staff count, researched technologies, reputation level, and suite tier
+- Benefits scale per tier: incident spawn reduction (0–40%), auto-resolve speed bonus (0–40%), revenue penalty reduction (0–30%), staff effectiveness bonus (0–30%), resolve cost reduction (0–50%)
+- Upgrade costs: $0 / $15,000 / $50,000 / $120,000
+- 4 dedicated achievements: Script Kiddie, SRE, Platform Engineer, Lights Out
+- Tracked stats: `opsAutoResolvedCount`, `opsPreventedCount`
 
 **Staff & HR:**
 - 4 roles: network_engineer, electrician, cooling_specialist, security_officer
@@ -594,6 +608,7 @@ A `setInterval` in `App.tsx` calls `tick()` at the rate determined by `gameSpeed
 | Cross-Connect | Direct physical cable connection between customer equipment. |
 | Spot Compute | On-demand compute capacity sold at dynamic market prices. |
 | Season | Time cycle (spring/summer/autumn/winter) affecting ambient temperature. |
+| Ops Tier | Operations maturity level (manual → monitoring → automation → orchestration). Reduces incidents and improves staff effectiveness. |
 
 ## Simulation Parameters (quick reference)
 
