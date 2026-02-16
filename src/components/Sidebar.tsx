@@ -3,7 +3,7 @@ import type { LucideIcon } from 'lucide-react'
 import {
   Cpu, Server, DollarSign, Radio, Zap, Plug,
   FlaskConical, FileText, Siren, Building, Trophy,
-  Save, X, HelpCircle, Leaf, Shield, TrendingUp,
+  Save, X, HelpCircle, Leaf, Shield, TrendingUp, Newspaper,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -30,8 +30,9 @@ import { GuidePanel } from '@/components/sidebar/GuidePanel'
 import { CarbonPanel } from '@/components/sidebar/CarbonPanel'
 import { SecurityPanel } from '@/components/sidebar/SecurityPanel'
 import { MarketPanel } from '@/components/sidebar/MarketPanel'
+import { BuildLogsPanel } from '@/components/sidebar/BuildLogsPanel'
 
-type PanelId = 'guide' | 'build' | 'equipment' | 'finance' | 'network' | 'operations' | 'infrastructure' | 'research' | 'contracts' | 'incidents' | 'facility' | 'carbon' | 'security' | 'market' | 'progress' | 'settings'
+type PanelId = 'guide' | 'build' | 'equipment' | 'finance' | 'network' | 'operations' | 'infrastructure' | 'research' | 'contracts' | 'incidents' | 'facility' | 'carbon' | 'security' | 'market' | 'progress' | 'settings' | 'build_logs'
 
 interface SidebarItem {
   id: PanelId
@@ -57,6 +58,7 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
   { id: 'security', icon: Shield, label: 'Security', color: '#ff8844', section: 'middle' },
   { id: 'market', icon: TrendingUp, label: 'Market', color: '#00aaff', section: 'middle' },
   { id: 'progress', icon: Trophy, label: 'Progress', color: '#ffaa00', section: 'middle' },
+  { id: 'build_logs', icon: Newspaper, label: "What's New", color: '#00ff88', section: 'bottom' },
   { id: 'settings', icon: Save, label: 'Settings', color: '#556677', section: 'bottom' },
 ]
 
@@ -76,6 +78,7 @@ const PANEL_TITLES: Record<PanelId, string> = {
   security: 'SECURITY & COMPLIANCE',
   market: 'MARKET & COMPETITORS',
   progress: 'PROGRESS',
+  build_logs: "WHAT'S NEW",
   settings: 'SETTINGS',
 }
 
@@ -96,6 +99,7 @@ function PanelContent({ panelId }: { panelId: PanelId }) {
     case 'security': return <SecurityPanel />
     case 'market': return <MarketPanel />
     case 'progress': return <ProgressPanel />
+    case 'build_logs': return <BuildLogsPanel />
     case 'settings': return <SettingsPanel />
   }
 }
