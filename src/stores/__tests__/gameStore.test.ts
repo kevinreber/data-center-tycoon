@@ -1180,3 +1180,102 @@ describe('Incident System', () => {
     expect(updatedSpine.powerStatus).toBe(true)
   })
 })
+
+// ============================================================================
+// Zone Adjacency Bonuses
+// ============================================================================
+describe('Zone Adjacency Bonuses', () => {
+  it('no zones with fewer than 3 cabinets', () => {
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'standard' })
+    getState().addCabinet(0, 0, 'production', 'general', 'north')
+    getState().addCabinet(1, 0, 'production', 'general', 'north')
+    expect(getState().zones).toHaveLength(0)
+  })
+
+  it('3 adjacent same-environment cabinets form an environment zone', () => {
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'standard' })
+    getState().addCabinet(0, 0, 'production', 'general', 'north')
+    getState().addCabinet(1, 0, 'production', 'general', 'north')
+    getState().addCabinet(2, 0, 'production', 'general', 'north')
+
+    const zones = getState().zones
+    const envZones = zones.filter(z => z.type === 'environment')
+    expect(envZones.length).toBeGreaterThanOrEqual(1)
+    expect(envZones[0].key).toBe('production')
+    expect(envZones[0].cabinetIds).toHaveLength(3)
+  })
+
+  it('non-adjacent cabinets do not form a zone', () => {
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'standard' })
+    getState().addCabinet(0, 0, 'production', 'general', 'north')
+    getState().addCabinet(2, 0, 'production', 'general', 'north') // gap at (1,0)
+    getState().addCabinet(4, 0, 'production', 'general', 'north') // gap at (3,0)
+    expect(getState().zones).toHaveLength(0)
+  })
+
+  it('mixed environments do not form a single zone', () => {
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'standard' })
+    getState().addCabinet(0, 0, 'production', 'general', 'north')
+    getState().addCabinet(1, 0, 'lab', 'general', 'north')
+    getState().addCabinet(2, 0, 'production', 'general', 'north')
+    // No cluster of 3 same-env adjacent cabinets
+    const envZones = getState().zones.filter(z => z.type === 'environment')
+    expect(envZones).toHaveLength(0)
+  })
+
+  it('customer type zones form among production cabinets', () => {
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'standard' })
+    getState().addCabinet(0, 0, 'production', 'ai_training', 'north')
+    getState().addCabinet(1, 0, 'production', 'ai_training', 'north')
+    getState().addCabinet(2, 0, 'production', 'ai_training', 'north')
+
+    const custZones = getState().zones.filter(z => z.type === 'customer')
+    expect(custZones.length).toBeGreaterThanOrEqual(1)
+    expect(custZones[0].key).toBe('ai_training')
+  })
+
+  it('zone bonus revenue is applied during tick', () => {
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'standard' })
+    // Place 3 adjacent production cabinets with servers
+    getState().addCabinet(0, 0, 'production', 'general', 'north')
+    getState().addCabinet(1, 0, 'production', 'general', 'north')
+    getState().addCabinet(2, 0, 'production', 'general', 'north')
+    // Add servers to all cabinets
+    getState().upgradeNextCabinet()
+    getState().upgradeNextCabinet()
+    getState().upgradeNextCabinet()
+    // Add spine for traffic
+    getState().addSpineSwitch()
+
+    expect(getState().zones.length).toBeGreaterThan(0)
+
+    getState().tick()
+    expect(getState().zoneBonusRevenue).toBeGreaterThan(0)
+  })
+
+  it('L-shaped clusters are detected correctly', () => {
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'standard' })
+    // L-shape: (0,0), (1,0), (1,1)
+    getState().addCabinet(0, 0, 'lab', 'general', 'north')
+    getState().addCabinet(1, 0, 'lab', 'general', 'north')
+    getState().addCabinet(1, 1, 'lab', 'general', 'north')
+
+    const envZones = getState().zones.filter(z => z.type === 'environment' && z.key === 'lab')
+    expect(envZones).toHaveLength(1)
+    expect(envZones[0].cabinetIds).toHaveLength(3)
+  })
+
+  it('zones recalculate during tick with infrastructure effects', () => {
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'standard' })
+    getState().addCabinet(0, 0, 'production', 'enterprise', 'north')
+    getState().addCabinet(1, 0, 'production', 'enterprise', 'north')
+    getState().addCabinet(2, 0, 'production', 'enterprise', 'north')
+
+    getState().tick()
+    const zones = getState().zones
+    expect(zones.length).toBeGreaterThan(0)
+    // Should have both env and customer zones
+    expect(zones.some(z => z.type === 'environment')).toBe(true)
+    expect(zones.some(z => z.type === 'customer')).toBe(true)
+  })
+})

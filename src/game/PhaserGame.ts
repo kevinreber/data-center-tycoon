@@ -129,6 +129,9 @@ class DataCenterScene extends Phaser.Scene {
   private panOffsetY = 0
   private zoomLevel = 1
 
+  // Zone outlines
+  private zoneGraphics: Phaser.GameObjects.Graphics | null = null
+
   // Heat map overlay
   private heatMapGraphics: Phaser.GameObjects.Graphics | null = null
   private heatMapVisible = false
@@ -1264,6 +1267,72 @@ class DataCenterScene extends Phaser.Scene {
     this.selectedCabinetId = null
     if (this.selectionGraphics) this.selectionGraphics.destroy()
     this.selectionGraphics = null
+  }
+
+  /** Set zone outlines for rendering */
+  setZones(zones: { tiles: { col: number; row: number }[]; color: string }[]) {
+    if (this.zoneGraphics) {
+      this.zoneGraphics.destroy()
+      this.zoneGraphics = null
+    }
+
+    if (zones.length === 0) return
+
+    this.zoneGraphics = this.add.graphics()
+    this.zoneGraphics.setDepth(2) // above floor/grid, below placement highlight and cabinets
+
+    for (const zone of zones) {
+      const tileSet = new Set(zone.tiles.map((t) => `${t.col},${t.row}`))
+      const colorNum = parseInt(zone.color.replace('#', ''), 16)
+
+      // Draw a subtle filled highlight on each zone tile
+      for (const tile of zone.tiles) {
+        const { x, y } = this.isoToScreen(tile.col, tile.row)
+        this.zoneGraphics.fillStyle(colorNum, 0.08)
+        this.zoneGraphics.beginPath()
+        this.zoneGraphics.moveTo(x, y)
+        this.zoneGraphics.lineTo(x + TILE_W / 2, y + TILE_H / 2)
+        this.zoneGraphics.lineTo(x, y + TILE_H)
+        this.zoneGraphics.lineTo(x - TILE_W / 2, y + TILE_H / 2)
+        this.zoneGraphics.closePath()
+        this.zoneGraphics.fillPath()
+      }
+
+      // Draw outline on boundary edges only (edges not shared with another tile in the same zone)
+      this.zoneGraphics.lineStyle(2, colorNum, 0.6)
+      for (const tile of zone.tiles) {
+        const { x, y } = this.isoToScreen(tile.col, tile.row)
+        // Check 4 neighbors; draw edge if neighbor is NOT in the zone
+        // Top-right edge (col+1 neighbor)
+        if (!tileSet.has(`${tile.col + 1},${tile.row}`)) {
+          this.zoneGraphics.beginPath()
+          this.zoneGraphics.moveTo(x, y)
+          this.zoneGraphics.lineTo(x + TILE_W / 2, y + TILE_H / 2)
+          this.zoneGraphics.strokePath()
+        }
+        // Bottom-right edge (row+1 neighbor)
+        if (!tileSet.has(`${tile.col},${tile.row + 1}`)) {
+          this.zoneGraphics.beginPath()
+          this.zoneGraphics.moveTo(x + TILE_W / 2, y + TILE_H / 2)
+          this.zoneGraphics.lineTo(x, y + TILE_H)
+          this.zoneGraphics.strokePath()
+        }
+        // Bottom-left edge (col-1 neighbor)
+        if (!tileSet.has(`${tile.col - 1},${tile.row}`)) {
+          this.zoneGraphics.beginPath()
+          this.zoneGraphics.moveTo(x, y + TILE_H)
+          this.zoneGraphics.lineTo(x - TILE_W / 2, y + TILE_H / 2)
+          this.zoneGraphics.strokePath()
+        }
+        // Top-left edge (row-1 neighbor)
+        if (!tileSet.has(`${tile.col},${tile.row - 1}`)) {
+          this.zoneGraphics.beginPath()
+          this.zoneGraphics.moveTo(x - TILE_W / 2, y + TILE_H / 2)
+          this.zoneGraphics.lineTo(x, y)
+          this.zoneGraphics.strokePath()
+        }
+      }
+    }
   }
 
   /** Reset camera to default position and zoom */
