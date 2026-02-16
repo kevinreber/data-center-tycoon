@@ -1,4 +1,7 @@
+import { Github, Bug, GitPullRequest } from 'lucide-react'
 import { useGameStore, ENVIRONMENT_CONFIG, SIM } from '@/stores/gameStore'
+
+const REPO_URL = 'https://github.com/kevinreber/data-center-tycoon'
 
 export function GuidePanel() {
   const money = useGameStore((s) => s.money)
@@ -67,6 +70,42 @@ export function GuidePanel() {
           <li><strong className="text-foreground">Price wars</strong> &mdash; Competitors may slash prices, reducing market revenue.</li>
           <li><strong className="text-foreground">Staff poaching</strong> &mdash; Counter-offer or lose staff to rivals.</li>
         </ul>
+      </div>
+
+      <div className="rounded-lg border border-[#aa44ff]/20 bg-[#aa44ff]/5 p-3">
+        <p className="text-xs font-bold text-[#aa44ff] mb-2">CONTRIBUTE</p>
+        <p className="text-xs font-mono text-muted-foreground mb-3">
+          Fabric Tycoon is open source! Help us build the ultimate data center simulator.
+        </p>
+        <div className="flex flex-col gap-1.5">
+          <a
+            href={REPO_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 text-xs font-mono text-[#aa44ff] hover:text-[#cc66ff] transition-colors"
+          >
+            <Github className="size-3.5 shrink-0" />
+            <span>View on GitHub</span>
+          </a>
+          <a
+            href={`${REPO_URL}/issues/new`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 text-xs font-mono text-[#aa44ff] hover:text-[#cc66ff] transition-colors"
+          >
+            <Bug className="size-3.5 shrink-0" />
+            <span>Report a Bug</span>
+          </a>
+          <a
+            href={`${REPO_URL}/pulls`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 text-xs font-mono text-[#aa44ff] hover:text-[#cc66ff] transition-colors"
+          >
+            <GitPullRequest className="size-3.5 shrink-0" />
+            <span>Submit a Pull Request</span>
+          </a>
+        </div>
       </div>
 
       <div className="text-xs text-muted-foreground space-y-1.5 font-mono">
