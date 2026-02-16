@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useCallback, useState } from 'react'
 import type Phaser from 'phaser'
 import { createGame, getScene } from '@/game/PhaserGame'
 import { useGameStore, getSuiteLimits, getPlacementHints } from '@/stores/gameStore'
@@ -8,6 +8,10 @@ export function GameCanvas() {
   const gameRef = useRef<Phaser.Game | null>(null)
   const prevCabCount = useRef(0)
   const prevSpineCount = useRef(0)
+  // Incremented once when Phaser scene finishes booting, so all sync
+  // effects re-run against the now-ready scene (fixes demo-mode load
+  // where state is populated before Phaser's async create() completes).
+  const [sceneReady, setSceneReady] = useState(false)
 
   const cabinets = useGameStore((s) => s.cabinets)
   const spineSwitches = useGameStore((s) => s.spineSwitches)
@@ -46,7 +50,19 @@ export function GameCanvas() {
       gameRef.current = createGame('phaser-container')
     }
 
+    // Phaser scene boots asynchronously — poll until create() has run,
+    // then flip sceneReady so every sync effect re-fires against the
+    // now-available scene.  This is critical for demo mode where state
+    // is populated on the same tick as the Phaser game is created.
+    const poll = setInterval(() => {
+      if (gameRef.current && getScene(gameRef.current)) {
+        setSceneReady(true)
+        clearInterval(poll)
+      }
+    }, 50)
+
     return () => {
+      clearInterval(poll)
       gameRef.current?.destroy(true)
       gameRef.current = null
     }
@@ -69,7 +85,7 @@ export function GameCanvas() {
       scene.clearSelection()
       useGameStore.getState().selectCabinet(null)
     }
-  }, [placementMode, handleTileClick, handleTileHover, handleCabinetSelect])
+  }, [placementMode, handleTileClick, handleTileHover, handleCabinetSelect, sceneReady])
 
   // Sync suite tier (grid dimensions) to Phaser
   useEffect(() => {
@@ -78,7 +94,7 @@ export function GameCanvas() {
     if (!scene) return
     const limits = getSuiteLimits(suiteTier)
     scene.setGridSize(limits.cols, limits.rows, limits.maxSpines)
-  }, [suiteTier])
+  }, [suiteTier, sceneReady])
 
   // Sync cabinets to Phaser
   useEffect(() => {
@@ -101,7 +117,7 @@ export function GameCanvas() {
     // Sync occupied tiles
     const occupied = new Set<string>(cabinets.map((c) => `${c.col},${c.row}`))
     scene.syncOccupiedTiles(occupied)
-  }, [cabinets])
+  }, [cabinets, sceneReady])
 
   // Sync spine switches to Phaser
   useEffect(() => {
@@ -119,7 +135,7 @@ export function GameCanvas() {
     for (const spine of spineSwitches) {
       scene.updateSpine(spine.id, spine.powerStatus)
     }
-  }, [spineSwitches])
+  }, [spineSwitches, sceneReady])
 
   // Sync layer visibility to Phaser
   useEffect(() => {
@@ -127,7 +143,7 @@ export function GameCanvas() {
     const scene = getScene(gameRef.current)
     if (!scene) return
     scene.setLayerVisibility(layerVisibility)
-  }, [layerVisibility])
+  }, [layerVisibility, sceneReady])
 
   // Sync layer opacity to Phaser
   useEffect(() => {
@@ -135,7 +151,7 @@ export function GameCanvas() {
     const scene = getScene(gameRef.current)
     if (!scene) return
     scene.setLayerOpacity(layerOpacity)
-  }, [layerOpacity])
+  }, [layerOpacity, sceneReady])
 
   // Sync layer colors to Phaser
   useEffect(() => {
@@ -143,7 +159,7 @@ export function GameCanvas() {
     const scene = getScene(gameRef.current)
     if (!scene) return
     scene.setLayerColors(layerColors)
-  }, [layerColors])
+  }, [layerColors, sceneReady])
 
   // Sync traffic data to Phaser
   useEffect(() => {
@@ -151,7 +167,7 @@ export function GameCanvas() {
     const scene = getScene(gameRef.current)
     if (!scene) return
     scene.setTrafficLinks(trafficStats.links)
-  }, [trafficStats])
+  }, [trafficStats, sceneReady])
 
   // Sync PDUs to Phaser
   useEffect(() => {
@@ -169,7 +185,7 @@ export function GameCanvas() {
     for (const tray of cableTrays) {
       scene.addCableTrayToScene(tray.id, tray.col, tray.row)
     }
-  }, [pdus, cableTrays, pduOverloaded])
+  }, [pdus, cableTrays, pduOverloaded, sceneReady])
 
   // Sync traffic visibility to Phaser
   useEffect(() => {
@@ -177,7 +193,7 @@ export function GameCanvas() {
     const scene = getScene(gameRef.current)
     if (!scene) return
     scene.setTrafficVisible(trafficVisible)
-  }, [trafficVisible])
+  }, [trafficVisible, sceneReady])
 
   // Sync heat map visibility to Phaser
   useEffect(() => {
@@ -185,7 +201,7 @@ export function GameCanvas() {
     const scene = getScene(gameRef.current)
     if (!scene) return
     scene.setHeatMapVisible(heatMapVisible)
-  }, [heatMapVisible])
+  }, [heatMapVisible, sceneReady])
 
   const handleCenterGrid = useCallback(() => {
     if (gameRef.current) {
