@@ -1,5 +1,5 @@
 import { Github, Bug, GitPullRequest } from 'lucide-react'
-import { useGameStore, ENVIRONMENT_CONFIG, SIM, SPACING_CONFIG, COOLING_CONFIG, INROW_COOLING_OPTIONS } from '@/stores/gameStore'
+import { useGameStore, ENVIRONMENT_CONFIG, SIM, SPACING_CONFIG, COOLING_CONFIG, INROW_COOLING_OPTIONS, OPS_TIER_CONFIG } from '@/stores/gameStore'
 
 const REPO_URL = 'https://github.com/kevinreber/data-center-tycoon'
 
@@ -169,6 +169,29 @@ export function GuidePanel() {
           <li><strong className="text-foreground">Price wars</strong> &mdash; Competitors may slash prices, reducing market revenue.</li>
           <li><strong className="text-foreground">Staff poaching</strong> &mdash; Counter-offer or lose staff to rivals.</li>
         </ul>
+      </div>
+
+      <div className="rounded-lg border border-neon-yellow/20 bg-neon-yellow/5 p-3">
+        <p className="text-xs font-bold text-neon-yellow mb-2">OPERATIONS PROGRESSION</p>
+        <p className="text-xs font-mono text-muted-foreground mb-2">
+          Level up your operations maturity to handle incidents like a pro. Find it in the <span className="text-neon-cyan">OPERATIONS</span> panel.
+        </p>
+        <div className="space-y-1.5">
+          {OPS_TIER_CONFIG.map((tier) => (
+            <div key={tier.id} className="flex gap-2 items-start">
+              <div className="w-3 h-3 rounded-sm shrink-0 mt-0.5" style={{ backgroundColor: tier.color }} />
+              <div className="text-xs font-mono">
+                <strong style={{ color: tier.color }}>{tier.label}</strong>
+                <span className="text-muted-foreground"> &mdash; {tier.description}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-2 pt-2 border-t border-neon-yellow/10">
+          <p className="text-[10px] font-mono text-muted-foreground">
+            <strong className="text-foreground">Key benefits:</strong> Fewer incidents, faster auto-resolve, cheaper resolve costs, and boosted staff effectiveness. Unlock higher tiers by hiring staff, researching tech, and building reputation.
+          </p>
+        </div>
       </div>
 
       <div className="rounded-lg border border-[#aa44ff]/20 bg-[#aa44ff]/5 p-3">
