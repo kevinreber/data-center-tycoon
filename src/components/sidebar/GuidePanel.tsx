@@ -1,5 +1,5 @@
 import { Github, Bug, GitPullRequest } from 'lucide-react'
-import { useGameStore, ENVIRONMENT_CONFIG, SIM, SPACING_CONFIG } from '@/stores/gameStore'
+import { useGameStore, ENVIRONMENT_CONFIG, SIM, SPACING_CONFIG, COOLING_CONFIG, INROW_COOLING_OPTIONS } from '@/stores/gameStore'
 
 const REPO_URL = 'https://github.com/kevinreber/data-center-tycoon'
 
@@ -81,6 +81,61 @@ export function GuidePanel() {
           <p className="text-[10px] font-mono text-muted-foreground">
             <strong className="text-foreground">Pro tip:</strong> Alternate facing (N/S or E/W) in adjacent rows/columns.
             Leave 1&ndash;2 tile gaps for proper hot/cold aisles. This earns up to {Math.round(SPACING_CONFIG.maxAisleSpacingBonus * 100)}% cooling bonus.
+          </p>
+        </div>
+      </div>
+
+      {/* Cooling & thermal management strategy */}
+      <div className="rounded-lg border border-neon-red/20 bg-neon-red/5 p-3">
+        <p className="text-xs font-bold text-neon-red mb-2">COOLING &amp; THERMAL MANAGEMENT</p>
+        <p className="text-xs font-mono text-muted-foreground mb-2">
+          Every server generates <span className="text-neon-red">+{SIM.heatPerServer}&deg;C/tick</span> of heat.
+          Air cooling is always active and removes <span className="text-neon-cyan">-{COOLING_CONFIG.air.coolingRate}&deg;C/tick</span> automatically &mdash; but
+          it can&rsquo;t keep up as you add more servers.
+        </p>
+
+        <div className="space-y-2 mb-2">
+          <p className="text-[10px] font-mono font-bold text-neon-yellow">WHY COOLING MATTERS</p>
+          <ul className="text-xs font-mono text-muted-foreground space-y-1 list-disc list-inside">
+            <li>
+              Above <span className="text-neon-yellow">{SIM.throttleTemp}&deg;C</span>: servers are <strong className="text-neon-red">thermally throttled</strong> and earn only <strong className="text-neon-red">50% revenue</strong>
+            </li>
+            <li>
+              Above <span className="text-neon-red">{SIM.criticalTemp}&deg;C</span>: risk of <strong className="text-neon-red">fire</strong> that can destroy equipment
+            </li>
+            <li>
+              Higher heat = higher <strong className="text-foreground">cooling power overhead</strong>, eating into your profits
+            </li>
+          </ul>
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-[10px] font-mono font-bold text-neon-cyan">COOLING STRATEGIES (CHEAPEST FIRST)</p>
+          <ol className="text-xs font-mono text-muted-foreground space-y-1.5 list-decimal list-inside">
+            <li>
+              <strong className="text-foreground">Layout optimization</strong> (free)
+              <span className="text-muted-foreground"> &mdash; Alternate cabinet facing and leave gaps for hot/cold aisles. Up to {Math.round(SPACING_CONFIG.maxAisleSpacingBonus * 100)}% cooling bonus.</span>
+            </li>
+            <li>
+              <strong className="text-foreground">Management cabinets</strong> (${(2000).toLocaleString()}/cab)
+              <span className="text-muted-foreground"> &mdash; Each management server cuts cooling overhead by 3% (max 30%). Great long-term investment.</span>
+            </li>
+            <li>
+              <strong className="text-foreground">In-row cooling units</strong> (${INROW_COOLING_OPTIONS[0].cost.toLocaleString()}&ndash;${INROW_COOLING_OPTIONS[2].cost.toLocaleString()})
+              <span className="text-muted-foreground"> &mdash; Place next to hot cabinets for targeted {INROW_COOLING_OPTIONS[0].coolingBonus}&ndash;{INROW_COOLING_OPTIONS[2].coolingBonus}&deg;C/tick extra cooling.</span>
+            </li>
+            <li>
+              <strong className="text-foreground">Water cooling upgrade</strong> (${COOLING_CONFIG.water.upgradeCost.toLocaleString()})
+              <span className="text-muted-foreground"> &mdash; Facility-wide upgrade: {COOLING_CONFIG.water.coolingRate}&deg;C/tick removal and {Math.round(COOLING_CONFIG.water.overheadReduction * 100)}% lower PUE overhead. Best for 8+ cabinets.</span>
+            </li>
+          </ol>
+        </div>
+
+        <div className="mt-2 pt-2 border-t border-neon-red/10">
+          <p className="text-[10px] font-mono text-muted-foreground">
+            <strong className="text-foreground">Rule of thumb:</strong> With air cooling, 1 cabinet handles ~1 server comfortably.
+            At 3&ndash;4 servers per cabinet, you&rsquo;ll need layout bonuses or in-row cooling to stay under {SIM.throttleTemp}&deg;C.
+            Water cooling is the long-term solution for any serious operation.
           </p>
         </div>
       </div>
