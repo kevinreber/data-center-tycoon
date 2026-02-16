@@ -420,6 +420,18 @@ Compare performance metrics with other players.
 
 ---
 
+### Cabinet Organization Incentives (Future Ideas)
+
+Ideas for further encouraging organized cabinet layouts. Zone Adjacency Bonus (with visual zone outlines) was implemented first. These remain as future options:
+
+- [ ] **Mixed-Environment Penalty** — If a cabinet is surrounded by cabinets of a *different* environment type, apply a small penalty: +5% heat (incompatible airflow profiles) and -3% revenue (operational complexity overhead). Lighter touch "stick" approach that creates a subtle push toward clustering.
+- [ ] **Dedicated Row Bonus** — If an entire row is the same environment type, grant a "dedicated row" bonus: +8% efficiency (revenue or cooling depending on type) with a visual row highlight on the isometric grid. Simpler to reason about than adjacency and maps well to the existing row-based aisle system.
+- [ ] **Zone Contracts** — Higher-tier contracts require organized zones: e.g., "Enterprise SLA: Requires a production zone of 4+ adjacent cabinets" or "AI Training Cluster: Requires 3+ adjacent GPU cabinets of the same customer type." Gates reward behind contracts rather than changing base mechanics, keeping early game freeform.
+
+**Effort:** Low-Medium each | **Impact:** Medium — Each builds on the zone adjacency system and adds strategic depth to cabinet placement.
+
+---
+
 ## Summary
 
 | Category | Total | Done | Pending |

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
 import type Phaser from 'phaser'
 import { createGame, getScene } from '@/game/PhaserGame'
-import { useGameStore, getSuiteLimits, getPlacementHints } from '@/stores/gameStore'
+import { useGameStore, getSuiteLimits, getPlacementHints, ENVIRONMENT_CONFIG, CUSTOMER_TYPE_CONFIG } from '@/stores/gameStore'
 import { Crosshair } from 'lucide-react'
 
 export function GameCanvas() {
@@ -27,6 +27,7 @@ export function GameCanvas() {
   const cableTrays = useGameStore((s) => s.cableTrays)
   const pduOverloaded = useGameStore((s) => s.pduOverloaded)
   const heatMapVisible = useGameStore((s) => s.heatMapVisible)
+  const zones = useGameStore((s) => s.zones)
 
   // Tile click handler — called from Phaser when user clicks a grid tile
   const handleTileClick = useCallback((col: number, row: number) => {
@@ -38,7 +39,7 @@ export function GameCanvas() {
   // Tile hover handler — returns placement hints for the hovered tile
   const handleTileHover = useCallback((col: number, row: number) => {
     const state = useGameStore.getState()
-    return getPlacementHints(col, row, state.cabinets, state.suiteTier)
+    return getPlacementHints(col, row, state.cabinets, state.suiteTier, state.placementEnvironment, state.placementCustomerType)
   }, [])
 
   // Cabinet selection handler — called from Phaser when user clicks a cabinet
@@ -224,6 +225,20 @@ export function GameCanvas() {
     if (!scene) return
     scene.setHeatMapVisible(heatMapVisible)
   }, [heatMapVisible, sceneReady])
+
+  // Sync zone outlines to Phaser
+  useEffect(() => {
+    if (!gameRef.current) return
+    const scene = getScene(gameRef.current)
+    if (!scene) return
+    const zoneData = zones.map((z) => {
+      const color = z.type === 'environment'
+        ? ENVIRONMENT_CONFIG[z.key as keyof typeof ENVIRONMENT_CONFIG].color
+        : CUSTOMER_TYPE_CONFIG[z.key as keyof typeof CUSTOMER_TYPE_CONFIG].color
+      return { tiles: z.tiles, color }
+    })
+    scene.setZones(zoneData)
+  }, [zones, sceneReady])
 
   const handleCenterGrid = useCallback(() => {
     if (gameRef.current) {
