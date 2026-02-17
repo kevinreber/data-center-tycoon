@@ -286,17 +286,17 @@ Late-game sci-fi progression beyond the current 4 suite tiers.
 
 A progression system for incident and infrastructure management, inspired by the journey from manual ops to Kubernetes-style orchestration. Early game forces hands-on management; later tiers unlock automation.
 
-- [x] **Tier 1 — Manual Ops (default):** Incidents persist until manually resolved (pay to fix). No auto-resolution.
-- [x] **Tier 2 — Monitoring & Alerting:** Reduced resolution costs (-20%) and incident damage (-15%). Still requires manual action.
-- [x] **Tier 3 — Basic Automation:** Incidents auto-resolve over time. Staff accelerates resolution. Hardware auto-restores on expiry.
-- [x] **Tier 4 — Full Orchestration:** 2x auto-resolve speed, 20% incident prevention, minor incidents auto-resolve instantly.
-- [x] Gate progression behind reputation, suite tier, and tech tree milestones (sequential upgrades)
-- [x] Operations Progression UI section added to OperationsPanel (tier stats, upgrade button, tooltips)
-- [x] 4 achievements: Eyes Everywhere (T2), SRE (T3), Platform Engineer (T4), Predictive (10 prevented)
-- [x] 2 tutorial tips: ops_manual (when 2+ unresolved at T1), ops_tier_available (when upgrade is possible)
-- [x] Per-tick maintenance costs ($5/$15/$30) and resolve cost multiplier applied to resolveIncident
-- [x] Incident effect damage multiplier reduces penalty severity at higher tiers
-- [x] 10 tests covering tier upgrades, requirements, auto-resolve behavior, cost multiplier, and reset
+- [x] **Tier 1 — Manual Ops (default):** Base tier with no automation. Incidents require manual resolution or expire naturally.
+- [x] **Tier 2 — Monitoring & Alerting:** Requires 2+ staff, `ups_upgrade` tech, reputation 25+. Benefits: -10% incident spawn, -20% resolve cost, +10% staff effectiveness, +5% auto-resolve speed.
+- [x] **Tier 3 — Basic Automation:** Requires 4+ staff, all 3 resilience techs, reputation 45+, Standard suite. Benefits: -25% incident spawn, -35% resolve cost, +20% auto-resolve speed, +20% staff effectiveness, -15% revenue penalty from incidents.
+- [x] **Tier 4 — Full Orchestration:** Requires 8+ staff, 5 techs (resilience + efficiency), reputation 65+, Professional suite. Benefits: -40% spawn, -50% resolve cost, +40% auto-resolve speed, +35% staff effectiveness, -30% revenue penalty.
+- [x] Gated behind tech tree, reputation, suite tier, staff count, and upgrade cost milestones
+- [x] Ops tier UI section in Operations panel with current benefits, stats, and upgrade path with requirement checklist
+- [x] Achievements: "Script Kiddie" (Monitoring), "SRE" (Automation), "Platform Engineer" (Orchestration), "Lights Out" (20 auto-resolves)
+- [x] Incident resolve cost discount shown in Incidents panel with strikethrough pricing
+- [x] Tutorial tip triggers when next ops tier requirements are met
+- [x] Event logging for auto-resolved and prevented incidents
+- [x] Tests for upgrade mechanics, cost deduction, sequential progression, and resolve cost reduction
 
 **Effort:** Medium-High | **Impact:** High — Transforms incident management from a passive system into a core progression mechanic. Gives players a strong sense of advancement and makes early game meaningfully challenging.
 
@@ -417,6 +417,18 @@ Compare performance metrics with other players.
 - [ ] Requires backend infrastructure
 
 **Effort:** High | **Impact:** Low — Requires server infrastructure. Only meaningful with an active player base.
+
+---
+
+### Cabinet Organization Incentives (Future Ideas)
+
+Ideas for further encouraging organized cabinet layouts. Zone Adjacency Bonus (with visual zone outlines) was implemented first. These remain as future options:
+
+- [ ] **Mixed-Environment Penalty** — If a cabinet is surrounded by cabinets of a *different* environment type, apply a small penalty: +5% heat (incompatible airflow profiles) and -3% revenue (operational complexity overhead). Lighter touch "stick" approach that creates a subtle push toward clustering.
+- [ ] **Dedicated Row Bonus** — If an entire row is the same environment type, grant a "dedicated row" bonus: +8% efficiency (revenue or cooling depending on type) with a visual row highlight on the isometric grid. Simpler to reason about than adjacency and maps well to the existing row-based aisle system.
+- [ ] **Zone Contracts** — Higher-tier contracts require organized zones: e.g., "Enterprise SLA: Requires a production zone of 4+ adjacent cabinets" or "AI Training Cluster: Requires 3+ adjacent GPU cabinets of the same customer type." Gates reward behind contracts rather than changing base mechanics, keeping early game freeform.
+
+**Effort:** Low-Medium each | **Impact:** Medium — Each builds on the zone adjacency system and adds strategic depth to cabinet placement.
 
 ---
 

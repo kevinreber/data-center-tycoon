@@ -121,7 +121,9 @@ All game state lives in a **single Zustand store** (`useGameStore`). This ~5300-
 - **Equipment constants**: `MAX_SERVERS_PER_CABINET` (4), `MAX_CABINETS` (50), `MAX_SPINES` (8), costs, power draw
 - **Suite tier configs** (`SUITE_TIERS`): grid dimensions and spine slots per tier
 - **Customer type configs** (`CUSTOMER_TYPE_CONFIG`): power/heat/revenue/bandwidth multipliers per customer
-- **Infrastructure configs**: PDU options, cable tray options, aisle configuration, busway options, cross-connect options, in-row cooling options
+- **Infrastructure configs**: PDU options, cable tray options, aisle containment (`AISLE_CONTAINMENT_CONFIG`), busway options, cross-connect options, in-row cooling options
+- **Spacing & layout configs** (`SPACING_CONFIG`): adjacency heat penalties, aisle bonuses, airflow bonuses, maintenance access, fire spread mechanics
+- **Zone bonus configs** (`ZONE_BONUS_CONFIG`): minimum cluster size (3), environment and customer type bonuses
 - **Economy configs**: loan options, depreciation, power market parameters, insurance options, valuation milestones
 - **Progression configs**: tech tree (9 techs), contracts (9 contracts + 4 compliance-gated), achievements (66+), incidents (17+ types), scenarios (5)
 - **Staff configs** (`STAFF_ROLE_CONFIG`, `STAFF_CERT_CONFIG`, `SHIFT_PATTERN_CONFIG`): roles, certifications, shift costs
@@ -143,9 +145,10 @@ All game state lives in a **single Zustand store** (`useGameStore`). This ~5300-
 - **Security feature configs** (`SECURITY_FEATURE_CONFIG`): 7 security features with defense bonuses
 - **Compliance cert configs** (`COMPLIANCE_CERT_CONFIG`): 5 compliance certifications with audit mechanics
 - **Competitor configs** (`COMPETITOR_PERSONALITIES`): 5 AI competitor personality profiles
+- **Operations Progression configs** (`OPS_TIER_CONFIG`): 4 ops tiers with unlock requirements, benefits, and upgrade costs
 - **Traffic constants** (`TRAFFIC`): bandwidth per server, link capacity
 - **Pure calculation functions**: `calcStats()`, `calcTraffic()`, `calcTrafficWithCapacity()`, `coolingOverheadFactor()`, `calcManagementBonus()`, `calcAisleBonus()`, `getPlacementHints()`, and more
-- **Store actions**: build, power, visual, simulation, finance, infrastructure, incidents, contracts, research, staff, supply chain, interconnection, peering, maintenance, save/load, and more
+- **Store actions**: build, power, visual, simulation, finance, infrastructure, incidents, contracts, research, staff, supply chain, interconnection, peering, maintenance, operations progression, save/load, and more
 
 **Pattern for accessing state in components:**
 ```typescript
@@ -166,7 +169,7 @@ Core types:
 - `CabinetEnvironment` = `'production' | 'lab' | 'management'`
 - `CoolingType` = `'air' | 'water'`
 - `CustomerType` = `'general' | 'ai_training' | 'streaming' | 'crypto' | 'enterprise'`
-- `CabinetFacing` = `'north' | 'south'`
+- `CabinetFacing` = `'north' | 'south' | 'east' | 'west'` (only N/S used by row-enforced layout)
 - `SuiteTier` = `'starter' | 'standard' | 'professional' | 'enterprise'`
 
 Progression types:
@@ -221,6 +224,10 @@ Security & compliance types:
 
 Competitor AI types:
 - `CompetitorPersonality` = `'budget' | 'premium' | 'green' | 'aggressive' | 'steady'`
+
+Operations Progression types:
+- `OpsTier` = `'manual' | 'monitoring' | 'automation' | 'orchestration'`
+- `OpsTierConfig` interface: unlock requirements (minStaff, requiredTechs, minReputation, minSuiteTier), benefits (incidentSpawnReduction, autoResolveSpeedBonus, revenuePenaltyReduction, staffEffectivenessBonus, resolveCostReduction), upgradeCost
 - `Competitor`, `CompetitorBid` interfaces
 
 Power & insurance types:
@@ -259,7 +266,7 @@ Key interfaces (core):
 | Visual | `toggleLayerVisibility`, `setLayerOpacity`, `setLayerColor`, `toggleTrafficVisible`, `toggleHeatMap` |
 | Simulation | `setGameSpeed`, `upgradeCooling`, `tick` |
 | Finance | `takeLoan`, `refreshServers`, `upgradeSuite` |
-| Infrastructure | `placePDU`, `placeCableTray`, `autoRouteCables`, `toggleCabinetFacing`, `placeBusway`, `placeCrossConnect`, `placeInRowCooling` |
+| Infrastructure | `placePDU`, `placeCableTray`, `autoRouteCables`, `toggleCabinetFacing`, `installAisleContainment`, `placeBusway`, `placeCrossConnect`, `placeInRowCooling` |
 | Incidents | `resolveIncident`, `buyGenerator`, `activateGenerator`, `upgradeSuppression` |
 | Operations Progression | `upgradeOperationsTier` |
 | Contracts | `acceptContract` |
@@ -280,6 +287,7 @@ Key interfaces (core):
 | Scenarios | `startScenario`, `abandonScenario` |
 | Carbon/Environment | `setEnergySource`, `applyForGreenCert`, `disposeEWaste` |
 | Security/Compliance | `upgradeSecurityTier`, `startComplianceAudit` |
+| Operations | `upgradeOpsTier` |
 | Competitor AI | `counterPoachOffer` |
 | Tutorial | `dismissTip`, `toggleTutorial` |
 | Save/Load | `saveGame`, `loadGame`, `deleteGame`, `resetGame`, `refreshSaveSlots` |
@@ -288,8 +296,15 @@ Key interfaces (core):
 
 #### Exported Functions
 
-- `getPlacementHints(col, row, cabinets, suiteTier)` — contextual placement strategy hints during cabinet placement
+- `getPlacementHints(col, row, cabinets, suiteTier)` — contextual placement strategy hints during cabinet placement (includes row info, aisle/corridor detection, zone adjacency hints)
 - `calcTrafficWithCapacity(cabinets, spines, demandMultiplier, linkCapacity)` — traffic calculation with custom link capacity
+- `calcAisleBonus(cabinets, suiteTier, aisleContainments)` — hot/cold aisle cooling bonus from layout pairs + containment
+- `calcZones(cabinets)` — detects zone adjacency clusters (environment + customer type)
+- `getAdjacentCabinets(cab, cabinets)` — orthogonal neighbors for spacing calculations
+- `hasMaintenanceAccess(cab, cabinets, cols, rows)` — checks if cabinet has at least one empty adjacent tile
+- `calcSpacingHeatEffect(cab, cabinets)` — heat penalty from adjacent cabinets + airflow bonuses
+- `getFacingOffsets(facing, col, row)` — front/rear tile positions based on cabinet facing
+- `generateLayout(numRows, cols)` — generates row-based data center layout for a given tier
 
 ### Phaser Rendering — `src/game/PhaserGame.ts`
 
@@ -299,18 +314,35 @@ The `DataCenterScene` class handles all isometric graphics using Phaser's Graphi
 - `createGame(parent: string): Phaser.Game` — creates and returns Phaser game instance
 - `getScene(game: Phaser.Game): DataCenterScene | undefined` — retrieves scene from game
 
-**Grid layout (dynamic, based on suite tier):**
-- Default: 4x2 cabinet grid (starter tier), up to 10x5 (enterprise tier)
+**Grid layout (dynamic, row-based, suite tier dependent):**
+- Each tier has a pre-built layout generated by `generateLayout(numRows, cols)`:
+  - **Cabinet rows**: Designated rows where cabinets can be placed. Facing (N/S) is enforced by the row.
+  - **Aisles**: Physical cold aisles between cabinet row pairs. Can be upgraded with containment.
+  - **Corridors**: Top and bottom access corridors. No cabinet placement.
 - Tile dimensions: TILE_W=64, TILE_H=32
 - Spine switches: horizontal row above the cabinet grid (2–8 slots by tier)
 
+**Row-based layout pattern** (starter tier example with 2 cabinet rows):
+```
+gridRow 0: Corridor (top access)
+gridRow 1: Cabinet Row 0 (facing south ▼)
+gridRow 2: Cold Aisle 0
+gridRow 3: Cabinet Row 1 (facing north ▲)
+gridRow 4: Corridor (bottom access)
+```
+
 **Suite tier grid dimensions:**
-| Tier | Cols x Rows | Max Cabinets | Spine Slots |
-|------|-------------|-------------|-------------|
-| Starter | 4x2 | 8 | 2 |
-| Standard | 6x3 | 18 | 4 |
-| Professional | 8x4 | 32 | 6 |
-| Enterprise | 10x5 | 50 | 8 |
+| Tier | Cols | Cabinet Rows | Total Grid Rows | Max Cabinets | Spine Slots |
+|------|------|-------------|-----------------|-------------|-------------|
+| Starter | 5 | 2 | 5 | 8 | 2 |
+| Standard | 8 | 3 | 7 | 18 | 4 |
+| Professional | 10 | 4 | 9 | 32 | 6 |
+| Enterprise | 14 | 5 | 11 | 50 | 8 |
+
+**Layout types:**
+- `DataCenterRow` — `{ id, gridRow, facing, slots }` — a cabinet row
+- `Aisle` — `{ id, gridRow, type, betweenRows }` — aisle between two cabinet rows
+- `DataCenterLayout` — `{ cabinetRows, aisles, totalGridRows, corridorTop, corridorBottom }`
 
 **Rendering pipeline per cabinet:** base frame → server layers (stacked) → leaf switch on top → LED indicators → ID label
 
@@ -370,7 +402,7 @@ A `setInterval` in `App.tsx` calls `tick()` at the rate determined by `gameSpeed
 1. **Time-of-day**: Advances `gameHour` (0–23), applies demand curve and random traffic spikes
 2. **Weather**: Season rotation, weather condition changes, ambient temperature modifiers
 3. **Supply chain**: Ticks pending orders, delivery processing, supply shortage events
-4. **Incidents**: Spawns random incidents (20+ types), ticks active incidents, applies effects
+4. **Incidents & Ops Tier**: Spawns random incidents (20+ types, reduced by ops tier), ticks active incidents, applies effects (revenue penalties reduced by ops tier), ops tier auto-resolve bonus, prevented incident tracking
 5. **Tech tree**: Ticks active research progress
 6. **Power market**: Updates spot pricing with random walk, mean reversion, and price spikes
 7. **Generators**: Manages fuel consumption, startup/cooldown, auto-activation during outages
@@ -417,13 +449,23 @@ A `setInterval` in `App.tsx` calls `tick()` at the rate determined by `gameSpeed
 - **Cooling**: air (2.0°C/tick, free) or water (3.5°C/tick, $25,000 upgrade), plus in-row cooling units
 - **PDUs**: Power distribution units with capacity limits; overloaded PDUs cause heat and revenue penalties
 - **Cable trays**: Organized cabling reduces messy cable penalties
-- **Hot/cold aisles**: Proper cabinet facing (alternating north/south) provides cooling bonuses
+- **Hot/cold aisles**: Row-based layout enforces alternating N/S facing with physical aisles between row pairs. Aisle containment upgrade ($15k/aisle, Standard+ tier) adds +6% cooling per aisle.
+- **Zone adjacency bonus**: 3+ adjacent same-type cabinets form zones with revenue/heat bonuses
+- **Spacing physics**: Adjacent cabinets create heat penalties (+0.3°C/tick per neighbor); open front/rear faces provide airflow bonuses
 - **Busways**: Power distribution infrastructure with capacity options
 - **Cross-connects**: Direct physical connections between equipment
 - **Server depreciation**: Efficiency decays over time, refreshable for a cost
 - **Server configurations**: 5 types (balanced, cpu_optimized, gpu_accelerated, storage_dense, memory_optimized) with different cost/power/heat/revenue profiles
 
 ### Advanced Systems
+
+**Operations Progression:**
+- 4 ops tiers: manual → monitoring → automation → orchestration
+- Each tier requires minimum staff count, researched technologies, reputation level, and suite tier
+- Benefits scale per tier: incident spawn reduction (0–40%), auto-resolve speed bonus (0–40%), revenue penalty reduction (0–30%), staff effectiveness bonus (0–30%), resolve cost reduction (0–50%)
+- Upgrade costs: $0 / $15,000 / $50,000 / $120,000
+- 4 dedicated achievements: Script Kiddie, SRE, Platform Engineer, Lights Out
+- Tracked stats: `opsAutoResolvedCount`, `opsPreventedCount`
 
 **Staff & HR:**
 - 4 roles: network_engineer, electrician, cooling_specialist, security_officer
@@ -606,6 +648,7 @@ A `setInterval` in `App.tsx` calls `tick()` at the rate determined by `gameSpeed
 | Cross-Connect | Direct physical cable connection between customer equipment. |
 | Spot Compute | On-demand compute capacity sold at dynamic market prices. |
 | Season | Time cycle (spring/summer/autumn/winter) affecting ambient temperature. |
+| Ops Tier | Operations maturity level (manual → monitoring → automation → orchestration). Reduces incidents and improves staff effectiveness. |
 
 ## Simulation Parameters (quick reference)
 

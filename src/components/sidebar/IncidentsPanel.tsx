@@ -1,4 +1,4 @@
-import { useGameStore, DRILL_CONFIG } from '@/stores/gameStore'
+import { useGameStore, DRILL_CONFIG, OPS_TIER_CONFIG } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Wrench, Target } from 'lucide-react'
@@ -13,7 +13,11 @@ export function IncidentsPanel() {
     money, sandboxMode,
     activeIncidents, resolveIncident,
     drillCooldown, lastDrillResult, drillsCompleted, drillsPassed, runDrill,
+    opsTier,
   } = useGameStore()
+
+  const opsConfig = OPS_TIER_CONFIG.find((c) => c.id === opsTier)
+  const costReduction = opsConfig?.benefits.resolveCostReduction ?? 0
 
   return (
     <div className="flex flex-col gap-4">
@@ -60,14 +64,23 @@ export function IncidentsPanel() {
                       variant="outline"
                       size="sm"
                       onClick={() => resolveIncident(inc.id)}
-                      disabled={money < inc.def.resolveCost}
+                      disabled={money < Math.round(inc.def.resolveCost * (1 - costReduction))}
                       className="w-full justify-between font-mono text-xs border-neon-green/20 hover:border-neon-green/50 hover:bg-neon-green/10 hover:text-neon-green"
                     >
                       <span className="flex items-center gap-1.5"><Wrench className="size-3" />Resolve</span>
-                      <span className="text-muted-foreground">${inc.def.resolveCost.toLocaleString()}</span>
+                      <span className="text-muted-foreground">
+                        {costReduction > 0 ? (
+                          <><s className="text-muted-foreground/50">${inc.def.resolveCost.toLocaleString()}</s> ${Math.round(inc.def.resolveCost * (1 - costReduction)).toLocaleString()}</>
+                        ) : (
+                          <>${inc.def.resolveCost.toLocaleString()}</>
+                        )}
+                      </span>
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent side="right">Pay to immediately resolve</TooltipContent>
+                  <TooltipContent side="right">
+                    Pay to immediately resolve
+                    {costReduction > 0 && <><br /><span className="text-neon-green">Ops discount: -{Math.round(costReduction * 100)}%</span></>}
+                  </TooltipContent>
                 </Tooltip>
               </div>
             ))}

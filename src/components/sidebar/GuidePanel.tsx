@@ -1,5 +1,5 @@
 import { Github, Bug, GitPullRequest } from 'lucide-react'
-import { useGameStore, ENVIRONMENT_CONFIG, SIM, SPACING_CONFIG, COOLING_CONFIG, INROW_COOLING_OPTIONS } from '@/stores/gameStore'
+import { useGameStore, ENVIRONMENT_CONFIG, SIM, SPACING_CONFIG, COOLING_CONFIG, INROW_COOLING_OPTIONS, OPS_TIER_CONFIG } from '@/stores/gameStore'
 
 const REPO_URL = 'https://github.com/kevinreber/data-center-tycoon'
 
@@ -43,9 +43,11 @@ export function GuidePanel() {
 
       {/* Layout strategy guide */}
       <div className="rounded-lg border border-neon-cyan/20 bg-neon-cyan/5 p-3">
-        <p className="text-xs font-bold text-neon-cyan mb-2">LAYOUT STRATEGY</p>
+        <p className="text-xs font-bold text-neon-cyan mb-2">LAYOUT &amp; AISLES</p>
         <p className="text-xs font-mono text-muted-foreground mb-2">
-          When placing cabinets, colored overlays show airflow zones. Press <strong className="text-neon-green">R</strong> to rotate facing.
+          Your facility has pre-built <strong className="text-foreground">cabinet rows</strong> with cold aisles between them.
+          Cabinet facing (N/S) is enforced by the row layout &mdash; no manual rotation needed.
+          Colored overlays show airflow zones during placement.
         </p>
         <div className="space-y-2">
           <div className="flex gap-2 items-start">
@@ -79,8 +81,9 @@ export function GuidePanel() {
         </div>
         <div className="mt-2 pt-2 border-t border-neon-cyan/10">
           <p className="text-[10px] font-mono text-muted-foreground">
-            <strong className="text-foreground">Pro tip:</strong> Alternate facing (N/S or E/W) in adjacent rows/columns.
-            Leave 1&ndash;2 tile gaps for proper hot/cold aisles. This earns up to {Math.round(SPACING_CONFIG.maxAisleSpacingBonus * 100)}% cooling bonus.
+            <strong className="text-foreground">Pro tip:</strong> The row layout handles hot/cold aisle separation automatically.
+            Fill both sides of an aisle to earn up to {Math.round(SPACING_CONFIG.maxAisleSpacingBonus * 100)}% cooling bonus.
+            At Standard tier+, upgrade aisles with <strong className="text-foreground">containment</strong> for even better cooling.
           </p>
         </div>
       </div>
@@ -113,8 +116,8 @@ export function GuidePanel() {
           <p className="text-[10px] font-mono font-bold text-neon-cyan">COOLING STRATEGIES (CHEAPEST FIRST)</p>
           <ol className="text-xs font-mono text-muted-foreground space-y-1.5 list-decimal list-inside">
             <li>
-              <strong className="text-foreground">Layout optimization</strong> (free)
-              <span className="text-muted-foreground"> &mdash; Alternate cabinet facing and leave gaps for hot/cold aisles. Up to {Math.round(SPACING_CONFIG.maxAisleSpacingBonus * 100)}% cooling bonus.</span>
+              <strong className="text-foreground">Fill both sides of aisles</strong> (free)
+              <span className="text-muted-foreground"> &mdash; Populate cabinet rows on both sides of each aisle for up to {Math.round(SPACING_CONFIG.maxAisleSpacingBonus * 100)}% cooling bonus. Upgrade with containment ($15k/aisle) for extra efficiency.</span>
             </li>
             <li>
               <strong className="text-foreground">Management cabinets</strong> (${(2000).toLocaleString()}/cab)
@@ -171,15 +174,27 @@ export function GuidePanel() {
         </ul>
       </div>
 
-      <div className="rounded-lg border border-neon-orange/20 bg-neon-orange/5 p-3">
-        <p className="text-xs font-bold text-neon-orange mb-2">OPERATIONS PROGRESSION</p>
-        <ul className="text-xs font-mono text-muted-foreground space-y-1 list-disc list-inside">
-          <li><strong className="text-foreground">4 tiers</strong> &mdash; Manual Ops &rarr; Monitoring &rarr; Automation &rarr; Orchestration.</li>
-          <li><strong className="text-foreground">Auto-resolve</strong> &mdash; Tier 3+ auto-resolves incidents over time; Tier 4 at 2x speed.</li>
-          <li><strong className="text-foreground">Cost reduction</strong> &mdash; Higher tiers reduce manual resolve costs and incident damage.</li>
-          <li><strong className="text-foreground">Prevention</strong> &mdash; Tier 4 has 20% chance to prevent incidents entirely.</li>
-          <li><strong className="text-foreground">Requirements</strong> &mdash; Tiers unlock via reputation, suite tier, and tech tree.</li>
-        </ul>
+      <div className="rounded-lg border border-neon-yellow/20 bg-neon-yellow/5 p-3">
+        <p className="text-xs font-bold text-neon-yellow mb-2">OPERATIONS PROGRESSION</p>
+        <p className="text-xs font-mono text-muted-foreground mb-2">
+          Level up your operations maturity to handle incidents like a pro. Find it in the <span className="text-neon-cyan">OPERATIONS</span> panel.
+        </p>
+        <div className="space-y-1.5">
+          {OPS_TIER_CONFIG.map((tier) => (
+            <div key={tier.id} className="flex gap-2 items-start">
+              <div className="w-3 h-3 rounded-sm shrink-0 mt-0.5" style={{ backgroundColor: tier.color }} />
+              <div className="text-xs font-mono">
+                <strong style={{ color: tier.color }}>{tier.label}</strong>
+                <span className="text-muted-foreground"> &mdash; {tier.description}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-2 pt-2 border-t border-neon-yellow/10">
+          <p className="text-[10px] font-mono text-muted-foreground">
+            <strong className="text-foreground">Key benefits:</strong> Fewer incidents, faster auto-resolve, cheaper resolve costs, and boosted staff effectiveness. Unlock higher tiers by hiring staff, researching tech, and building reputation.
+          </p>
+        </div>
       </div>
 
       <div className="rounded-lg border border-[#aa44ff]/20 bg-[#aa44ff]/5 p-3">

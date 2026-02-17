@@ -6,20 +6,26 @@ beforeEach(() => {
   useGameStore.setState(useGameStore.getInitialState())
 })
 
+// Starter tier layout: cabinet rows at gridRow 1 (facing south) and gridRow 3 (facing north)
+// Columns 0–3, aisles at gridRow 2, corridors at gridRow 0 and 4
+const STARTER_ROW_0 = 1 // gridRow for first cabinet row (facing south)
+const STARTER_ROW_1 = 3 // gridRow for second cabinet row (facing north)
+
 describe('cabinet placement', () => {
   describe('addCabinet', () => {
-    it('places a cabinet at the specified grid position', () => {
+    it('places a cabinet at a valid cabinet row position', () => {
       const { addCabinet } = useGameStore.getState()
 
-      addCabinet(0, 0, 'production', 'general', 'north')
+      addCabinet(0, STARTER_ROW_0, 'production', 'general', 'north')
 
       const state = useGameStore.getState()
       expect(state.cabinets).toHaveLength(1)
       expect(state.cabinets[0].col).toBe(0)
-      expect(state.cabinets[0].row).toBe(0)
+      expect(state.cabinets[0].row).toBe(STARTER_ROW_0)
       expect(state.cabinets[0].environment).toBe('production')
       expect(state.cabinets[0].customerType).toBe('general')
-      expect(state.cabinets[0].facing).toBe('north')
+      // Facing is enforced by the row layout (row 0 faces south), not by user input
+      expect(state.cabinets[0].facing).toBe('south')
       expect(state.cabinets[0].serverCount).toBe(1)
       expect(state.cabinets[0].powerStatus).toBe(true)
     })
@@ -27,7 +33,7 @@ describe('cabinet placement', () => {
     it('deducts the cabinet cost from player money', () => {
       const moneyBefore = useGameStore.getState().money
 
-      useGameStore.getState().addCabinet(0, 0, 'production')
+      useGameStore.getState().addCabinet(0, STARTER_ROW_0, 'production')
 
       const moneyAfter = useGameStore.getState().money
       expect(moneyAfter).toBe(moneyBefore - 2000)
@@ -39,39 +45,55 @@ describe('cabinet placement', () => {
       enterPlacementMode('production', 'general')
       expect(useGameStore.getState().placementMode).toBe(true)
 
-      addCabinet(0, 0, 'production')
+      addCabinet(0, STARTER_ROW_0, 'production')
       expect(useGameStore.getState().placementMode).toBe(false)
     })
 
     it('rejects placement on an occupied tile', () => {
       const { addCabinet } = useGameStore.getState()
 
-      addCabinet(0, 0, 'production')
+      addCabinet(0, STARTER_ROW_0, 'production')
       expect(useGameStore.getState().cabinets).toHaveLength(1)
 
       // Try to place on the same tile
-      useGameStore.getState().addCabinet(0, 0, 'production')
+      useGameStore.getState().addCabinet(0, STARTER_ROW_0, 'production')
       expect(useGameStore.getState().cabinets).toHaveLength(1)
     })
 
     it('rejects placement outside grid bounds', () => {
-      // Starter tier grid is 5x5
+      // Starter tier: 5 cols, cabinet rows at gridRow 1 and 3
       const { addCabinet } = useGameStore.getState()
 
-      addCabinet(5, 0, 'production') // col out of bounds (max col = 4)
+      addCabinet(5, STARTER_ROW_0, 'production') // col out of bounds (max 4)
       expect(useGameStore.getState().cabinets).toHaveLength(0)
 
-      addCabinet(0, 5, 'production') // row out of bounds (max row = 4)
+      addCabinet(0, 10, 'production') // row beyond grid
       expect(useGameStore.getState().cabinets).toHaveLength(0)
 
-      addCabinet(-1, 0, 'production') // negative col
+      addCabinet(-1, STARTER_ROW_0, 'production') // negative col
+      expect(useGameStore.getState().cabinets).toHaveLength(0)
+    })
+
+    it('rejects placement on aisle or corridor rows', () => {
+      const { addCabinet } = useGameStore.getState()
+
+      // Row 0 is the top corridor
+      addCabinet(0, 0, 'production')
+      expect(useGameStore.getState().cabinets).toHaveLength(0)
+
+      // Row 2 is a cold aisle
+      addCabinet(0, 2, 'production')
+      expect(useGameStore.getState().cabinets).toHaveLength(0)
+
+      // Row 4 is the bottom corridor
+      addCabinet(0, 4, 'production')
       expect(useGameStore.getState().cabinets).toHaveLength(0)
     })
 
     it('rejects placement when player has insufficient funds', () => {
       useGameStore.setState({ money: 100 })
 
-      useGameStore.getState().addCabinet(0, 0, 'production')
+      useGameStore.getState().addCabinet(0, STARTER_ROW_0, 'production')
       expect(useGameStore.getState().cabinets).toHaveLength(0)
       expect(useGameStore.getState().money).toBe(100)
     })
@@ -79,20 +101,33 @@ describe('cabinet placement', () => {
     it('places cabinets with different environments and customer types', () => {
       const { addCabinet } = useGameStore.getState()
 
-      addCabinet(0, 0, 'lab', 'ai_training', 'south')
+      addCabinet(0, STARTER_ROW_0, 'lab', 'ai_training', 'south')
 
       const cab = useGameStore.getState().cabinets[0]
       expect(cab.environment).toBe('lab')
       expect(cab.customerType).toBe('ai_training')
+      // Facing enforced by row layout (south for row 0)
       expect(cab.facing).toBe('south')
+    })
+
+    it('enforces row-level facing regardless of user input', () => {
+      const { addCabinet } = useGameStore.getState()
+
+      // Row at gridRow 1 faces south; passing 'north' should be overridden
+      addCabinet(0, STARTER_ROW_0, 'production', 'general', 'north')
+      expect(useGameStore.getState().cabinets[0].facing).toBe('south')
+
+      // Row at gridRow 3 faces north; passing 'south' should be overridden
+      useGameStore.getState().addCabinet(0, STARTER_ROW_1, 'production', 'general', 'south')
+      expect(useGameStore.getState().cabinets[1].facing).toBe('north')
     })
 
     it('places multiple cabinets at different positions', () => {
       const store = useGameStore.getState()
 
-      store.addCabinet(0, 0, 'production')
-      useGameStore.getState().addCabinet(1, 0, 'production')
-      useGameStore.getState().addCabinet(2, 0, 'lab')
+      store.addCabinet(0, STARTER_ROW_0, 'production')
+      useGameStore.getState().addCabinet(1, STARTER_ROW_0, 'production')
+      useGameStore.getState().addCabinet(2, STARTER_ROW_0, 'lab')
 
       const state = useGameStore.getState()
       expect(state.cabinets).toHaveLength(3)
@@ -141,7 +176,7 @@ describe('cabinet placement', () => {
       const state = useGameStore.getState()
       expect(state.placementMode).toBe(true)
       state.addCabinet(
-        1, 1,
+        1, STARTER_ROW_0,
         state.placementEnvironment,
         state.placementCustomerType,
         state.placementFacing,
@@ -150,7 +185,7 @@ describe('cabinet placement', () => {
       const result = useGameStore.getState()
       expect(result.cabinets).toHaveLength(1)
       expect(result.cabinets[0].col).toBe(1)
-      expect(result.cabinets[0].row).toBe(1)
+      expect(result.cabinets[0].row).toBe(STARTER_ROW_0)
       expect(result.placementMode).toBe(false)
     })
 
@@ -161,7 +196,7 @@ describe('cabinet placement', () => {
 
       // handleTileClick checks placementMode before calling addCabinet
       if (state.placementMode) {
-        state.addCabinet(0, 0, state.placementEnvironment, state.placementCustomerType, state.placementFacing)
+        state.addCabinet(0, STARTER_ROW_0, state.placementEnvironment, state.placementCustomerType, state.placementFacing)
       }
 
       expect(useGameStore.getState().cabinets).toHaveLength(0)
@@ -171,13 +206,13 @@ describe('cabinet placement', () => {
       // Place first cabinet
       useGameStore.getState().enterPlacementMode('production', 'general')
       let state = useGameStore.getState()
-      state.addCabinet(0, 0, state.placementEnvironment, state.placementCustomerType, state.placementFacing)
+      state.addCabinet(0, STARTER_ROW_0, state.placementEnvironment, state.placementCustomerType, state.placementFacing)
       expect(useGameStore.getState().placementMode).toBe(false)
 
       // Place second cabinet (must re-enter placement mode)
       useGameStore.getState().enterPlacementMode('production', 'general')
       state = useGameStore.getState()
-      state.addCabinet(1, 0, state.placementEnvironment, state.placementCustomerType, state.placementFacing)
+      state.addCabinet(1, STARTER_ROW_0, state.placementEnvironment, state.placementCustomerType, state.placementFacing)
 
       const result = useGameStore.getState()
       expect(result.cabinets).toHaveLength(2)
@@ -186,18 +221,33 @@ describe('cabinet placement', () => {
   })
 
   describe('getPlacementHints', () => {
-    it('returns first-cabinet tip when no cabinets exist', () => {
-      const hints = getPlacementHints(0, 0, [], 'starter')
+    it('returns first-cabinet tip when hovering a valid cabinet row with no cabinets', () => {
+      const hints = getPlacementHints(0, STARTER_ROW_0, [], 'starter')
       const messages = hints.map((h) => h.message)
-      expect(messages.some(m => m.includes('Open placement'))).toBe(true)
-      expect(messages.some(m => m.includes('Leave gaps between cabinets'))).toBe(true)
+      // Should show row info and first-cabinet tip
+      expect(messages.some(m => m.includes('Row 1'))).toBe(true)
+      expect(messages.some(m => m.includes('First cabinet'))).toBe(true)
     })
 
-    it('returns aisle facing hint when row has existing cabinets', () => {
+    it('returns aisle hint when hovering an aisle row', () => {
+      // gridRow 2 is the cold aisle in starter tier
+      const hints = getPlacementHints(0, 2, [], 'starter')
+      const messages = hints.map((h) => h.message)
+      expect(messages.some(m => m.includes('Cold aisle'))).toBe(true)
+      expect(messages.some(m => m.includes('no cabinet placement'))).toBe(true)
+    })
+
+    it('returns corridor hint when hovering a corridor row', () => {
+      const hints = getPlacementHints(0, 0, [], 'starter')
+      const messages = hints.map((h) => h.message)
+      expect(messages.some(m => m.includes('corridor'))).toBe(true)
+    })
+
+    it('returns row facing info when row has existing cabinets', () => {
       const existingCab = {
         id: 'cab-1',
         col: 0,
-        row: 0,
+        row: STARTER_ROW_1, // gridRow 3, facing north
         environment: 'production' as const,
         customerType: 'general' as const,
         serverCount: 1,
@@ -208,9 +258,62 @@ describe('cabinet placement', () => {
         facing: 'north' as const,
       }
 
-      const hints = getPlacementHints(1, 0, [existingCab], 'starter')
-      const facingHints = hints.filter((h) => h.message.includes('north'))
+      const hints = getPlacementHints(1, STARTER_ROW_1, [existingCab], 'starter')
+      const facingHints = hints.filter((h) => h.message.includes('North'))
       expect(facingHints.length).toBeGreaterThan(0)
+    })
+  })
+
+  describe('aisle containment', () => {
+    it('installAisleContainment installs containment on an aisle', () => {
+      // Need standard tier for containment
+      useGameStore.setState({ money: 999999, suiteTier: 'standard' })
+
+      useGameStore.getState().installAisleContainment(0)
+
+      expect(useGameStore.getState().aisleContainments).toContain(0)
+    })
+
+    it('installAisleContainment deducts cost', () => {
+      useGameStore.setState({ money: 20000, suiteTier: 'standard' })
+
+      useGameStore.getState().installAisleContainment(0)
+
+      expect(useGameStore.getState().money).toBe(20000 - 15000)
+      expect(useGameStore.getState().aisleContainments).toContain(0)
+    })
+
+    it('installAisleContainment refuses at starter tier', () => {
+      useGameStore.setState({ money: 999999, suiteTier: 'starter' })
+
+      useGameStore.getState().installAisleContainment(0)
+
+      expect(useGameStore.getState().aisleContainments).toHaveLength(0)
+    })
+
+    it('installAisleContainment refuses if already installed', () => {
+      useGameStore.setState({ money: 999999, suiteTier: 'standard', aisleContainments: [0] })
+
+      useGameStore.getState().installAisleContainment(0)
+
+      // Should still only have one entry
+      expect(useGameStore.getState().aisleContainments.filter(id => id === 0)).toHaveLength(1)
+    })
+
+    it('installAisleContainment refuses with insufficient funds', () => {
+      useGameStore.setState({ money: 100, suiteTier: 'standard' })
+
+      useGameStore.getState().installAisleContainment(0)
+
+      expect(useGameStore.getState().aisleContainments).toHaveLength(0)
+    })
+
+    it('aisleContainments reset on resetGame', () => {
+      useGameStore.setState({ aisleContainments: [0, 1] })
+
+      useGameStore.getState().resetGame()
+
+      expect(useGameStore.getState().aisleContainments).toHaveLength(0)
     })
   })
 })

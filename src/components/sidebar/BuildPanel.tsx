@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react'
-import { useGameStore, RACK_COST, MAX_SERVERS_PER_CABINET, ENVIRONMENT_CONFIG, CUSTOMER_TYPE_CONFIG, getSuiteLimits } from '@/stores/gameStore'
-import type { CabinetEnvironment, CustomerType, CabinetFacing } from '@/stores/gameStore'
+import { useState } from 'react'
+import { useGameStore, RACK_COST, MAX_SERVERS_PER_CABINET, ENVIRONMENT_CONFIG, CUSTOMER_TYPE_CONFIG, SUITE_TIERS, getSuiteLimits } from '@/stores/gameStore'
+import type { CabinetEnvironment, CustomerType } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
-import { Server, Network, Plus, MousePointer, X, ArrowUp, ArrowDown, ArrowLeft, ArrowRight } from 'lucide-react'
+import { Server, Network, Plus, MousePointer, Rows3 } from 'lucide-react'
 import {
   Tooltip,
   TooltipContent,
@@ -14,17 +14,11 @@ export function BuildPanel() {
     cabinets, spineSwitches, money,
     upgradeNextCabinet, addLeafToNextCabinet, addSpineSwitch,
     suiteTier,
-    placementMode, placementFacing, enterPlacementMode, exitPlacementMode,
+    placementMode, enterPlacementMode,
   } = useGameStore()
 
   const [selectedEnv, setSelectedEnv] = useState<CabinetEnvironment>('production')
   const [selectedCustomerType, setSelectedCustomerType] = useState<CustomerType>('general')
-  const [selectedFacing, setSelectedFacing] = useState<CabinetFacing>('north')
-
-  // Keep local facing in sync with store (updated by R key shortcut)
-  useEffect(() => {
-    setSelectedFacing(placementFacing)
-  }, [placementFacing])
 
   const suiteLimits = getSuiteLimits(suiteTier)
   const canUpgrade = cabinets.some((c) => c.serverCount < MAX_SERVERS_PER_CABINET)
@@ -32,8 +26,43 @@ export function BuildPanel() {
 
   const envEntries = Object.entries(ENVIRONMENT_CONFIG) as [CabinetEnvironment, typeof ENVIRONMENT_CONFIG['production']][]
 
+  // Row layout info for display
+  const layout = SUITE_TIERS[suiteTier].layout
+
   return (
     <div className="flex flex-col gap-3">
+      {/* Row layout info */}
+      <div className="flex flex-col gap-1 rounded border border-border/30 bg-card/30 px-2 py-1.5">
+        <div className="flex items-center gap-1.5">
+          <Rows3 className="size-3 text-neon-cyan/70" />
+          <span className="text-xs font-mono text-muted-foreground">
+            {layout.cabinetRows.length} rows · {layout.aisles.length} aisles
+          </span>
+        </div>
+        <div className="flex gap-1 flex-wrap">
+          {layout.cabinetRows.map((row) => {
+            const rowCabs = cabinets.filter(c => c.row === row.gridRow)
+            const fill = rowCabs.length
+            return (
+              <Tooltip key={row.id}>
+                <TooltipTrigger asChild>
+                  <span className={`text-xs font-mono px-1 rounded border ${
+                    fill > 0 ? 'border-neon-green/30 text-neon-green/80' : 'border-border/30 text-muted-foreground/50'
+                  }`}>
+                    R{row.id + 1} {row.facing === 'north' ? '▲' : '▼'} {fill}/{row.slots}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="max-w-48">
+                  <p className="font-bold">Row {row.id + 1}</p>
+                  <p className="text-xs mt-1">Facing {row.facing} — {fill}/{row.slots} slots filled</p>
+                  <p className="text-xs text-muted-foreground">Facing is set by the facility layout</p>
+                </TooltipContent>
+              </Tooltip>
+            )
+          })}
+        </div>
+      </div>
+
       {/* Environment selector */}
       <div className="flex flex-col gap-1.5">
         <span className="text-xs text-muted-foreground">Environment:</span>
@@ -104,71 +133,13 @@ export function BuildPanel() {
         </div>
       </div>
 
-      {/* Cabinet facing selector */}
-      <div className="flex flex-col gap-1.5">
-        <span className="text-xs text-muted-foreground">Facing (intake direction):</span>
-        <div className="grid grid-cols-4 gap-1">
-          {([
-            { dir: 'north' as CabinetFacing, label: 'N', Icon: ArrowUp },
-            { dir: 'east' as CabinetFacing, label: 'E', Icon: ArrowRight },
-            { dir: 'south' as CabinetFacing, label: 'S', Icon: ArrowDown },
-            { dir: 'west' as CabinetFacing, label: 'W', Icon: ArrowLeft },
-          ]).map(({ dir, label, Icon }) => (
-            <Tooltip key={dir}>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="xs"
-                  onClick={() => setSelectedFacing(dir)}
-                  className={`font-mono text-xs transition-all ${
-                    selectedFacing === dir
-                      ? 'border-2 border-neon-cyan/60 text-neon-cyan bg-neon-cyan/10'
-                      : 'border border-border/50 opacity-50 hover:opacity-80'
-                  }`}
-                >
-                  <Icon className="size-3 mr-0.5" />
-                  {label}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right" className="max-w-52">
-                <p className="font-bold">Face {dir.charAt(0).toUpperCase() + dir.slice(1)}</p>
-                <p className="text-xs mt-1">
-                  Cabinet intake faces {dir}, exhaust exits the opposite side.
-                  {dir === 'north' || dir === 'south'
-                    ? ' Align adjacent rows with opposing faces (N/S) for hot/cold aisle cooling.'
-                    : ' Align adjacent columns with opposing faces (E/W) for hot/cold aisle cooling.'}
-                </p>
-              </TooltipContent>
-            </Tooltip>
-          ))}
-        </div>
-      </div>
-
       {/* Placement / Build Actions */}
       <div className="flex flex-col gap-2 pt-1 border-t border-border/50">
         {placementMode ? (
-          <>
-            <div className="flex gap-1.5">
-              <div className="flex-1 rounded border border-neon-green/40 bg-neon-green/10 px-2 py-1.5 flex flex-col gap-0.5">
-                <div className="flex items-center gap-1.5">
-                  <MousePointer className="size-3 text-neon-green animate-pulse" />
-                  <span className="text-xs font-mono text-neon-green">Click grid tile</span>
-                </div>
-                <span className="text-[10px] font-mono text-neon-green/60">R = rotate | Esc = cancel</span>
-              </div>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => exitPlacementMode()}
-                    className="font-mono text-xs border-neon-red/30 hover:border-neon-red/60 hover:bg-neon-red/10 text-neon-red px-2"
-                  >
-                    <X className="size-3" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="right">Cancel placement (Esc)</TooltipContent>
-              </Tooltip>
+          <div className="flex gap-1.5">
+            <div className="flex-1 rounded border border-neon-green/40 bg-neon-green/10 px-2 py-1.5 flex items-center gap-1.5">
+              <MousePointer className="size-3 text-neon-green animate-pulse" />
+              <span className="text-xs font-mono text-neon-green">Click a row slot</span>
             </div>
             {/* Zone overlay legend */}
             <div className="rounded border border-border/30 bg-muted/30 px-2 py-1.5">
@@ -192,14 +163,14 @@ export function BuildPanel() {
                 </span>
               </div>
             </div>
-          </>
+          </div>
         ) : (
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => enterPlacementMode(selectedEnv, selectedCustomerType, selectedFacing)}
+                onClick={() => enterPlacementMode(selectedEnv, selectedCustomerType)}
                 disabled={money < RACK_COST.cabinet || cabinets.length >= suiteLimits.maxCabinets}
                 className="justify-between font-mono text-xs transition-all"
                 style={{
@@ -214,7 +185,8 @@ export function BuildPanel() {
               </Button>
             </TooltipTrigger>
             <TooltipContent side="right">
-              Click to enter placement mode ({cabinets.length}/{suiteLimits.maxCabinets} slots)
+              <p>Click to enter placement mode ({cabinets.length}/{suiteLimits.maxCabinets} slots)</p>
+              <p className="text-xs text-muted-foreground mt-1">Cabinet facing is set by the row layout</p>
             </TooltipContent>
           </Tooltip>
         )}
