@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://kevinreber.github.io/data-center-tycoon/sitemap.xml
