@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useGameStore, RACK_COST, MAX_SERVERS_PER_CABINET, ENVIRONMENT_CONFIG, CUSTOMER_TYPE_CONFIG, SUITE_TIERS, getSuiteLimits } from '@/stores/gameStore'
+import { useGameStore, RACK_COST, MAX_SERVERS_PER_CABINET, ENVIRONMENT_CONFIG, CUSTOMER_TYPE_CONFIG, SUITE_TIERS, getSuiteLimits, DEDICATED_ROW_BONUS_CONFIG, MIXED_ENV_PENALTY_CONFIG } from '@/stores/gameStore'
 import type { CabinetEnvironment, CustomerType } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
 import { Server, Network, Plus, MousePointer, Rows3 } from 'lucide-react'
@@ -15,6 +15,7 @@ export function BuildPanel() {
     upgradeNextCabinet, addLeafToNextCabinet, addSpineSwitch,
     suiteTier,
     placementMode, enterPlacementMode,
+    mixedEnvPenaltyCount, dedicatedRows, zones,
   } = useGameStore()
 
   const [selectedEnv, setSelectedEnv] = useState<CabinetEnvironment>('production')
@@ -255,6 +256,41 @@ export function BuildPanel() {
           </TooltipContent>
         </Tooltip>
       </div>
+
+      {/* Organization Status */}
+      {cabinets.length >= 2 && (
+        <div className="border-t border-border/50 pt-2">
+          <span className="text-[10px] font-bold text-muted-foreground">ORGANIZATION</span>
+          <div className="flex flex-col gap-0.5 mt-1">
+            <div className="flex justify-between text-[10px]">
+              <span className="text-muted-foreground">Zones</span>
+              <span className={zones.length > 0 ? 'text-neon-cyan' : 'text-muted-foreground'}>{zones.length}</span>
+            </div>
+            <div className="flex justify-between text-[10px]">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="text-muted-foreground cursor-help">Dedicated Rows</span>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="max-w-52">
+                  <p className="text-xs">Fill an entire row with the same environment type for +{(DEDICATED_ROW_BONUS_CONFIG.efficiencyBonus * 100).toFixed(0)}% efficiency (revenue for production, cooling for lab/management).</p>
+                </TooltipContent>
+              </Tooltip>
+              <span className={dedicatedRows.length > 0 ? 'text-neon-green' : 'text-muted-foreground'}>{dedicatedRows.length}</span>
+            </div>
+            <div className="flex justify-between text-[10px]">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className={`cursor-help ${mixedEnvPenaltyCount > 0 ? 'text-neon-red' : 'text-muted-foreground'}`}>Mixed-Env Penalties</span>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="max-w-52">
+                  <p className="text-xs">Cabinets surrounded by different environment types get +{(MIXED_ENV_PENALTY_CONFIG.heatPenalty * 100).toFixed(0)}% heat and -{(MIXED_ENV_PENALTY_CONFIG.revenuePenalty * 100).toFixed(0)}% revenue. Cluster same types together to avoid.</p>
+                </TooltipContent>
+              </Tooltip>
+              <span className={mixedEnvPenaltyCount > 0 ? 'text-neon-red' : 'text-neon-green'}>{mixedEnvPenaltyCount}</span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

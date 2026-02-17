@@ -1,4 +1,4 @@
-import { useGameStore, CONTRACT_TIER_COLORS } from '@/stores/gameStore'
+import { useGameStore, CONTRACT_TIER_COLORS, ZONE_CONTRACT_REQUIREMENTS } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { AlertTriangle, Check, Briefcase } from 'lucide-react'
@@ -67,6 +67,9 @@ export function ContractsPanel() {
                     <p className="font-bold" style={{ color: tierColor }}>{contract.def.company} ({contract.def.tier.toUpperCase()})</p>
                     <p className="text-xs mt-1">{contract.def.description}</p>
                     <p className="text-xs mt-1">Requires: {contract.def.minServers} servers, &lt;{contract.def.maxTemp}°C</p>
+                    {ZONE_CONTRACT_REQUIREMENTS[contract.def.type] && (
+                      <p className="text-xs text-neon-cyan">Zone: {ZONE_CONTRACT_REQUIREMENTS[contract.def.type].minSize}+ adjacent {ZONE_CONTRACT_REQUIREMENTS[contract.def.type].key.replace('_', ' ')} cabinets</p>
+                    )}
                     <p className="text-xs">Earned: ${contract.totalEarned.toFixed(0)} | Penalties: ${contract.totalPenalties.toFixed(0)}</p>
                     <p className="text-xs">Completion bonus: ${contract.def.completionBonus.toLocaleString()}</p>
                   </TooltipContent>
@@ -107,6 +110,9 @@ export function ContractsPanel() {
                     <p className="font-bold" style={{ color: tierColor }}>{def.company} ({def.tier.toUpperCase()})</p>
                     <p className="text-xs mt-1">{def.description}</p>
                     <p className="text-xs mt-1">Requires: {def.minServers} prod servers, &lt;{def.maxTemp}°C</p>
+                    {ZONE_CONTRACT_REQUIREMENTS[def.type] && (
+                      <p className="text-xs text-neon-cyan mt-0.5">Zone: {ZONE_CONTRACT_REQUIREMENTS[def.type].minSize}+ adjacent {ZONE_CONTRACT_REQUIREMENTS[def.type].key.replace('_', ' ')} cabinets</p>
+                    )}
                     <p className="text-xs">Duration: {def.durationTicks}t | Bonus: ${def.completionBonus.toLocaleString()}</p>
                     {!canAccept && activeContracts.length < 3 && (
                       <p className="text-xs text-neon-red mt-1">Need {def.minServers} online prod servers (have {activeProductionServers})</p>

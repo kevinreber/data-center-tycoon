@@ -424,9 +424,9 @@ Compare performance metrics with other players.
 
 Ideas for further encouraging organized cabinet layouts. Zone Adjacency Bonus (with visual zone outlines) was implemented first. These remain as future options:
 
-- [ ] **Mixed-Environment Penalty** — If a cabinet is surrounded by cabinets of a *different* environment type, apply a small penalty: +5% heat (incompatible airflow profiles) and -3% revenue (operational complexity overhead). Lighter touch "stick" approach that creates a subtle push toward clustering.
-- [ ] **Dedicated Row Bonus** — If an entire row is the same environment type, grant a "dedicated row" bonus: +8% efficiency (revenue or cooling depending on type) with a visual row highlight on the isometric grid. Simpler to reason about than adjacency and maps well to the existing row-based aisle system.
-- [ ] **Zone Contracts** — Higher-tier contracts require organized zones: e.g., "Enterprise SLA: Requires a production zone of 4+ adjacent cabinets" or "AI Training Cluster: Requires 3+ adjacent GPU cabinets of the same customer type." Gates reward behind contracts rather than changing base mechanics, keeping early game freeform.
+- [x] **Mixed-Environment Penalty** — If a cabinet is surrounded by cabinets of a *different* environment type, apply a small penalty: +5% heat (incompatible airflow profiles) and -3% revenue (operational complexity overhead). Lighter touch "stick" approach that creates a subtle push toward clustering.
+- [x] **Dedicated Row Bonus** — If an entire row is the same environment type, grant a "dedicated row" bonus: +8% efficiency (revenue or cooling depending on type) with a visual row highlight on the isometric grid. Simpler to reason about than adjacency and maps well to the existing row-based aisle system.
+- [x] **Zone Contracts** — Higher-tier contracts require organized zones: e.g., "Enterprise SLA: Requires a production zone of 4+ adjacent cabinets" or "AI Training Cluster: Requires 3+ adjacent GPU cabinets of the same customer type." Gates reward behind contracts rather than changing base mechanics, keeping early game freeform.
 
 **Effort:** Low-Medium each | **Impact:** Medium — Each builds on the zone adjacency system and adds strategic depth to cabinet placement.
 
@@ -443,7 +443,7 @@ Ideas for further encouraging organized cabinet layouts. Zone Adjacency Bonus (w
 | Phase 5 (Longevity) | 60+ | 60+ | 0 |
 | Rendering & Views | 17 | 17 | 0 |
 | UX / Camera | 6 | 6 | 0 |
-| **Pending Features** | **~31** | **7** | **~24** |
+| **Pending Features** | **~31** | **10** | **~21** |
 
-**Implemented features:** 157+ items across Phases 1–5, rendering, UX, capacity planning, and operations progression.
-**Remaining features:** ~24 items, including cooling infrastructure redesign, high-effort late-game content (multi-site, scaling tiers, 42U racks), visualization (sub-floor view, sound), and advanced simulation (workload migration, AI training jobs, leaderboards).
+**Implemented features:** 160+ items across Phases 1–5, rendering, UX, capacity planning, operations progression, and cabinet organization incentives.
+**Remaining features:** ~21 items, including cooling infrastructure redesign, high-effort late-game content (multi-site, scaling tiers, 42U racks), visualization (sub-floor view, sound), and advanced simulation (workload migration, AI training jobs, leaderboards).
