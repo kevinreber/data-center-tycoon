@@ -1,4 +1,4 @@
-import { useGameStore, SIM, DEPRECIATION, POWER_DRAW, ENVIRONMENT_CONFIG, CUSTOMER_TYPE_CONFIG, MAX_SERVERS_PER_CABINET, ZONE_BONUS_CONFIG } from '@/stores/gameStore'
+import { useGameStore, SIM, DEPRECIATION, POWER_DRAW, ENVIRONMENT_CONFIG, CUSTOMER_TYPE_CONFIG, MAX_SERVERS_PER_CABINET, ZONE_BONUS_CONFIG, calcMixedEnvPenalties, DEDICATED_ROW_BONUS_CONFIG } from '@/stores/gameStore'
 import type { Cabinet } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/tooltip'
 import {
   X, Power, Thermometer, Clock, RefreshCw, Server,
-  Network, ArrowUpDown, Cpu, Zap, DollarSign, LayoutGrid,
+  Network, ArrowUpDown, Cpu, Zap, DollarSign, LayoutGrid, AlertTriangle,
 } from 'lucide-react'
 
 function ServerSlot({ index, filled, powerOn }: { index: number; filled: boolean; powerOn: boolean }) {
@@ -81,11 +81,13 @@ function StatRow({ icon: Icon, label, value, color, sub }: {
 function CabinetDetail({ cabinet }: { cabinet: Cabinet }) {
   const {
     toggleCabinetPower, refreshServers, money,
-    selectCabinet, coolingType, trafficStats, zones,
+    selectCabinet, coolingType, trafficStats, zones, cabinets, dedicatedRows,
   } = useGameStore()
 
   const envConfig = ENVIRONMENT_CONFIG[cabinet.environment]
   const cabinetZones = zones.filter((z) => z.cabinetIds.includes(cabinet.id))
+  const hasMixedPenalty = calcMixedEnvPenalties(cabinets).has(cabinet.id)
+  const inDedicatedRow = dedicatedRows.some((r) => r.gridRow === cabinet.row)
   const custConfig = CUSTOMER_TYPE_CONFIG[cabinet.customerType]
 
   // Power calculations
@@ -246,6 +248,24 @@ function CabinetDetail({ cabinet }: { cabinet: Cabinet }) {
               <div className="text-[10px] text-muted-foreground/50 italic mt-0.5">
                 Not in a zone
               </div>
+            )}
+
+            {inDedicatedRow && (
+              <StatRow
+                icon={LayoutGrid}
+                label="Dedicated Row"
+                value={`+${Math.round(DEDICATED_ROW_BONUS_CONFIG.efficiencyBonus * 100)}%`}
+                color="#00ff88"
+              />
+            )}
+
+            {hasMixedPenalty && (
+              <StatRow
+                icon={AlertTriangle}
+                label="Mixed-Env Penalty"
+                value="+5% heat, -3% rev"
+                color="#ff4444"
+              />
             )}
           </div>
 

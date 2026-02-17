@@ -34,6 +34,13 @@ import {
   calcSpacingHeatEffect,
   calcAisleBonus,
   getFacingOffsets,
+  calcMixedEnvPenalties,
+  calcDedicatedRows,
+  MIXED_ENV_PENALTY_CONFIG,
+  DEDICATED_ROW_BONUS_CONFIG,
+  ZONE_CONTRACT_CATALOG,
+  ZONE_CONTRACT_REQUIREMENTS,
+  isZoneRequirementMet,
 } from '@/stores/gameStore'
 import type { RegionId } from '@/stores/gameStore'
 
@@ -2104,6 +2111,186 @@ describe('Phase 6 — Multi-Site Expansion', () => {
       expect(getState().totalSiteRevenue).toBe(0)
       expect(getState().totalSiteExpenses).toBe(0)
     })
+  })
+})
+
+// ============================================================================
+// Cabinet Organization Incentives
+// ============================================================================
+
+describe('Mixed-Environment Penalty', () => {
+  it('calcMixedEnvPenalties returns empty set when no cabinets exist', () => {
+    const result = calcMixedEnvPenalties([])
+    expect(result.size).toBe(0)
+  })
+
+  it('no penalty when a cabinet has no neighbors', () => {
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'standard' })
+    getState().addCabinet(0, STD_ROW_0, 'production', 'general', 'south')
+    const cabinets = getState().cabinets
+    const result = calcMixedEnvPenalties(cabinets)
+    expect(result.size).toBe(0)
+  })
+
+  it('no penalty when adjacent cabinets share the same environment', () => {
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'standard' })
+    getState().addCabinet(0, STD_ROW_0, 'production', 'general', 'south')
+    getState().addCabinet(1, STD_ROW_0, 'production', 'general', 'south')
+    const cabinets = getState().cabinets
+    const result = calcMixedEnvPenalties(cabinets)
+    expect(result.size).toBe(0)
+  })
+
+  it('penalty when a cabinet is surrounded by different-env neighbors', () => {
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'standard' })
+    // Place a lab cabinet between two production cabinets in the same row
+    getState().addCabinet(0, STD_ROW_0, 'production', 'general', 'south')
+    getState().addCabinet(1, STD_ROW_0, 'lab', 'general', 'south')
+    getState().addCabinet(2, STD_ROW_0, 'production', 'general', 'south')
+    const cabinets = getState().cabinets
+    const result = calcMixedEnvPenalties(cabinets)
+    // All 3 cabinets are penalized because each has ALL neighbors of a different env:
+    // - cab-1 (prod at col 0): only neighbor is lab → penalized
+    // - cab-2 (lab at col 1): both neighbors are prod → penalized
+    // - cab-3 (prod at col 2): only neighbor is lab → penalized
+    expect(result.size).toBe(3)
+    expect(result.has('cab-2')).toBe(true)
+  })
+
+  it('no penalty when cabinet has at least one same-env neighbor', () => {
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'standard' })
+    getState().addCabinet(0, STD_ROW_0, 'lab', 'general', 'south')
+    getState().addCabinet(1, STD_ROW_0, 'lab', 'general', 'south')
+    getState().addCabinet(2, STD_ROW_0, 'production', 'general', 'south')
+    const cabinets = getState().cabinets
+    const result = calcMixedEnvPenalties(cabinets)
+    // cab-1 (lab at col 0) has neighbor cab-2 (lab at col 1) — same env, no penalty
+    // cab-2 (lab at col 1) has neighbors cab-1 (lab) and cab-3 (prod) — mixed, no penalty because not ALL different
+    // cab-3 (prod at col 2) has only cab-2 (lab) — all different, so penalty
+    expect(result.size).toBe(1)
+  })
+
+  it('config values are correct', () => {
+    expect(MIXED_ENV_PENALTY_CONFIG.heatPenalty).toBe(0.05)
+    expect(MIXED_ENV_PENALTY_CONFIG.revenuePenalty).toBe(0.03)
+  })
+
+  it('mixedEnvPenaltyCount is tracked in state after tick', () => {
+    setupBasicDataCenter()
+    // Add a second cabinet of different environment adjacent to first
+    getState().addCabinet(1, STD_ROW_0, 'lab', 'general', 'south')
+    getState().tick()
+    // The prod cabinet (col 0) has only a lab neighbor → penalty
+    // The lab cabinet (col 1) has only a prod neighbor → penalty
+    expect(getState().mixedEnvPenaltyCount).toBe(2)
+  })
+})
+
+describe('Dedicated Row Bonus', () => {
+  it('calcDedicatedRows returns empty when no rows are full', () => {
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'starter' })
+    getState().addCabinet(0, 1, 'production', 'general', 'south')
+    const result = calcDedicatedRows(getState().cabinets, 'starter')
+    expect(result).toHaveLength(0)
+  })
+
+  it('calcDedicatedRows detects a fully filled uniform row', () => {
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'starter' })
+    // Starter tier has 5 cols, rows at gridRow 1 and 3
+    // Fill row at gridRow 1 with all production
+    for (let col = 0; col < 5; col++) {
+      getState().addCabinet(col, 1, 'production', 'general', 'south')
+    }
+    const result = calcDedicatedRows(getState().cabinets, 'starter')
+    expect(result).toHaveLength(1)
+    expect(result[0].environment).toBe('production')
+    expect(result[0].gridRow).toBe(1)
+    expect(result[0].cabinetCount).toBe(5)
+  })
+
+  it('calcDedicatedRows rejects a row with mixed environments', () => {
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'starter' })
+    // Fill row at gridRow 1, but with mixed environments
+    for (let col = 0; col < 4; col++) {
+      getState().addCabinet(col, 1, 'production', 'general', 'south')
+    }
+    getState().addCabinet(4, 1, 'lab', 'general', 'south')
+    const result = calcDedicatedRows(getState().cabinets, 'starter')
+    expect(result).toHaveLength(0)
+  })
+
+  it('config value is correct', () => {
+    expect(DEDICATED_ROW_BONUS_CONFIG.efficiencyBonus).toBe(0.08)
+  })
+
+  it('dedicatedRows state is updated after tick', () => {
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'starter' })
+    // Fill first row (gridRow 1) with all production
+    for (let col = 0; col < 5; col++) {
+      getState().addCabinet(col, 1, 'production', 'general', 'south')
+    }
+    getState().tick()
+    expect(getState().dedicatedRows).toHaveLength(1)
+    expect(getState().dedicatedRows[0].environment).toBe('production')
+  })
+})
+
+describe('Zone Contracts', () => {
+  it('ZONE_CONTRACT_CATALOG has 4 contracts', () => {
+    expect(ZONE_CONTRACT_CATALOG).toHaveLength(4)
+  })
+
+  it('each zone contract has a matching requirement', () => {
+    for (const def of ZONE_CONTRACT_CATALOG) {
+      const req = ZONE_CONTRACT_REQUIREMENTS[def.type]
+      expect(req).toBeDefined()
+      expect(req.type).toMatch(/^(environment|customer)$/)
+      expect(req.minSize).toBeGreaterThanOrEqual(3)
+    }
+  })
+
+  it('isZoneRequirementMet returns false when no zones exist', () => {
+    const req = ZONE_CONTRACT_REQUIREMENTS['enterprise_sla']
+    expect(isZoneRequirementMet([], req)).toBe(false)
+  })
+
+  it('isZoneRequirementMet returns true when matching zone exists', () => {
+    const req = ZONE_CONTRACT_REQUIREMENTS['enterprise_sla'] // production, minSize 4
+    const zones = [{
+      id: 'test-zone',
+      type: 'environment' as const,
+      key: 'production',
+      cabinetIds: ['1', '2', '3', '4'],
+      tiles: [{ col: 0, row: 0 }, { col: 1, row: 0 }, { col: 2, row: 0 }, { col: 3, row: 0 }],
+      bonus: 0.08,
+    }]
+    expect(isZoneRequirementMet(zones, req)).toBe(true)
+  })
+
+  it('isZoneRequirementMet returns false when zone is too small', () => {
+    const req = ZONE_CONTRACT_REQUIREMENTS['enterprise_sla'] // production, minSize 4
+    const zones = [{
+      id: 'test-zone',
+      type: 'environment' as const,
+      key: 'production',
+      cabinetIds: ['1', '2', '3'],
+      tiles: [{ col: 0, row: 0 }, { col: 1, row: 0 }, { col: 2, row: 0 }],
+      bonus: 0.08,
+    }]
+    expect(isZoneRequirementMet(zones, req)).toBe(false)
+  })
+
+  it('isZoneRequirementMet returns false when zone type mismatch', () => {
+    const req = ZONE_CONTRACT_REQUIREMENTS['ai_cluster'] // customer, ai_training, minSize 3
+    const zones = [{
+      id: 'test-zone',
+      type: 'customer' as const,
+      key: 'enterprise', // wrong key
+      cabinetIds: ['1', '2', '3'],
+      tiles: [{ col: 0, row: 0 }, { col: 1, row: 0 }, { col: 2, row: 0 }],
+      bonus: 0.08,
+    }]
+    expect(isZoneRequirementMet(zones, req)).toBe(false)
   })
 })
 

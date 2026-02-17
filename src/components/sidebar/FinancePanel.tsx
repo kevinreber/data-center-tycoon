@@ -1,4 +1,4 @@
-import { useGameStore, SIM, LOAN_OPTIONS, POWER_MARKET, ENVIRONMENT_CONFIG, INSURANCE_OPTIONS, VALUATION_MILESTONES } from '@/stores/gameStore'
+import { useGameStore, SIM, LOAN_OPTIONS, POWER_MARKET, ENVIRONMENT_CONFIG, INSURANCE_OPTIONS, VALUATION_MILESTONES, MIXED_ENV_PENALTY_CONFIG } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { TrendingUp, TrendingDown, Zap, Shield, Landmark, Check } from 'lucide-react'
@@ -11,7 +11,7 @@ import {
 export function FinancePanel() {
   const {
     cabinets, revenue, expenses, powerCost, coolingCost, mgmtBonus,
-    contractRevenue, contractPenalties, zoneBonusRevenue,
+    contractRevenue, contractPenalties, zoneBonusRevenue, dedicatedRowBonusRevenue, mixedEnvPenaltyCount,
     loanPayments, loans, takeLoan,
     generatorFuelCost,
     powerPriceMultiplier, powerPriceSpikeActive,
@@ -57,6 +57,18 @@ export function FinancePanel() {
             <div className="flex justify-between text-xs">
               <span className="text-neon-cyan ml-3">Zone Bonuses</span>
               <span className="text-neon-cyan tabular-nums">+${zoneBonusRevenue.toFixed(0)}</span>
+            </div>
+          )}
+          {dedicatedRowBonusRevenue > 0 && (
+            <div className="flex justify-between text-xs">
+              <span className="text-neon-cyan ml-3">Dedicated Row</span>
+              <span className="text-neon-cyan tabular-nums">+${dedicatedRowBonusRevenue.toFixed(0)}</span>
+            </div>
+          )}
+          {mixedEnvPenaltyCount > 0 && (
+            <div className="flex justify-between text-xs">
+              <span className="text-neon-red ml-3">Mixed-Env ({mixedEnvPenaltyCount})</span>
+              <span className="text-neon-red tabular-nums">-{(MIXED_ENV_PENALTY_CONFIG.revenuePenalty * 100).toFixed(0)}%</span>
             </div>
           )}
           <div className="border-t border-border my-0.5" />

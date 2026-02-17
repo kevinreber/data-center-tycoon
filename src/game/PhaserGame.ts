@@ -159,6 +159,10 @@ class DataCenterScene extends Phaser.Scene {
   // Zone outlines
   private zoneGraphics: Phaser.GameObjects.Graphics | null = null
 
+  // Dedicated row highlights
+  private dedicatedRowGraphics: Phaser.GameObjects.Graphics | null = null
+  private dedicatedRowLabels: Phaser.GameObjects.Text[] = []
+
   // Heat map overlay
   private heatMapGraphics: Phaser.GameObjects.Graphics | null = null
   private heatMapVisible = false
@@ -1987,6 +1991,52 @@ class DataCenterScene extends Phaser.Scene {
           this.zoneGraphics.strokePath()
         }
       }
+    }
+  }
+
+  /** Set dedicated row highlights for rendering */
+  setDedicatedRows(rows: { gridRow: number; color: string }[]) {
+    if (this.dedicatedRowGraphics) {
+      this.dedicatedRowGraphics.destroy()
+      this.dedicatedRowGraphics = null
+    }
+    for (const label of this.dedicatedRowLabels) label.destroy()
+    this.dedicatedRowLabels = []
+
+    if (rows.length === 0) return
+
+    this.dedicatedRowGraphics = this.add.graphics()
+    this.dedicatedRowGraphics.setDepth(1) // same depth as aisle graphics
+
+    for (const row of rows) {
+      const r = row.gridRow
+      const colorNum = parseInt(row.color.replace('#', ''), 16)
+
+      // Draw a subtle highlight stripe across the row
+      const leftTop = this.isoToScreen(0, r)
+      const rightTop = this.isoToScreen(this.cabCols, r)
+      const leftBot = this.isoToScreen(0, r + 1)
+      const rightBot = this.isoToScreen(this.cabCols, r + 1)
+
+      // Top edge border
+      this.dedicatedRowGraphics.lineStyle(1.5, colorNum, 0.5)
+      this.dedicatedRowGraphics.lineBetween(leftTop.x, leftTop.y, rightTop.x, rightTop.y)
+      // Bottom edge border
+      this.dedicatedRowGraphics.lineBetween(leftBot.x, leftBot.y, rightBot.x, rightBot.y)
+
+      // "DEDICATED" label in the center of the row
+      const centerX = (leftTop.x + rightBot.x) / 2
+      const centerY = (leftTop.y + rightBot.y) / 2
+      const label = this.add
+        .text(centerX, centerY - 4, 'DEDICATED', {
+          fontFamily: 'monospace',
+          fontSize: '6px',
+          color: `#${colorNum.toString(16).padStart(6, '0')}`,
+        })
+        .setOrigin(0.5)
+        .setAlpha(0.45)
+        .setDepth(2)
+      this.dedicatedRowLabels.push(label)
     }
   }
 

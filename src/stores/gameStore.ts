@@ -1864,6 +1864,10 @@ export const ACHIEVEMENT_CATALOG: AchievementDef[] = [
   { id: 'first_cooling_unit', label: 'Stay Cool', description: 'Place your first cooling unit.', icon: '🧊' },
   { id: 'cooling_fleet', label: 'Cooling Fleet', description: 'Have 10 or more cooling units operational.', icon: '❄️' },
   { id: 'immersion_pioneer', label: 'Immersion Pioneer', description: 'Deploy an immersion cooling pod.', icon: '🌊' },
+  // Cabinet Organization Incentives achievements
+  { id: 'no_mixed_penalty', label: 'Clean Segregation', description: 'Have 5+ cabinets with zero mixed-environment penalties.', icon: '🧹' },
+  { id: 'dedicated_row', label: 'Dedicated Row', description: 'Fill an entire row with the same environment type.', icon: '📏' },
+  { id: 'zone_contract', label: 'Zone Landlord', description: 'Complete a zone-gated contract.', icon: '🏘️' },
   // Phase 6 — Multi-Site Expansion achievements
   { id: 'multi_site_unlocked', label: 'Global Ambitions', description: 'Unlock multi-site expansion.', icon: '🌐' },
   { id: 'first_expansion', label: 'First Expansion', description: 'Purchase your first expansion site.', icon: '📍' },
@@ -2292,6 +2296,95 @@ export const ZONE_BONUS_CONFIG = {
     crypto: { revenueBonus: 0.06, heatReduction: 0, label: 'Crypto Zone', description: '+6% revenue from shared mining pools' },
     enterprise: { revenueBonus: 0.08, heatReduction: 0, label: 'Enterprise Zone', description: '+8% revenue from dedicated SLA infrastructure' },
   } as Record<CustomerType, { revenueBonus: number; heatReduction: number; label: string; description: string }>,
+}
+
+// ── Mixed-Environment Penalty ────────────────────────────────────
+// Cabinets surrounded entirely by different-environment neighbors get penalized
+
+export const MIXED_ENV_PENALTY_CONFIG = {
+  heatPenalty: 0.05,        // +5% extra heat (multiplier on heat generation)
+  revenuePenalty: 0.03,     // -3% revenue penalty
+}
+
+/** Check which cabinets have the mixed-environment penalty.
+ *  A cabinet is penalized if it has at least 1 adjacent cabinet and ALL adjacent cabinets
+ *  have a different environment type (the "fish out of water" scenario). */
+export function calcMixedEnvPenalties(cabinets: Cabinet[]): Set<string> {
+  const penalized = new Set<string>()
+  for (const cab of cabinets) {
+    const adjacent = getAdjacentCabinets(cab, cabinets)
+    if (adjacent.length > 0 && adjacent.every((a) => a.environment !== cab.environment)) {
+      penalized.add(cab.id)
+    }
+  }
+  return penalized
+}
+
+// ── Dedicated Row Bonus ──────────────────────────────────────────
+// An entire cabinet row with the same environment type gets an efficiency bonus
+
+export const DEDICATED_ROW_BONUS_CONFIG = {
+  efficiencyBonus: 0.08,    // +8% efficiency (revenue for production, cooling for lab/management)
+}
+
+export interface DedicatedRowInfo {
+  rowId: number               // cabinet row index (DataCenterRow.id)
+  gridRow: number             // grid Y position
+  environment: CabinetEnvironment
+  cabinetCount: number
+}
+
+/** Calculate which cabinet rows are "dedicated" (fully filled, all same environment).
+ *  Returns info about each dedicated row for bonuses and rendering. */
+export function calcDedicatedRows(cabinets: Cabinet[], suiteTier: SuiteTier): DedicatedRowInfo[] {
+  const layout = SUITE_TIERS[suiteTier].layout
+  const result: DedicatedRowInfo[] = []
+
+  for (const row of layout.cabinetRows) {
+    const rowCabs = cabinets.filter((c) => c.row === row.gridRow)
+    // Row must be fully filled (all slots occupied) and all same environment
+    if (rowCabs.length >= row.slots && rowCabs.length > 0) {
+      const env = rowCabs[0].environment
+      if (rowCabs.every((c) => c.environment === env)) {
+        result.push({
+          rowId: row.id,
+          gridRow: row.gridRow,
+          environment: env,
+          cabinetCount: rowCabs.length,
+        })
+      }
+    }
+  }
+
+  return result
+}
+
+// ── Zone Contracts ───────────────────────────────────────────────
+// Premium contracts that require organized cabinet zones
+
+export interface ZoneRequirement {
+  type: 'environment' | 'customer'
+  key: string                 // environment or customer type key
+  minSize: number             // minimum number of cabinets in the zone
+}
+
+export const ZONE_CONTRACT_CATALOG: ContractDef[] = [
+  { type: 'enterprise_sla', company: 'EnterpriseOne', tier: 'silver', description: 'Enterprise SLA hosting. Requires a production zone of 4+ adjacent cabinets.', minServers: 6, maxTemp: 75, revenuePerTick: 35, durationTicks: 200, penaltyPerTick: 20, terminationTicks: 8, completionBonus: 10000 },
+  { type: 'ai_cluster', company: 'NeuralScale AI', tier: 'silver', description: 'AI training cluster. Requires 3+ adjacent AI training cabinets.', minServers: 4, maxTemp: 78, revenuePerTick: 40, durationTicks: 180, penaltyPerTick: 25, terminationTicks: 8, completionBonus: 12000 },
+  { type: 'data_vault', company: 'VaultGuard', tier: 'gold', description: 'Enterprise data vault. Requires 4+ adjacent enterprise customer cabinets.', minServers: 8, maxTemp: 68, revenuePerTick: 65, durationTicks: 300, penaltyPerTick: 40, terminationTicks: 5, completionBonus: 25000 },
+  { type: 'crypto_farm', company: 'CryptoMine', tier: 'silver', description: 'Crypto mining operation. Requires 3+ adjacent crypto cabinets.', minServers: 4, maxTemp: 82, revenuePerTick: 30, durationTicks: 150, penaltyPerTick: 15, terminationTicks: 10, completionBonus: 8000 },
+]
+
+export const ZONE_CONTRACT_REQUIREMENTS: Record<string, ZoneRequirement> = {
+  enterprise_sla: { type: 'environment', key: 'production', minSize: 4 },
+  ai_cluster: { type: 'customer', key: 'ai_training', minSize: 3 },
+  data_vault: { type: 'customer', key: 'enterprise', minSize: 4 },
+  crypto_farm: { type: 'customer', key: 'crypto', minSize: 3 },
+}
+
+/** Check if a zone requirement is met by the current zones */
+export function isZoneRequirementMet(zones: Zone[], req: ZoneRequirement): boolean {
+  return zones.some((z) => z.type === req.type && z.key === req.key && z.cabinetIds.length >= req.minSize)
 }
 
 /** Find connected clusters of cabinets sharing the same key using flood-fill adjacency */
@@ -2998,6 +3091,11 @@ interface GameState {
   zones: Zone[]                               // active zones from cabinet clustering
   zoneBonusRevenue: number                    // total zone revenue bonus last tick
 
+  // Cabinet Organization Incentives
+  mixedEnvPenaltyCount: number                // cabinets currently suffering mixed-env penalty
+  dedicatedRows: DedicatedRowInfo[]           // rows with uniform environment (fully filled)
+  dedicatedRowBonusRevenue: number            // revenue from dedicated row bonus last tick
+
   // Cabinet selection
   selectedCabinetId: string | null            // currently selected cabinet (clicked in canvas)
 
@@ -3436,6 +3534,11 @@ export const useGameStore = create<GameState>((set) => ({
   // Zone adjacency bonuses
   zones: [],
   zoneBonusRevenue: 0,
+
+  // Cabinet Organization Incentives
+  mixedEnvPenaltyCount: 0,
+  dedicatedRows: [],
+  dedicatedRowBonusRevenue: 0,
 
   // Cabinet selection
   selectedCabinetId: null,
@@ -5628,6 +5731,9 @@ export const useGameStore = create<GameState>((set) => ({
       infraIncidentBonus: 0,
       zones: [],
       zoneBonusRevenue: 0,
+      mixedEnvPenaltyCount: 0,
+      dedicatedRows: [],
+      dedicatedRowBonusRevenue: 0,
       selectedCabinetId: null,
       placementMode: false,
       insurancePolicies: [],
@@ -6267,6 +6373,11 @@ export const useGameStore = create<GameState>((set) => ({
         }
       }
 
+      // Cabinet Organization Incentives: mixed-env penalties and dedicated row bonuses
+      const mixedEnvPenalties = calcMixedEnvPenalties(state.cabinets)
+      const currentDedicatedRows = calcDedicatedRows(state.cabinets, state.suiteTier)
+      const dedicatedRowGridRows = new Set(currentDedicatedRows.map((r) => r.gridRow))
+
       // Check PDU overloads
       let anyPDUOverloaded = false
       for (const pdu of state.pdus) {
@@ -6331,6 +6442,11 @@ export const useGameStore = create<GameState>((set) => ({
           // Spacing heat effects: adjacency penalties and airflow bonuses
           heat += calcSpacingHeatEffect(cab, state.cabinets)
 
+          // Mixed-environment penalty: cabinets surrounded by different env types generate extra heat
+          if (mixedEnvPenalties.has(cab.id)) {
+            heat += cab.serverCount * SIM.heatPerServer * envConfig.heatMultiplier * custConfig.heatMultiplier * MIXED_ENV_PENALTY_CONFIG.heatPenalty
+          }
+
           // PDU overload: cabinets on overloaded PDUs generate extra heat
           if (anyPDUOverloaded) {
             const cabinetPDUs = state.pdus.filter((pdu) => {
@@ -6362,13 +6478,17 @@ export const useGameStore = create<GameState>((set) => ({
         const zoneBonus = cabinetZoneBonuses.get(cab.id)
         const zoneHeatReduction = zoneBonus ? zoneBonus.heatReduction : 0
 
-        // Cooling dissipation: facility-wide base + cooling units + in-row + tech + aisle + zone + staff
+        // Dedicated row cooling bonus: lab/management dedicated rows get extra cooling
+        const dedicatedRowCoolingBonus = (dedicatedRowGridRows.has(cab.row) && cab.environment !== 'production')
+          ? DEDICATED_ROW_BONUS_CONFIG.efficiencyBonus * SIM.heatPerServer : 0
+
+        // Cooling dissipation: facility-wide base + cooling units + in-row + tech + aisle + zone + staff + dedicated row
         // When cooling units are placed, they provide the primary cooling via unitCooling (which includes BASE_AMBIENT_DISSIPATION)
         // The facility-wide coolingConfig.coolingRate still applies as legacy/base layer
         const aisleCoolingBoost = currentAisleBonus * 2 // up to +0.6°C/tick extra cooling
         const zoneHeatBoost = zoneHeatReduction * SIM.heatPerServer // scale zone heat reduction relative to heat generation
         const baseCooling = state.coolingUnits.length > 0 ? unitCooling : coolingConfig.coolingRate
-        heat -= (baseCooling + techCoolingBonus + aisleCoolingBoost + inRowBonus + staffCoolingBonus + zoneHeatBoost) * incidentCoolingMult
+        heat -= (baseCooling + techCoolingBonus + aisleCoolingBoost + inRowBonus + staffCoolingBonus + zoneHeatBoost + dedicatedRowCoolingBonus) * incidentCoolingMult
 
         // Incident heat spike
         heat += incidentHeatAdd
@@ -6491,6 +6611,16 @@ export const useGameStore = create<GameState>((set) => ({
             baseRevenue *= (1 + cabZoneBonus.revenueBonus)
           }
 
+          // Dedicated row bonus: cabinets in fully uniform rows earn more
+          if (dedicatedRowGridRows.has(cab.row)) {
+            baseRevenue *= (1 + DEDICATED_ROW_BONUS_CONFIG.efficiencyBonus)
+          }
+
+          // Mixed-environment penalty: cabinets surrounded by different env types earn less
+          if (mixedEnvPenalties.has(cab.id)) {
+            baseRevenue *= (1 - MIXED_ENV_PENALTY_CONFIG.revenuePenalty)
+          }
+
           // PDU overload penalty: cabinets on tripped PDUs earn nothing
           if (anyPDUOverloaded) {
             const cabinetPDUs = state.pdus.filter((pdu) => {
@@ -6515,6 +6645,7 @@ export const useGameStore = create<GameState>((set) => ({
 
       // Calculate zone bonus revenue for display (difference vs. what revenue would be without zone bonuses)
       let zoneBonusRevenue = 0
+      let dedicatedRowBonusRevenue = 0
       for (const cab of newCabinets) {
         if (cab.powerStatus) {
           const cabZoneBonus = cabinetZoneBonuses.get(cab.id)
@@ -6523,6 +6654,13 @@ export const useGameStore = create<GameState>((set) => ({
             const custCfg = CUSTOMER_TYPE_CONFIG[cab.customerType]
             const baseRev = cab.serverCount * SIM.revenuePerServer * envCfg.revenueMultiplier * custCfg.revenueMultiplier
             zoneBonusRevenue += baseRev * cabZoneBonus.revenueBonus
+          }
+          // Dedicated row bonus revenue (production rows only — lab/management get cooling bonus instead)
+          if (dedicatedRowGridRows.has(cab.row) && cab.environment === 'production') {
+            const envCfg = ENVIRONMENT_CONFIG[cab.environment]
+            const custCfg = CUSTOMER_TYPE_CONFIG[cab.customerType]
+            const baseRev = cab.serverCount * SIM.revenuePerServer * envCfg.revenueMultiplier * custCfg.revenueMultiplier
+            dedicatedRowBonusRevenue += baseRev * DEDICATED_ROW_BONUS_CONFIG.efficiencyBonus
           }
         }
       }
@@ -6571,9 +6709,11 @@ export const useGameStore = create<GameState>((set) => ({
         .map((contract) => {
           if (contract.status !== 'active') return contract
 
-          // Check SLA: enough production servers online AND avg temp within limits
+          // Check SLA: enough production servers online AND avg temp within limits AND zone requirement met (if any)
+          const zoneReq = ZONE_CONTRACT_REQUIREMENTS[contract.def.type]
+          const zoneSatisfied = !zoneReq || isZoneRequirementMet(currentZones, zoneReq)
           const slaMet = activeProductionServers >= contract.def.minServers &&
-            stats.avgHeat <= contract.def.maxTemp
+            stats.avgHeat <= contract.def.maxTemp && zoneSatisfied
 
           let consecutiveViolations = contract.consecutiveViolations
           let totalViolationTicks = contract.totalViolationTicks
@@ -6618,18 +6758,28 @@ export const useGameStore = create<GameState>((set) => ({
       // Generate new contract offers periodically (reputation affects quality)
       let contractOffers = state.contractOffers
       if (newTickCount % CONTRACT_OFFER_INTERVAL === 0 || (state.contractOffers.length === 0 && newCabinets.length >= 2)) {
+        const totalProdServers = newCabinets
+          .filter((c) => c.environment === 'production')
+          .reduce((sum, c) => sum + c.serverCount, 0)
         const eligible = CONTRACT_CATALOG.filter((def) => {
-          const totalProdServers = newCabinets
-            .filter((c) => c.environment === 'production')
-            .reduce((sum, c) => sum + c.serverCount, 0)
           // Reputation gates higher-tier contracts
           if (def.tier === 'gold' && state.reputationScore < 50) return false
           if (def.tier === 'silver' && state.reputationScore < 25) return false
           return totalProdServers >= Math.ceil(def.minServers * 0.5)
         })
-        if (eligible.length > 0) {
+        // Zone-gated contracts: only offer if player has the required zone
+        const eligibleZoneContracts = ZONE_CONTRACT_CATALOG.filter((def) => {
+          const req = ZONE_CONTRACT_REQUIREMENTS[def.type]
+          if (!req) return false
+          if (!isZoneRequirementMet(currentZones, req)) return false
+          if (def.tier === 'gold' && state.reputationScore < 50) return false
+          if (def.tier === 'silver' && state.reputationScore < 25) return false
+          return totalProdServers >= Math.ceil(def.minServers * 0.5)
+        })
+        const allEligible = [...eligible, ...eligibleZoneContracts]
+        if (allEligible.length > 0) {
           const activeTypes = new Set(updatedContracts.map((c) => c.def.type))
-          const available = eligible.filter((d) => !activeTypes.has(d.type))
+          const available = allEligible.filter((d) => !activeTypes.has(d.type))
           const shuffled = [...available].sort(() => Math.random() - 0.5)
           contractOffers = shuffled.slice(0, CONTRACT_OFFER_COUNT)
         }
@@ -6738,6 +6888,15 @@ export const useGameStore = create<GameState>((set) => ({
       if (state.cableTrays.length >= 1) unlock('first_cable_tray')
       if (currentAisleBonus > 0) unlock('proper_aisles')
       if (currentZones.length > 0) unlock('first_zone')
+      // Cabinet Organization Incentives achievements
+      if (newCabinets.length >= 5 && mixedEnvPenalties.size === 0) unlock('no_mixed_penalty')
+      if (currentDedicatedRows.length > 0) unlock('dedicated_row')
+      if (completedContracts > state.completedContracts) {
+        const justCompletedContract = state.activeContracts.find((c) => c.status === 'active' && c.ticksRemaining <= 1)
+        if (justCompletedContract && ZONE_CONTRACT_REQUIREMENTS[justCompletedContract.def.type]) {
+          unlock('zone_contract')
+        }
+      }
       if (cableRuns.length > 0 && messyCableCount === 0) unlock('clean_cabling')
 
       // ── Insurance system ──────────────────────────────────────
@@ -7614,6 +7773,9 @@ export const useGameStore = create<GameState>((set) => ({
         aisleViolations: currentAisleViolations,
         zones: currentZones,
         zoneBonusRevenue: +zoneBonusRevenue.toFixed(2),
+        mixedEnvPenaltyCount: mixedEnvPenalties.size,
+        dedicatedRows: currentDedicatedRows,
+        dedicatedRowBonusRevenue: +dedicatedRowBonusRevenue.toFixed(2),
         pduOverloaded: anyPDUOverloaded,
         cableRuns,
         messyCableCount,

@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback, useState } from 'react'
 import type Phaser from 'phaser'
 import { createGame, getScene } from '@/game/PhaserGame'
 import { useGameStore, getSuiteLimits, getPlacementHints, SUITE_TIERS, ENVIRONMENT_CONFIG, CUSTOMER_TYPE_CONFIG } from '@/stores/gameStore'
+import type { DedicatedRowInfo } from '@/stores/gameStore'
 import { Crosshair } from 'lucide-react'
 
 export function GameCanvas() {
@@ -29,6 +30,7 @@ export function GameCanvas() {
   const heatMapVisible = useGameStore((s) => s.heatMapVisible)
   const aisleContainments = useGameStore((s) => s.aisleContainments)
   const zones = useGameStore((s) => s.zones)
+  const dedicatedRows = useGameStore((s) => s.dedicatedRows)
   const coolingUnits = useGameStore((s) => s.coolingUnits)
 
   // Tile click handler — called from Phaser when user clicks a grid tile
@@ -264,6 +266,18 @@ export function GameCanvas() {
     })
     scene.setZones(zoneData)
   }, [zones, sceneReady])
+
+  // Sync dedicated row highlights to Phaser
+  useEffect(() => {
+    if (!gameRef.current) return
+    const scene = getScene(gameRef.current)
+    if (!scene) return
+    const rowData = dedicatedRows.map((r: DedicatedRowInfo) => ({
+      gridRow: r.gridRow,
+      color: ENVIRONMENT_CONFIG[r.environment].color,
+    }))
+    scene.setDedicatedRows(rowData)
+  }, [dedicatedRows, sceneReady])
 
   const handleCenterGrid = useCallback(() => {
     if (gameRef.current) {
