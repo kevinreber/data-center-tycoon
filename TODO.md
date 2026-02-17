@@ -378,31 +378,158 @@ Forecasting tools for proactive management.
 
 ---
 
-### Sound Effects & Audio
+### Game Feel & Polish — RCT-Style Improvements
 
-Audio feedback for game events.
+Inspired by RollerCoaster Tycoon's feedback loops and "aliveness." Full design details in BRAINSTORM.md under "Game Feel & Polish — RCT-Style Improvements."
 
-- [ ] Placement sounds (cabinet, server, switch)
-- [ ] Incident alert sounds
-- [ ] Achievement unlock chime
-- [ ] Ambient data center hum
-- [ ] UI interaction sounds (clicks, toggles)
-- [ ] Volume controls in settings
+#### Animated Worker Sprites ("Peeps")
 
-**Effort:** Medium | **Impact:** Low-Medium — Polish feature. Adds atmosphere but not gameplay depth.
+Procedurally-drawn technician sprites that walk corridors, respond to incidents, and install equipment. Role-colored uniforms (green/yellow/blue/red by role). The single highest-impact "game feel" feature.
+
+- [ ] Worker sprite rendering (procedural `Graphics`, consistent with no-asset approach)
+- [ ] Pathfinding along corridors and aisles
+- [ ] Walk-to-incident behavior when incident fires
+- [ ] Walk-to-cabinet behavior during placement/maintenance
+- [ ] Idle patrol behavior for on-shift staff
+- [ ] Role-colored uniforms and busy/idle indicators
+
+**Effort:** High | **Impact:** High — Makes the data center feel alive. Workers create ambient motion and make staffing visible.
 
 ---
 
-### Placement Animations
+#### Floating World-Space Text ("Damage Numbers")
 
-Visual feedback when placing or building equipment.
+Revenue/expense/warning text that rises from game objects each tick.
 
-- [ ] Build/place animation for cabinets
-- [ ] Server install animation
-- [ ] Equipment removal animation
-- [ ] Construction progress indicator
+- [ ] `+$` revenue text rising from cabinets on tick
+- [ ] `-$` expense text from cost sources
+- [ ] `THROTTLED` / temperature warnings above hot cabinets
+- [ ] `FIRE!` text above burning cabinets
+- [ ] `⚠ INCIDENT` / `RESOLVED ✓` text for incidents
+- [ ] `★ ACHIEVEMENT` text on unlock
+- [ ] Text pooling and recycling for performance
 
-**Effort:** Low-Medium | **Impact:** Low — Pure polish. Nice-to-have visual feedback.
+**Effort:** Low-Medium | **Impact:** High — Constant visual heartbeat. Players see the simulation running without opening panels.
+
+---
+
+#### Placement Pop & Build Animations
+
+Tweens and visual feedback when placing or building equipment.
+
+- [ ] Cabinet place: scale 0→1 with `Back.easeOut` bounce + green flash
+- [ ] Server install: scale pulse on cabinet + green particle burst
+- [ ] Leaf switch add: cyan flash on top of cabinet
+- [ ] Spine switch add: orange scale-in with glow
+- [ ] Equipment removal: scale 1→0 with red flash
+- [ ] Suite tier upgrade: camera zoom out, grid expand animation
+
+**Effort:** Low | **Impact:** Medium — Makes building feel satisfying instead of instant.
+
+---
+
+#### Particle Effects for Events
+
+Phaser particle system (`Phaser.GameObjects.Particles`) for physical event feedback.
+
+- [ ] Fire: orange/red flickering particles over burning cabinet
+- [ ] Overloaded PDU: electric spark particles (yellow/white bursts)
+- [ ] Cooling units: subtle blue mist/cold air particles
+- [ ] Thermal throttle: heat shimmer (wavy transparent particles rising)
+- [ ] Server refresh: cyan sparkle burst
+- [ ] Critical incident: red warning pulse ring expanding outward
+- [ ] Achievement: gold particle shower from top of screen
+
+**Effort:** Medium | **Impact:** Medium — Makes events feel physical rather than just notifications.
+
+---
+
+#### Ambient Animations & Visual Life
+
+Small animations that make the facility feel like a living, operational space.
+
+- [ ] Cabinet LED pulse tweens (slow when idle, fast under load, off when powered down)
+- [ ] Cooling unit fan rotation indicators
+- [ ] Spine switch glow pulse when handling traffic
+- [ ] Power-off cabinet dimming (darkened graphic, LEDs off)
+- [ ] Throttled cabinet red/orange tint overlay
+- [ ] Weather particle overlays (rain, snow, heat shimmer)
+- [ ] Day/night ambient light shift
+
+**Effort:** Low-Medium | **Impact:** Medium — The data center equivalent of RCT rides running and guests wandering.
+
+---
+
+#### Sound Effects & Audio
+
+Audio feedback for game events and ambient atmosphere.
+
+- [ ] Ambient server hum (looped, volume scales with cabinet count)
+- [ ] HVAC white noise for cooling
+- [ ] Placement sounds (click/thunk for cabinet, metallic slide for server, switch click for leaf/spine)
+- [ ] Alert sounds (alarm for fire/critical, warning tone for throttling)
+- [ ] Economy sounds (cash register ding on contract, coin sound on milestone)
+- [ ] Achievement unlock chime
+- [ ] UI interaction sounds (button click, panel slide, toggle)
+- [ ] Volume controls and master mute in Settings panel
+
+**Effort:** Medium | **Impact:** Medium — Sound creates subconscious connection to game state.
+
+---
+
+#### Camera Juice
+
+Camera effects tied to significant game events.
+
+- [ ] Screen shake on critical incidents (fire, major outage)
+- [ ] Smooth camera pan to newly placed cabinet
+- [ ] Zoom pulse on achievement unlock
+- [ ] Camera zoom out on suite tier upgrade to reveal expanded grid
+- [ ] Larger screen shake for explosions/fire suppression
+
+**Effort:** Low | **Impact:** Low-Medium — Draws attention to important events.
+
+---
+
+#### Visual State Differentiation
+
+Make important game states visible on the isometric grid without opening panels.
+
+- [ ] Throttled cabinets: red/orange pulsing tint overlay
+- [ ] Powered-off cabinets: darkened/dimmed graphic
+- [ ] Cabinets on fire: orange tint + fire particles (not just React banner)
+- [ ] Active incident: yellow warning triangle icon above cabinet
+- [ ] Maintenance in progress: blue wrench icon, dimmed graphic
+- [ ] Recently placed: green highlight glow fading over 3s
+- [ ] Aged/deprecated servers: yellowed tint on cabinet
+- [ ] Fix heat map to use actual `heatLevel` from store (currently uses server count)
+
+**Effort:** Low | **Impact:** Medium — Enables "glance and react" gameplay.
+
+---
+
+#### Sidebar Panel Slide Animation
+
+- [ ] CSS slide-in transition on panel open (`transform: translateX(-100%) → 0`, 200ms ease-out)
+- [ ] Slide-out animation on panel close
+- [ ] Staggered content fade-in (50ms delay after panel reaches position)
+
+**Effort:** Low | **Impact:** Low — Small UI polish eliminating jarring pop-in.
+
+---
+
+#### Scenario Presentation & Framing
+
+Make scenarios a first-class feature rather than a settings toggle.
+
+- [ ] Dedicated scenario select screen with scenario cards
+- [ ] 1-3 star ratings based on completion quality
+- [ ] Locked progression (later scenarios require completing earlier ones)
+- [ ] Scenario preview showing starting state
+- [ ] Victory/defeat results screen with stats
+- [ ] Local best times/scores per scenario
+
+**Effort:** Medium | **Impact:** Medium — RCT's "one more scenario" pull driven by visible progress.
 
 ---
 
@@ -443,7 +570,8 @@ Ideas for further encouraging organized cabinet layouts. Zone Adjacency Bonus (w
 | Phase 5 (Longevity) | 60+ | 60+ | 0 |
 | Rendering & Views | 17 | 17 | 0 |
 | UX / Camera | 6 | 6 | 0 |
-| **Pending Features** | **~31** | **10** | **~21** |
+| Game Feel & Polish (RCT-Style) | ~60 | 0 | ~60 |
+| **Other Pending Features** | **~25** | **10** | **~15** |
 
 **Implemented features:** 160+ items across Phases 1–5, rendering, UX, capacity planning, operations progression, and cabinet organization incentives.
-**Remaining features:** ~21 items, including cooling infrastructure redesign, high-effort late-game content (multi-site, scaling tiers, 42U racks), visualization (sub-floor view, sound), and advanced simulation (workload migration, AI training jobs, leaderboards).
+**Remaining features:** ~75 items, including RCT-style game feel improvements (worker sprites, floating text, particles, sound, animations, camera juice, visual states), cooling infrastructure redesign, high-effort late-game content (multi-site, scaling tiers, 42U racks), visualization (sub-floor view), and advanced simulation (workload migration, AI training jobs, leaderboards).

@@ -1717,6 +1717,247 @@ Multi-site is the largest feature in the game's roadmap. Break it into sub-phase
 
 ---
 
+## Game Feel & Polish — RCT-Style Improvements
+
+Inspired by the feedback loops and "aliveness" of RollerCoaster Tycoon. These features transform a functional simulation into a game that *feels good to play*. Currently the Phaser scene is almost entirely static — no tweens, no particles, no ambient animation, no sound. These changes target that gap.
+
+---
+
+### Animated Worker Sprites ("Peeps")
+
+**Impact: High | Effort: High**
+
+RCT's soul is its guests. The equivalent here is **technicians walking the floor**. Small procedurally-drawn sprites (using `Graphics`, consistent with the no-asset approach) that move along corridors and aisles.
+
+| Trigger | Behavior |
+|---------|----------|
+| Staff hired | Worker appears at corridor entrance, walks to a "station" position |
+| Incident fires | Nearest qualified tech walks to the affected cabinet |
+| Cabinet placed | A worker "installs" it (walks to tile, brief animation, cabinet appears) |
+| Maintenance window | Tech walks to target equipment, stays for duration |
+| Idle | Workers patrol corridors, occasionally stop at cabinets |
+
+Workers should have role-colored uniforms (green = network engineer, yellow = electrician, blue = cooling specialist, red = security officer). When busy resolving an incident, a small wrench/tool icon appears above them.
+
+**Why it matters:** This single feature would make the data center feel *alive*. Right now the floor is completely static between placement actions. Workers create ambient motion and make staffing decisions feel tangible — you can *see* your team responding to incidents.
+
+---
+
+### Floating World-Space Text ("Damage Numbers")
+
+**Impact: High | Effort: Low-Medium**
+
+Tycoon staple: text that rises from game objects to give constant feedback that the simulation is running.
+
+| Event | Text | Color | Position |
+|-------|------|-------|----------|
+| Revenue tick | `+$144` | Green | Rises from cabinets |
+| Expense tick | `-$50` | Red | Rises from expense source |
+| Thermal throttle | `THROTTLED` | Orange | Above affected cabinet |
+| Fire | `FIRE!` | Red, pulsing | Above burning cabinet |
+| Incident spawn | `⚠ INCIDENT` | Yellow | Above affected area |
+| Incident resolved | `RESOLVED ✓` | Green | Above resolved cabinet |
+| Achievement | `★ ACHIEVEMENT` | Gold | Center screen |
+| Contract completed | `CONTRACT COMPLETE` | Cyan | Top of screen |
+| Temperature warning | `82°C ▲` | Orange/Red | Above hot cabinet |
+| Server refresh | `REFRESHED` | Cyan | Above cabinet |
+
+Implementation: Phaser `Text` objects with `this.tweens.add({ y: y - 40, alpha: 0, duration: 1500, ease: 'Power2' })`. Pool and recycle text objects to avoid GC pressure.
+
+**Why it matters:** Creates a constant visual heartbeat. Players can *see* money flowing in, problems developing, and issues being resolved without opening any panel.
+
+---
+
+### Placement Pop & Build Animations
+
+**Impact: Medium | Effort: Low**
+
+Currently cabinets just appear instantly via `renderCabinet()`. Adding tweens makes building feel *satisfying*.
+
+| Action | Animation |
+|--------|-----------|
+| Place cabinet | Scale 0→1 with `Back.easeOut` (bounce), brief green flash overlay |
+| Add server | Small scale pulse on cabinet + green particle burst |
+| Add leaf switch | Cyan flash on top of cabinet |
+| Add spine | Orange scale-in with glow |
+| Remove/destroy | Scale 1→0 with `Power2.easeIn`, red flash |
+| Upgrade suite | Camera zoom out, grid expands with wave animation |
+
+Implementation: Wrap `renderCabinet()` calls with `this.tweens.add({ scaleX: [0, 1], scaleY: [0, 1], duration: 300, ease: 'Back.easeOut' })`. Store graphics in containers for transform support.
+
+**Why it matters:** RCT has that signature "chunk" when you place a ride segment. Even a simple scale tween transforms placement from "clicking a spreadsheet" to "building something."
+
+---
+
+### Particle Effects for Events
+
+**Impact: Medium | Effort: Medium**
+
+Phaser has a built-in particle system (`Phaser.GameObjects.Particles`) that's currently unused.
+
+| Event | Particle Effect |
+|-------|----------------|
+| Fire active | Orange/red emitter over burning cabinet tile — flickering upward particles |
+| Overloaded PDU | Electric spark particles (yellow/white, short bursts) |
+| Cooling units running | Subtle blue mist/cold air particles drifting from unit |
+| Thermal throttle | Heat shimmer — wavy transparent particles rising from cabinet |
+| Server refresh | Brief sparkle/confetti burst (cyan) |
+| Critical incident | Red warning pulse ring expanding outward from source |
+| Achievement unlock | Gold particle shower from top of screen |
+| Construction complete | Dust cloud settling (gray/brown particles) |
+
+**Why it matters:** Particles make events feel *physical*. A fire that only shows a React banner feels like a notification. A fire with flickering orange particles rising from a cabinet tile feels like an emergency.
+
+---
+
+### Ambient Animations & Visual Life
+
+**Impact: Medium | Effort: Low-Medium**
+
+The isometric scene is completely static between state changes. Small ambient animations make it feel like a living facility.
+
+| Element | Animation |
+|---------|-----------|
+| Cabinet LEDs | Slow pulse tween (alpha 0.4→1.0, 2s loop) when operational; fast blink (200ms) under load; off when powered down |
+| Cooling unit fans | Small rotating line indicator (or animated circle) on operational cooling units |
+| Spine switch activity | Subtle glow pulse when handling traffic |
+| Power-off cabinets | Dim/darken the entire cabinet graphic (tint or alpha reduction) |
+| Throttled cabinets | Red/orange tint overlay pulsing slowly, visually distinct from healthy cabinets |
+| Weather effects | Rain particle overlay during rain/storm; heat shimmer during heatwave; snow particles during cold_snap |
+| Day/night cycle | Subtle ambient light shift — slightly brighter during day hours, dimmer at night |
+| Traffic links | Already animated (packet dots) — extend with glow pulse on active connections |
+
+**Why it matters:** In RCT, rides run continuously, guests wander, and the park never feels "paused" even when you're not doing anything. The data center equivalent is servers humming, LEDs blinking, cooling running, and traffic flowing.
+
+---
+
+### Sound Design
+
+**Impact: Medium | Effort: Medium**
+
+RCT's ambient park audio is iconic. Even minimal procedural audio would add atmosphere.
+
+| Category | Sounds |
+|----------|--------|
+| Ambient | Low server hum (looped, volume scales with cabinet count); HVAC white noise for cooling |
+| Placement | Click/thunk on cabinet place; metallic slide for server install; switch click for leaf/spine |
+| Alerts | Chime for achievement; alarm for fire/critical incident; warning tone for throttling |
+| Economy | Cash register ding on contract completion; coin sound on revenue milestone |
+| UI | Subtle click on button press; panel slide sound; toggle switch sound |
+
+Implementation options: Web Audio API for procedural tones (low effort, no assets), or Phaser audio with small sound files. Volume controls in Settings panel. Master mute toggle.
+
+**Why it matters:** Sound creates a subconscious connection to the game state. Players learn to recognize the "something's wrong" alarm tone before they even look at the screen.
+
+---
+
+### Camera Juice
+
+**Impact: Low-Medium | Effort: Low**
+
+Camera effects tied to significant game events.
+
+| Event | Camera Effect |
+|-------|--------------|
+| Critical incident (fire, major outage) | Brief screen shake (2-3 frames, small amplitude) |
+| Cabinet placed | Smooth camera pan to placed cabinet |
+| Achievement unlocked | Subtle zoom pulse (quick zoom in 2%, back out) |
+| Suite tier upgrade | Camera zooms out to reveal expanded grid |
+| Explosion/fire suppression | Larger screen shake |
+| Game over / bankruptcy | Slow zoom out, desaturation |
+
+Implementation: `this.cameras.main.shake(100, 0.005)` for screen shake; `this.cameras.main.pan(x, y, 500)` for smooth pan.
+
+**Why it matters:** Camera movement draws attention to important events and makes the world feel reactive to what's happening.
+
+---
+
+### Visual State Differentiation
+
+**Impact: Medium | Effort: Low**
+
+Currently many important states are invisible on the isometric grid. Players must open panels to see them.
+
+| State | Current Visual | Proposed Visual |
+|-------|---------------|----------------|
+| Throttled cabinet (>80°C) | Identical to healthy | Red/orange tint overlay, pulsing glow |
+| Powered-off cabinet | Identical to powered-on | Darkened/dimmed graphic, LEDs off |
+| Cabinet on fire | No Phaser visual (React banner only) | Orange tint + fire particles |
+| Overloaded PDU | Red color (exists) | Add spark particles |
+| Active incident on cabinet | No visual | Yellow warning triangle icon above cabinet |
+| Maintenance in progress | No visual | Blue wrench icon above cabinet, dimmed graphic |
+| New/recently placed | No visual | Brief green highlight glow that fades over 3s |
+| Server depreciation (old servers) | No visual | Slightly yellowed/aged tint on cabinet |
+| Heat map | Uses server count (wrong) | Use actual `heatLevel` from store |
+
+**Why it matters:** If you can't *see* that a cabinet is throttled or on fire without opening a panel, you lose the "glance and react" gameplay that RCT excels at.
+
+---
+
+### Sidebar Panel Slide Animation
+
+**Impact: Low | Effort: Low**
+
+Panels currently pop in/out via React conditional rendering with no transition. Adding a CSS slide animation makes the UI feel polished.
+
+- Panel slides in from left: `transform: translateX(-100%) → translateX(0)` with `transition: transform 200ms ease-out`
+- Panel slides out on close: reverse animation
+- Content fades in slightly after panel reaches position (staggered, 50ms delay)
+
+**Why it matters:** Small UI polish that eliminates the "jarring pop" feeling and makes the interface feel more game-like.
+
+---
+
+### Scenario Presentation & Framing
+
+**Impact: Medium | Effort: Medium**
+
+The game has 5 scenarios but they're accessed through a settings panel. RCT's scenario select screen with preview images, star ratings, and locked/unlocked progression is a major hook.
+
+| Improvement | Description |
+|-------------|-------------|
+| Scenario select screen | Dedicated full-screen selector with scenario cards showing name, description, difficulty rating, objectives |
+| Star ratings | 1-3 stars per scenario based on completion quality (e.g., finished early = 3 stars, barely made it = 1 star) |
+| Locked progression | Later scenarios locked until earlier ones are completed |
+| Scenario preview | Small isometric preview showing the starting state of each scenario |
+| Victory/defeat screen | Dedicated results screen showing stats, time taken, score |
+| Scenario leaderboard (local) | Best times/scores per scenario saved locally |
+
+**Why it matters:** RCT's "one more scenario" pull is driven by the scenario select screen showing your progress. Making scenarios a first-class feature rather than a settings toggle adds significant replayability.
+
+---
+
+### Quick Reference: Game Feel Effort vs. Impact
+
+```
+                        LOW EFFORT          MEDIUM EFFORT         HIGH EFFORT
+                   ┌──────────────────┬──────────────────┬──────────────────┐
+                   │                  │                  │                  │
+    HIGH IMPACT    │  Floating text   │                  │  Worker sprites  │
+                   │                  │                  │   ("Peeps")      │
+                   │                  │                  │                  │
+                   ├──────────────────┼──────────────────┼──────────────────┤
+                   │                  │                  │                  │
+    MEDIUM IMPACT  │  Placement pop   │  Particle FX     │                  │
+                   │  Visual states   │  Ambient anims   │                  │
+                   │  Camera juice    │  Sound design    │                  │
+                   │                  │  Scenario framing│                  │
+                   ├──────────────────┼──────────────────┼──────────────────┤
+                   │                  │                  │                  │
+    LOW IMPACT     │  Panel slide     │                  │                  │
+                   │   animation      │                  │                  │
+                   │                  │                  │                  │
+                   └──────────────────┴──────────────────┴──────────────────┘
+```
+
+**Best bets (high impact, low-medium effort):** Floating world-space text, placement pop animations, visual state differentiation.
+
+**The big one (high impact, high effort):** Animated worker sprites — the single feature that would most transform the game's feel.
+
+**Quick wins (low effort):** Placement tweens, camera juice, panel slide animation, visual state fixes (heat map using actual temp).
+
+---
+
 ## Deferred Design Ideas
 
 Ideas that were considered but deferred in favor of other approaches. Kept here for future reference.
