@@ -1,5 +1,5 @@
-import { useGameStore, COOLING_CONFIG, COOLING_UNIT_CONFIG, ENVIRONMENT_CONFIG, GENERATOR_OPTIONS, SUPPRESSION_CONFIG, SUITE_TIERS, OPS_TIER_CONFIG, OPS_TIER_ORDER } from '@/stores/gameStore'
-import type { SuppressionType, CoolingUnitType, OpsTier, SuiteTier } from '@/stores/gameStore'
+import { useGameStore, COOLING_CONFIG, COOLING_UNIT_CONFIG, CHILLER_PLANT_CONFIG, COOLING_PIPE_CONFIG, ENVIRONMENT_CONFIG, GENERATOR_OPTIONS, SUPPRESSION_CONFIG, SUITE_TIERS, OPS_TIER_CONFIG, OPS_TIER_ORDER, getChillerConnection } from '@/stores/gameStore'
+import type { SuppressionType, CoolingUnitType, ChillerTier, OpsTier, SuiteTier } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Power, Droplets, Shield, Fuel, Flame, Cpu, Snowflake, X } from 'lucide-react'
@@ -21,6 +21,8 @@ export function OperationsPanel() {
     cabinets, spineSwitches, totalPower, coolingPower, mgmtBonus,
     coolingType, upgradeCooling, money,
     coolingUnits, placeCoolingUnit, removeCoolingUnit, sandboxMode,
+    chillerPlants, placeChillerPlant, removeChillerPlant,
+    coolingPipes, placeCoolingPipe, removeCoolingPipe,
     generators, generatorFuelCost, powerOutage, outageTicksRemaining,
     buyGenerator, activateGenerator,
     suppressionType, fireActive, upgradeSuppression,
@@ -380,6 +382,163 @@ export function OperationsPanel() {
         </div>
         {coolingUnits.length >= 20 && <p className="text-xs text-neon-cyan/60 italic mt-1">Max 20 cooling units</p>}
       </div>
+
+      {/* Chiller Plants */}
+      <div className="border-t border-border pt-3">
+        <div className="flex items-center gap-2 mb-2">
+          <Droplets className="size-3 text-[#00aacc]" />
+          <span className="text-xs font-bold text-[#00aacc]">CHILLER PLANTS</span>
+          <Badge className="ml-auto bg-[#00aacc]/20 text-[#00aacc] border-[#00aacc]/30 font-mono text-xs">
+            {chillerPlants.length}/2
+          </Badge>
+        </div>
+
+        {/* Placed chillers */}
+        {chillerPlants.length > 0 && (
+          <div className="flex flex-col gap-1 mb-2 pb-2 border-b border-border/50">
+            {chillerPlants.map((plant) => {
+              const cfg = CHILLER_PLANT_CONFIG.find((c) => c.tier === plant.tier)!
+              const connectedCount = coolingUnits
+                .filter((u) => u.operational && u.type === 'crah')
+                .filter((u) => getChillerConnection(u, [plant], coolingPipes).connected)
+                .length
+              return (
+                <div key={plant.id} className="flex items-center justify-between text-xs">
+                  <span className="flex items-center gap-1.5 truncate" style={{ color: plant.operational ? '#00aacc' : '#ff4444' }}>
+                    <Droplets className="size-2.5 shrink-0" />
+                    <span className="truncate">{cfg.label}</span>
+                    <span className="text-muted-foreground tabular-nums">({plant.col},{plant.row})</span>
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] text-muted-foreground tabular-nums">{connectedCount} CRAH</span>
+                    <span className={`text-[10px] tabular-nums ${plant.operational ? 'text-neon-green' : 'text-neon-red'}`}>
+                      {plant.operational ? 'OK' : 'FAIL'}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      className="text-muted-foreground hover:text-neon-red p-0 h-auto"
+                      onClick={() => removeChillerPlant(plant.id)}
+                    >
+                      <X className="size-2.5" />
+                    </Button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Place new chiller */}
+        <div className="flex flex-col gap-1">
+          {CHILLER_PLANT_CONFIG.map((cfg) => {
+            const locked = cfg.requiresTech && !unlockedTech.includes(cfg.requiresTech)
+            const tooExpensive = !sandboxMode && money < cfg.cost
+            const atMax = chillerPlants.length >= 2
+            return (
+              <Tooltip key={cfg.tier}>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const layout = suiteConfig.layout
+                      const col = Math.floor(Math.random() * suiteConfig.cols)
+                      const row = Math.floor(Math.random() * layout.totalGridRows)
+                      placeChillerPlant(cfg.tier as ChillerTier, col, row)
+                    }}
+                    disabled={!!locked || tooExpensive || atMax}
+                    className="justify-between font-mono text-xs transition-all"
+                    style={{
+                      borderColor: locked ? undefined : '#00aacc30',
+                      ...((!locked && !tooExpensive && !atMax) ? { color: '#00aacc' } : {}),
+                    }}
+                  >
+                    <span className="flex items-center gap-1.5 truncate">
+                      <Droplets className="size-3 shrink-0" />
+                      {cfg.label}
+                    </span>
+                    <span className="text-muted-foreground">${cfg.cost.toLocaleString()}</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="max-w-56">
+                  <p className="font-bold mb-1 text-[#00aacc]">{cfg.label}</p>
+                  <p className="text-xs mb-1">{cfg.description}</p>
+                  <div className="text-xs space-y-0.5">
+                    <div>Range: <span className="text-neon-cyan">{cfg.range} tiles</span></div>
+                    <div>Bonus: <span className="text-neon-green">+{(cfg.efficiencyBonus * 100).toFixed(0)}%</span> cooling to connected CRAH</div>
+                    <div>Power: <span className="text-neon-orange">{cfg.powerDraw}W</span></div>
+                  </div>
+                  {locked && <p className="text-neon-red text-xs mt-1">Requires: {cfg.requiresTech}</p>}
+                  <p className="text-xs text-muted-foreground mt-1">CRAH units within range (or connected via pipes) get the chiller bonus. Unconnected CRAH units operate at 60% efficiency.</p>
+                </TooltipContent>
+              </Tooltip>
+            )
+          })}
+        </div>
+        {chillerPlants.length >= 2 && <p className="text-xs text-[#00aacc]/60 italic mt-1">Max 2 chiller plants</p>}
+      </div>
+
+      {/* Cooling Pipes */}
+      {chillerPlants.length > 0 && (
+        <div className="border-t border-border pt-3">
+          <div className="flex items-center gap-2 mb-2">
+            <Cpu className="size-3 text-[#00ccff]" />
+            <span className="text-xs font-bold text-[#00ccff]">COOLING PIPES</span>
+            <Badge className="ml-auto bg-[#00ccff]/20 text-[#00ccff] border-[#00ccff]/30 font-mono text-xs">
+              {coolingPipes.length}/{COOLING_PIPE_CONFIG.maxPipes}
+            </Badge>
+          </div>
+          <p className="text-xs text-muted-foreground mb-2">
+            Extend chiller coverage. Place pipes between chiller and CRAH units to connect them.
+          </p>
+
+          {/* Placed pipes summary */}
+          {coolingPipes.length > 0 && (
+            <div className="flex flex-wrap gap-1 mb-2 pb-2 border-b border-border/50">
+              {coolingPipes.map((pipe) => (
+                <span
+                  key={pipe.id}
+                  className="inline-flex items-center gap-0.5 text-[10px] text-[#00ccff]/70 bg-[#00ccff]/10 rounded px-1 py-0.5 cursor-pointer hover:text-neon-red hover:bg-neon-red/10 transition-colors"
+                  onClick={() => removeCoolingPipe(pipe.id)}
+                  title={`Pipe at (${pipe.col},${pipe.row}) — click to remove`}
+                >
+                  ({pipe.col},{pipe.row}) <X className="size-2" />
+                </span>
+              ))}
+            </div>
+          )}
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const layout = suiteConfig.layout
+                  const col = Math.floor(Math.random() * suiteConfig.cols)
+                  const row = Math.floor(Math.random() * layout.totalGridRows)
+                  placeCoolingPipe(col, row)
+                }}
+                disabled={(!sandboxMode && money < COOLING_PIPE_CONFIG.cost) || coolingPipes.length >= COOLING_PIPE_CONFIG.maxPipes}
+                className="w-full justify-between font-mono text-xs transition-all"
+                style={{ borderColor: '#00ccff30', color: '#00ccff' }}
+              >
+                <span className="flex items-center gap-1.5">
+                  <Cpu className="size-3 shrink-0" />
+                  Place Pipe Segment
+                </span>
+                <span className="text-muted-foreground">${COOLING_PIPE_CONFIG.cost.toLocaleString()}</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right" className="max-w-56">
+              <p className="font-bold mb-1 text-[#00ccff]">Cooling Pipe</p>
+              <p className="text-xs">{COOLING_PIPE_CONFIG.description}</p>
+            </TooltipContent>
+          </Tooltip>
+          {coolingPipes.length >= COOLING_PIPE_CONFIG.maxPipes && <p className="text-xs text-[#00ccff]/60 italic mt-1">Max {COOLING_PIPE_CONFIG.maxPipes} pipe segments</p>}
+        </div>
+      )}
 
       {/* Generators */}
       <div className="border-t border-border pt-3">

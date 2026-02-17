@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
-import type { LayerVisibility, LayerOpacity, LayerColors, LayerColorOverrides, TrafficLink, CabinetEnvironment, CabinetFacing, PlacementHint, DataCenterLayout, CoolingUnitType } from '@/stores/gameStore'
-import { DEFAULT_COLORS, ENVIRONMENT_CONFIG, MAX_SERVERS_PER_CABINET, getFacingOffsets, COOLING_UNIT_CONFIG } from '@/stores/gameStore'
+import type { LayerVisibility, LayerOpacity, LayerColors, LayerColorOverrides, TrafficLink, CabinetEnvironment, CabinetFacing, PlacementHint, DataCenterLayout, CoolingUnitType, ChillerTier } from '@/stores/gameStore'
+import { DEFAULT_COLORS, ENVIRONMENT_CONFIG, MAX_SERVERS_PER_CABINET, getFacingOffsets, COOLING_UNIT_CONFIG, CHILLER_PLANT_CONFIG } from '@/stores/gameStore'
 
 const COLORS = DEFAULT_COLORS
 
@@ -74,6 +74,20 @@ interface CoolingUnitEntry {
   operational: boolean
 }
 
+interface ChillerPlantEntry {
+  id: string
+  col: number
+  row: number
+  tier: ChillerTier
+  operational: boolean
+}
+
+interface CoolingPipeEntry {
+  id: string
+  col: number
+  row: number
+}
+
 interface SpineEntry {
   id: string
   slot: number
@@ -130,6 +144,11 @@ class DataCenterScene extends Phaser.Scene {
   private coolingUnitGraphics: Map<string, Phaser.GameObjects.Graphics> = new Map()
   private coolingUnitLabels: Map<string, Phaser.GameObjects.Text> = new Map()
   private coolingUnitEntries: Map<string, CoolingUnitEntry> = new Map()
+  private chillerGraphics: Map<string, Phaser.GameObjects.Graphics> = new Map()
+  private chillerLabels: Map<string, Phaser.GameObjects.Text> = new Map()
+  private chillerEntries: Map<string, ChillerPlantEntry> = new Map()
+  private pipeGraphics: Map<string, Phaser.GameObjects.Graphics> = new Map()
+  private pipeEntries: Map<string, CoolingPipeEntry> = new Map()
   private facingIndicators: Map<string, Phaser.GameObjects.Text> = new Map()
 
   // Placement mode
@@ -1772,6 +1791,181 @@ class DataCenterScene extends Phaser.Scene {
     this.coolingUnitEntries.clear()
   }
 
+  // ── Chiller Plant Rendering ──────────────────────────────────────
+
+  private renderChillerPlant(entry: ChillerPlantEntry) {
+    const oldG = this.chillerGraphics.get(entry.id)
+    if (oldG) oldG.destroy()
+    const oldLabel = this.chillerLabels.get(entry.id)
+    if (oldLabel) oldLabel.destroy()
+
+    const cfg = CHILLER_PLANT_CONFIG.find((c) => c.tier === entry.tier)
+    if (!cfg) return
+
+    const { x, y } = this.isoToScreen(entry.col, entry.row)
+    const cx = x
+    const cy = y + TILE_H / 2
+
+    const g = this.add.graphics()
+    const baseDepth = 9 + entry.row * this.cabCols + entry.col
+
+    // Chiller plant: larger cube, industrial blue-green
+    const topColor = entry.operational ? 0x00aacc : 0xcc2222
+    const sideColor = entry.operational ? 0x007799 : 0x991111
+    const frontColor = entry.operational ? 0x005566 : 0x660808
+
+    this.drawIsoCube(g, cx, cy, CUBE_W * 0.7, CUBE_H * 0.7, 12,
+      { top: topColor, side: sideColor, front: frontColor }, 0.9)
+
+    // Coverage range ring
+    if (cfg.range > 0 && entry.operational) {
+      g.lineStyle(1.5, 0x00aacc, 0.2)
+      const rng = cfg.range
+      for (let dr = -rng; dr <= rng; dr++) {
+        for (let dc = -rng; dc <= rng; dc++) {
+          if (Math.abs(dr) + Math.abs(dc) > rng) continue
+          const tc = entry.col + dc
+          const tr = entry.row + dr
+          if (tc < 0 || tr < 0 || tc >= this.cabCols || tr >= this.cabRows) continue
+          const { x: tx, y: ty } = this.isoToScreen(tc, tr)
+          const tcx = tx, tcy = ty + TILE_H / 2
+          g.lineStyle(1, 0x00aacc, 0.12)
+          g.beginPath()
+          g.moveTo(tcx, tcy - TILE_H / 2 + 2)
+          g.lineTo(tcx + TILE_W / 2 - 4, tcy)
+          g.lineTo(tcx, tcy + TILE_H / 2 - 2)
+          g.lineTo(tcx - TILE_W / 2 + 4, tcy)
+          g.closePath()
+          g.strokePath()
+        }
+      }
+    }
+
+    g.setDepth(baseDepth)
+    this.chillerGraphics.set(entry.id, g)
+
+    const tierLabel = entry.tier === 'advanced' ? 'CHILLER+' : 'CHILLER'
+    const labelColor = entry.operational ? '#00aacc' : '#ff4444'
+    const label = this.add
+      .text(cx, cy - 20, tierLabel, {
+        fontFamily: 'monospace',
+        fontSize: '6px',
+        color: labelColor,
+      })
+      .setOrigin(0.5)
+      .setAlpha(0.85)
+      .setDepth(baseDepth + 1)
+    this.chillerLabels.set(entry.id, label)
+  }
+
+  addChillerPlantToScene(id: string, col: number, row: number, tier: ChillerTier, operational: boolean) {
+    const entry: ChillerPlantEntry = { id, col, row, tier, operational }
+    this.chillerEntries.set(id, entry)
+    this.renderChillerPlant(entry)
+  }
+
+  updateChillerPlant(id: string, operational: boolean) {
+    const entry = this.chillerEntries.get(id)
+    if (!entry) return
+    entry.operational = operational
+    this.renderChillerPlant(entry)
+  }
+
+  removeChillerPlantFromScene(id: string) {
+    const g = this.chillerGraphics.get(id)
+    if (g) g.destroy()
+    const l = this.chillerLabels.get(id)
+    if (l) l.destroy()
+    this.chillerGraphics.delete(id)
+    this.chillerLabels.delete(id)
+    this.chillerEntries.delete(id)
+  }
+
+  clearChillerPlants() {
+    for (const g of this.chillerGraphics.values()) g.destroy()
+    for (const l of this.chillerLabels.values()) l.destroy()
+    this.chillerGraphics.clear()
+    this.chillerLabels.clear()
+    this.chillerEntries.clear()
+  }
+
+  // ── Cooling Pipe Rendering ───────────────────────────────────────
+
+  private renderCoolingPipe(entry: CoolingPipeEntry) {
+    const oldG = this.pipeGraphics.get(entry.id)
+    if (oldG) oldG.destroy()
+
+    const { x, y } = this.isoToScreen(entry.col, entry.row)
+    const cx = x
+    const cy = y + TILE_H / 2
+
+    const g = this.add.graphics()
+    const baseDepth = 5 + entry.row * this.cabCols + entry.col
+
+    // Pipe: small flat disc on the tile (cyan line segment look)
+    g.fillStyle(0x00ccff, 0.3)
+    g.beginPath()
+    g.moveTo(cx, cy - TILE_H / 4)
+    g.lineTo(cx + TILE_W / 4, cy)
+    g.lineTo(cx, cy + TILE_H / 4)
+    g.lineTo(cx - TILE_W / 4, cy)
+    g.closePath()
+    g.fillPath()
+
+    // Pipe border
+    g.lineStyle(1, 0x00ccff, 0.5)
+    g.beginPath()
+    g.moveTo(cx, cy - TILE_H / 4)
+    g.lineTo(cx + TILE_W / 4, cy)
+    g.lineTo(cx, cy + TILE_H / 4)
+    g.lineTo(cx - TILE_W / 4, cy)
+    g.closePath()
+    g.strokePath()
+
+    // Draw pipe connection lines to adjacent pipes
+    for (const [, other] of this.pipeEntries) {
+      if (other.id === entry.id) continue
+      const dist = Math.abs(other.col - entry.col) + Math.abs(other.row - entry.row)
+      if (dist === 1) {
+        const { x: ox, y: oy } = this.isoToScreen(other.col, other.row)
+        g.lineStyle(2, 0x00ccff, 0.35)
+        g.lineBetween(cx, cy, ox, oy + TILE_H / 2)
+      }
+    }
+
+    // Also draw lines to adjacent chiller plants
+    for (const [, chiller] of this.chillerEntries) {
+      const dist = Math.abs(chiller.col - entry.col) + Math.abs(chiller.row - entry.row)
+      if (dist <= 1) {
+        const { x: ox, y: oy } = this.isoToScreen(chiller.col, chiller.row)
+        g.lineStyle(2, 0x00aacc, 0.4)
+        g.lineBetween(cx, cy, ox, oy + TILE_H / 2)
+      }
+    }
+
+    g.setDepth(baseDepth)
+    this.pipeGraphics.set(entry.id, g)
+  }
+
+  addCoolingPipeToScene(id: string, col: number, row: number) {
+    const entry: CoolingPipeEntry = { id, col, row }
+    this.pipeEntries.set(id, entry)
+    this.renderCoolingPipe(entry)
+  }
+
+  removeCoolingPipeFromScene(id: string) {
+    const g = this.pipeGraphics.get(id)
+    if (g) g.destroy()
+    this.pipeGraphics.delete(id)
+    this.pipeEntries.delete(id)
+  }
+
+  clearCoolingPipes() {
+    for (const g of this.pipeGraphics.values()) g.destroy()
+    this.pipeGraphics.clear()
+    this.pipeEntries.clear()
+  }
+
   /** Clear all infrastructure graphics (for rebuild) */
   clearInfrastructure() {
     for (const g of this.pduGraphics.values()) g.destroy()
@@ -1779,6 +1973,9 @@ class DataCenterScene extends Phaser.Scene {
     for (const g of this.cableTrayGraphics.values()) g.destroy()
     for (const g of this.coolingUnitGraphics.values()) g.destroy()
     for (const l of this.coolingUnitLabels.values()) l.destroy()
+    for (const g of this.chillerGraphics.values()) g.destroy()
+    for (const l of this.chillerLabels.values()) l.destroy()
+    for (const g of this.pipeGraphics.values()) g.destroy()
     this.pduGraphics.clear()
     this.pduLabels.clear()
     this.pduEntries.clear()
@@ -1787,6 +1984,11 @@ class DataCenterScene extends Phaser.Scene {
     this.coolingUnitGraphics.clear()
     this.coolingUnitLabels.clear()
     this.coolingUnitEntries.clear()
+    this.chillerGraphics.clear()
+    this.chillerLabels.clear()
+    this.chillerEntries.clear()
+    this.pipeGraphics.clear()
+    this.pipeEntries.clear()
   }
 
   /** Update aisle containment state and redraw aisle overlays */

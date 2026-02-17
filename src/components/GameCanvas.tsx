@@ -32,6 +32,8 @@ export function GameCanvas() {
   const zones = useGameStore((s) => s.zones)
   const dedicatedRows = useGameStore((s) => s.dedicatedRows)
   const coolingUnits = useGameStore((s) => s.coolingUnits)
+  const chillerPlants = useGameStore((s) => s.chillerPlants)
+  const coolingPipes = useGameStore((s) => s.coolingPipes)
 
   // Tile click handler — called from Phaser when user clicks a grid tile
   const handleTileClick = useCallback((col: number, row: number) => {
@@ -228,6 +230,30 @@ export function GameCanvas() {
       scene.addCoolingUnitToScene(unit.id, unit.col, unit.row, unit.type, unit.operational)
     }
   }, [coolingUnits, sceneReady])
+
+  // Sync chiller plants to Phaser
+  useEffect(() => {
+    if (!gameRef.current) return
+    const scene = getScene(gameRef.current)
+    if (!scene) return
+
+    scene.clearChillerPlants()
+    for (const plant of chillerPlants) {
+      scene.addChillerPlantToScene(plant.id, plant.col, plant.row, plant.tier, plant.operational)
+    }
+  }, [chillerPlants, sceneReady])
+
+  // Sync cooling pipes to Phaser
+  useEffect(() => {
+    if (!gameRef.current) return
+    const scene = getScene(gameRef.current)
+    if (!scene) return
+
+    scene.clearCoolingPipes()
+    for (const pipe of coolingPipes) {
+      scene.addCoolingPipeToScene(pipe.id, pipe.col, pipe.row)
+    }
+  }, [coolingPipes, sceneReady])
 
   // Sync traffic visibility to Phaser
   useEffect(() => {
