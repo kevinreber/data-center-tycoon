@@ -24,6 +24,10 @@ import {
   SUITE_TIERS,
   OPS_TIER_CONFIG,
   COOLING_UNIT_CONFIG,
+  REGION_CATALOG,
+  SITE_TYPE_CONFIG,
+  REGION_RESEARCH_COST,
+  MAX_SITES,
   calcCabinetCooling,
   getAdjacentCabinets,
   hasMaintenanceAccess,
@@ -31,6 +35,7 @@ import {
   calcAisleBonus,
   getFacingOffsets,
 } from '@/stores/gameStore'
+import type { RegionId } from '@/stores/gameStore'
 
 // Helper to get/set store state
 const getState = () => useGameStore.getState()
@@ -1818,6 +1823,287 @@ describe('Cooling Infrastructure', () => {
     expect(immersion.range).toBe(0)
     expect(immersion.maxCabinets).toBe(1)
     expect(immersion.requiresTech).toBe('immersion_cooling')
+  })
+})
+
+// ── Phase 6: Multi-Site Expansion Tests ──────────────────────────
+
+describe('Phase 6 — Multi-Site Expansion', () => {
+  beforeEach(() => {
+    getState().resetGame()
+  })
+
+  function setupMultiSiteUnlocked() {
+    setState({
+      sandboxMode: true,
+      money: 999999,
+      suiteTier: 'enterprise',
+      reputationScore: 80,
+      multiSiteUnlocked: true,
+    })
+  }
+
+  describe('Region Catalog', () => {
+    it('has 15 regions across 5 continents', () => {
+      expect(REGION_CATALOG).toHaveLength(15)
+      const continents = new Set(REGION_CATALOG.map((r) => r.continent))
+      expect(continents.size).toBe(5)
+    })
+
+    it('all regions have valid profiles', () => {
+      for (const region of REGION_CATALOG) {
+        expect(region.id).toBeTruthy()
+        expect(region.name).toBeTruthy()
+        expect(region.description).toBeTruthy()
+        expect(region.coordinates.x).toBeGreaterThanOrEqual(0)
+        expect(region.coordinates.y).toBeGreaterThanOrEqual(0)
+        expect(region.profile.powerCostMultiplier).toBeGreaterThan(0)
+        expect(region.profile.networkConnectivity).toBeGreaterThanOrEqual(0)
+        expect(region.profile.networkConnectivity).toBeLessThanOrEqual(1)
+      }
+    })
+
+    it('all regions have demand profiles with valid ranges', () => {
+      for (const region of REGION_CATALOG) {
+        for (const [, val] of Object.entries(region.demandProfile)) {
+          expect(val).toBeGreaterThanOrEqual(0)
+          expect(val).toBeLessThanOrEqual(1)
+        }
+      }
+    })
+  })
+
+  describe('Site Type Config', () => {
+    it('has 6 site types including headquarters', () => {
+      const types = Object.keys(SITE_TYPE_CONFIG)
+      expect(types).toHaveLength(6)
+      expect(types).toContain('headquarters')
+      expect(types).toContain('edge_pop')
+      expect(types).toContain('colocation')
+      expect(types).toContain('hyperscale')
+      expect(types).toContain('network_hub')
+      expect(types).toContain('disaster_recovery')
+    })
+
+    it('edge_pop is cheapest expansion site', () => {
+      const edgePop = SITE_TYPE_CONFIG.edge_pop
+      expect(edgePop.purchaseCost).toBe(25000)
+      expect(edgePop.maxCabinets).toBe(4)
+      expect(edgePop.constructionTicks).toBe(10)
+    })
+
+    it('headquarters has zero purchase cost', () => {
+      expect(SITE_TYPE_CONFIG.headquarters.purchaseCost).toBe(0)
+    })
+  })
+
+  describe('researchRegion', () => {
+    it('fails when multi-site not unlocked', () => {
+      setState({ money: 999999 })
+      getState().researchRegion('ashburn')
+      expect(getState().researchedRegions).toHaveLength(0)
+    })
+
+    it('researches a region and deducts cost', () => {
+      setupMultiSiteUnlocked()
+      const startMoney = getState().money
+      getState().researchRegion('ashburn')
+      expect(getState().researchedRegions).toContain('ashburn')
+      expect(getState().money).toBe(startMoney - REGION_RESEARCH_COST)
+    })
+
+    it('prevents duplicate research', () => {
+      setupMultiSiteUnlocked()
+      getState().researchRegion('ashburn')
+      const moneyAfterFirst = getState().money
+      getState().researchRegion('ashburn')
+      expect(getState().money).toBe(moneyAfterFirst)
+      expect(getState().researchedRegions.filter((r) => r === 'ashburn')).toHaveLength(1)
+    })
+
+    it('fails with insufficient funds', () => {
+      setState({ multiSiteUnlocked: true, money: 100 })
+      getState().researchRegion('ashburn')
+      expect(getState().researchedRegions).toHaveLength(0)
+    })
+  })
+
+  describe('purchaseSite', () => {
+    it('fails when multi-site not unlocked', () => {
+      setState({ money: 999999, researchedRegions: ['ashburn'] })
+      getState().purchaseSite('ashburn', 'edge_pop', 'Test Site')
+      expect(getState().sites).toHaveLength(0)
+    })
+
+    it('fails when region not researched', () => {
+      setupMultiSiteUnlocked()
+      getState().purchaseSite('ashburn', 'edge_pop', 'Test Site')
+      expect(getState().sites).toHaveLength(0)
+    })
+
+    it('purchases an edge_pop site', () => {
+      setupMultiSiteUnlocked()
+      getState().researchRegion('ashburn')
+      const moneyBefore = getState().money
+      getState().purchaseSite('ashburn', 'edge_pop', 'Ashburn Edge')
+      const sites = getState().sites
+      expect(sites).toHaveLength(1)
+      expect(sites[0].type).toBe('edge_pop')
+      expect(sites[0].name).toBe('Ashburn Edge')
+      expect(sites[0].regionId).toBe('ashburn')
+      expect(sites[0].operational).toBe(false)
+      expect(sites[0].constructionTicksRemaining).toBe(10)
+      // Cost = base * land cost multiplier
+      const region = REGION_CATALOG.find((r) => r.id === 'ashburn')!
+      const expectedCost = Math.round(SITE_TYPE_CONFIG.edge_pop.purchaseCost * region.profile.landCostMultiplier)
+      expect(getState().money).toBe(moneyBefore - expectedCost)
+    })
+
+    it('prevents purchasing headquarters', () => {
+      setupMultiSiteUnlocked()
+      getState().researchRegion('ashburn')
+      getState().purchaseSite('ashburn', 'headquarters', 'Bad HQ')
+      expect(getState().sites).toHaveLength(0)
+    })
+
+    it('prevents duplicate sites in same region', () => {
+      setupMultiSiteUnlocked()
+      getState().researchRegion('ashburn')
+      getState().purchaseSite('ashburn', 'edge_pop', 'Site 1')
+      getState().purchaseSite('ashburn', 'colocation', 'Site 2')
+      expect(getState().sites).toHaveLength(1)
+    })
+
+    it('respects MAX_SITES limit', () => {
+      setupMultiSiteUnlocked()
+      // Research and purchase sites up to limit
+      const regionIds: RegionId[] = ['ashburn', 'bay_area', 'dallas', 'chicago', 'portland', 'sao_paulo', 'london', 'amsterdam']
+      for (const rid of regionIds) {
+        getState().researchRegion(rid)
+        getState().purchaseSite(rid, 'edge_pop', `Site ${rid}`)
+      }
+      expect(getState().sites).toHaveLength(MAX_SITES)
+      // Try to add one more
+      getState().researchRegion('frankfurt')
+      getState().purchaseSite('frankfurt', 'edge_pop', 'Overflow')
+      expect(getState().sites).toHaveLength(MAX_SITES)
+    })
+  })
+
+  describe('switchSite', () => {
+    it('switches to null (HQ)', () => {
+      setupMultiSiteUnlocked()
+      setState({ activeSiteId: 'site-1' })
+      getState().switchSite(null)
+      expect(getState().activeSiteId).toBeNull()
+    })
+
+    it('fails to switch to non-operational site', () => {
+      setupMultiSiteUnlocked()
+      getState().researchRegion('ashburn')
+      getState().purchaseSite('ashburn', 'edge_pop', 'Test')
+      const siteId = getState().sites[0].id
+      getState().switchSite(siteId)
+      // Site is still under construction
+      expect(getState().activeSiteId).toBeNull()
+    })
+
+    it('switches to operational site', () => {
+      setupMultiSiteUnlocked()
+      getState().researchRegion('ashburn')
+      getState().purchaseSite('ashburn', 'edge_pop', 'Test')
+      const siteId = getState().sites[0].id
+      // Manually mark as operational
+      setState({ sites: getState().sites.map((s) => ({ ...s, operational: true, constructionTicksRemaining: 0 })) })
+      getState().switchSite(siteId)
+      expect(getState().activeSiteId).toBe(siteId)
+    })
+  })
+
+  describe('toggleWorldMap', () => {
+    it('toggles worldMapOpen', () => {
+      expect(getState().worldMapOpen).toBe(false)
+      getState().toggleWorldMap()
+      expect(getState().worldMapOpen).toBe(true)
+      getState().toggleWorldMap()
+      expect(getState().worldMapOpen).toBe(false)
+    })
+  })
+
+  describe('tick — site construction', () => {
+    it('ticks down construction timer', () => {
+      setupMultiSiteUnlocked()
+      getState().researchRegion('portland')
+      getState().purchaseSite('portland', 'edge_pop', 'Portland Edge')
+      const site = getState().sites[0]
+      expect(site.constructionTicksRemaining).toBe(10)
+      expect(site.operational).toBe(false)
+
+      // Tick once
+      getState().tick()
+      const afterTick = getState().sites[0]
+      expect(afterTick.constructionTicksRemaining).toBe(9)
+      expect(afterTick.operational).toBe(false)
+    })
+
+    it('marks site operational when construction completes', () => {
+      setupMultiSiteUnlocked()
+      getState().researchRegion('portland')
+      getState().purchaseSite('portland', 'edge_pop', 'Portland Edge')
+      // Set to 1 tick remaining
+      setState({ sites: getState().sites.map((s) => ({ ...s, constructionTicksRemaining: 1 })) })
+      getState().tick()
+      const site = getState().sites[0]
+      expect(site.constructionTicksRemaining).toBe(0)
+      expect(site.operational).toBe(true)
+    })
+  })
+
+  describe('tick — multi-site unlock', () => {
+    it('unlocks multi-site when conditions met', () => {
+      setState({
+        sandboxMode: true,
+        money: 999999,
+        suiteTier: 'enterprise',
+        reputationScore: 80,
+        multiSiteUnlocked: false,
+      })
+      // Add a cabinet so tick can run meaningfully
+      getState().addCabinet(0, 1, 'production', 'general', 'south')
+      getState().tick()
+      expect(getState().multiSiteUnlocked).toBe(true)
+    })
+
+    it('does not unlock if conditions not met', () => {
+      setState({
+        sandboxMode: true,
+        money: 999999,
+        suiteTier: 'starter',
+        reputationScore: 10,
+        multiSiteUnlocked: false,
+      })
+      getState().tick()
+      expect(getState().multiSiteUnlocked).toBe(false)
+    })
+  })
+
+  describe('resetGame — Phase 6 state', () => {
+    it('resets all Phase 6 state fields', () => {
+      setupMultiSiteUnlocked()
+      getState().researchRegion('ashburn')
+      getState().purchaseSite('ashburn', 'edge_pop', 'Test')
+      setState({ worldMapOpen: true })
+
+      getState().resetGame()
+
+      expect(getState().multiSiteUnlocked).toBe(false)
+      expect(getState().worldMapOpen).toBe(false)
+      expect(getState().sites).toHaveLength(0)
+      expect(getState().activeSiteId).toBeNull()
+      expect(getState().researchedRegions).toHaveLength(0)
+      expect(getState().totalSiteRevenue).toBe(0)
+      expect(getState().totalSiteExpenses).toBe(0)
+    })
   })
 })
 
