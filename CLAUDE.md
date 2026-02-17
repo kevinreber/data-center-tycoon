@@ -136,7 +136,6 @@ All game state lives in a **single Zustand store** (`useGameStore`). This ~5300-
 - **Power redundancy configs** (`POWER_REDUNDANCY_CONFIG`): N, N+1, 2N levels
 - **Noise configs** (`NOISE_CONFIG`): noise generation, complaints, fines, sound barriers
 - **Spot compute configs** (`SPOT_COMPUTE_CONFIG`): dynamic spot market pricing
-- **Operations Progression configs** (`OPS_TIER_CONFIG`): 4 operations tiers with auto-resolve, cost, and prevention settings
 - **Tutorial tips** (`TUTORIAL_TIPS`): 30 contextual gameplay tips (including carbon, security, market, and operations tips)
 - **Energy source configs** (`ENERGY_SOURCE_CONFIG`): 4 energy sources with cost/carbon/reliability
 - **Green cert configs** (`GREEN_CERT_CONFIG`): 4 green certifications with requirements and bonuses
@@ -179,7 +178,6 @@ Progression types:
 - `IncidentSeverity` = `'minor' | 'major' | 'critical'`
 - `GeneratorStatus` = `'standby' | 'running' | 'cooldown'`
 - `SuppressionType` = `'none' | 'water_suppression' | 'gas_suppression'`
-- `OperationsTier` = `1 | 2 | 3 | 4`
 
 Staff & HR types:
 - `StaffRole` = `'network_engineer' | 'electrician' | 'cooling_specialist' | 'security_officer'`
@@ -268,7 +266,7 @@ Key interfaces (core):
 | Finance | `takeLoan`, `refreshServers`, `upgradeSuite` |
 | Infrastructure | `placePDU`, `placeCableTray`, `autoRouteCables`, `toggleCabinetFacing`, `installAisleContainment`, `placeBusway`, `placeCrossConnect`, `placeInRowCooling` |
 | Incidents | `resolveIncident`, `buyGenerator`, `activateGenerator`, `upgradeSuppression` |
-| Operations Progression | `upgradeOperationsTier` |
+| Operations Progression | `upgradeOpsTier` |
 | Contracts | `acceptContract` |
 | Research | `startResearch` |
 | Staff | `hireStaff`, `fireStaff`, `setShiftPattern`, `startTraining` |
@@ -545,15 +543,6 @@ A `setInterval` in `App.tsx` calls `tick()` at the rate determined by `gameSpeed
 - **Contract competition**: Competitors bid on open contracts with timed windows; accept before they win
 - **Events**: Price wars (15% revenue reduction), staff poaching (counter-offer or lose), competitor outages
 - **Market share**: Tracked as player vs competitor strength ratio
-
-**Operations Progression:**
-- **4 tiers**: Manual Ops → Monitoring & Alerting → Basic Automation → Full Orchestration
-- **Tier 1 (default)**: Incidents persist until manually resolved (no auto-resolution)
-- **Tier 2**: Reduced resolve costs (-20%), reduced incident damage (-15%)
-- **Tier 3**: Incidents auto-resolve over time, staff accelerates resolution, hardware auto-restores
-- **Tier 4**: 2x auto-resolve speed, 20% incident prevention chance, minor incidents auto-resolve instantly
-- **Gated progression**: Each tier requires reputation, suite tier, and tech tree milestones
-- **Ongoing cost**: Higher tiers have per-tick maintenance costs ($5/$15/$30 per tick)
 
 **Additional Systems:**
 - **Patents**: Patent unlocked technologies for ongoing royalty income
