@@ -29,6 +29,7 @@ export function GameCanvas() {
   const heatMapVisible = useGameStore((s) => s.heatMapVisible)
   const aisleContainments = useGameStore((s) => s.aisleContainments)
   const zones = useGameStore((s) => s.zones)
+  const coolingUnits = useGameStore((s) => s.coolingUnits)
 
   // Tile click handler — called from Phaser when user clicks a grid tile
   const handleTileClick = useCallback((col: number, row: number) => {
@@ -212,6 +213,19 @@ export function GameCanvas() {
       scene.addCableTrayToScene(tray.id, tray.col, tray.row)
     }
   }, [pdus, cableTrays, pduOverloaded, sceneReady])
+
+  // Sync cooling units to Phaser
+  useEffect(() => {
+    if (!gameRef.current) return
+    const scene = getScene(gameRef.current)
+    if (!scene) return
+
+    // Clear and rebuild all cooling units each time state changes
+    scene.clearCoolingUnits()
+    for (const unit of coolingUnits) {
+      scene.addCoolingUnitToScene(unit.id, unit.col, unit.row, unit.type, unit.operational)
+    }
+  }, [coolingUnits, sceneReady])
 
   // Sync traffic visibility to Phaser
   useEffect(() => {

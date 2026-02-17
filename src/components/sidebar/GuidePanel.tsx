@@ -1,5 +1,5 @@
 import { Github, Bug, GitPullRequest } from 'lucide-react'
-import { useGameStore, ENVIRONMENT_CONFIG, SIM, SPACING_CONFIG, COOLING_CONFIG, INROW_COOLING_OPTIONS, OPS_TIER_CONFIG } from '@/stores/gameStore'
+import { useGameStore, ENVIRONMENT_CONFIG, SIM, SPACING_CONFIG, COOLING_CONFIG, INROW_COOLING_OPTIONS, COOLING_UNIT_CONFIG, OPS_TIER_CONFIG } from '@/stores/gameStore'
 
 const REPO_URL = 'https://github.com/kevinreber/data-center-tycoon'
 
@@ -126,6 +126,10 @@ export function GuidePanel() {
             <li>
               <strong className="text-foreground">In-row cooling units</strong> (${INROW_COOLING_OPTIONS[0].cost.toLocaleString()}&ndash;${INROW_COOLING_OPTIONS[2].cost.toLocaleString()})
               <span className="text-muted-foreground"> &mdash; Place next to hot cabinets for targeted {INROW_COOLING_OPTIONS[0].coolingBonus}&ndash;{INROW_COOLING_OPTIONS[2].coolingBonus}&deg;C/tick extra cooling.</span>
+            </li>
+            <li>
+              <strong className="text-foreground">Cooling units</strong> ($3,000&ndash;$60,000)
+              <span className="text-muted-foreground"> &mdash; Placeable infrastructure with coverage zones. {COOLING_UNIT_CONFIG.map(c => `${c.label}: ${c.coolingRate}&deg;C/tick, range ${c.range}`).join('; ')}. Units degrade when serving more cabinets than their max capacity.</span>
             </li>
             <li>
               <strong className="text-foreground">Water cooling upgrade</strong> (${COOLING_CONFIG.water.upgradeCost.toLocaleString()})

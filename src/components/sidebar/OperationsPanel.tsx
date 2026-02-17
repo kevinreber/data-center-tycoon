@@ -1,8 +1,8 @@
-import { useGameStore, COOLING_CONFIG, ENVIRONMENT_CONFIG, GENERATOR_OPTIONS, SUPPRESSION_CONFIG, OPS_TIER_CONFIG, OPS_TIER_ORDER } from '@/stores/gameStore'
-import type { SuppressionType, OpsTier, SuiteTier } from '@/stores/gameStore'
+import { useGameStore, COOLING_CONFIG, COOLING_UNIT_CONFIG, ENVIRONMENT_CONFIG, GENERATOR_OPTIONS, SUPPRESSION_CONFIG, SUITE_TIERS, OPS_TIER_CONFIG, OPS_TIER_ORDER } from '@/stores/gameStore'
+import type { SuppressionType, CoolingUnitType, OpsTier, SuiteTier } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Power, Droplets, Shield, Fuel, Flame, Cpu } from 'lucide-react'
+import { Power, Droplets, Shield, Fuel, Flame, Cpu, Snowflake, X } from 'lucide-react'
 import {
   Tooltip,
   TooltipContent,
@@ -20,6 +20,7 @@ export function OperationsPanel() {
   const {
     cabinets, spineSwitches, totalPower, coolingPower, mgmtBonus,
     coolingType, upgradeCooling, money,
+    coolingUnits, placeCoolingUnit, removeCoolingUnit, sandboxMode,
     generators, generatorFuelCost, powerOutage, outageTicksRemaining,
     buyGenerator, activateGenerator,
     suppressionType, fireActive, upgradeSuppression,
@@ -27,6 +28,8 @@ export function OperationsPanel() {
     upgradeOpsTier,
     staff, unlockedTech, reputationScore, suiteTier,
   } = useGameStore()
+
+  const suiteConfig = SUITE_TIERS[suiteTier]
 
   const currentConfig = OPS_TIER_CONFIG.find((c) => c.id === opsTier)!
   const nextTierId = getNextOpsTier(opsTier)
@@ -280,6 +283,102 @@ export function OperationsPanel() {
             </p>
           )}
         </div>
+      </div>
+
+      {/* Cooling Units */}
+      <div className="border-t border-border pt-3">
+        <div className="flex items-center gap-2 mb-2">
+          <Snowflake className="size-3 text-neon-cyan" />
+          <span className="text-xs font-bold text-neon-cyan">COOLING UNITS</span>
+          <Badge className="ml-auto bg-neon-cyan/20 text-neon-cyan border-neon-cyan/30 font-mono text-xs">
+            {coolingUnits.length}/20
+          </Badge>
+        </div>
+
+        {/* Placed units */}
+        {coolingUnits.length > 0 && (
+          <div className="flex flex-col gap-1 mb-2 pb-2 border-b border-border/50">
+            {coolingUnits.map((unit) => {
+              const cfg = COOLING_UNIT_CONFIG.find((c) => c.type === unit.type)!
+              return (
+                <div key={unit.id} className="flex items-center justify-between text-xs">
+                  <span className="flex items-center gap-1.5 truncate" style={{ color: unit.operational ? cfg.color : '#ff4444' }}>
+                    <Snowflake className="size-2.5 shrink-0" />
+                    <span className="truncate">{cfg.label}</span>
+                    <span className="text-muted-foreground tabular-nums">({unit.col},{unit.row})</span>
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className={`text-[10px] tabular-nums ${unit.operational ? 'text-neon-green' : 'text-neon-red'}`}>
+                      {unit.operational ? 'OK' : 'FAIL'}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      className="text-muted-foreground hover:text-neon-red p-0 h-auto"
+                      onClick={() => removeCoolingUnit(unit.id)}
+                    >
+                      <X className="size-2.5" />
+                    </Button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Place new units */}
+        <div className="flex flex-col gap-1">
+          {COOLING_UNIT_CONFIG.map((cfg) => {
+            const locked = cfg.requiresTech && !unlockedTech.includes(cfg.requiresTech)
+            const tooExpensive = !sandboxMode && money < cfg.cost
+            const atMax = coolingUnits.length >= 20
+            return (
+              <Tooltip key={cfg.type}>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const layout = suiteConfig.layout
+                      // Find a random valid grid position
+                      const allGridRows = layout.totalGridRows
+                      const col = Math.floor(Math.random() * suiteConfig.cols)
+                      const row = Math.floor(Math.random() * allGridRows)
+                      placeCoolingUnit(cfg.type as CoolingUnitType, col, row)
+                    }}
+                    disabled={!!locked || tooExpensive || atMax}
+                    className="justify-between font-mono text-xs transition-all"
+                    style={{
+                      borderColor: locked ? undefined : `${cfg.color}30`,
+                      ...((!locked && !tooExpensive && !atMax) ? { color: cfg.color } : {}),
+                    }}
+                  >
+                    <span className="flex items-center gap-1.5 truncate">
+                      <Snowflake className="size-3 shrink-0" />
+                      {cfg.label}
+                    </span>
+                    <span className="text-muted-foreground">${cfg.cost.toLocaleString()}</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="max-w-56">
+                  <p className="font-bold mb-1" style={{ color: cfg.color }}>{cfg.label}</p>
+                  <p className="text-xs mb-1">{cfg.description}</p>
+                  <div className="text-xs space-y-0.5">
+                    <div>Cooling: <span className="text-neon-cyan">{cfg.coolingRate}°C/tick</span></div>
+                    <div>Range: <span className="text-neon-cyan">{cfg.range} tile{cfg.range !== 1 ? 's' : ''}</span></div>
+                    <div>Max cabs: <span className="text-neon-cyan">{cfg.maxCabinets}</span> at full efficiency</div>
+                    <div>Power: <span className="text-neon-orange">{cfg.powerDraw}W</span></div>
+                    {cfg.waterUsage > 0 && <div>Water: <span className="text-neon-cyan">{cfg.waterUsage} gal/tick</span></div>}
+                  </div>
+                  {locked && (
+                    <p className="text-neon-red text-xs mt-1">Requires: {cfg.requiresTech}</p>
+                  )}
+                </TooltipContent>
+              </Tooltip>
+            )
+          })}
+        </div>
+        {coolingUnits.length >= 20 && <p className="text-xs text-neon-cyan/60 italic mt-1">Max 20 cooling units</p>}
       </div>
 
       {/* Generators */}

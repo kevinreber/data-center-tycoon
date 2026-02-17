@@ -443,7 +443,7 @@ Ideas for further encouraging organized cabinet layouts. Zone Adjacency Bonus (w
 | Phase 5 (Longevity) | 60+ | 60+ | 0 |
 | Rendering & Views | 17 | 17 | 0 |
 | UX / Camera | 6 | 6 | 0 |
-| **Pending Features** | **~31** | **6** | **~25** |
+| **Pending Features** | **~31** | **7** | **~24** |
 
-**Implemented features:** 156+ items across Phases 1–5, rendering, UX, and capacity planning.
-**Remaining features:** ~25 items, including cooling infrastructure redesign, high-effort late-game content (multi-site, scaling tiers, 42U racks), visualization (sub-floor view, sound), and advanced simulation (workload migration, AI training jobs, leaderboards).
+**Implemented features:** 157+ items across Phases 1–5, rendering, UX, capacity planning, and operations progression.
+**Remaining features:** ~24 items, including cooling infrastructure redesign, high-effort late-game content (multi-site, scaling tiers, 42U racks), visualization (sub-floor view, sound), and advanced simulation (workload migration, AI training jobs, leaderboards).

@@ -125,10 +125,11 @@ All game state lives in a **single Zustand store** (`useGameStore`). This ~7100-
 - **Suite tier configs** (`SUITE_TIERS`): grid dimensions and spine slots per tier
 - **Customer type configs** (`CUSTOMER_TYPE_CONFIG`): power/heat/revenue/bandwidth multipliers per customer
 - **Infrastructure configs**: PDU options, cable tray options, aisle containment (`AISLE_CONTAINMENT_CONFIG`), busway options, cross-connect options, in-row cooling options
+- **Cooling unit configs** (`COOLING_UNIT_CONFIG`): 4 placeable cooling unit types (fan_tray, crac, crah, immersion_pod) with cost, coolingRate, range, maxCabinets, powerDraw, waterUsage, tech requirements
 - **Spacing & layout configs** (`SPACING_CONFIG`): adjacency heat penalties, aisle bonuses, airflow bonuses, maintenance access, fire spread mechanics
 - **Zone bonus configs** (`ZONE_BONUS_CONFIG`): minimum cluster size (3), environment and customer type bonuses
 - **Economy configs**: loan options, depreciation, power market parameters, insurance options, valuation milestones
-- **Progression configs**: tech tree (9 techs), contracts (9 base + 4 compliance-gated), achievements (67), incidents (17 types), scenarios (5)
+- **Progression configs**: tech tree (9 techs), contracts (9 base + 4 compliance-gated), achievements (70), incidents (17 types), scenarios (5)
 - **Staff configs** (`STAFF_ROLE_CONFIG`, `STAFF_CERT_CONFIG`, `SHIFT_PATTERN_CONFIG`): roles, certifications, shift costs
 - **Supply chain configs** (`SUPPLY_CHAIN_CONFIG`): lead times, bulk discounts, shortage mechanics
 - **Weather configs** (`SEASON_CONFIG`, `WEATHER_CONDITION_CONFIG`): seasonal/weather ambient modifiers
@@ -139,7 +140,7 @@ All game state lives in a **single Zustand store** (`useGameStore`). This ~7100-
 - **Power redundancy configs** (`POWER_REDUNDANCY_CONFIG`): N, N+1, 2N levels
 - **Noise configs** (`NOISE_CONFIG`): noise generation, complaints, fines, sound barriers
 - **Spot compute configs** (`SPOT_COMPUTE_CONFIG`): dynamic spot market pricing
-- **Tutorial tips** (`TUTORIAL_TIPS`): 30 contextual gameplay tips (including carbon, security, and market tips)
+- **Tutorial tips** (`TUTORIAL_TIPS`): 32 contextual gameplay tips (including carbon, security, market, operations, and cooling tips)
 - **Energy source configs** (`ENERGY_SOURCE_CONFIG`): 4 energy sources with cost/carbon/reliability
 - **Green cert configs** (`GREEN_CERT_CONFIG`): 4 green certifications with requirements and bonuses
 - **Carbon tax schedule** (`CARBON_TAX_SCHEDULE`): escalating carbon tax brackets
@@ -149,7 +150,7 @@ All game state lives in a **single Zustand store** (`useGameStore`). This ~7100-
 - **Competitor configs** (`COMPETITOR_PERSONALITIES`): 5 AI competitor personality profiles
 - **Operations Progression configs** (`OPS_TIER_CONFIG`): 4 ops tiers with unlock requirements, benefits, and upgrade costs
 - **Traffic constants** (`TRAFFIC`): bandwidth per server, link capacity
-- **Pure calculation functions**: `calcStats()`, `calcTraffic()`, `calcTrafficWithCapacity()`, `coolingOverheadFactor()`, `calcManagementBonus()`, `calcAisleBonus()`, `getPlacementHints()`, and more
+- **Pure calculation functions**: `calcStats()`, `calcTraffic()`, `calcTrafficWithCapacity()`, `coolingOverheadFactor()`, `calcManagementBonus()`, `calcAisleBonus()`, `calcCabinetCooling()`, `getPlacementHints()`, and more
 - **Store actions**: build, power, visual, simulation, finance, infrastructure, incidents, contracts, research, staff, supply chain, interconnection, peering, maintenance, operations progression, save/load, and more
 
 **Pattern for accessing state in components:**
@@ -170,6 +171,7 @@ Core types:
 - `GameSpeed` = `0 | 1 | 2 | 3`
 - `CabinetEnvironment` = `'production' | 'lab' | 'management'`
 - `CoolingType` = `'air' | 'water'`
+- `CoolingUnitType` = `'fan_tray' | 'crac' | 'crah' | 'immersion_pod'`
 - `CustomerType` = `'general' | 'ai_training' | 'streaming' | 'crypto' | 'enterprise'`
 - `CabinetFacing` = `'north' | 'south' | 'east' | 'west'` (only N/S used by row-enforced layout)
 - `SuiteTier` = `'starter' | 'standard' | 'professional' | 'enterprise'`
@@ -236,6 +238,8 @@ Power & insurance types:
 - `InsurancePolicyType` = `'fire_insurance' | 'power_insurance' | 'cyber_insurance' | 'equipment_insurance'`
 
 Infrastructure entity types:
+- `CoolingUnit` — id, type (CoolingUnitType), col, row, operational
+- `CoolingUnitConfig` — type, label, cost, coolingRate, range, maxCabinets, powerDraw, waterUsage, requiresTech
 - `Busway`, `CrossConnect`, `InRowCooling` interfaces
 
 Event & analytics types:
@@ -268,7 +272,9 @@ Key interfaces (core):
 | Simulation | `setGameSpeed`, `upgradeCooling`, `tick` |
 | Finance | `takeLoan`, `refreshServers`, `upgradeSuite` |
 | Infrastructure | `placePDU`, `placeCableTray`, `autoRouteCables`, `toggleCabinetFacing`, `installAisleContainment`, `placeBusway`, `placeCrossConnect`, `placeInRowCooling` |
+| Cooling Units | `placeCoolingUnit`, `removeCoolingUnit` |
 | Incidents | `resolveIncident`, `buyGenerator`, `activateGenerator`, `upgradeSuppression` |
+| Operations Progression | `upgradeOpsTier` |
 | Contracts | `acceptContract` |
 | Research | `startResearch` |
 | Staff | `hireStaff`, `fireStaff`, `setShiftPattern`, `startTraining` |
@@ -298,6 +304,7 @@ Key interfaces (core):
 
 - `getPlacementHints(col, row, cabinets, suiteTier)` — contextual placement strategy hints during cabinet placement (includes row info, aisle/corridor detection, zone adjacency hints)
 - `calcTrafficWithCapacity(cabinets, spines, demandMultiplier, linkCapacity)` — traffic calculation with custom link capacity
+- `calcCabinetCooling(cab, coolingUnits, allCabinets)` — per-cabinet cooling from nearby cooling units with capacity degradation
 - `calcAisleBonus(cabinets, suiteTier, aisleContainments)` — hot/cold aisle cooling bonus from layout pairs + containment
 - `calcZones(cabinets)` — detects zone adjacency clusters (environment + customer type)
 - `getAdjacentCabinets(cab, cabinets)` — orthogonal neighbors for spacing calculations
@@ -367,7 +374,8 @@ gridRow 4: Corridor (bottom access)
 - `syncOccupiedTiles(occupied)` — mark blocked positions
 - `addPDUToScene(id, col, row, label, overloaded)` / `updatePDU(id, overloaded)`
 - `addCableTrayToScene(id, col, row)`
-- `clearInfrastructure()` — clears PDUs and cable trays
+- `addCoolingUnitToScene(id, col, row, type, operational)` / `updateCoolingUnit(id, operational)` / `removeCoolingUnitFromScene(id)` / `clearCoolingUnits()`
+- `clearInfrastructure()` — clears PDUs, cable trays, and cooling units
 
 ### UI Architecture
 
@@ -418,7 +426,7 @@ A `setInterval` in `App.tsx` calls `tick()` at the rate determined by `gameSpeed
 17. **Contracts**: Checks SLA compliance, termination/completion logic
 18. **Reputation**: Adjusts score based on SLAs, outages, fires, violations
 19. **Depreciation**: Ages servers, reduces efficiency after 30% of 800-tick lifespan
-20. **Achievements**: Checks 67 achievement conditions
+20. **Achievements**: Checks 70 achievement conditions
 21. **Traffic**: ECMP distribution across active spines
 22. **Capacity history**: Records snapshot of current stats each tick (capped at 100 entries)
 23. **Lifetime stats**: Updates running totals (revenue, expenses, peak temp, uptime streaks, etc.)
@@ -446,7 +454,7 @@ A `setInterval` in `App.tsx` calls `tick()` at the rate determined by `gameSpeed
 **Infrastructure:**
 - **Cabinet environments**: production (baseline), lab (low revenue, low heat), management (3% bonus per server, capped at 30%)
 - **Customer types**: general, ai_training, streaming, crypto, enterprise — each with power/heat/revenue/bandwidth multipliers
-- **Cooling**: air (2.0°C/tick, free) or water (3.5°C/tick, $25,000 upgrade), plus in-row cooling units
+- **Cooling**: facility-wide air (2.0°C/tick, free) or water (3.5°C/tick, $25,000 upgrade), plus placeable cooling units (fan trays, CRACs, CRAHs, immersion pods) with per-cabinet coverage zones and capacity degradation
 - **PDUs**: Power distribution units with capacity limits; overloaded PDUs cause heat and revenue penalties
 - **Cable trays**: Organized cabling reduces messy cable penalties
 - **Hot/cold aisles**: Row-based layout enforces alternating N/S facing with physical aisles between row pairs. Aisle containment upgrade ($15k/aisle, Standard+ tier) adds +6% cooling per aisle.
@@ -550,7 +558,7 @@ A `setInterval` in `App.tsx` calls `tick()` at the rate determined by `gameSpeed
 - **Patents**: Patent unlocked technologies for ongoing royalty income
 - **RFP Bidding**: Compete for contract wins/losses
 - **Scenario Challenges**: 5 predefined challenges with special rules and objectives
-- **Tutorial System**: 30 contextual tips triggered during gameplay (including carbon, security, and market tips)
+- **Tutorial System**: 32 contextual tips triggered during gameplay (including carbon, security, market, operations, and cooling tips)
 - **Event Logging**: Filterable log of significant events (capped at 200)
 - **Capacity History**: Per-tick snapshot of key metrics (capped at 100)
 - **Lifetime Statistics**: Revenue, expenses, peak temp, uptime streaks, fires survived, etc.

@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
-import type { LayerVisibility, LayerOpacity, LayerColors, LayerColorOverrides, TrafficLink, CabinetEnvironment, CabinetFacing, PlacementHint, DataCenterLayout } from '@/stores/gameStore'
-import { DEFAULT_COLORS, ENVIRONMENT_CONFIG, MAX_SERVERS_PER_CABINET, getFacingOffsets } from '@/stores/gameStore'
+import type { LayerVisibility, LayerOpacity, LayerColors, LayerColorOverrides, TrafficLink, CabinetEnvironment, CabinetFacing, PlacementHint, DataCenterLayout, CoolingUnitType } from '@/stores/gameStore'
+import { DEFAULT_COLORS, ENVIRONMENT_CONFIG, MAX_SERVERS_PER_CABINET, getFacingOffsets, COOLING_UNIT_CONFIG } from '@/stores/gameStore'
 
 const COLORS = DEFAULT_COLORS
 
@@ -66,6 +66,14 @@ interface CableTrayEntry {
   row: number
 }
 
+interface CoolingUnitEntry {
+  id: string
+  col: number
+  row: number
+  type: CoolingUnitType
+  operational: boolean
+}
+
 interface SpineEntry {
   id: string
   slot: number
@@ -119,6 +127,9 @@ class DataCenterScene extends Phaser.Scene {
   private pduEntries: Map<string, PDUEntry> = new Map()
   private cableTrayGraphics: Map<string, Phaser.GameObjects.Graphics> = new Map()
   private cableTrayEntries: Map<string, CableTrayEntry> = new Map()
+  private coolingUnitGraphics: Map<string, Phaser.GameObjects.Graphics> = new Map()
+  private coolingUnitLabels: Map<string, Phaser.GameObjects.Text> = new Map()
+  private coolingUnitEntries: Map<string, CoolingUnitEntry> = new Map()
   private facingIndicators: Map<string, Phaser.GameObjects.Text> = new Map()
 
   // Placement mode
@@ -1645,16 +1656,133 @@ class DataCenterScene extends Phaser.Scene {
     this.renderCableTray(entry)
   }
 
+  /** Render a cooling unit at a grid position */
+  private renderCoolingUnit(entry: CoolingUnitEntry) {
+    const oldG = this.coolingUnitGraphics.get(entry.id)
+    if (oldG) oldG.destroy()
+    const oldLabel = this.coolingUnitLabels.get(entry.id)
+    if (oldLabel) oldLabel.destroy()
+
+    const cfg = COOLING_UNIT_CONFIG.find((c) => c.type === entry.type)
+    if (!cfg) return
+
+    const { x, y } = this.isoToScreen(entry.col, entry.row)
+    const cx = x
+    const cy = y + TILE_H / 2
+
+    const g = this.add.graphics()
+    const baseDepth = 9 + entry.row * this.cabCols + entry.col
+
+    // Parse hex color from config
+    const hexStr = cfg.color.replace('#', '')
+    const colorNum = parseInt(hexStr, 16)
+    const darkerColor = ((colorNum >> 1) & 0x7f7f7f)
+    const darkestColor = ((colorNum >> 2) & 0x3f3f3f)
+
+    if (entry.operational) {
+      this.drawIsoCube(g, cx, cy, CUBE_W * 0.5, CUBE_H * 0.5, 8,
+        { top: colorNum, side: darkerColor, front: darkestColor }, 0.85)
+    } else {
+      // Failed unit: red tint, lower alpha
+      this.drawIsoCube(g, cx, cy, CUBE_W * 0.5, CUBE_H * 0.5, 8,
+        { top: 0xff2222, side: 0xaa1111, front: 0x770808 }, 0.6)
+    }
+
+    // Coverage ring for units with range > 0
+    if (cfg.range > 0 && entry.operational) {
+      g.lineStyle(1, colorNum, 0.2)
+      // Draw diamond outline at range distance
+      const rng = cfg.range
+      for (let dr = -rng; dr <= rng; dr++) {
+        for (let dc = -rng; dc <= rng; dc++) {
+          if (Math.abs(dr) + Math.abs(dc) > rng) continue
+          const tc = entry.col + dc
+          const tr = entry.row + dr
+          if (tc < 0 || tr < 0 || tc >= this.cabCols || tr >= this.cabRows) continue
+          const { x: tx, y: ty } = this.isoToScreen(tc, tr)
+          const tcx = tx, tcy = ty + TILE_H / 2
+          g.lineStyle(1, colorNum, 0.15)
+          g.beginPath()
+          g.moveTo(tcx, tcy - TILE_H / 2 + 2)
+          g.lineTo(tcx + TILE_W / 2 - 4, tcy)
+          g.lineTo(tcx, tcy + TILE_H / 2 - 2)
+          g.lineTo(tcx - TILE_W / 2 + 4, tcy)
+          g.closePath()
+          g.strokePath()
+        }
+      }
+    }
+
+    g.setDepth(baseDepth)
+    this.coolingUnitGraphics.set(entry.id, g)
+
+    // Label
+    const shortLabel = entry.type === 'fan_tray' ? 'FAN' :
+      entry.type === 'crac' ? 'CRAC' :
+      entry.type === 'crah' ? 'CRAH' : 'IMR'
+    const labelColor = entry.operational ? cfg.color : '#ff4444'
+    const label = this.add
+      .text(cx, cy - 16, shortLabel, {
+        fontFamily: 'monospace',
+        fontSize: '6px',
+        color: labelColor,
+      })
+      .setOrigin(0.5)
+      .setAlpha(0.8)
+      .setDepth(baseDepth + 1)
+    this.coolingUnitLabels.set(entry.id, label)
+  }
+
+  /** Add a cooling unit to the scene */
+  addCoolingUnitToScene(id: string, col: number, row: number, type: CoolingUnitType, operational: boolean) {
+    const entry: CoolingUnitEntry = { id, col, row, type, operational }
+    this.coolingUnitEntries.set(id, entry)
+    this.renderCoolingUnit(entry)
+  }
+
+  /** Update cooling unit operational status */
+  updateCoolingUnit(id: string, operational: boolean) {
+    const entry = this.coolingUnitEntries.get(id)
+    if (!entry) return
+    entry.operational = operational
+    this.renderCoolingUnit(entry)
+  }
+
+  /** Remove a cooling unit from the scene */
+  removeCoolingUnitFromScene(id: string) {
+    const g = this.coolingUnitGraphics.get(id)
+    if (g) g.destroy()
+    const l = this.coolingUnitLabels.get(id)
+    if (l) l.destroy()
+    this.coolingUnitGraphics.delete(id)
+    this.coolingUnitLabels.delete(id)
+    this.coolingUnitEntries.delete(id)
+  }
+
+  /** Clear all cooling unit graphics */
+  clearCoolingUnits() {
+    for (const g of this.coolingUnitGraphics.values()) g.destroy()
+    for (const l of this.coolingUnitLabels.values()) l.destroy()
+    this.coolingUnitGraphics.clear()
+    this.coolingUnitLabels.clear()
+    this.coolingUnitEntries.clear()
+  }
+
   /** Clear all infrastructure graphics (for rebuild) */
   clearInfrastructure() {
     for (const g of this.pduGraphics.values()) g.destroy()
     for (const l of this.pduLabels.values()) l.destroy()
     for (const g of this.cableTrayGraphics.values()) g.destroy()
+    for (const g of this.coolingUnitGraphics.values()) g.destroy()
+    for (const l of this.coolingUnitLabels.values()) l.destroy()
     this.pduGraphics.clear()
     this.pduLabels.clear()
     this.pduEntries.clear()
     this.cableTrayGraphics.clear()
     this.cableTrayEntries.clear()
+    this.coolingUnitGraphics.clear()
+    this.coolingUnitLabels.clear()
+    this.coolingUnitEntries.clear()
   }
 
   /** Update aisle containment state and redraw aisle overlays */
