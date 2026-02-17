@@ -63,7 +63,7 @@ A web-based, 2D isometric Tycoon game (think Roller Coaster Tycoon) where the pl
 - **Suite Tiers** — Scale from Starter (4x2 grid) to Enterprise (10x5 grid) by purchasing upgrades.
 - **Tech Tree** — Research 9 technologies across Efficiency, Performance, and Resilience branches.
 - **Reputation** — Build reputation from Unknown to Legendary through uptime, SLA compliance, and incident management.
-- **Achievements** — Unlock 40+ achievements for milestones across all game systems.
+- **Achievements** — Unlock 67 achievements for milestones across all game systems.
 - **Scenarios** — Play themed challenges with specific goals and constraints.
 
 ### Staff & Operations

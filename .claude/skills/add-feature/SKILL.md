@@ -1,6 +1,6 @@
 # /add-feature — Add a New Game System
 
-Use this skill when adding a new game system, equipment type, mechanic, or feature to Fabric Tycoon. It enforces the 7-step integration checklist from CLAUDE.md so nothing gets missed.
+Use this skill when adding a new game system, equipment type, mechanic, or feature to Fabric Tycoon. It enforces the 9-step integration checklist from CLAUDE.md so nothing gets missed.
 
 ## Instructions
 
@@ -28,23 +28,36 @@ File: `src/stores/gameStore.ts`
 
 File: `src/stores/gameStore.ts`
 
-- Add processing logic in the `tick()` function (~730 lines)
+- Add processing logic in the `tick()` function
 - Place it in the correct section among the existing systems:
   1. Time-of-day
-  2. Incidents
-  3. Tech tree
-  4. Power market
-  5. Generators
-  6. Fire system
-  7. Heat
-  8. Revenue
-  9. Expenses
-  10. Infrastructure
-  11. Contracts
-  12. Reputation
-  13. Depreciation
-  14. Achievements
-  15. Traffic
+  2. Weather
+  3. Supply chain
+  4. Incidents & Ops Tier
+  5. Tech tree
+  6. Power market
+  7. Generators
+  8. Fire system
+  9. Heat
+  10. Revenue
+  11. Expenses
+  12. Noise
+  13. Spot compute
+  14. Staff
+  15. Maintenance
+  16. Infrastructure
+  17. Contracts
+  18. Reputation
+  19. Depreciation
+  20. Achievements
+  21. Traffic
+  22. Capacity history
+  23. Lifetime stats
+  24. Event logging
+  25. Tutorial
+  26. Carbon/Environment
+  27. Security/Compliance
+  28. Competitor AI
 
 ### Step 4: Update `calcStats()` (if applicable)
 
@@ -72,21 +85,40 @@ File: `src/components/GameCanvas.tsx`
 
 ### Step 7: Add UI Controls
 
-File: `src/components/HUD.tsx`
+File: `src/components/sidebar/*.tsx`
 
-- Add controls in the appropriate HUD panel section
+- Add controls in the appropriate sidebar panel (see `src/components/sidebar/` for all panels)
+- If no existing panel fits, create a new panel component and register it in `Sidebar.tsx`
 - Follow existing patterns: shadcn/ui buttons, Tailwind classes, neon color theme
 - Wrap interactive elements with `<Tooltip>` using the established pattern
 - Use `lucide-react` icons
+
+### Step 8: Add Tests
+
+File: `src/stores/__tests__/gameStore.test.ts`
+
+- Add tests for new store actions and tick behavior
+- Use the `setupBasicDataCenter()` helper for standard test fixtures
+- Follow existing `describe()` block organization by game system
+- Test both happy paths and edge cases
+
+### Step 9: Update `resetGame()`
+
+File: `src/stores/gameStore.ts`
+
+- Add all new state fields to the `resetGame()` action with their default values
+- Ensure a full reset returns the game to a clean initial state
 
 ### Final Checklist
 
 Before marking complete, verify:
 
 - [ ] `npm run lint` passes with no errors
+- [ ] `npm run test` passes with no failures
 - [ ] `npm run build` succeeds (TypeScript + Vite)
 - [ ] New types use `import type` where appropriate (`verbatimModuleSyntax`)
 - [ ] No unused variables or parameters (strict mode)
 - [ ] Constants use UPPER_SNAKE_CASE, types use PascalCase
 - [ ] State updates are immutable (spread operators, new arrays/objects)
 - [ ] `calcStats()` called after relevant mutations
+- [ ] `resetGame()` resets all new state fields

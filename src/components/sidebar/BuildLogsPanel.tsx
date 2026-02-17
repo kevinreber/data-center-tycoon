@@ -38,7 +38,7 @@ const CHANGELOG: VersionEntry[] = [
       { text: 'Busways, cross-connects, and in-row cooling infrastructure', type: 'new' },
       { text: 'Event log with filtering — track everything happening in your data center', type: 'improved' },
       { text: 'Lifetime statistics dashboard — cumulative stats across your entire run', type: 'improved' },
-      { text: 'Tutorial system — 27 contextual tips that appear as you discover new mechanics', type: 'improved' },
+      { text: 'Tutorial system — 30 contextual tips that appear as you discover new mechanics', type: 'improved' },
       { text: '30+ new achievements to unlock across all new systems', type: 'improved' },
     ],
   },
