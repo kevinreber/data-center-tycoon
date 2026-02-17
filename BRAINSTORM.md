@@ -1185,27 +1185,27 @@ interface TutorialTip {
 
 ## Layout & Physical Design — Future Ideas
 
-These are ideas that expand on the row-based layout system introduced with the realistic data center layout feature. They are explicitly deferred for later exploration.
+These are ideas that expand on the row-based layout system introduced with the realistic data center layout feature.
 
 ### Player-Built Rows
-**Impact: High | Effort: Medium**
+**Impact: High | Effort: Medium** — *Not yet implemented*
 Instead of pre-defined rows per suite tier, let the player choose where to place rows on the floor plan. This adds another layer of strategic planning — players decide row count, spacing, and orientation. Could introduce constraints like minimum aisle width, maximum row length, and fire code compliance.
 
 ### Flexible Row Placement
-**Impact: Medium | Effort: High**
+**Impact: Medium | Effort: High** — *Not yet implemented*
 Semi-free-form row positioning on a larger floor plan grid. Players could drag and drop rows, adjust row length, and create non-uniform layouts. Would require significant UI work for a row-placement editor and more complex validation logic.
 
-### Row-End Infrastructure Slots
-**Impact: Medium | Effort: Low**
-Dedicated positions at the end of each cabinet row for PDUs, in-row cooling units, network panels, and fire suppression equipment. Provides a natural location for infrastructure that's currently placed on the grid alongside cabinets.
+### Row-End Infrastructure Slots ✅
+**Impact: Medium | Effort: Low** — *Implemented*
+Dedicated positions at the end of each cabinet row for PDUs, in-row cooling units, network panels, and fire suppression equipment. 4 slot types: cooling_slot, pdu_slot, network_panel, fire_suppression. UI in Infrastructure panel.
 
-### Aisle Width Upgrades
-**Impact: Low | Effort: Low**
-Wider aisles (2-tile instead of 1-tile) for equipment cart access. Could reduce maintenance time (faster incident resolution), allow forklift access for heavy equipment, and unlock certain large-format cooling units. Trade-off: uses more floor space, reducing maximum cabinet density.
+### Aisle Width Upgrades ✅
+**Impact: Low | Effort: Low** — *Implemented*
+3 aisle width tiers: standard (1-tile), wide (2-tile, +0.5°C cooling), extra-wide (3-tile, +1.0°C cooling). Per-aisle upgrades with cost scaling. UI in Infrastructure panel.
 
-### Raised Floor / Overhead Cable Management
-**Impact: Medium | Effort: Medium**
-Visual and mechanical distinction between under-floor (cold air plenum) and overhead (cable trays, busways) infrastructure. Raised floor could provide better cooling distribution but costs more. Overhead cable management could be a cheaper alternative with different trade-offs (cable mess visibility, maintenance access).
+### Raised Floor / Overhead Cable Management ✅
+**Impact: Medium | Effort: Medium** — *Implemented*
+3 raised floor tiers (none, standard, advanced) providing cooling distribution bonuses. 3 cable management types (none, overhead, underfloor — underfloor requires raised floor). Sub-floor view mode shows cooling pipes and power conduits. UI in Infrastructure panel.
 
 ---
 

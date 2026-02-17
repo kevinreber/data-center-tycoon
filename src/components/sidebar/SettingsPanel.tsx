@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useGameStore, MAX_SAVE_SLOTS, SUITE_TIERS } from '@/stores/gameStore'
-import type { SaveSlotMeta } from '@/stores/gameStore'
+import type { SaveSlotMeta, LeaderboardCategory } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
-import { Save, Upload, RotateCw, Play, Trash2, Plus, AlertTriangle } from 'lucide-react'
+import { Save, Upload, RotateCw, Play, Trash2, Plus, AlertTriangle, Volume2, VolumeX, Trophy } from 'lucide-react'
 
 function formatMoney(n: number): string {
   if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`
@@ -99,6 +99,8 @@ export function SettingsPanel() {
     sandboxMode, toggleSandboxMode,
     saveGame, loadGame, deleteGame, resetGame,
     activeSlotId, saveSlots,
+    audioSettings, setAudioSettings,
+    leaderboardEntries, submitLeaderboardEntry,
   } = useGameStore()
 
   const [feedback, setFeedback] = useState<string | null>(null)
@@ -187,6 +189,71 @@ export function SettingsPanel() {
         <p className="text-[10px] text-muted-foreground mt-1.5">
           Resets to a fresh game. Existing saves are kept.
         </p>
+      </div>
+
+      {/* Audio Settings */}
+      <div className="border-t border-border pt-3">
+        <span className="text-xs font-bold text-muted-foreground tracking-widest mb-2 block">AUDIO</span>
+        <div className="flex items-center gap-2 mb-2">
+          <Button
+            variant={audioSettings.muted ? 'default' : 'outline'}
+            size="xs"
+            className="text-[9px] gap-1"
+            onClick={() => setAudioSettings({ muted: !audioSettings.muted })}
+          >
+            {audioSettings.muted ? <VolumeX className="size-3" /> : <Volume2 className="size-3" />}
+            {audioSettings.muted ? 'Unmute' : 'Mute'}
+          </Button>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-[10px] text-muted-foreground flex items-center justify-between">
+            Master
+            <input type="range" min="0" max="100" value={Math.round(audioSettings.masterVolume * 100)}
+              onChange={(e) => setAudioSettings({ masterVolume: Number(e.target.value) / 100 })}
+              className="w-20 h-1 accent-neon-green" />
+          </label>
+          <label className="text-[10px] text-muted-foreground flex items-center justify-between">
+            SFX
+            <input type="range" min="0" max="100" value={Math.round(audioSettings.sfxVolume * 100)}
+              onChange={(e) => setAudioSettings({ sfxVolume: Number(e.target.value) / 100 })}
+              className="w-20 h-1 accent-neon-green" />
+          </label>
+          <label className="text-[10px] text-muted-foreground flex items-center justify-between">
+            Ambient
+            <input type="range" min="0" max="100" value={Math.round(audioSettings.ambientVolume * 100)}
+              onChange={(e) => setAudioSettings({ ambientVolume: Number(e.target.value) / 100 })}
+              className="w-20 h-1 accent-neon-green" />
+          </label>
+        </div>
+      </div>
+
+      {/* Leaderboard */}
+      <div className="border-t border-border pt-3">
+        <div className="flex items-center gap-2 mb-2">
+          <Trophy className="size-3 text-neon-yellow" />
+          <span className="text-xs font-bold text-neon-yellow tracking-widest">LEADERBOARD</span>
+        </div>
+        {leaderboardEntries.length > 0 ? (
+          <div className="flex flex-col gap-1 mb-2">
+            {leaderboardEntries.slice(0, 5).map((entry, i) => (
+              <div key={entry.id} className="flex items-center text-[10px] gap-1">
+                <span className={`font-bold ${i === 0 ? 'text-neon-yellow' : i === 1 ? 'text-muted-foreground' : 'text-muted-foreground/60'}`}>#{i + 1}</span>
+                <span className="text-muted-foreground truncate">{entry.playerName}</span>
+                <span className="ml-auto tabular-nums text-neon-green/80">{entry.category === 'pue' ? entry.value.toFixed(2) : entry.value.toLocaleString()}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-[10px] text-muted-foreground mb-2">No entries yet.</p>
+        )}
+        <div className="flex gap-1">
+          {(['revenue', 'uptime', 'cabinets'] as LeaderboardCategory[]).map((cat) => (
+            <Button key={cat} variant="outline" size="xs" className="text-[9px] flex-1"
+              onClick={() => submitLeaderboardEntry('Player', cat)}>
+              {cat.charAt(0).toUpperCase() + cat.slice(1)}
+            </Button>
+          ))}
+        </div>
       </div>
 
       {/* Sandbox */}

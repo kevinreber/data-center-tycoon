@@ -2470,3 +2470,208 @@ describe('Zone Contracts', () => {
   })
 })
 
+// ============================================================================
+// New Feature Tests
+// ============================================================================
+
+describe('Row-End Infrastructure Slots', () => {
+  it('places a row-end slot', () => {
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'standard' })
+    expect(getState().rowEndSlots).toHaveLength(0)
+    getState().placeRowEndSlot(0, 'left', 'cooling_slot')
+    expect(getState().rowEndSlots).toHaveLength(1)
+    expect(getState().rowEndSlots[0].type).toBe('cooling_slot')
+    expect(getState().rowEndSlots[0].side).toBe('left')
+  })
+
+  it('prevents duplicate slots in same position', () => {
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'standard' })
+    getState().placeRowEndSlot(0, 'left', 'cooling_slot')
+    getState().placeRowEndSlot(0, 'left', 'pdu_slot')
+    expect(getState().rowEndSlots).toHaveLength(1)
+  })
+
+  it('removes a row-end slot', () => {
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'standard' })
+    getState().placeRowEndSlot(0, 'left', 'cooling_slot')
+    const slotId = getState().rowEndSlots[0].id
+    getState().removeRowEndSlot(slotId)
+    expect(getState().rowEndSlots).toHaveLength(0)
+  })
+})
+
+describe('Aisle Width Upgrades', () => {
+  it('upgrades aisle width', () => {
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'standard' })
+    expect(Object.keys(getState().aisleWidths)).toHaveLength(0)
+    getState().upgradeAisleWidth(0, 'wide')
+    expect(getState().aisleWidths[0]).toBe('wide')
+  })
+})
+
+describe('Raised Floor', () => {
+  it('installs raised floor', () => {
+    setState({ sandboxMode: true, money: 999999 })
+    expect(getState().raisedFloorTier).toBe('none')
+    getState().installRaisedFloor('basic')
+    expect(getState().raisedFloorTier).toBe('basic')
+  })
+
+  it('installs advanced raised floor', () => {
+    setState({ sandboxMode: true, money: 999999 })
+    getState().installRaisedFloor('advanced')
+    expect(getState().raisedFloorTier).toBe('advanced')
+  })
+})
+
+describe('Cable Management', () => {
+  it('sets cable management type', () => {
+    setState({ sandboxMode: true, money: 999999 })
+    getState().setCableManagement('overhead')
+    expect(getState().cableManagementType).toBe('overhead')
+  })
+
+  it('blocks underfloor without raised floor', () => {
+    setState({ sandboxMode: true, money: 999999, raisedFloorTier: 'none' })
+    getState().setCableManagement('underfloor')
+    expect(getState().cableManagementType).toBe('none')
+  })
+
+  it('allows underfloor with raised floor', () => {
+    setState({ sandboxMode: true, money: 999999, raisedFloorTier: 'basic' })
+    getState().setCableManagement('underfloor')
+    expect(getState().cableManagementType).toBe('underfloor')
+  })
+})
+
+describe('Workload Simulation', () => {
+  it('starts a workload on a cabinet', () => {
+    setupBasicDataCenter()
+    const cab = getState().cabinets[0]
+    expect(getState().activeWorkloads).toHaveLength(0)
+    getState().startWorkload('batch_processing', cab.id)
+    expect(getState().activeWorkloads).toHaveLength(1)
+    expect(getState().activeWorkloads[0].type).toBe('batch_processing')
+    expect(getState().activeWorkloads[0].status).toBe('running')
+  })
+
+  it('prevents two workloads on same cabinet', () => {
+    setupBasicDataCenter()
+    const cab = getState().cabinets[0]
+    getState().startWorkload('batch_processing', cab.id)
+    getState().startWorkload('ai_training', cab.id)
+    expect(getState().activeWorkloads).toHaveLength(1)
+  })
+
+  it('cancels a workload', () => {
+    setupBasicDataCenter()
+    const cab = getState().cabinets[0]
+    getState().startWorkload('batch_processing', cab.id)
+    const wlId = getState().activeWorkloads[0].id
+    getState().cancelWorkload(wlId)
+    expect(getState().activeWorkloads).toHaveLength(0)
+  })
+})
+
+describe('Advanced Scaling Tiers', () => {
+  it('unlocks nuclear tier', () => {
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'enterprise' })
+    expect(getState().advancedTier).toBeNull()
+    getState().unlockAdvancedTier('nuclear')
+    expect(getState().advancedTier).toBe('nuclear')
+  })
+
+  it('blocks fusion without nuclear', () => {
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'enterprise' })
+    getState().unlockAdvancedTier('fusion')
+    expect(getState().advancedTier).toBeNull()
+  })
+
+  it('unlocks fusion after nuclear', () => {
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'enterprise', advancedTier: 'nuclear' })
+    getState().unlockAdvancedTier('fusion')
+    expect(getState().advancedTier).toBe('fusion')
+  })
+})
+
+describe('42U Rack Model', () => {
+  it('installs rack equipment', () => {
+    setupBasicDataCenter()
+    const cab = getState().cabinets[0]
+    getState().installRackEquipment(cab.id, 1, 'server_2u')
+    const detail = getState().rackDetails[cab.id]
+    expect(detail).toBeDefined()
+    expect(detail.slots).toHaveLength(1)
+    expect(detail.totalUsedU).toBe(2)
+  })
+
+  it('prevents overlapping equipment', () => {
+    setupBasicDataCenter()
+    const cab = getState().cabinets[0]
+    getState().installRackEquipment(cab.id, 1, 'server_2u')
+    getState().installRackEquipment(cab.id, 2, 'server_1u') // overlaps at position 2
+    expect(getState().rackDetails[cab.id].slots).toHaveLength(1)
+  })
+
+  it('removes rack equipment', () => {
+    setupBasicDataCenter()
+    const cab = getState().cabinets[0]
+    getState().installRackEquipment(cab.id, 1, 'server_2u')
+    getState().removeRackEquipment(cab.id, 1)
+    expect(getState().rackDetails[cab.id].totalUsedU).toBe(0)
+  })
+})
+
+describe('Leaderboard', () => {
+  it('submits a leaderboard entry', () => {
+    setState({ sandboxMode: true, money: 100000 })
+    getState().submitLeaderboardEntry('TestPlayer', 'net_worth')
+    expect(getState().leaderboardEntries).toHaveLength(1)
+    expect(getState().leaderboardEntries[0].playerName).toBe('TestPlayer')
+    expect(getState().leaderboardEntries[0].value).toBe(100000)
+  })
+})
+
+describe('Audio Settings', () => {
+  it('updates audio settings', () => {
+    getState().setAudioSettings({ muted: true })
+    expect(getState().audioSettings.muted).toBe(true)
+
+    getState().setAudioSettings({ masterVolume: 0.8, muted: false })
+    expect(getState().audioSettings.masterVolume).toBe(0.8)
+    expect(getState().audioSettings.muted).toBe(false)
+  })
+})
+
+describe('View Mode', () => {
+  it('changes view mode', () => {
+    expect(getState().viewMode).toBe('cabinet')
+    getState().setViewMode('sub_floor')
+    expect(getState().viewMode).toBe('sub_floor')
+  })
+})
+
+describe('Reset Game includes new features', () => {
+  it('resets all new feature state', () => {
+    setState({ sandboxMode: true, money: 999999, suiteTier: 'standard' })
+    getState().placeRowEndSlot(0, 'left', 'cooling_slot')
+    getState().upgradeAisleWidth(0, 'wide')
+    getState().installRaisedFloor('basic')
+    getState().setCableManagement('overhead')
+    getState().setViewMode('sub_floor')
+    getState().unlockAdvancedTier('nuclear')
+    getState().setAudioSettings({ muted: true })
+
+    getState().resetGame()
+
+    expect(getState().rowEndSlots).toHaveLength(0)
+    expect(Object.keys(getState().aisleWidths)).toHaveLength(0)
+    expect(getState().raisedFloorTier).toBe('none')
+    expect(getState().cableManagementType).toBe('none')
+    expect(getState().viewMode).toBe('cabinet')
+    expect(getState().advancedTier).toBeNull()
+    expect(getState().activeWorkloads).toHaveLength(0)
+    expect(getState().audioSettings.muted).toBe(false)
+  })
+})
+

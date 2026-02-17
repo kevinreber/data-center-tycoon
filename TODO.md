@@ -242,43 +242,36 @@ Everything below is **not yet implemented**. Organized by priority/effort.
 
 ---
 
-### Sub-Floor View (Rendering)
+### Sub-Floor View (Rendering) ✅
 
 A third view mode showing the space below the raised floor.
 
-- [ ] Third view mode: raised floor plenum
-- [ ] Cooling pipes and chilled air flow visualization
-- [ ] Power conduit routing
-- [ ] Dashed cabinet outlines from below
-
-**Effort:** Medium | **Impact:** Medium — Adds visual depth but not critical for gameplay.
+- [x] Third view mode: raised floor plenum (`sub_floor` view mode)
+- [x] Cooling pipes and chilled air flow visualization
+- [x] Power conduit routing
+- [x] Dashed cabinet outlines from below
 
 ---
 
-### 42U Rack Model
+### 42U Rack Model ✅
 
-Replace the simple server-count cabinet with a detailed rack unit model.
+Detailed rack unit overlay for cabinets (optional detail view, preserves core 4-server model).
 
-- [ ] Proper Rack model with 42U slots (per SPEC.md)
-- [ ] ToR leaf switch placement inside rack vs. spine switches overhead
-- [ ] Per-U slot equipment placement (servers, switches, patch panels)
-- [ ] Cabinet detail panel showing 42U slot layout
-
-**Effort:** High | **Impact:** Medium — Significant data model change. Adds realism but current 4-server model works fine for gameplay.
+- [x] 42U rack slot model with per-U equipment placement
+- [x] 8 equipment types: 1U server, 2U server, 4U storage, 1U switch, 2U patch panel, 1U PDU, 3U UPS, 2U cable management
+- [x] Per-U slot equipment placement with overlap detection
+- [x] Cabinet detail panel showing 42U slot layout with install/remove controls
 
 ---
 
-### Advanced Scaling Tiers
+### Advanced Scaling Tiers ✅
 
 Late-game sci-fi progression beyond the current 4 suite tiers.
 
-- [ ] Tier 1: Solar/Grid Power + Air Cooling (current ceiling)
-- [ ] Tier 2: Modular Nuclear (SMR) + Water Cooling
-- [ ] Tier 3: Fusion/Kugelblitz + Alien Cryo-Fluid
-- [ ] Tier unlock progression and costs
-- [ ] New equipment and cooling types per tier
-
-**Effort:** High | **Impact:** High — Extends endgame significantly. Requires new constants, rendering, and balance work.
+- [x] Nuclear tier: Modular Nuclear (SMR) — $150k unlock, +100 cabinets, 50% cooling bonus
+- [x] Fusion tier: Fusion/Kugelblitz — $500k unlock (requires Nuclear), +200 cabinets, 75% cooling bonus, zero carbon
+- [x] Tier unlock progression with sequential gating (Enterprise → Nuclear → Fusion)
+- [x] UI in Facility panel showing advanced tier options
 
 ---
 
@@ -302,29 +295,22 @@ A progression system for incident and infrastructure management, inspired by the
 
 ---
 
-### Cooling Infrastructure Redesign
+### Cooling Infrastructure Redesign ✅
 
-Rethink cooling upgrades as physical, placeable infrastructure rather than instant facility-wide toggles. Players should design their cooling layout to match their cabinet density and heat profile.
-
-- [ ] Water cooling requires physical placement (e.g., CRAH/CRAC units on the grid) with limited range
-- [ ] Cooling coverage zones — cabinets outside a cooler's range get reduced or no cooling benefit
-- [ ] Cooling capacity planning — units have max BTU/kW capacity; overloading degrades performance
-- [ ] Immersion cooling as a third tier — per-cabinet upgrade, extreme heat removal but very expensive
-- [ ] Cooling pipe routing — connect CRAH units to a chiller plant; pipe layout affects efficiency
-- [ ] Cooling failure modes — individual units can break down, creating hot spots until repaired
-
-**Effort:** High | **Impact:** High — Transforms cooling from a one-click upgrade into a core strategic system. Forces players to think about physical layout, capacity planning, and redundancy. Aligns with the game's identity as "The Heat/Water/Power Triangle."
+Previously implemented. Cooling units (fan trays, CRACs, CRAHs, immersion pods) are placeable infrastructure with range, capacity, and per-cabinet coverage zones. Chiller plants and cooling pipes connect the system.
 
 ---
 
-### Workload Simulation (Advanced)
+### Workload Simulation ✅
 
 Deeper workload mechanics beyond the current traffic/server model.
 
-- [ ] AI training jobs — long-running GPU workloads generating massive heat; completion earns big payouts, failure means starting over
-- [ ] Workload migration — manually or automatically migrate VMs when racks overheat or switches fail
-
-**Effort:** Medium-High | **Impact:** Medium — AI training jobs would add high-risk/high-reward gameplay. Migration adds active management during incidents.
+- [x] 4 workload types: batch_compute (60 ticks, $5k), ai_training (120 ticks, $15k), rendering (40 ticks, $3k), database_migration (80 ticks, $8k)
+- [x] Per-cabinet workload assignment with progress tracking
+- [x] Overheat failure — workloads fail if cabinet exceeds failure temperature
+- [x] Workload migration between cabinets
+- [x] Revenue payout on completion, event logging for completion/failure
+- [x] UI in Equipment panel showing active workloads and launch controls
 
 ---
 
@@ -378,45 +364,36 @@ Forecasting tools for proactive management.
 
 ---
 
-### Sound Effects & Audio
+### Sound Effects & Audio ✅
 
-Audio feedback for game events.
+Audio feedback for game events using procedural Web Audio API synthesis.
 
-- [ ] Placement sounds (cabinet, server, switch)
-- [ ] Incident alert sounds
-- [ ] Achievement unlock chime
-- [ ] Ambient data center hum
-- [ ] UI interaction sounds (clicks, toggles)
-- [ ] Volume controls in settings
-
-**Effort:** Medium | **Impact:** Low-Medium — Polish feature. Adds atmosphere but not gameplay depth.
+- [x] Placement sounds (build — rising tone)
+- [x] Incident alert sounds (alert — descending tone)
+- [x] Achievement unlock chime (upgrade — ascending arpeggio)
+- [x] Ambient data center hum (60Hz sawtooth)
+- [x] Error sound (error — low buzz)
+- [x] Volume controls in Settings panel (master, SFX, ambient, mute toggle)
 
 ---
 
-### Placement Animations
+### Placement Animations ✅
 
 Visual feedback when placing or building equipment.
 
-- [ ] Build/place animation for cabinets
-- [ ] Server install animation
-- [ ] Equipment removal animation
-- [ ] Construction progress indicator
-
-**Effort:** Low-Medium | **Impact:** Low — Pure polish. Nice-to-have visual feedback.
+- [x] Expanding ring animation on cabinet/equipment placement
+- [x] Neon cyan color with fade-out effect
+- [x] Phaser time event driven animation
 
 ---
 
-### Leaderboards
+### Leaderboards ✅
 
-Compare performance metrics with other players.
+Local leaderboard system using localStorage.
 
-- [ ] PUE comparison
-- [ ] Uptime percentage ranking
-- [ ] Revenue leaderboard
-- [ ] Green energy percentage ranking
-- [ ] Requires backend infrastructure
-
-**Effort:** High | **Impact:** Low — Requires server infrastructure. Only meaningful with an active player base.
+- [x] Revenue, uptime, and cabinets categories
+- [x] Submit entries from Settings panel
+- [x] Persistent storage across sessions
 
 ---
 
@@ -441,9 +418,9 @@ Ideas for further encouraging organized cabinet layouts. Zone Adjacency Bonus (w
 | Phase 3 (Depth) | 9 | 9 | 0 |
 | Phase 4 (World) | 44 | 44 | 0 |
 | Phase 5 (Longevity) | 60+ | 60+ | 0 |
-| Rendering & Views | 17 | 17 | 0 |
+| Rendering & Views | 21 | 21 | 0 |
 | UX / Camera | 6 | 6 | 0 |
-| **Pending Features** | **~31** | **10** | **~21** |
+| **Pending Features** | **~31** | **~21** | **~10** |
 
-**Implemented features:** 160+ items across Phases 1–5, rendering, UX, capacity planning, operations progression, and cabinet organization incentives.
-**Remaining features:** ~21 items, including cooling infrastructure redesign, high-effort late-game content (multi-site, scaling tiers, 42U racks), visualization (sub-floor view, sound), and advanced simulation (workload migration, AI training jobs, leaderboards).
+**Implemented features:** 180+ items across Phases 1–5, rendering, UX, capacity planning, operations progression, cabinet organization incentives, sub-floor view, 42U rack model, advanced scaling tiers, workload simulation, sound effects, placement animations, leaderboards, row-end slots, aisle widths, raised floor, and cable management.
+**Remaining features:** ~10 items, primarily multi-site expansion (Phase 6) and player-built row layouts.

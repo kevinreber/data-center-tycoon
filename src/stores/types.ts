@@ -972,3 +972,166 @@ export interface DedicatedRowInfo {
 
 // ── Reputation Types ───────────────────────────────────────────
 export type ReputationTier = 'unknown' | 'poor' | 'average' | 'good' | 'excellent' | 'legendary'
+
+// ── View Mode Types ──────────────────────────────────────────
+export type ViewMode = 'cabinet' | 'above_cabinet' | 'sub_floor'
+
+// ── Row-End Infrastructure Slot Types ────────────────────────
+export type RowEndSlotType = 'pdu_slot' | 'cooling_slot' | 'fire_panel' | 'network_patch'
+
+export interface RowEndSlot {
+  id: string
+  rowId: number
+  side: 'left' | 'right'
+  type: RowEndSlotType
+  col: number
+  row: number
+}
+
+export interface RowEndSlotConfig {
+  type: RowEndSlotType
+  label: string
+  cost: number
+  effect: string
+  description: string
+  color: string
+}
+
+// ── Aisle Width Types ────────────────────────────────────────
+export type AisleWidth = 'standard' | 'wide' | 'extra_wide'
+
+export interface AisleWidthConfig {
+  width: AisleWidth
+  label: string
+  cost: number
+  maintenanceSpeedBonus: number
+  coolingBonus: number
+  description: string
+}
+
+// ── Raised Floor & Cable Management Types ────────────────────
+export type RaisedFloorTier = 'none' | 'basic' | 'advanced'
+export type CableManagementType = 'none' | 'overhead' | 'underfloor'
+
+export interface RaisedFloorConfig {
+  tier: RaisedFloorTier
+  label: string
+  cost: number
+  coolingDistributionBonus: number
+  description: string
+}
+
+export interface CableManagementConfig {
+  type: CableManagementType
+  label: string
+  cost: number
+  cableMessReduction: number
+  description: string
+}
+
+// ── Workload Simulation Types ────────────────────────────────
+export type WorkloadType = 'ai_training' | 'batch_processing' | 'live_migration'
+export type WorkloadStatus = 'queued' | 'running' | 'migrating' | 'completed' | 'failed'
+
+export interface Workload {
+  id: string
+  type: WorkloadType
+  cabinetId: string
+  serversRequired: number
+  ticksTotal: number
+  ticksRemaining: number
+  status: WorkloadStatus
+  heatMultiplier: number
+  payoutOnComplete: number
+  startedAtTick: number
+}
+
+export interface WorkloadConfig {
+  type: WorkloadType
+  label: string
+  description: string
+  minServers: number
+  durationTicks: number
+  basePayout: number
+  heatMultiplier: number
+  failOnOverheat: boolean
+  failTemp: number
+  color: string
+}
+
+// ── Advanced Scaling Tier Types ──────────────────────────────
+export type AdvancedTier = 'nuclear' | 'fusion'
+
+export interface AdvancedTierConfig {
+  tier: AdvancedTier
+  label: string
+  description: string
+  prerequisiteSuiteTier: SuiteTier
+  unlockCost: number
+  cols: number
+  maxCabinets: number
+  maxSpines: number
+  powerType: string
+  coolingType: string
+  coolingRate: number
+  powerCostMultiplier: number
+  carbonPerKW: number
+  color: string
+}
+
+// ── Player-Built Row Types ───────────────────────────────────
+export interface CustomRow {
+  id: number
+  gridRow: number
+  facing: CabinetFacing
+  placedByPlayer: boolean
+}
+
+// ── 42U Rack Model Types ─────────────────────────────────────
+export type RackEquipmentType = 'server_1u' | 'server_2u' | 'server_4u' | 'switch_1u' | 'patch_panel_1u' | 'ups_2u' | 'blank_1u' | 'storage_2u'
+
+export interface RackSlot {
+  position: number
+  height: number
+  equipment: RackEquipmentType | null
+}
+
+export interface RackEquipmentConfig {
+  type: RackEquipmentType
+  label: string
+  heightU: number
+  cost: number
+  powerDraw: number
+  heatOutput: number
+  revenuePerTick: number
+  description: string
+  color: string
+}
+
+export interface RackDetail {
+  cabinetId: string
+  slots: RackSlot[]
+  totalUsedU: number
+  totalCapacityU: number
+}
+
+// ── Leaderboard Types ────────────────────────────────────────
+export type LeaderboardCategory = 'revenue' | 'uptime' | 'pue' | 'cabinets' | 'green_energy' | 'net_worth'
+
+export interface LeaderboardEntry {
+  id: string
+  playerName: string
+  category: LeaderboardCategory
+  value: number
+  suiteTier: SuiteTier
+  tickCount: number
+  timestamp: number
+}
+
+// ── Audio Settings Types ─────────────────────────────────────
+export interface AudioSettings {
+  masterVolume: number
+  sfxVolume: number
+  ambientVolume: number
+  muted: boolean
+}
