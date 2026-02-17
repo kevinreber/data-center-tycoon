@@ -4,6 +4,7 @@ export type NodeType = 'server' | 'leaf_switch' | 'spine_switch'
 export type GameSpeed = 0 | 1 | 2 | 3
 export type CabinetEnvironment = 'production' | 'lab' | 'management'
 export type CoolingType = 'air' | 'water'
+export type CoolingUnitType = 'fan_tray' | 'crac' | 'crah' | 'immersion_pod'
 export type CustomerType = 'general' | 'ai_training' | 'streaming' | 'crypto' | 'enterprise'
 export type GeneratorStatus = 'standby' | 'running' | 'cooldown'
 export type SuppressionType = 'none' | 'water_suppression' | 'gas_suppression'
@@ -1225,6 +1226,9 @@ export const TUTORIAL_TIPS: TutorialTip[] = [
   { id: 'price_war', title: 'Price War!', message: 'A competitor has started a price war! Contract revenue is temporarily reduced across the market.', category: 'market' },
   // Operations Progression tips
   { id: 'ops_upgrade_available', title: 'Ops Upgrade Ready', message: 'You meet the requirements to upgrade your operations tier! Check the Operations panel to unlock better automation and reduced incident costs.', category: 'incidents' },
+  // Cooling Infrastructure tips
+  { id: 'cooling_units_hint', title: 'Cooling Units', message: 'Place cooling units near cabinets for targeted heat removal. Different units have different range and capacity — plan your layout!', category: 'cooling' },
+  { id: 'cooling_overloaded', title: 'Cooling Overloaded', message: 'A cooling unit is serving more cabinets than its max capacity. Efficiency is degraded — add more units or spread out cabinets.', category: 'cooling' },
 ]
 
 // ── Procedural Name Generation ──────────────────────────────────
@@ -1266,6 +1270,87 @@ export const COOLING_CONFIG: Record<CoolingType, {
     description: 'Chilled water cooling. Higher operating cost but dramatically better heat removal and lower PUE.',
   },
 }
+
+// ── Cooling Unit Infrastructure ─────────────────────────────────
+
+export interface CoolingUnit {
+  id: string
+  type: CoolingUnitType
+  col: number
+  row: number
+  operational: boolean        // false when disabled by incident
+}
+
+export interface CoolingUnitConfig {
+  type: CoolingUnitType
+  label: string
+  cost: number
+  coolingRate: number          // °C removed per tick per cabinet in range
+  range: number                // Manhattan distance coverage (0 = same tile only)
+  maxCabinets: number          // max cabinets at full efficiency; beyond this, effectiveness degrades
+  powerDraw: number            // watts
+  waterUsage: number           // gallons per tick (0 for air-cooled units)
+  color: string
+  description: string
+  requiresTech: string | null  // tech tree unlock required (null = always available)
+}
+
+export const COOLING_UNIT_CONFIG: CoolingUnitConfig[] = [
+  {
+    type: 'fan_tray',
+    label: 'Fan Tray',
+    cost: 3000,
+    coolingRate: 1.5,
+    range: 1,
+    maxCabinets: 3,
+    powerDraw: 100,
+    waterUsage: 0,
+    color: '#88ccff',
+    description: 'Basic fan array. Cheap and easy to deploy but limited cooling capacity.',
+    requiresTech: null,
+  },
+  {
+    type: 'crac',
+    label: 'CRAC Unit',
+    cost: 15000,
+    coolingRate: 3.0,
+    range: 2,
+    maxCabinets: 6,
+    powerDraw: 300,
+    waterUsage: 0,
+    color: '#44aaff',
+    description: 'Computer Room Air Conditioner. Reliable air-based cooling with good coverage.',
+    requiresTech: null,
+  },
+  {
+    type: 'crah',
+    label: 'CRAH Unit',
+    cost: 35000,
+    coolingRate: 5.0,
+    range: 3,
+    maxCabinets: 10,
+    powerDraw: 400,
+    waterUsage: 3,
+    color: '#00ccff',
+    description: 'Computer Room Air Handler with chilled water. Superior cooling for dense deployments.',
+    requiresTech: 'hot_aisle',
+  },
+  {
+    type: 'immersion_pod',
+    label: 'Immersion Pod',
+    cost: 60000,
+    coolingRate: 8.0,
+    range: 0,
+    maxCabinets: 1,
+    powerDraw: 200,
+    waterUsage: 5,
+    color: '#cc66ff',
+    description: 'Liquid immersion cooling for a single cabinet. Extreme heat removal for high-density workloads.',
+    requiresTech: 'immersion_cooling',
+  },
+]
+
+const BASE_AMBIENT_DISSIPATION = 0.3  // °C/tick ambient heat loss even without cooling units
 
 // ── Loan System Types ───────────────────────────────────────────
 
@@ -1484,6 +1569,10 @@ export const ACHIEVEMENT_CATALOG: AchievementDef[] = [
   { id: 'sre', label: 'SRE', description: 'Unlock Basic Automation ops tier.', icon: '🤖' },
   { id: 'platform_engineer', label: 'Platform Engineer', description: 'Unlock Full Orchestration ops tier.', icon: '🚀' },
   { id: 'lights_out', label: 'Lights Out', description: 'Auto-resolve 20 incidents via ops automation.', icon: '💡' },
+  // Cooling Infrastructure achievements
+  { id: 'first_cooling_unit', label: 'Stay Cool', description: 'Place your first cooling unit.', icon: '🧊' },
+  { id: 'cooling_fleet', label: 'Cooling Fleet', description: 'Have 10 or more cooling units operational.', icon: '❄️' },
+  { id: 'immersion_pioneer', label: 'Immersion Pioneer', description: 'Deploy an immersion cooling pod.', icon: '🌊' },
 ]
 
 export interface EnvironmentConfig {
@@ -1700,6 +1789,38 @@ export function calcManagementBonus(cabinets: Cabinet[]): number {
     }
   }
   return Math.min(MGMT_BONUS_CAP, mgmtServers * MGMT_BONUS_PER_SERVER)
+}
+
+// ── Cooling Unit Helpers ───────────────────────────────────────────
+
+/** Calculate the effective cooling rate for a specific cabinet from all nearby cooling units.
+ *  Each unit provides its full coolingRate if serving <= maxCabinets, otherwise it degrades. */
+export function calcCabinetCooling(
+  cab: Cabinet,
+  coolingUnits: CoolingUnit[],
+  allCabinets: Cabinet[],
+): number {
+  let totalCooling = BASE_AMBIENT_DISSIPATION
+  for (const unit of coolingUnits) {
+    if (!unit.operational) continue
+    const config = COOLING_UNIT_CONFIG.find((c) => c.type === unit.type)
+    if (!config) continue
+    const dist = Math.abs(unit.col - cab.col) + Math.abs(unit.row - cab.row)
+    if (dist > config.range) continue
+
+    // Count how many powered cabinets this unit is serving
+    const servedCount = allCabinets.filter((c) =>
+      c.powerStatus && Math.abs(unit.col - c.col) + Math.abs(unit.row - c.row) <= config.range
+    ).length
+
+    // Efficiency degrades linearly when overloaded: at 2x max, effectiveness halves
+    const efficiency = servedCount <= config.maxCabinets
+      ? 1.0
+      : config.maxCabinets / servedCount
+
+    totalCooling += config.coolingRate * efficiency
+  }
+  return totalCooling
 }
 
 // ── Infrastructure Layout Helpers ──────────────────────────────────
@@ -2618,6 +2739,7 @@ interface GameState {
   busways: Busway[]
   crossConnects: CrossConnect[]
   inRowCoolers: InRowCooling[]
+  coolingUnits: CoolingUnit[]
 
   // Sandbox Mode
   sandboxMode: boolean
@@ -2800,6 +2922,8 @@ interface GameState {
   placeBusway: (col: number, row: number, optionIndex: number) => void
   placeCrossConnect: (col: number, row: number, optionIndex: number) => void
   placeInRowCooling: (col: number, row: number, optionIndex: number) => void
+  placeCoolingUnit: (type: CoolingUnitType, col: number, row: number) => void
+  removeCoolingUnit: (id: string) => void
   // Sandbox mode
   toggleSandboxMode: () => void
   // Scenario actions
@@ -3039,6 +3163,7 @@ export const useGameStore = create<GameState>((set) => ({
   busways: [],
   crossConnects: [],
   inRowCoolers: [],
+  coolingUnits: [],
 
   // Sandbox Mode
   sandboxMode: false,
@@ -3845,6 +3970,34 @@ export const useGameStore = create<GameState>((set) => ({
       }
     }),
 
+  placeCoolingUnit: (type: CoolingUnitType, col: number, row: number) =>
+    set((state) => {
+      const config = COOLING_UNIT_CONFIG.find((c) => c.type === type)
+      if (!config) return state
+      if (!state.sandboxMode && state.money < config.cost) return state
+      if (config.requiresTech && !state.unlockedTech.includes(config.requiresTech)) return state
+      // Max 20 cooling units total
+      if (state.coolingUnits.length >= 20) return state
+      // No duplicate placement on same tile (except immersion pods can share with cabinets)
+      if (state.coolingUnits.some((u) => u.col === col && u.row === row)) return state
+
+      const unit: CoolingUnit = {
+        id: `cu-${Date.now()}-${state.coolingUnits.length}`,
+        type,
+        col, row,
+        operational: true,
+      }
+      return {
+        coolingUnits: [...state.coolingUnits, unit],
+        money: state.sandboxMode ? state.money : state.money - config.cost,
+      }
+    }),
+
+  removeCoolingUnit: (id: string) =>
+    set((state) => ({
+      coolingUnits: state.coolingUnits.filter((u) => u.id !== id),
+    })),
+
   // ── Sandbox Mode ───────────────────────────────────────────────
 
   toggleSandboxMode: () =>
@@ -4423,6 +4576,14 @@ export const useGameStore = create<GameState>((set) => ({
       { id: 'irc-2', col: 6, row: aisleRows[1], coolingBonus: 3.5, label: 'High-Capacity In-Row' },
     ]
 
+    // Cooling units placed in aisles for coverage of adjacent cabinet rows
+    const demoCoolingUnits: CoolingUnit[] = [
+      { id: 'cu-demo-1', type: 'crac', col: 2, row: aisleRows[0], operational: true },
+      { id: 'cu-demo-2', type: 'crac', col: 7, row: aisleRows[1], operational: true },
+      { id: 'cu-demo-3', type: 'fan_tray', col: 0, row: aisleRows[2], operational: true },
+      { id: 'cu-demo-4', type: 'fan_tray', col: 9, row: aisleRows[0], operational: true },
+    ]
+
     // ── Staff
     const demoStaff: StaffMember[] = [
       { id: 'staff-1', name: 'Alex Chen', role: 'network_engineer', skillLevel: 2, salaryPerTick: 6, hiredAtTick: 200, onShift: true, certifications: ['ccna'], incidentsResolved: 12, fatigueLevel: 25 },
@@ -4562,6 +4723,7 @@ export const useGameStore = create<GameState>((set) => ({
       busways: demoBusways,
       crossConnects: demoCrossConnects,
       inRowCoolers: demoInRowCoolers,
+      coolingUnits: demoCoolingUnits,
       // Staff
       staff: demoStaff,
       shiftPattern: 'day_night' as ShiftPattern,
@@ -4765,6 +4927,7 @@ export const useGameStore = create<GameState>((set) => ({
       busways: [],
       crossConnects: [],
       inRowCoolers: [],
+      coolingUnits: [],
       sandboxMode: false,
       activeScenario: null,
       scenarioProgress: {},
@@ -4900,6 +5063,7 @@ export const useGameStore = create<GameState>((set) => ({
         busways: state.busways,
         crossConnects: state.crossConnects,
         inRowCoolers: state.inRowCoolers,
+        coolingUnits: state.coolingUnits,
         sandboxMode: state.sandboxMode,
         aisleContainments: state.aisleContainments,
         stockPrice: state.stockPrice,
@@ -4981,6 +5145,7 @@ export const useGameStore = create<GameState>((set) => ({
         busways: data.busways ?? state.busways,
         crossConnects: data.crossConnects ?? state.crossConnects,
         inRowCoolers: data.inRowCoolers ?? state.inRowCoolers,
+        coolingUnits: data.coolingUnits ?? state.coolingUnits,
         sandboxMode: data.sandboxMode ?? state.sandboxMode,
         aisleContainments: data.aisleContainments ?? state.aisleContainments,
         stockPrice: data.stockPrice ?? state.stockPrice,
@@ -5101,6 +5266,7 @@ export const useGameStore = create<GameState>((set) => ({
       busways: [],
       crossConnects: [],
       inRowCoolers: [],
+      coolingUnits: [],
       sandboxMode: false,
       activeScenario: null,
       scenarioProgress: {},
@@ -5210,6 +5376,7 @@ export const useGameStore = create<GameState>((set) => ({
       let activeIncidents = [...state.activeIncidents]
       let incidentLog = [...state.incidentLog]
       const resolvedCount = state.resolvedCount
+      let coolingUnits = [...state.coolingUnits]
       // Clean up resolved incidents and track hardware that needs restoration
       const justResolved = activeIncidents.filter((i) => i.resolved)
       activeIncidents = activeIncidents.filter((i) => !i.resolved)
@@ -5221,6 +5388,13 @@ export const useGameStore = create<GameState>((set) => ({
         if (inc.def.effect === 'hardware_failure' && inc.affectedHardwareId) {
           if (inc.def.hardwareTarget === 'leaf') restoredLeafCabIds.add(inc.affectedHardwareId)
           if (inc.def.hardwareTarget === 'spine') restoredSpineIds.add(inc.affectedHardwareId)
+        }
+        // Restore a disabled cooling unit when a cooling_failure incident resolves
+        if (inc.def.effect === 'cooling_failure') {
+          const disabled = coolingUnits.find((u) => !u.operational)
+          if (disabled) {
+            coolingUnits = coolingUnits.map((u) => u.id === disabled.id ? { ...u, operational: true } : u)
+          }
         }
       }
 
@@ -5277,6 +5451,15 @@ export const useGameStore = create<GameState>((set) => ({
             ...(affectedHwId ? { affectedHardwareId: affectedHwId } : {}),
           }
           activeIncidents.push(incident)
+          // Cooling failure incidents disable a random operational cooling unit
+          if (selectedDef.effect === 'cooling_failure' && coolingUnits.length > 0) {
+            const operational = coolingUnits.filter((u) => u.operational)
+            if (operational.length > 0) {
+              const target = operational[Math.floor(Math.random() * operational.length)]
+              coolingUnits = coolingUnits.map((u) => u.id === target.id ? { ...u, operational: false } : u)
+              incidentLog = [`Cooling unit offline: ${COOLING_UNIT_CONFIG.find(c => c.type === target.type)?.label ?? target.type} at (${target.col},${target.row})`, ...incidentLog].slice(0, 10)
+            }
+          }
           incidentLog = [`New: ${selectedDef.label} — ${selectedDef.description}`, ...incidentLog].slice(0, 10)
         } else if (opsSpawnReduction > 0 && Math.random() < baseSpawnChance) {
           // Incident was prevented by ops tier
@@ -5755,7 +5938,7 @@ export const useGameStore = create<GameState>((set) => ({
           }
         }
 
-        // In-row cooling bonus: nearby in-row coolers provide extra cooling
+        // In-row cooling bonus: nearby in-row coolers provide extra cooling (legacy system)
         let inRowBonus = 0
         for (const cooler of state.inRowCoolers) {
           const config = INROW_COOLING_OPTIONS.find((o) => o.label === cooler.label)
@@ -5764,14 +5947,20 @@ export const useGameStore = create<GameState>((set) => ({
           }
         }
 
+        // Cooling unit infrastructure: per-cabinet coverage from placed cooling units
+        const unitCooling = calcCabinetCooling(cab, state.coolingUnits, state.cabinets)
+
         // Zone adjacency heat reduction
         const zoneBonus = cabinetZoneBonuses.get(cab.id)
         const zoneHeatReduction = zoneBonus ? zoneBonus.heatReduction : 0
 
-        // Cooling dissipation (base + tech bonus + aisle bonus + in-row cooling + zone bonus; reduced by incident effects)
+        // Cooling dissipation: facility-wide base + cooling units + in-row + tech + aisle + zone + staff
+        // When cooling units are placed, they provide the primary cooling via unitCooling (which includes BASE_AMBIENT_DISSIPATION)
+        // The facility-wide coolingConfig.coolingRate still applies as legacy/base layer
         const aisleCoolingBoost = currentAisleBonus * 2 // up to +0.6°C/tick extra cooling
         const zoneHeatBoost = zoneHeatReduction * SIM.heatPerServer // scale zone heat reduction relative to heat generation
-        heat -= (coolingConfig.coolingRate + techCoolingBonus + aisleCoolingBoost + inRowBonus + staffCoolingBonus + zoneHeatBoost) * incidentCoolingMult
+        const baseCooling = state.coolingUnits.length > 0 ? unitCooling : coolingConfig.coolingRate
+        heat -= (baseCooling + techCoolingBonus + aisleCoolingBoost + inRowBonus + staffCoolingBonus + zoneHeatBoost) * incidentCoolingMult
 
         // Incident heat spike
         heat += incidentHeatAdd
@@ -5938,7 +6127,13 @@ export const useGameStore = create<GameState>((set) => ({
       const spotPowerCost = SIM.powerCostPerKW * effectivePowerPrice
       const powerCost = +(effectivePower / 1000 * spotPowerCost).toFixed(2)
       const coolingCost = +(adjustedCoolingPower / 1000 * spotPowerCost).toFixed(2)
-      const expenses = +(powerCost + coolingCost + generatorFuelCost).toFixed(2)
+      // Cooling unit power draw
+      const coolingUnitPower = coolingUnits.filter((u) => u.operational).reduce((sum, u) => {
+        const cfg = COOLING_UNIT_CONFIG.find((c) => c.type === u.type)
+        return sum + (cfg?.powerDraw ?? 0)
+      }, 0)
+      const coolingUnitPowerCost = +(coolingUnitPower / 1000 * spotPowerCost).toFixed(2)
+      const expenses = +(powerCost + coolingCost + coolingUnitPowerCost + generatorFuelCost).toFixed(2)
 
       // 5. Process loan payments
       let loanPayments = 0
@@ -6453,11 +6648,15 @@ export const useGameStore = create<GameState>((set) => ({
       const effectiveCarbonTaxRate = Math.max(0, baseCarbonTaxRate * (1 - Math.min(1, certTaxReduction)))
       const carbonTaxPerTick = +(carbonEmissionsPerTick * effectiveCarbonTaxRate).toFixed(4)
 
-      // Water usage (only water cooling, affected by drought)
+      // Water usage (facility-wide water cooling + cooling unit water usage, affected by drought)
       const isDrought = state.activeIncidents.some((i) => i.def.type === 'drought' && !i.resolved)
       const waterMultiplier = isDrought ? WATER_USAGE_CONFIG.droughtPriceMultiplier : 1
       const waterCabinets = state.coolingType === 'water' ? newCabinets.filter((c) => c.powerStatus).length : 0
-      const waterUsagePerTick = waterCabinets * WATER_USAGE_CONFIG.gallonsPerCabinetPerTick
+      const coolingUnitWaterUsage = coolingUnits.filter((u) => u.operational).reduce((sum, u) => {
+        const cfg = COOLING_UNIT_CONFIG.find((c) => c.type === u.type)
+        return sum + (cfg?.waterUsage ?? 0)
+      }, 0)
+      const waterUsagePerTick = waterCabinets * WATER_USAGE_CONFIG.gallonsPerCabinetPerTick + coolingUnitWaterUsage
       const waterCostPerTick = +(waterUsagePerTick * WATER_USAGE_CONFIG.costPerGallon * waterMultiplier).toFixed(2)
 
       // E-waste reputation penalty
@@ -6803,6 +7002,17 @@ export const useGameStore = create<GameState>((set) => ({
           if (tip.id === 'competitor_appeared' && competitors.length === 1 && state.competitors.length === 0) trigger = true
           if (tip.id === 'competitor_bidding' && competitorBids.length > 0 && state.competitorBids.length === 0) trigger = true
           if (tip.id === 'price_war' && priceWarActive && !state.priceWarActive) trigger = true
+          // Cooling Infrastructure tips
+          if (tip.id === 'cooling_units_hint' && newCabinets.length >= 3 && coolingUnits.length === 0) trigger = true
+          if (tip.id === 'cooling_overloaded' && coolingUnits.length > 0) {
+            for (const unit of coolingUnits) {
+              if (!unit.operational) continue
+              const cfg = COOLING_UNIT_CONFIG.find((c) => c.type === unit.type)
+              if (!cfg) continue
+              const served = newCabinets.filter((c) => c.powerStatus && Math.abs(unit.col - c.col) + Math.abs(unit.row - c.row) <= cfg.range).length
+              if (served > cfg.maxCabinets) { trigger = true; break }
+            }
+          }
           // Operations Progression tips
           if (tip.id === 'ops_upgrade_available' && state.opsTier !== 'orchestration') {
             const nextIdx = OPS_TIER_ORDER.indexOf(state.opsTier) + 1
@@ -6832,6 +7042,9 @@ export const useGameStore = create<GameState>((set) => ({
       if (state.busways.length >= 1) unlock('first_busway')
       if (state.crossConnects.length >= 1) unlock('first_crossconnect')
       if (state.inRowCoolers.length >= 1) unlock('first_inrow')
+      if (coolingUnits.length >= 1) unlock('first_cooling_unit')
+      if (coolingUnits.filter((u) => u.operational).length >= 10) unlock('cooling_fleet')
+      if (coolingUnits.some((u) => u.type === 'immersion_pod')) unlock('immersion_pioneer')
       if (state.sandboxMode) unlock('sandbox_activated')
       if (state.hasSaved) unlock('game_saved')
       if (scenariosCompleted.length > state.scenariosCompleted.length) unlock('scenario_complete')
@@ -7041,6 +7254,8 @@ export const useGameStore = create<GameState>((set) => ({
         // Operations Progression
         opsAutoResolvedCount,
         opsPreventedCount,
+        // Cooling infrastructure
+        coolingUnits,
       }
     }),
 }))
