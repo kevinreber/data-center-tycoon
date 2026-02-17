@@ -41,7 +41,7 @@ src/
 ├── index.css                   # Global styles, Tailwind imports, neon color theme
 ├── components/
 │   ├── GameCanvas.tsx          # Phaser <-> React bridge; syncs Zustand state to Phaser scene
-│   ├── Sidebar.tsx             # Icon-rail sidebar with 17 slide-out panels
+│   ├── Sidebar.tsx             # Icon-rail sidebar with 18 slide-out panels
 │   ├── HUD.tsx                 # Legacy control panel (build, layers, finance, traffic, equipment)
 │   ├── CabinetDetailPanel.tsx  # Floating detail panel for selected cabinet (stats, actions)
 │   ├── LayersPopup.tsx         # Layer visibility/opacity/color controls popup
@@ -68,12 +68,13 @@ src/
 │       ├── CapacityPanel.tsx   # Capacity planning dashboard, trends, projections, alerts
 │       ├── ProgressPanel.tsx   # Achievements, reputation, lifetime stats
 │       ├── SettingsPanel.tsx   # Save/load, sandbox mode, reset, demo
-│       └── GuidePanel.tsx      # How to play / tutorial (with Phase 4 system guides)
+│       ├── GuidePanel.tsx      # How to play / tutorial (with Phase 4 system guides)
+│       └── BuildLogsPanel.tsx  # What's New changelog (version history, player-facing)
 ├── game/
 │   ├── PhaserGame.ts           # Phaser scene: isometric rendering, traffic visualization, placement mode
 │   └── CLAUDE.md               # Phaser-specific coding rules (see Sub-module Rules below)
 ├── stores/
-│   ├── gameStore.ts            # Single Zustand store (~5300 lines): all game state, types, constants, actions
+│   ├── gameStore.ts            # Single Zustand store (~7100 lines): all game state, types, constants, actions
 │   ├── gameStore.test.ts       # Vitest tests for cabinet placement and placement hints
 │   ├── __tests__/
 │   │   └── gameStore.test.ts   # Vitest tests for Phase 5 systems (supply chain, weather, etc.)
@@ -101,7 +102,9 @@ src/
 ### Claude Code configuration
 
 - `.claude/settings.json` — Hooks: ESLint runs after Edit/Write on `.ts/.tsx` files; lint + type-check on session start
-- `.claude/skills/add-feature/SKILL.md` — 7-step feature addition checklist (invoked with `/add-feature`)
+- `.claude/skills/add-feature/SKILL.md` — 9-step feature addition checklist (invoked with `/add-feature`)
+- `.claude/skills/update-build-logs/SKILL.md` — Changelog update checklist (invoked with `/update-build-logs`)
+- `.claude/skills/validate-pr-docs/SKILL.md` — Pre-PR documentation validation (invoked with `/validate-pr-docs`)
 
 ## Sub-module Rules
 
@@ -114,7 +117,7 @@ The codebase has module-specific `CLAUDE.md` files with focused rules:
 
 ### State Management — `src/stores/gameStore.ts`
 
-All game state lives in a **single Zustand store** (`useGameStore`). This ~5300-line file contains:
+All game state lives in a **single Zustand store** (`useGameStore`). This ~7100-line file contains:
 
 - **Type definitions** (see Types section below)
 - **Simulation constants** (`SIM`): revenue rates, power costs, heat generation/dissipation, temperature thresholds
@@ -126,7 +129,7 @@ All game state lives in a **single Zustand store** (`useGameStore`). This ~5300-
 - **Spacing & layout configs** (`SPACING_CONFIG`): adjacency heat penalties, aisle bonuses, airflow bonuses, maintenance access, fire spread mechanics
 - **Zone bonus configs** (`ZONE_BONUS_CONFIG`): minimum cluster size (3), environment and customer type bonuses
 - **Economy configs**: loan options, depreciation, power market parameters, insurance options, valuation milestones
-- **Progression configs**: tech tree (9 techs), contracts (9 contracts + 4 compliance-gated), achievements (69+), incidents (17+ types), scenarios (5)
+- **Progression configs**: tech tree (9 techs), contracts (9 base + 4 compliance-gated), achievements (70), incidents (17 types), scenarios (5)
 - **Staff configs** (`STAFF_ROLE_CONFIG`, `STAFF_CERT_CONFIG`, `SHIFT_PATTERN_CONFIG`): roles, certifications, shift costs
 - **Supply chain configs** (`SUPPLY_CHAIN_CONFIG`): lead times, bulk discounts, shortage mechanics
 - **Weather configs** (`SEASON_CONFIG`, `WEATHER_CONDITION_CONFIG`): seasonal/weather ambient modifiers
@@ -378,8 +381,8 @@ gridRow 4: Corridor (bottom access)
 
 The UI uses a **sidebar-driven navigation pattern**:
 
-- **`Sidebar.tsx`** renders an icon rail on the left with 17 panel icons organized into top/middle/bottom sections. Clicking an icon slides out the corresponding panel.
-- **`sidebar/*.tsx`** — Each panel is a separate component: `BuildPanel`, `EquipmentPanel`, `FinancePanel`, `NetworkPanel`, `OperationsPanel`, `InfrastructurePanel`, `ResearchPanel`, `ContractsPanel`, `IncidentsPanel`, `FacilityPanel`, `CarbonPanel`, `SecurityPanel`, `MarketPanel`, `CapacityPanel`, `ProgressPanel`, `SettingsPanel`, `GuidePanel`
+- **`Sidebar.tsx`** renders an icon rail on the left with 18 panel icons organized into top/middle/bottom sections. Clicking an icon slides out the corresponding panel.
+- **`sidebar/*.tsx`** — Each panel is a separate component: `BuildPanel`, `EquipmentPanel`, `FinancePanel`, `NetworkPanel`, `OperationsPanel`, `InfrastructurePanel`, `ResearchPanel`, `ContractsPanel`, `IncidentsPanel`, `FacilityPanel`, `CarbonPanel`, `SecurityPanel`, `MarketPanel`, `CapacityPanel`, `ProgressPanel`, `SettingsPanel`, `GuidePanel`, `BuildLogsPanel`
 - **`CabinetDetailPanel.tsx`** — Floating detail panel shown when a cabinet is selected; displays hardware slots, real-time stats (power, temp, revenue, age, traffic), and actions (power toggle, flip facing, refresh servers)
 - **`LayersPopup.tsx`** — Layer controls popup for toggling visibility, opacity, and custom colors per network layer
 - **`HUD.tsx`** — Legacy monolithic control panel (still present, ~2940 lines)
@@ -407,7 +410,7 @@ A `setInterval` in `App.tsx` calls `tick()` at the rate determined by `gameSpeed
 1. **Time-of-day**: Advances `gameHour` (0–23), applies demand curve and random traffic spikes
 2. **Weather**: Season rotation, weather condition changes, ambient temperature modifiers
 3. **Supply chain**: Ticks pending orders, delivery processing, supply shortage events
-4. **Incidents & Ops Tier**: Spawns random incidents (20+ types, reduced by ops tier), ticks active incidents, applies effects (revenue penalties reduced by ops tier), ops tier auto-resolve bonus, prevented incident tracking
+4. **Incidents & Ops Tier**: Spawns random incidents (17 types, reduced by ops tier), ticks active incidents, applies effects (revenue penalties reduced by ops tier), ops tier auto-resolve bonus, prevented incident tracking
 5. **Tech tree**: Ticks active research progress
 6. **Power market**: Updates spot pricing with random walk, mean reversion, and price spikes
 7. **Generators**: Manages fuel consumption, startup/cooldown, auto-activation during outages
@@ -423,7 +426,7 @@ A `setInterval` in `App.tsx` calls `tick()` at the rate determined by `gameSpeed
 17. **Contracts**: Checks SLA compliance, termination/completion logic
 18. **Reputation**: Adjusts score based on SLAs, outages, fires, violations
 19. **Depreciation**: Ages servers, reduces efficiency after 30% of 800-tick lifespan
-20. **Achievements**: Checks 66+ achievement conditions
+20. **Achievements**: Checks 70 achievement conditions
 21. **Traffic**: ECMP distribution across active spines
 22. **Capacity history**: Records snapshot of current stats each tick (capped at 100 entries)
 23. **Lifetime stats**: Updates running totals (revenue, expenses, peak temp, uptime streaks, etc.)
@@ -522,7 +525,7 @@ A `setInterval` in `App.tsx` calls `tick()` at the rate determined by `gameSpeed
 - Revenue based on allocated capacity × current spot price
 
 **Incidents & Resilience:**
-- **20+ incident types** with minor/major/critical severity
+- **17 incident types** with minor/major/critical severity
 - **Generators**: 3 options (Small Diesel, Large Diesel, Natural Gas) with fuel management
 - **Fire suppression**: none, water (cheap, some damage), gas (expensive, minimal damage)
 - **Fires** trigger at critical temperature (95°C)
@@ -555,7 +558,7 @@ A `setInterval` in `App.tsx` calls `tick()` at the rate determined by `gameSpeed
 - **Patents**: Patent unlocked technologies for ongoing royalty income
 - **RFP Bidding**: Compete for contract wins/losses
 - **Scenario Challenges**: 5 predefined challenges with special rules and objectives
-- **Tutorial System**: 30 contextual tips triggered during gameplay (including carbon, security, market, and operations tips)
+- **Tutorial System**: 32 contextual tips triggered during gameplay (including carbon, security, market, operations, and cooling tips)
 - **Event Logging**: Filterable log of significant events (capped at 200)
 - **Capacity History**: Per-tick snapshot of key metrics (capped at 100)
 - **Lifetime Statistics**: Revenue, expenses, peak temp, uptime streaks, fires survived, etc.
@@ -677,7 +680,7 @@ Each server config (balanced, cpu_optimized, gpu_accelerated, storage_dense, mem
 
 ## Adding New Features
 
-When adding new game systems or equipment types, follow the 7-step checklist (also available via `/add-feature` skill):
+When adding new game systems or equipment types, follow the 9-step checklist (also available via `/add-feature` skill):
 
 1. **Define types and constants** in `src/stores/gameStore.ts`
 2. **Add state fields and actions** to the `GameState` interface and store
@@ -716,4 +719,5 @@ Add to `TECH_TREE` in `gameStore.ts`. Research is managed by `startResearch` act
 - Production build: `npm run build` outputs to `dist/`
 - **CI/CD**: GitHub Actions workflow (`.github/workflows/deploy.yml`) deploys to GitHub Pages on push to `main`
 - Validate changes with `npm run lint`, `npm run test`, and `npm run build`
+- **Before creating a PR**, run `/validate-pr-docs` to ensure all documentation is consistent with the codebase
 - Demo available at deployment URL with `?demo=true` parameter

@@ -1139,27 +1139,28 @@ describe('Incident System', () => {
     const incident: ActiveIncident = {
       id: 'test-leaf-fail',
       def: leafDef,
-      ticksRemaining: 2,
+      ticksRemaining: 5,  // longer duration to avoid random early resolve from ops bonus
       resolved: false,
       affectedHardwareId: cab.id,
     }
-    // Auto-resolve requires Ops Tier 3
+    // Auto-resolve requires Ops Tier 3+; automation has 20% auto-resolve speed bonus
     setState({ activeIncidents: [incident], opsTier: 'automation' as const })
 
-    // Tick 1: leaf should be disabled, ticksRemaining decreases
+    // Tick 1: leaf should be disabled while incident is active
     getState().tick()
     let state = getState()
     let updatedCab = state.cabinets.find(c => c.id === cab.id)!
     expect(updatedCab.hasLeafSwitch).toBe(false)
 
-    // Tick 2: incident should resolve (ticksRemaining reaches 0)
-    getState().tick()
-    state = getState()
-    const inc = state.activeIncidents.find(i => i.id === 'test-leaf-fail')
-    expect(inc?.resolved).toBe(true)
+    // Tick through until incident resolves (account for random ops bonus ticks)
+    for (let t = 0; t < 10; t++) {
+      getState().tick()
+      state = getState()
+      const inc = state.activeIncidents.find(i => i.id === 'test-leaf-fail')
+      if (!inc) break  // resolved and cleaned up
+    }
 
-    // Tick 3: resolved incident is cleaned up, leaf switch should be restored
-    getState().tick()
+    // After all ticks, leaf switch should be restored
     state = getState()
     updatedCab = state.cabinets.find(c => c.id === cab.id)!
     expect(updatedCab.hasLeafSwitch).toBe(true)
@@ -1174,27 +1175,28 @@ describe('Incident System', () => {
     const incident: ActiveIncident = {
       id: 'test-spine-fail',
       def: spineDef,
-      ticksRemaining: 2,
+      ticksRemaining: 5,  // longer duration to avoid random early resolve from ops bonus
       resolved: false,
       affectedHardwareId: spine.id,
     }
-    // Auto-resolve requires Ops Tier 3
+    // Auto-resolve requires Ops Tier 3+; automation has 20% auto-resolve speed bonus
     setState({ activeIncidents: [incident], opsTier: 'automation' as const })
 
-    // Tick 1: spine should be disabled
+    // Tick 1: spine should be disabled while incident is active
     getState().tick()
     let state = getState()
     let updatedSpine = state.spineSwitches.find(s => s.id === spine.id)!
     expect(updatedSpine.powerStatus).toBe(false)
 
-    // Tick 2: incident should resolve
-    getState().tick()
-    state = getState()
-    const inc = state.activeIncidents.find(i => i.id === 'test-spine-fail')
-    expect(inc?.resolved).toBe(true)
+    // Tick through until incident resolves (account for random ops bonus ticks)
+    for (let t = 0; t < 10; t++) {
+      getState().tick()
+      state = getState()
+      const inc = state.activeIncidents.find(i => i.id === 'test-spine-fail')
+      if (!inc) break  // resolved and cleaned up
+    }
 
-    // Tick 3: resolved incident is cleaned up, spine should be restored
-    getState().tick()
+    // After all ticks, spine power should be restored
     state = getState()
     updatedSpine = state.spineSwitches.find(s => s.id === spine.id)!
     expect(updatedSpine.powerStatus).toBe(true)

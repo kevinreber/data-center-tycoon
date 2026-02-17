@@ -1,7 +1,7 @@
 # Fabric Tycoon — Consolidated Feature Tracker
 
 > Single source of truth for all features — completed, in progress, and pending.
-> Last audited: 2026-02-15
+> Last audited: 2026-02-17
 
 ---
 
@@ -22,7 +22,7 @@ All complete. Core economic loop works.
 
 All complete. Incidents and variety make the game engaging.
 
-- [x] Timer-based random incident system (20+ incident types)
+- [x] Timer-based random incident system (17 incident types)
 - [x] Real-world incidents: fiber cuts, squirrels, DDoS, pipe leaks
 - [x] Creative incidents: sentient AI, solar flares, quantum decoherence
 - [x] Incident notification UI and resolution mechanics
