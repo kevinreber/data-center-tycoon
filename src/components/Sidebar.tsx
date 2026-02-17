@@ -3,7 +3,7 @@ import type { LucideIcon } from 'lucide-react'
 import {
   Cpu, Server, DollarSign, Radio, Zap, Plug,
   FlaskConical, FileText, Siren, Building, Trophy,
-  Save, X, HelpCircle, Leaf, Shield, TrendingUp, Newspaper, BarChart3,
+  Save, X, HelpCircle, Leaf, Shield, TrendingUp, Newspaper, BarChart3, Globe,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -32,8 +32,9 @@ import { SecurityPanel } from '@/components/sidebar/SecurityPanel'
 import { MarketPanel } from '@/components/sidebar/MarketPanel'
 import { BuildLogsPanel } from '@/components/sidebar/BuildLogsPanel'
 import { CapacityPanel } from '@/components/sidebar/CapacityPanel'
+import { WorldMapPanel } from '@/components/sidebar/WorldMapPanel'
 
-type PanelId = 'guide' | 'build' | 'equipment' | 'finance' | 'network' | 'operations' | 'infrastructure' | 'research' | 'contracts' | 'incidents' | 'facility' | 'carbon' | 'security' | 'market' | 'capacity' | 'progress' | 'settings' | 'build_logs'
+type PanelId = 'guide' | 'build' | 'equipment' | 'finance' | 'network' | 'operations' | 'infrastructure' | 'research' | 'contracts' | 'incidents' | 'facility' | 'carbon' | 'security' | 'market' | 'capacity' | 'world_map' | 'progress' | 'settings' | 'build_logs'
 
 interface SidebarItem {
   id: PanelId
@@ -59,6 +60,7 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
   { id: 'security', icon: Shield, label: 'Security', color: '#ff8844', section: 'middle' },
   { id: 'market', icon: TrendingUp, label: 'Market', color: '#00aaff', section: 'middle' },
   { id: 'capacity', icon: BarChart3, label: 'Capacity', color: '#00ddff', section: 'middle' },
+  { id: 'world_map', icon: Globe, label: 'World Map', color: '#00ccff', section: 'middle' },
   { id: 'progress', icon: Trophy, label: 'Progress', color: '#ffaa00', section: 'middle' },
   { id: 'build_logs', icon: Newspaper, label: "What's New", color: '#00ff88', section: 'bottom' },
   { id: 'settings', icon: Save, label: 'Settings', color: '#556677', section: 'bottom' },
@@ -80,6 +82,7 @@ const PANEL_TITLES: Record<PanelId, string> = {
   security: 'SECURITY & COMPLIANCE',
   market: 'MARKET & COMPETITORS',
   capacity: 'CAPACITY PLANNING',
+  world_map: 'GLOBAL EXPANSION',
   progress: 'PROGRESS',
   build_logs: "WHAT'S NEW",
   settings: 'SETTINGS',
@@ -102,6 +105,7 @@ function PanelContent({ panelId }: { panelId: PanelId }) {
     case 'security': return <SecurityPanel />
     case 'market': return <MarketPanel />
     case 'capacity': return <CapacityPanel />
+    case 'world_map': return <WorldMapPanel />
     case 'progress': return <ProgressPanel />
     case 'build_logs': return <BuildLogsPanel />
     case 'settings': return <SettingsPanel />

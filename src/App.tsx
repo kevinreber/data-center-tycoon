@@ -6,7 +6,7 @@ import { CabinetDetailPanel } from '@/components/CabinetDetailPanel'
 import { StatusBar } from '@/components/StatusBar'
 import { useGameStore } from '@/stores/gameStore'
 import type { GameSpeed } from '@/stores/gameStore'
-import { Zap, DollarSign, Thermometer, Activity, Pause, Play, FastForward, Trophy, X, Flame, Eye, ExternalLink } from 'lucide-react'
+import { Zap, DollarSign, Thermometer, Activity, Pause, Play, FastForward, Trophy, X, Flame, Eye, ExternalLink, Globe, ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Tooltip,
@@ -37,6 +37,7 @@ function App() {
     contractRevenue, contractPenalties,
     powerOutage, outageTicksRemaining, fireActive, suppressionType,
     isDemo, loadDemoState, exitDemo,
+    worldMapOpen, activeSiteId, sites, toggleWorldMap, switchSite,
   } = useGameStore()
   const totalNodes = cabinets.length + spineSwitches.length
   const activeNodes = cabinets.filter((c) => c.powerStatus).length + spineSwitches.filter((s) => s.powerStatus).length
@@ -247,6 +248,49 @@ function App() {
                 >
                   <X className="size-3" />
                   Exit Demo
+                </Button>
+              </div>
+            )}
+
+            {/* Active site indicator */}
+            {activeSiteId && (() => {
+              const site = sites.find(s => s.id === activeSiteId)
+              return site ? (
+                <div className="rounded-lg border border-neon-cyan/40 bg-neon-cyan/10 p-2 flex items-center gap-2 shrink-0">
+                  <Globe className="size-4 text-neon-cyan" />
+                  <span className="text-xs font-bold text-neon-cyan tracking-wider">{site.name.toUpperCase()}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {site.cabinets} cabinets · {site.servers} servers
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    onClick={() => switchSite(null)}
+                    className="text-xs text-neon-cyan hover:text-foreground ml-auto gap-1"
+                  >
+                    <ArrowLeft className="size-3" />
+                    Back to HQ
+                  </Button>
+                </div>
+              ) : null
+            })()}
+
+            {/* World map overlay */}
+            {worldMapOpen && (
+              <div className="rounded-lg border border-neon-cyan/40 bg-card/95 p-2 flex items-center gap-2 shrink-0">
+                <Globe className="size-4 text-neon-cyan" />
+                <span className="text-xs font-bold text-neon-cyan tracking-wider">WORLD MAP ACTIVE</span>
+                <span className="text-xs text-muted-foreground">
+                  Use the Global Expansion panel to manage sites
+                </span>
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  onClick={() => toggleWorldMap()}
+                  className="text-xs text-neon-cyan hover:text-foreground ml-auto gap-1"
+                >
+                  <X className="size-3" />
+                  Close
                 </Button>
               </div>
             )}

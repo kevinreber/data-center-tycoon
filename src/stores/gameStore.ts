@@ -31,6 +31,85 @@ export type CompetitorPersonality = 'budget' | 'premium' | 'green' | 'aggressive
 // ── Operations Progression Types ────────────────────────────────
 export type OpsTier = 'manual' | 'monitoring' | 'automation' | 'orchestration'
 
+// ── Phase 6: Multi-Site Expansion Types ──────────────────────
+export type SiteType = 'headquarters' | 'edge_pop' | 'colocation' | 'hyperscale' | 'network_hub' | 'disaster_recovery'
+export type Continent = 'north_america' | 'south_america' | 'europe' | 'asia_pacific' | 'middle_east_africa'
+export type RegionId =
+  | 'ashburn' | 'bay_area' | 'dallas' | 'chicago' | 'portland'
+  | 'sao_paulo'
+  | 'london' | 'amsterdam' | 'frankfurt' | 'nordics'
+  | 'singapore' | 'tokyo' | 'mumbai'
+  | 'dubai' | 'johannesburg'
+
+export interface RegionProfile {
+  powerCostMultiplier: number      // 0.5–2.0x
+  laborCostMultiplier: number      // 0.7–1.8x
+  landCostMultiplier: number       // 0.5–3.0x
+  coolingEfficiency: number        // ambient modifier °C (-10 to +15)
+  networkConnectivity: number      // 0–1 fiber/IX availability
+  regulatoryBurden: number         // 0–1
+  carbonTaxMultiplier: number      // 0–2.0x
+  taxIncentiveDiscount: number     // 0–0.3
+  solarEfficiency: number          // 0–1
+  windEfficiency: number           // 0–1
+}
+
+export interface RegionDemandProfile {
+  general: number       // 0–1 demand strength
+  ai_training: number
+  streaming: number
+  crypto: number
+  enterprise: number
+}
+
+export interface RegionDisasterProfile {
+  earthquakeRisk: number    // 0–1
+  floodRisk: number
+  hurricaneRisk: number
+  heatwaveRisk: number
+  gridInstability: number   // 0–1
+}
+
+export interface Region {
+  id: RegionId
+  name: string
+  continent: Continent
+  coordinates: { x: number; y: number }   // SVG map coordinates (0–1000, 0–500)
+  profile: RegionProfile
+  demandProfile: RegionDemandProfile
+  disasterProfile: RegionDisasterProfile
+  description: string
+}
+
+export interface SiteTypeConfig {
+  type: SiteType
+  label: string
+  purchaseCost: number
+  constructionTicks: number
+  maxSuiteTier: SuiteTier
+  maxCabinets: number
+  maxStaff: number
+  maintenanceCostPerTick: number
+  description: string
+}
+
+export interface Site {
+  id: string
+  name: string
+  type: SiteType
+  regionId: RegionId
+  purchasedAtTick: number
+  constructionTicksRemaining: number
+  operational: boolean
+  // Per-site state snapshot (simplified for background sites)
+  cabinets: number         // cabinet count (simplified for non-active sites)
+  servers: number          // total servers
+  revenue: number          // revenue per tick
+  expenses: number         // expenses per tick
+  heat: number             // avg temperature
+  suiteTier: SuiteTier
+}
+
 // ── Save Slot Types ──────────────────────────────────────────
 
 export const MAX_SAVE_SLOTS = 3
@@ -265,6 +344,215 @@ export const OPS_TIER_CONFIG: OpsTierConfig[] = [
 ]
 
 export const OPS_TIER_ORDER: OpsTier[] = ['manual', 'monitoring', 'automation', 'orchestration']
+
+// ── Phase 6: Multi-Site Expansion Configs ────────────────────
+
+export const MULTI_SITE_GATE = {
+  minSuiteTier: 'enterprise' as SuiteTier,
+  minCash: 500000,
+  minReputation: 75,   // 'excellent' tier
+}
+
+export const SITE_TYPE_CONFIG: Record<SiteType, SiteTypeConfig> = {
+  headquarters: {
+    type: 'headquarters',
+    label: 'Headquarters',
+    purchaseCost: 0,
+    constructionTicks: 0,
+    maxSuiteTier: 'enterprise',
+    maxCabinets: 50,
+    maxStaff: 16,
+    maintenanceCostPerTick: 0,
+    description: 'Your original data center. Full management capabilities.',
+  },
+  edge_pop: {
+    type: 'edge_pop',
+    label: 'Edge PoP',
+    purchaseCost: 25000,
+    constructionTicks: 10,
+    maxSuiteTier: 'starter',
+    maxCabinets: 4,
+    maxStaff: 2,
+    maintenanceCostPerTick: 5,
+    description: 'Small edge presence for low-latency content delivery. Requires backhaul link to core site.',
+  },
+  colocation: {
+    type: 'colocation',
+    label: 'Colocation',
+    purchaseCost: 150000,
+    constructionTicks: 30,
+    maxSuiteTier: 'standard',
+    maxCabinets: 18,
+    maxStaff: 4,
+    maintenanceCostPerTick: 20,
+    description: 'Shared facility with meet-me room potential. Standard contracts and interconnection.',
+  },
+  hyperscale: {
+    type: 'hyperscale',
+    label: 'Hyperscale',
+    purchaseCost: 500000,
+    constructionTicks: 60,
+    maxSuiteTier: 'enterprise',
+    maxCabinets: 50,
+    maxStaff: 16,
+    maintenanceCostPerTick: 50,
+    description: 'Massive facility for volume contracts, AI training, and bulk workloads.',
+  },
+  network_hub: {
+    type: 'network_hub',
+    label: 'Network Hub / IXP',
+    purchaseCost: 200000,
+    constructionTicks: 25,
+    maxSuiteTier: 'standard',
+    maxCabinets: 8,
+    maxStaff: 4,
+    maintenanceCostPerTick: 30,
+    description: 'Internet exchange point. Revenue from interconnection and transit fees.',
+  },
+  disaster_recovery: {
+    type: 'disaster_recovery',
+    label: 'Disaster Recovery',
+    purchaseCost: 300000,
+    constructionTicks: 40,
+    maxSuiteTier: 'professional',
+    maxCabinets: 32,
+    maxStaff: 8,
+    maintenanceCostPerTick: 40,
+    description: 'DR site for compliance contracts and failover. Enables DR-gated contracts.',
+  },
+}
+
+export const REGION_RESEARCH_COST = 10000
+
+export const REGION_CATALOG: Region[] = [
+  // ── North America ──────────────────────────
+  {
+    id: 'ashburn', name: 'Northern Virginia (Ashburn)', continent: 'north_america',
+    coordinates: { x: 260, y: 195 },
+    profile: { powerCostMultiplier: 0.8, laborCostMultiplier: 1.2, landCostMultiplier: 1.5, coolingEfficiency: 2, networkConnectivity: 1.0, regulatoryBurden: 0.3, carbonTaxMultiplier: 0.5, taxIncentiveDiscount: 0.15, solarEfficiency: 0.5, windEfficiency: 0.4 },
+    demandProfile: { general: 0.9, ai_training: 0.6, streaming: 0.9, crypto: 0.3, enterprise: 0.9 },
+    disasterProfile: { earthquakeRisk: 0.05, floodRisk: 0.15, hurricaneRisk: 0.2, heatwaveRisk: 0.3, gridInstability: 0.05 },
+    description: 'The data center capital of the world. Excellent network connectivity, moderate power costs, and strong enterprise demand.',
+  },
+  {
+    id: 'bay_area', name: 'Bay Area (Santa Clara)', continent: 'north_america',
+    coordinates: { x: 135, y: 195 },
+    profile: { powerCostMultiplier: 1.4, laborCostMultiplier: 1.8, landCostMultiplier: 3.0, coolingEfficiency: 0, networkConnectivity: 0.9, regulatoryBurden: 0.6, carbonTaxMultiplier: 1.5, taxIncentiveDiscount: 0.1, solarEfficiency: 0.8, windEfficiency: 0.5 },
+    demandProfile: { general: 0.7, ai_training: 1.0, streaming: 0.5, crypto: 0.5, enterprise: 0.8 },
+    disasterProfile: { earthquakeRisk: 0.7, floodRisk: 0.1, hurricaneRisk: 0, heatwaveRisk: 0.4, gridInstability: 0.15 },
+    description: 'Tech hub with massive AI training demand. Expensive real estate and labor but unmatched innovation ecosystem.',
+  },
+  {
+    id: 'dallas', name: 'Dallas / Fort Worth', continent: 'north_america',
+    coordinates: { x: 200, y: 215 },
+    profile: { powerCostMultiplier: 0.7, laborCostMultiplier: 0.9, landCostMultiplier: 0.6, coolingEfficiency: 5, networkConnectivity: 0.8, regulatoryBurden: 0.2, carbonTaxMultiplier: 0.2, taxIncentiveDiscount: 0.2, solarEfficiency: 0.7, windEfficiency: 0.8 },
+    demandProfile: { general: 0.7, ai_training: 0.4, streaming: 0.6, crypto: 0.7, enterprise: 0.6 },
+    disasterProfile: { earthquakeRisk: 0.05, floodRisk: 0.2, hurricaneRisk: 0.15, heatwaveRisk: 0.6, gridInstability: 0.2 },
+    description: 'Low-cost power hub in tornado alley. Strong wind energy potential but grid reliability concerns.',
+  },
+  {
+    id: 'chicago', name: 'Chicago', continent: 'north_america',
+    coordinates: { x: 235, y: 180 },
+    profile: { powerCostMultiplier: 0.9, laborCostMultiplier: 1.1, landCostMultiplier: 1.0, coolingEfficiency: -3, networkConnectivity: 0.85, regulatoryBurden: 0.4, carbonTaxMultiplier: 0.8, taxIncentiveDiscount: 0.1, solarEfficiency: 0.4, windEfficiency: 0.7 },
+    demandProfile: { general: 0.8, ai_training: 0.5, streaming: 0.6, crypto: 0.4, enterprise: 0.8 },
+    disasterProfile: { earthquakeRisk: 0.02, floodRisk: 0.2, hurricaneRisk: 0, heatwaveRisk: 0.2, gridInstability: 0.1 },
+    description: 'Major financial and network exchange hub. Cold winters provide natural cooling advantage.',
+  },
+  {
+    id: 'portland', name: 'Portland / Oregon', continent: 'north_america',
+    coordinates: { x: 130, y: 170 },
+    profile: { powerCostMultiplier: 0.5, laborCostMultiplier: 1.0, landCostMultiplier: 0.7, coolingEfficiency: -5, networkConnectivity: 0.7, regulatoryBurden: 0.4, carbonTaxMultiplier: 1.0, taxIncentiveDiscount: 0.2, solarEfficiency: 0.3, windEfficiency: 0.8 },
+    demandProfile: { general: 0.5, ai_training: 0.7, streaming: 0.4, crypto: 0.8, enterprise: 0.4 },
+    disasterProfile: { earthquakeRisk: 0.3, floodRisk: 0.15, hurricaneRisk: 0, heatwaveRisk: 0.1, gridInstability: 0.05 },
+    description: 'Cheap hydroelectric power and cool climate. Favored by crypto miners and AI training workloads.',
+  },
+  // ── South America ──────────────────────────
+  {
+    id: 'sao_paulo', name: 'São Paulo', continent: 'south_america',
+    coordinates: { x: 330, y: 355 },
+    profile: { powerCostMultiplier: 1.1, laborCostMultiplier: 0.7, landCostMultiplier: 0.8, coolingEfficiency: 3, networkConnectivity: 0.6, regulatoryBurden: 0.7, carbonTaxMultiplier: 0.3, taxIncentiveDiscount: 0.1, solarEfficiency: 0.6, windEfficiency: 0.3 },
+    demandProfile: { general: 0.6, ai_training: 0.3, streaming: 0.8, crypto: 0.4, enterprise: 0.5 },
+    disasterProfile: { earthquakeRisk: 0.02, floodRisk: 0.4, hurricaneRisk: 0, heatwaveRisk: 0.3, gridInstability: 0.25 },
+    description: 'Gateway to Latin America. LGPD data sovereignty requirements make local presence essential for regional contracts.',
+  },
+  // ── Europe ─────────────────────────────────
+  {
+    id: 'london', name: 'London', continent: 'europe',
+    coordinates: { x: 470, y: 165 },
+    profile: { powerCostMultiplier: 1.3, laborCostMultiplier: 1.5, landCostMultiplier: 2.5, coolingEfficiency: -4, networkConnectivity: 0.95, regulatoryBurden: 0.7, carbonTaxMultiplier: 1.5, taxIncentiveDiscount: 0.05, solarEfficiency: 0.2, windEfficiency: 0.6 },
+    demandProfile: { general: 0.8, ai_training: 0.5, streaming: 0.8, crypto: 0.3, enterprise: 0.9 },
+    disasterProfile: { earthquakeRisk: 0.01, floodRisk: 0.25, hurricaneRisk: 0, heatwaveRisk: 0.15, gridInstability: 0.05 },
+    description: 'Europe\'s financial hub. Excellent connectivity but expensive. GDPR compliance required.',
+  },
+  {
+    id: 'amsterdam', name: 'Amsterdam', continent: 'europe',
+    coordinates: { x: 490, y: 155 },
+    profile: { powerCostMultiplier: 1.1, laborCostMultiplier: 1.3, landCostMultiplier: 1.8, coolingEfficiency: -5, networkConnectivity: 0.95, regulatoryBurden: 0.6, carbonTaxMultiplier: 1.2, taxIncentiveDiscount: 0.1, solarEfficiency: 0.3, windEfficiency: 0.8 },
+    demandProfile: { general: 0.7, ai_training: 0.4, streaming: 0.7, crypto: 0.5, enterprise: 0.7 },
+    disasterProfile: { earthquakeRisk: 0.01, floodRisk: 0.4, hurricaneRisk: 0, heatwaveRisk: 0.1, gridInstability: 0.03 },
+    description: 'Europe\'s internet exchange capital. AMS-IX provides unmatched peering. Flood risk from below sea level geography.',
+  },
+  {
+    id: 'frankfurt', name: 'Frankfurt', continent: 'europe',
+    coordinates: { x: 505, y: 160 },
+    profile: { powerCostMultiplier: 1.2, laborCostMultiplier: 1.4, landCostMultiplier: 1.5, coolingEfficiency: -3, networkConnectivity: 0.9, regulatoryBurden: 0.8, carbonTaxMultiplier: 1.8, taxIncentiveDiscount: 0.05, solarEfficiency: 0.4, windEfficiency: 0.6 },
+    demandProfile: { general: 0.8, ai_training: 0.5, streaming: 0.5, crypto: 0.2, enterprise: 0.9 },
+    disasterProfile: { earthquakeRisk: 0.05, floodRisk: 0.2, hurricaneRisk: 0, heatwaveRisk: 0.2, gridInstability: 0.03 },
+    description: 'Germany\'s financial center with strict data protection laws. DE-CIX is the world\'s largest IX by throughput.',
+  },
+  {
+    id: 'nordics', name: 'Nordics (Stockholm)', continent: 'europe',
+    coordinates: { x: 520, y: 125 },
+    profile: { powerCostMultiplier: 0.6, laborCostMultiplier: 1.3, landCostMultiplier: 0.8, coolingEfficiency: -10, networkConnectivity: 0.7, regulatoryBurden: 0.5, carbonTaxMultiplier: 2.0, taxIncentiveDiscount: 0.25, solarEfficiency: 0.2, windEfficiency: 0.9 },
+    demandProfile: { general: 0.4, ai_training: 0.8, streaming: 0.3, crypto: 0.9, enterprise: 0.5 },
+    disasterProfile: { earthquakeRisk: 0.02, floodRisk: 0.1, hurricaneRisk: 0, heatwaveRisk: 0.02, gridInstability: 0.02 },
+    description: 'Arctic-adjacent cooling paradise. Cheap renewable energy and excellent climate for heat-intensive workloads.',
+  },
+  // ── Asia-Pacific ───────────────────────────
+  {
+    id: 'singapore', name: 'Singapore', continent: 'asia_pacific',
+    coordinates: { x: 720, y: 305 },
+    profile: { powerCostMultiplier: 1.3, laborCostMultiplier: 1.2, landCostMultiplier: 2.0, coolingEfficiency: 12, networkConnectivity: 0.9, regulatoryBurden: 0.4, carbonTaxMultiplier: 1.0, taxIncentiveDiscount: 0.15, solarEfficiency: 0.7, windEfficiency: 0.1 },
+    demandProfile: { general: 0.7, ai_training: 0.5, streaming: 0.8, crypto: 0.4, enterprise: 0.8 },
+    disasterProfile: { earthquakeRisk: 0.01, floodRisk: 0.3, hurricaneRisk: 0, heatwaveRisk: 0.5, gridInstability: 0.02 },
+    description: 'Southeast Asia\'s digital hub. Tropical heat challenges cooling but excellent connectivity and stable politics.',
+  },
+  {
+    id: 'tokyo', name: 'Tokyo', continent: 'asia_pacific',
+    coordinates: { x: 815, y: 195 },
+    profile: { powerCostMultiplier: 1.5, laborCostMultiplier: 1.4, landCostMultiplier: 2.5, coolingEfficiency: 2, networkConnectivity: 0.85, regulatoryBurden: 0.5, carbonTaxMultiplier: 0.8, taxIncentiveDiscount: 0.1, solarEfficiency: 0.5, windEfficiency: 0.3 },
+    demandProfile: { general: 0.8, ai_training: 0.6, streaming: 0.7, crypto: 0.3, enterprise: 0.8 },
+    disasterProfile: { earthquakeRisk: 0.8, floodRisk: 0.3, hurricaneRisk: 0.2, heatwaveRisk: 0.3, gridInstability: 0.05 },
+    description: 'Japan\'s tech capital. High earthquake risk but world-class infrastructure and enterprise demand.',
+  },
+  {
+    id: 'mumbai', name: 'Mumbai', continent: 'asia_pacific',
+    coordinates: { x: 660, y: 260 },
+    profile: { powerCostMultiplier: 0.8, laborCostMultiplier: 0.7, landCostMultiplier: 1.0, coolingEfficiency: 10, networkConnectivity: 0.6, regulatoryBurden: 0.6, carbonTaxMultiplier: 0.3, taxIncentiveDiscount: 0.2, solarEfficiency: 0.8, windEfficiency: 0.4 },
+    demandProfile: { general: 0.7, ai_training: 0.5, streaming: 0.8, crypto: 0.3, enterprise: 0.6 },
+    disasterProfile: { earthquakeRisk: 0.15, floodRisk: 0.6, hurricaneRisk: 0.1, heatwaveRisk: 0.7, gridInstability: 0.35 },
+    description: 'India\'s fastest-growing digital market. Cheap labor, high heat, monsoon flooding risk, and unreliable grid.',
+  },
+  // ── Middle East & Africa ───────────────────
+  {
+    id: 'dubai', name: 'Dubai', continent: 'middle_east_africa',
+    coordinates: { x: 610, y: 240 },
+    profile: { powerCostMultiplier: 0.9, laborCostMultiplier: 1.0, landCostMultiplier: 1.2, coolingEfficiency: 15, networkConnectivity: 0.7, regulatoryBurden: 0.3, carbonTaxMultiplier: 0.1, taxIncentiveDiscount: 0.3, solarEfficiency: 0.95, windEfficiency: 0.2 },
+    demandProfile: { general: 0.5, ai_training: 0.3, streaming: 0.5, crypto: 0.6, enterprise: 0.7 },
+    disasterProfile: { earthquakeRisk: 0.05, floodRisk: 0.1, hurricaneRisk: 0, heatwaveRisk: 0.9, gridInstability: 0.1 },
+    description: 'Middle East digital hub with extreme heat challenges. Strong tax incentives and solar potential.',
+  },
+  {
+    id: 'johannesburg', name: 'Johannesburg', continent: 'middle_east_africa',
+    coordinates: { x: 545, y: 380 },
+    profile: { powerCostMultiplier: 0.7, laborCostMultiplier: 0.8, landCostMultiplier: 0.5, coolingEfficiency: 0, networkConnectivity: 0.4, regulatoryBurden: 0.4, carbonTaxMultiplier: 0.5, taxIncentiveDiscount: 0.15, solarEfficiency: 0.8, windEfficiency: 0.5 },
+    demandProfile: { general: 0.4, ai_training: 0.2, streaming: 0.5, crypto: 0.3, enterprise: 0.4 },
+    disasterProfile: { earthquakeRisk: 0.05, floodRisk: 0.15, hurricaneRisk: 0, heatwaveRisk: 0.3, gridInstability: 0.6 },
+    description: 'Africa\'s emerging tech hub. Cheap land but severe grid instability with rolling load shedding.',
+  },
+]
+
+export const MAX_SITES = 8
 
 // ── Reputation System Types ───────────────────────────────────
 
@@ -1229,6 +1517,9 @@ export const TUTORIAL_TIPS: TutorialTip[] = [
   // Cooling Infrastructure tips
   { id: 'cooling_units_hint', title: 'Cooling Units', message: 'Place cooling units near cabinets for targeted heat removal. Different units have different range and capacity — plan your layout!', category: 'cooling' },
   { id: 'cooling_overloaded', title: 'Cooling Overloaded', message: 'A cooling unit is serving more cabinets than its max capacity. Efficiency is degraded — add more units or spread out cabinets.', category: 'cooling' },
+  // Phase 6 — Multi-Site Expansion tips
+  { id: 'multi_site_unlocked', title: 'Global Expansion', message: 'You\'ve unlocked multi-site expansion! Open the Global Expansion panel to research regions and purchase your first expansion site.', category: 'build' },
+  { id: 'site_under_construction', title: 'Site Building', message: 'Your new site is under construction. It will become operational after the build timer completes.', category: 'build' },
 ]
 
 // ── Procedural Name Generation ──────────────────────────────────
@@ -1577,6 +1868,12 @@ export const ACHIEVEMENT_CATALOG: AchievementDef[] = [
   { id: 'no_mixed_penalty', label: 'Clean Segregation', description: 'Have 5+ cabinets with zero mixed-environment penalties.', icon: '🧹' },
   { id: 'dedicated_row', label: 'Dedicated Row', description: 'Fill an entire row with the same environment type.', icon: '📏' },
   { id: 'zone_contract', label: 'Zone Landlord', description: 'Complete a zone-gated contract.', icon: '🏘️' },
+  // Phase 6 — Multi-Site Expansion achievements
+  { id: 'multi_site_unlocked', label: 'Global Ambitions', description: 'Unlock multi-site expansion.', icon: '🌐' },
+  { id: 'first_expansion', label: 'First Expansion', description: 'Purchase your first expansion site.', icon: '📍' },
+  { id: 'global_network', label: 'Global Network', description: 'Have 3 or more operational sites.', icon: '🗺️' },
+  { id: 'three_continents', label: 'Three Continents', description: 'Operate sites on 3 different continents.', icon: '✈️' },
+  { id: 'world_domination', label: 'World Domination', description: 'Fill all available site slots.', icon: '👑' },
 ]
 
 export interface EnvironmentConfig {
@@ -2967,6 +3264,15 @@ interface GameState {
   opsAutoResolvedCount: number          // lifetime incidents auto-resolved by ops automation
   opsPreventedCount: number             // lifetime incidents prevented by ops automation
 
+  // Phase 6 — Multi-Site Expansion
+  multiSiteUnlocked: boolean
+  worldMapOpen: boolean
+  sites: Site[]
+  activeSiteId: string | null            // null = HQ (original site)
+  researchedRegions: RegionId[]          // regions with revealed profiles
+  totalSiteRevenue: number               // aggregate revenue from background sites per tick
+  totalSiteExpenses: number              // aggregate expenses from background sites per tick
+
   // Save / Load
   hasSaved: boolean
   activeSlotId: number | null
@@ -3065,6 +3371,11 @@ interface GameState {
   counterPoachOffer: () => void
   // Operations Progression actions
   upgradeOpsTier: () => void
+  // Phase 6 — Multi-Site Expansion actions
+  toggleWorldMap: () => void
+  researchRegion: (regionId: RegionId) => void
+  purchaseSite: (regionId: RegionId, siteType: SiteType, name: string) => void
+  switchSite: (siteId: string | null) => void
   // Tutorial actions
   dismissTip: (tipId: string) => void
   toggleTutorial: () => void
@@ -3088,6 +3399,7 @@ let nextContractId = 1
 let nextGeneratorId = 1
 let nextStaffId = 1
 let nextCompetitorId = 1
+let nextSiteId = 1
 
 function maxIdNum(items: { id: string }[], prefix: string): number {
   let max = 0
@@ -3401,6 +3713,15 @@ export const useGameStore = create<GameState>((set) => ({
   opsTier: 'manual' as OpsTier,
   opsAutoResolvedCount: 0,
   opsPreventedCount: 0,
+
+  // Phase 6 — Multi-Site Expansion
+  multiSiteUnlocked: false,
+  worldMapOpen: false,
+  sites: [] as Site[],
+  activeSiteId: null as string | null,
+  researchedRegions: [] as RegionId[],
+  totalSiteRevenue: 0,
+  totalSiteExpenses: 0,
 
   // Demo mode
   isDemo: false,
@@ -4542,6 +4863,66 @@ export const useGameStore = create<GameState>((set) => ({
       }
     }),
 
+  // ── Phase 6: Multi-Site Expansion Actions ──────────────────────
+
+  toggleWorldMap: () =>
+    set((state) => ({ worldMapOpen: !state.worldMapOpen })),
+
+  researchRegion: (regionId: RegionId) =>
+    set((state) => {
+      if (!state.multiSiteUnlocked) return state
+      if (state.researchedRegions.includes(regionId)) return state
+      if (state.money < REGION_RESEARCH_COST) return state
+      const region = REGION_CATALOG.find((r) => r.id === regionId)
+      if (!region) return state
+      return {
+        researchedRegions: [...state.researchedRegions, regionId],
+        money: state.money - REGION_RESEARCH_COST,
+      }
+    }),
+
+  purchaseSite: (regionId: RegionId, siteType: SiteType, name: string) =>
+    set((state) => {
+      if (!state.multiSiteUnlocked) return state
+      if (siteType === 'headquarters') return state  // can't buy another HQ
+      if (state.sites.length >= MAX_SITES) return state
+      if (!state.researchedRegions.includes(regionId)) return state
+      // Check if already have a site in this region
+      if (state.sites.some((s) => s.regionId === regionId)) return state
+      const region = REGION_CATALOG.find((r) => r.id === regionId)
+      if (!region) return state
+      const config = SITE_TYPE_CONFIG[siteType]
+      const landCost = Math.round(config.purchaseCost * region.profile.landCostMultiplier)
+      if (state.money < landCost) return state
+      const newSite: Site = {
+        id: `site-${nextSiteId++}`,
+        name: name || `${region.name} ${config.label}`,
+        type: siteType,
+        regionId,
+        purchasedAtTick: state.tickCount,
+        constructionTicksRemaining: config.constructionTicks,
+        operational: false,
+        cabinets: 0,
+        servers: 0,
+        revenue: 0,
+        expenses: 0,
+        heat: region.profile.coolingEfficiency + 22, // ambient based on region
+        suiteTier: 'starter',
+      }
+      return {
+        sites: [...state.sites, newSite],
+        money: state.money - landCost,
+      }
+    }),
+
+  switchSite: (siteId: string | null) =>
+    set((state) => {
+      if (siteId === null) return { activeSiteId: null }  // switch to HQ
+      const site = state.sites.find((s) => s.id === siteId)
+      if (!site || !site.operational) return state
+      return { activeSiteId: siteId }
+    }),
+
   // ── Tutorial Actions ────────────────────────────────────────────
 
   dismissTip: (tipId: string) =>
@@ -5291,6 +5672,7 @@ export const useGameStore = create<GameState>((set) => ({
     nextContractId = 1
     nextGeneratorId = 1
     nextCompetitorId = 1
+    nextSiteId = 1
     set({
       cabinets: [],
       spineSwitches: [],
@@ -5441,6 +5823,14 @@ export const useGameStore = create<GameState>((set) => ({
       opsTier: 'manual' as OpsTier,
       opsAutoResolvedCount: 0,
       opsPreventedCount: 0,
+      // Phase 6 — Multi-Site Expansion
+      multiSiteUnlocked: false,
+      worldMapOpen: false,
+      sites: [],
+      activeSiteId: null,
+      researchedRegions: [],
+      totalSiteRevenue: 0,
+      totalSiteExpenses: 0,
     })
   },
 
@@ -5914,6 +6304,21 @@ export const useGameStore = create<GameState>((set) => ({
           }
         }
 
+        // Phase 6 — site construction still ticks even with no equipment
+        const earlyReturnSites = state.sites.map((site) => {
+          if (!site.operational && site.constructionTicksRemaining > 0) {
+            const remaining = site.constructionTicksRemaining - 1
+            if (remaining <= 0) return { ...site, constructionTicksRemaining: 0, operational: true }
+            return { ...site, constructionTicksRemaining: remaining }
+          }
+          return site
+        })
+        const earlyMultiSiteUnlocked = state.multiSiteUnlocked || (
+          state.suiteTier === 'enterprise' &&
+          state.money >= MULTI_SITE_GATE.minCash &&
+          state.reputationScore >= MULTI_SITE_GATE.minReputation
+        )
+
         return {
           tickCount: newTickCount,
           gameHour: newHour,
@@ -5938,6 +6343,9 @@ export const useGameStore = create<GameState>((set) => ({
           unlockedTech,
           drillCooldown: Math.max(0, state.drillCooldown - 1),
           rfpOffers: state.rfpOffers.map((r) => ({ ...r, bidWindowTicks: r.bidWindowTicks - 1 })).filter((r) => r.bidWindowTicks > 0),
+          // Phase 6
+          sites: earlyReturnSites,
+          multiSiteUnlocked: earlyMultiSiteUnlocked,
         }
       }
 
@@ -7182,6 +7590,9 @@ export const useGameStore = create<GameState>((set) => ({
               if (updatedStaff.length >= minStaff && requiredTechs.every((t) => state.unlockedTech.includes(t)) && reputationScore >= minReputation && suiteTierOrder.indexOf(state.suiteTier) >= suiteTierOrder.indexOf(minSuiteTier)) trigger = true
             }
           }
+          // Phase 6 — Multi-Site tips
+          if (tip.id === 'multi_site_unlocked' && !state.multiSiteUnlocked && state.suiteTier === 'enterprise' && state.money >= MULTI_SITE_GATE.minCash && reputationScore >= MULTI_SITE_GATE.minReputation) trigger = true
+          if (tip.id === 'site_under_construction' && state.sites.some((s) => !s.operational && s.constructionTicksRemaining > 0)) trigger = true
           if (trigger) { activeTip = tip; break }
         }
       }
@@ -7258,16 +7669,60 @@ export const useGameStore = create<GameState>((set) => ({
       if (state.opsTier === 'orchestration') unlock('platform_engineer')
       if (opsAutoResolvedCount >= 20) unlock('lights_out')
 
+      // ── Phase 6 — Multi-Site Expansion Tick ────────────────────
+      const suiteTierOrder: SuiteTier[] = ['starter', 'standard', 'professional', 'enterprise']
+      const multiSiteUnlocked = state.multiSiteUnlocked || (
+        suiteTierOrder.indexOf(state.suiteTier) >= suiteTierOrder.indexOf(MULTI_SITE_GATE.minSuiteTier) &&
+        state.money >= MULTI_SITE_GATE.minCash &&
+        reputationScore >= MULTI_SITE_GATE.minReputation
+      )
+
+      // Tick site construction and calculate background site income/expenses
+      let totalSiteRevenue = 0
+      let totalSiteExpenses = 0
+      const updatedSites = state.sites.map((site) => {
+        // Tick construction
+        if (!site.operational && site.constructionTicksRemaining > 0) {
+          const remaining = site.constructionTicksRemaining - 1
+          if (remaining <= 0) {
+            return { ...site, constructionTicksRemaining: 0, operational: true }
+          }
+          return { ...site, constructionTicksRemaining: remaining }
+        }
+        // Background site simplified revenue/expenses (only for operational non-active sites)
+        if (site.operational && site.id !== state.activeSiteId) {
+          const region = REGION_CATALOG.find((r) => r.id === site.regionId)
+          const siteConfig = SITE_TYPE_CONFIG[site.type]
+          const regionPowerMult = region ? region.profile.powerCostMultiplier : 1
+          const siteRev = site.servers * SIM.revenuePerServer * (region ? (region.demandProfile.general + 0.5) : 1)
+          const siteExp = site.servers * POWER_DRAW.server * 0.001 * POWER_MARKET.baseCost * regionPowerMult + siteConfig.maintenanceCostPerTick
+          totalSiteRevenue += siteRev
+          totalSiteExpenses += siteExp
+          return { ...site, revenue: +siteRev.toFixed(2), expenses: +siteExp.toFixed(2) }
+        }
+        return site
+      })
+
+      // Phase 6 achievements
+      if (multiSiteUnlocked && !state.multiSiteUnlocked) unlock('multi_site_unlocked')
+      if (updatedSites.length >= 1) unlock('first_expansion')
+      if (updatedSites.filter((s) => s.operational).length >= 3) unlock('global_network')
+      if (updatedSites.filter((s) => s.operational).length >= MAX_SITES) unlock('world_domination')
+      const continentsWithSites = new Set(updatedSites.filter((s) => s.operational).map((s) => REGION_CATALOG.find((r) => r.id === s.regionId)?.continent).filter(Boolean))
+      if (continentsWithSites.size >= 3) unlock('three_continents')
+
       // Apply Phase 4 bonuses to contract revenue
       const adjustedContractRevenue = +(contractRevenue * (1 + complianceRevenueBonus + greenCertRevenueBonus) * priceWarPenalty).toFixed(2)
 
-      // Recalculate final money with all income/expenses (Phase 4 + 5 + ops included)
+      // Recalculate final money with all income/expenses (Phase 4 + 5 + 6 + ops included)
       const phase5Income = spotRevenue + meetMeRevenue
       const phase5Expenses = peeringCostPerTick + powerRedundancyCost + meetMeMaintenanceCost + (noiseComplaints > state.noiseComplaints && noiseComplaints % NOISE_CONFIG.fineThreshold === 0 ? NOISE_CONFIG.fineAmount : 0)
       const phase4Expenses = carbonTaxPerTick + waterCostPerTick + securityMaintenanceCost
+      const phase6Income = totalSiteRevenue
+      const phase6Expenses = totalSiteExpenses
       const finalNewMoney = state.sandboxMode
         ? 999999999
-        : Math.round((state.money + revenue + adjustedContractRevenue + patentIncome + milestoneMoney + phase5Income + (insurancePayouts - state.insurancePayouts) - expenses - loanPayments - contractPenalties - insuranceCost - staffCostPerTick - phase5Expenses - phase4Expenses) * 100) / 100
+        : Math.round((state.money + revenue + adjustedContractRevenue + patentIncome + milestoneMoney + phase5Income + phase6Income + (insurancePayouts - state.insurancePayouts) - expenses - loanPayments - contractPenalties - insuranceCost - staffCostPerTick - phase5Expenses - phase4Expenses - phase6Expenses) * 100) / 100
 
       return {
         cabinets: newCabinets,
@@ -7418,6 +7873,11 @@ export const useGameStore = create<GameState>((set) => ({
         opsPreventedCount,
         // Cooling infrastructure
         coolingUnits,
+        // Phase 6 — Multi-Site Expansion
+        multiSiteUnlocked,
+        sites: updatedSites,
+        totalSiteRevenue: +totalSiteRevenue.toFixed(2),
+        totalSiteExpenses: +totalSiteExpenses.toFixed(2),
       }
     }),
 }))
