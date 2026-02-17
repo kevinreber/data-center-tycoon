@@ -24,11 +24,13 @@ import {
   SUITE_TIERS,
   OPS_TIER_CONFIG,
   COOLING_UNIT_CONFIG,
+  CHILLER_PLANT_CONFIG,
   REGION_CATALOG,
   SITE_TYPE_CONFIG,
   REGION_RESEARCH_COST,
   MAX_SITES,
   calcCabinetCooling,
+  getChillerConnection,
   getAdjacentCabinets,
   hasMaintenanceAccess,
   calcSpacingHeatEffect,
@@ -1830,6 +1832,180 @@ describe('Cooling Infrastructure', () => {
     expect(immersion.range).toBe(0)
     expect(immersion.maxCabinets).toBe(1)
     expect(immersion.requiresTech).toBe('immersion_cooling')
+  })
+})
+
+// ── Chiller Plant & Cooling Pipe Tests ───────────────────────────
+
+describe('Chiller Plant & Cooling Pipes', () => {
+  beforeEach(() => {
+    getState().resetGame()
+  })
+
+  it('placeChillerPlant adds a chiller to state', () => {
+    setState({ sandboxMode: true, money: 999999, unlockedTech: ['hot_aisle'] })
+    getState().placeChillerPlant('basic', 2, 2)
+    expect(getState().chillerPlants).toHaveLength(1)
+    expect(getState().chillerPlants[0].tier).toBe('basic')
+    expect(getState().chillerPlants[0].operational).toBe(true)
+  })
+
+  it('placeChillerPlant deducts cost when not in sandbox', () => {
+    setState({ sandboxMode: false, money: 60000, unlockedTech: ['hot_aisle'] })
+    getState().placeChillerPlant('basic', 2, 2)
+    expect(getState().chillerPlants).toHaveLength(1)
+    expect(getState().money).toBe(10000) // 60000 - 50000
+  })
+
+  it('placeChillerPlant rejects if insufficient funds', () => {
+    setState({ sandboxMode: false, money: 1000, unlockedTech: ['hot_aisle'] })
+    getState().placeChillerPlant('basic', 2, 2)
+    expect(getState().chillerPlants).toHaveLength(0)
+  })
+
+  it('placeChillerPlant rejects if tech requirement not met', () => {
+    setState({ sandboxMode: true, money: 999999, unlockedTech: [] })
+    getState().placeChillerPlant('basic', 2, 2)
+    expect(getState().chillerPlants).toHaveLength(0)
+  })
+
+  it('placeChillerPlant enforces max 2 chiller plants', () => {
+    setState({ sandboxMode: true, money: 999999, unlockedTech: ['hot_aisle'] })
+    getState().placeChillerPlant('basic', 0, 0)
+    getState().placeChillerPlant('basic', 1, 1)
+    getState().placeChillerPlant('basic', 2, 2)
+    expect(getState().chillerPlants).toHaveLength(2)
+  })
+
+  it('removeChillerPlant removes by id', () => {
+    setState({ sandboxMode: true, money: 999999, unlockedTech: ['hot_aisle'] })
+    getState().placeChillerPlant('basic', 2, 2)
+    const id = getState().chillerPlants[0].id
+    getState().removeChillerPlant(id)
+    expect(getState().chillerPlants).toHaveLength(0)
+  })
+
+  it('placeCoolingPipe adds a pipe to state', () => {
+    setState({ sandboxMode: true, money: 999999 })
+    getState().placeCoolingPipe(3, 3)
+    expect(getState().coolingPipes).toHaveLength(1)
+    expect(getState().coolingPipes[0].col).toBe(3)
+  })
+
+  it('placeCoolingPipe deducts cost', () => {
+    setState({ sandboxMode: false, money: 5000 })
+    getState().placeCoolingPipe(3, 3)
+    expect(getState().coolingPipes).toHaveLength(1)
+    expect(getState().money).toBe(3000) // 5000 - 2000
+  })
+
+  it('placeCoolingPipe enforces max pipes', () => {
+    setState({ sandboxMode: true, money: 999999 })
+    for (let i = 0; i < 25; i++) {
+      getState().placeCoolingPipe(i % 10, Math.floor(i / 10))
+    }
+    expect(getState().coolingPipes).toHaveLength(20)
+  })
+
+  it('removeCoolingPipe removes by id', () => {
+    setState({ sandboxMode: true, money: 999999 })
+    getState().placeCoolingPipe(3, 3)
+    const id = getState().coolingPipes[0].id
+    getState().removeCoolingPipe(id)
+    expect(getState().coolingPipes).toHaveLength(0)
+  })
+
+  it('getChillerConnection detects direct range connection', () => {
+    const unit: CoolingUnit = { id: 'cu1', type: 'crah', col: 2, row: 2, operational: true }
+    const chiller = { id: 'ch1', col: 3, row: 2, tier: 'basic' as const, operational: true }
+    // Basic chiller range is 3, distance is 1 — should be connected
+    const result = getChillerConnection(unit, [chiller], [])
+    expect(result.connected).toBe(true)
+    expect(result.efficiencyBonus).toBe(0.25)
+  })
+
+  it('getChillerConnection returns false when out of range with no pipes', () => {
+    const unit: CoolingUnit = { id: 'cu1', type: 'crah', col: 0, row: 0, operational: true }
+    const chiller = { id: 'ch1', col: 7, row: 7, tier: 'basic' as const, operational: true }
+    // Distance 14, way beyond range 3
+    const result = getChillerConnection(unit, [chiller], [])
+    expect(result.connected).toBe(false)
+  })
+
+  it('getChillerConnection extends range via pipes', () => {
+    const unit: CoolingUnit = { id: 'cu1', type: 'crah', col: 6, row: 0, operational: true }
+    const chiller = { id: 'ch1', col: 0, row: 0, tier: 'basic' as const, operational: true }
+    // Distance 6, beyond basic range 3. Pipes at 3,0 → 4,0 → 5,0 → 6,0
+    const pipes = [
+      { id: 'p1', col: 3, row: 0 },
+      { id: 'p2', col: 4, row: 0 },
+      { id: 'p3', col: 5, row: 0 },
+    ]
+    // Pipe at col 3 is within range 3 of chiller at col 0 → starts the chain
+    // Then p2 adjacent to p1, p3 adjacent to p2
+    // Unit at col 6 is adjacent to pipe at col 5
+    const result = getChillerConnection(unit, [chiller], pipes)
+    expect(result.connected).toBe(true)
+  })
+
+  it('getChillerConnection returns false for non-operational chiller', () => {
+    const unit: CoolingUnit = { id: 'cu1', type: 'crah', col: 0, row: 0, operational: true }
+    const chiller = { id: 'ch1', col: 1, row: 0, tier: 'basic' as const, operational: false }
+    const result = getChillerConnection(unit, [chiller], [])
+    expect(result.connected).toBe(false)
+  })
+
+  it('calcCabinetCooling applies chiller bonus to CRAH units', () => {
+    const cab = { id: 'c1', col: 2, row: STD_ROW_0, serverCount: 1, hasLeafSwitch: false, powerStatus: true, heatLevel: 30, environment: 'production' as const, customerType: 'general' as const, serverAge: 0, facing: 'north' as const }
+    const unit: CoolingUnit = { id: 'cu1', type: 'crah', col: 2, row: STD_ROW_0, operational: true }
+    const chiller = { id: 'ch1', col: 2, row: STD_ROW_0, tier: 'basic' as const, operational: true }
+    const crahConfig = COOLING_UNIT_CONFIG.find((c) => c.type === 'crah')!
+
+    const result = calcCabinetCooling(cab, [unit], [cab], [chiller], [])
+    // BASE_AMBIENT (0.3) + coolingRate × 1.0 efficiency × (1.0 + 0.25 chiller bonus)
+    expect(result).toBeCloseTo(0.3 + crahConfig.coolingRate * 1.25)
+  })
+
+  it('calcCabinetCooling penalizes unconnected CRAH when chiller exists', () => {
+    const cab = { id: 'c1', col: 0, row: STD_ROW_0, serverCount: 1, hasLeafSwitch: false, powerStatus: true, heatLevel: 30, environment: 'production' as const, customerType: 'general' as const, serverAge: 0, facing: 'north' as const }
+    const unit: CoolingUnit = { id: 'cu1', type: 'crah', col: 0, row: STD_ROW_0, operational: true }
+    // Chiller far away, out of range, no pipes
+    const chiller = { id: 'ch1', col: 7, row: 7, tier: 'basic' as const, operational: true }
+    const crahConfig = COOLING_UNIT_CONFIG.find((c) => c.type === 'crah')!
+
+    const result = calcCabinetCooling(cab, [unit], [cab], [chiller], [])
+    // BASE_AMBIENT (0.3) + coolingRate × 0.6 (UNCONNECTED_CRAH_PENALTY)
+    expect(result).toBeCloseTo(0.3 + crahConfig.coolingRate * 0.6)
+  })
+
+  it('chillerPlants and coolingPipes are cleared on resetGame', () => {
+    setState({ sandboxMode: true, money: 999999, unlockedTech: ['hot_aisle'] })
+    getState().placeChillerPlant('basic', 2, 2)
+    getState().placeCoolingPipe(3, 3)
+    expect(getState().chillerPlants).toHaveLength(1)
+    expect(getState().coolingPipes).toHaveLength(1)
+    getState().resetGame()
+    expect(getState().chillerPlants).toHaveLength(0)
+    expect(getState().coolingPipes).toHaveLength(0)
+  })
+
+  it('CHILLER_PLANT_CONFIG has valid entries', () => {
+    expect(CHILLER_PLANT_CONFIG).toHaveLength(2)
+    for (const cfg of CHILLER_PLANT_CONFIG) {
+      expect(cfg.cost).toBeGreaterThan(0)
+      expect(cfg.range).toBeGreaterThan(0)
+      expect(cfg.efficiencyBonus).toBeGreaterThan(0)
+      expect(cfg.powerDraw).toBeGreaterThan(0)
+    }
+  })
+
+  it('new cooling incident types exist in INCIDENT_CATALOG', () => {
+    const types = ['compressor_failure', 'refrigerant_leak', 'chiller_malfunction', 'pipe_burst']
+    for (const t of types) {
+      const def = INCIDENT_CATALOG.find((i) => i.type === t)
+      expect(def).toBeDefined()
+      expect(def!.resolveCost).toBeGreaterThan(0)
+    }
   })
 })
 

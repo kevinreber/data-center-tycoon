@@ -1643,6 +1643,71 @@ export const COOLING_UNIT_CONFIG: CoolingUnitConfig[] = [
 
 const BASE_AMBIENT_DISSIPATION = 0.3  // °C/tick ambient heat loss even without cooling units
 
+// ── Chiller Plant & Cooling Pipe Types ────────────────────────────
+
+export type ChillerTier = 'basic' | 'advanced'
+
+export interface ChillerPlant {
+  id: string
+  col: number
+  row: number
+  tier: ChillerTier
+  operational: boolean
+}
+
+export interface ChillerPlantConfig {
+  tier: ChillerTier
+  label: string
+  cost: number
+  range: number              // base Manhattan distance coverage
+  efficiencyBonus: number    // multiplier bonus for connected cooling units (e.g. 0.25 = +25%)
+  powerDraw: number          // watts
+  requiresTech: string | null
+  description: string
+}
+
+export const CHILLER_PLANT_CONFIG: ChillerPlantConfig[] = [
+  {
+    tier: 'basic',
+    label: 'Basic Chiller Plant',
+    cost: 50000,
+    range: 3,
+    efficiencyBonus: 0.25,
+    powerDraw: 500,
+    requiresTech: 'hot_aisle',
+    description: 'Central chilled water plant. Boosts connected CRAH units within range by 25%.',
+  },
+  {
+    tier: 'advanced',
+    label: 'Advanced Chiller Plant',
+    cost: 120000,
+    range: 5,
+    efficiencyBonus: 0.40,
+    powerDraw: 800,
+    requiresTech: 'immersion_cooling',
+    description: 'High-capacity chiller with extended range. 40% efficiency boost to connected units.',
+  },
+]
+
+export interface CoolingPipe {
+  id: string
+  col: number
+  row: number
+}
+
+export const COOLING_PIPE_CONFIG = {
+  cost: 2000,
+  maxPipes: 20,
+  color: '#00ccff',
+  description: 'Chilled water pipe segment. Extends chiller coverage to reach distant cooling units.',
+}
+
+/** Max chiller plants allowed per facility */
+const MAX_CHILLER_PLANTS = 2
+
+/** CRAH units not connected to a chiller operate at this fraction of their base cooling rate */
+const UNCONNECTED_CRAH_PENALTY = 0.6
+
 // ── Loan System Types ───────────────────────────────────────────
 
 export interface Loan {
@@ -1672,7 +1737,7 @@ export interface IncidentDef {
   description: string
   durationTicks: number       // how long the incident lasts if unresolved
   resolveCost: number         // $ to resolve immediately
-  effect: 'heat_spike' | 'revenue_penalty' | 'power_surge' | 'traffic_drop' | 'cooling_failure' | 'hardware_failure'
+  effect: 'heat_spike' | 'revenue_penalty' | 'power_surge' | 'traffic_drop' | 'cooling_failure' | 'hardware_failure' | 'chiller_failure' | 'pipe_failure'
   effectMagnitude: number     // severity-dependent multiplier
   hardwareTarget?: 'spine' | 'leaf'  // for hardware_failure: which type of switch to disable
 }
@@ -1707,6 +1772,11 @@ export const INCIDENT_CATALOG: IncidentDef[] = [
   { type: 'tailgating', label: 'Tailgating', severity: 'minor', description: 'Someone followed an employee through a secure door. Security review required.', durationTicks: 5, resolveCost: 1000, effect: 'revenue_penalty', effectMagnitude: 0.95 },
   { type: 'social_engineering', label: 'Social Engineering', severity: 'major', description: 'An attacker tricked staff into granting unauthorized access. Revenue impacted.', durationTicks: 10, resolveCost: 5000, effect: 'revenue_penalty', effectMagnitude: 0.6 },
   { type: 'break_in', label: 'Break-in Attempt', severity: 'critical', description: 'Physical intrusion detected! Equipment at risk. Immediate security response needed.', durationTicks: 8, resolveCost: 15000, effect: 'revenue_penalty', effectMagnitude: 0.3 },
+  // Cooling infrastructure incidents
+  { type: 'compressor_failure', label: 'Compressor Failure', severity: 'major', description: 'A cooling unit compressor has seized. Unit offline until repaired.', durationTicks: 14, resolveCost: 10000, effect: 'cooling_failure', effectMagnitude: 0.5 },
+  { type: 'refrigerant_leak', label: 'Refrigerant Leak', severity: 'major', description: 'Refrigerant leaking from a cooling unit. Cooling capacity degraded facility-wide.', durationTicks: 16, resolveCost: 8000, effect: 'cooling_failure', effectMagnitude: 0.6 },
+  { type: 'chiller_malfunction', label: 'Chiller Plant Malfunction', severity: 'critical', description: 'Central chiller plant offline. Connected cooling units lose efficiency bonus.', durationTicks: 18, resolveCost: 15000, effect: 'chiller_failure', effectMagnitude: 0 },
+  { type: 'pipe_burst', label: 'Cooling Pipe Burst', severity: 'minor', description: 'A chilled water pipe has burst. Pipe segment destroyed — must be rebuilt.', durationTicks: 6, resolveCost: 3000, effect: 'pipe_failure', effectMagnitude: 0 },
 ]
 
 /** Chance per tick of an incident occurring (when fewer than max active) */
@@ -1868,6 +1938,10 @@ export const ACHIEVEMENT_CATALOG: AchievementDef[] = [
   { id: 'no_mixed_penalty', label: 'Clean Segregation', description: 'Have 5+ cabinets with zero mixed-environment penalties.', icon: '🧹' },
   { id: 'dedicated_row', label: 'Dedicated Row', description: 'Fill an entire row with the same environment type.', icon: '📏' },
   { id: 'zone_contract', label: 'Zone Landlord', description: 'Complete a zone-gated contract.', icon: '🏘️' },
+  // Chiller Plant & Cooling Pipe achievements
+  { id: 'chiller_installed', label: 'Piped Up', description: 'Install a chiller plant.', icon: '🏭' },
+  { id: 'cold_chain', label: 'Cold Chain', description: 'Connect 3 or more CRAH units to a chiller plant.', icon: '🔗' },
+  { id: 'pipe_network', label: 'Pipe Dream', description: 'Place 10 or more cooling pipes.', icon: '🔧' },
   // Phase 6 — Multi-Site Expansion achievements
   { id: 'multi_site_unlocked', label: 'Global Ambitions', description: 'Unlock multi-site expansion.', icon: '🌐' },
   { id: 'first_expansion', label: 'First Expansion', description: 'Purchase your first expansion site.', icon: '📍' },
@@ -2092,14 +2166,95 @@ export function calcManagementBonus(cabinets: Cabinet[]): number {
   return Math.min(MGMT_BONUS_CAP, mgmtServers * MGMT_BONUS_PER_SERVER)
 }
 
+// ── Chiller Plant & Cooling Pipe Helpers ──────────────────────────
+
+/** Check if a cooling unit is connected to an operational chiller plant.
+ *  A unit is "connected" if:
+ *  1. It is within Manhattan distance of a chiller's range, OR
+ *  2. There is a chain of adjacent pipes (Manhattan dist 1) from the unit to within the chiller's range.
+ *  Returns the best (highest) efficiency bonus from any connected chiller. */
+export function getChillerConnection(
+  unit: CoolingUnit,
+  chillerPlants: ChillerPlant[],
+  coolingPipes: CoolingPipe[],
+): { connected: boolean; efficiencyBonus: number } {
+  const operationalChillers = chillerPlants.filter((c) => c.operational)
+  if (operationalChillers.length === 0) return { connected: false, efficiencyBonus: 0 }
+
+  let bestBonus = 0
+
+  for (const chiller of operationalChillers) {
+    const cfg = CHILLER_PLANT_CONFIG.find((c) => c.tier === chiller.tier)
+    if (!cfg) continue
+
+    // Direct range check
+    const directDist = Math.abs(unit.col - chiller.col) + Math.abs(unit.row - chiller.row)
+    if (directDist <= cfg.range) {
+      bestBonus = Math.max(bestBonus, cfg.efficiencyBonus)
+      continue
+    }
+
+    // Flood-fill through pipes to check extended connectivity
+    if (coolingPipes.length === 0) continue
+
+    // BFS from chiller through adjacent pipes
+    const visited = new Set<string>()
+    const queue: Array<{ col: number; row: number }> = [{ col: chiller.col, row: chiller.row }]
+    visited.add(`${chiller.col},${chiller.row}`)
+
+    // Also add all tiles within chiller base range as starting points
+    for (const pipe of coolingPipes) {
+      const pipeDist = Math.abs(pipe.col - chiller.col) + Math.abs(pipe.row - chiller.row)
+      if (pipeDist <= cfg.range) {
+        const key = `${pipe.col},${pipe.row}`
+        if (!visited.has(key)) {
+          visited.add(key)
+          queue.push({ col: pipe.col, row: pipe.row })
+        }
+      }
+    }
+
+    // BFS through connected pipes
+    let found = false
+    while (queue.length > 0) {
+      const curr = queue.shift()!
+      // Check if this position is adjacent to the cooling unit
+      if (Math.abs(curr.col - unit.col) + Math.abs(curr.row - unit.row) <= 1) {
+        found = true
+        break
+      }
+      // Expand to adjacent pipes
+      for (const pipe of coolingPipes) {
+        const key = `${pipe.col},${pipe.row}`
+        if (visited.has(key)) continue
+        if (Math.abs(pipe.col - curr.col) + Math.abs(pipe.row - curr.row) === 1) {
+          visited.add(key)
+          queue.push({ col: pipe.col, row: pipe.row })
+        }
+      }
+    }
+
+    if (found) {
+      bestBonus = Math.max(bestBonus, cfg.efficiencyBonus)
+    }
+  }
+
+  return bestBonus > 0
+    ? { connected: true, efficiencyBonus: bestBonus }
+    : { connected: false, efficiencyBonus: 0 }
+}
+
 // ── Cooling Unit Helpers ───────────────────────────────────────────
 
 /** Calculate the effective cooling rate for a specific cabinet from all nearby cooling units.
- *  Each unit provides its full coolingRate if serving <= maxCabinets, otherwise it degrades. */
+ *  Each unit provides its full coolingRate if serving <= maxCabinets, otherwise it degrades.
+ *  CRAH units not connected to a chiller operate at reduced efficiency. */
 export function calcCabinetCooling(
   cab: Cabinet,
   coolingUnits: CoolingUnit[],
   allCabinets: Cabinet[],
+  chillerPlants: ChillerPlant[] = [],
+  coolingPipes: CoolingPipe[] = [],
 ): number {
   let totalCooling = BASE_AMBIENT_DISSIPATION
   for (const unit of coolingUnits) {
@@ -2119,7 +2274,20 @@ export function calcCabinetCooling(
       ? 1.0
       : config.maxCabinets / servedCount
 
-    totalCooling += config.coolingRate * efficiency
+    // CRAH units benefit from chiller connection; without it they operate at reduced efficiency
+    let chillerMult = 1.0
+    if (config.waterUsage > 0 && config.type === 'crah') {
+      const connection = getChillerConnection(unit, chillerPlants, coolingPipes)
+      if (connection.connected) {
+        chillerMult = 1.0 + connection.efficiencyBonus
+      } else if (chillerPlants.length > 0) {
+        // Chiller exists but unit is not connected — penalty
+        chillerMult = UNCONNECTED_CRAH_PENALTY
+      }
+      // If no chiller plant exists at all, CRAH operates at base rate (no penalty)
+    }
+
+    totalCooling += config.coolingRate * efficiency * chillerMult
   }
   return totalCooling
 }
@@ -3135,6 +3303,8 @@ interface GameState {
   crossConnects: CrossConnect[]
   inRowCoolers: InRowCooling[]
   coolingUnits: CoolingUnit[]
+  chillerPlants: ChillerPlant[]
+  coolingPipes: CoolingPipe[]
 
   // Sandbox Mode
   sandboxMode: boolean
@@ -3328,6 +3498,10 @@ interface GameState {
   placeInRowCooling: (col: number, row: number, optionIndex: number) => void
   placeCoolingUnit: (type: CoolingUnitType, col: number, row: number) => void
   removeCoolingUnit: (id: string) => void
+  placeChillerPlant: (tier: ChillerTier, col: number, row: number) => void
+  removeChillerPlant: (id: string) => void
+  placeCoolingPipe: (col: number, row: number) => void
+  removeCoolingPipe: (id: string) => void
   // Sandbox mode
   toggleSandboxMode: () => void
   // Scenario actions
@@ -3579,6 +3753,8 @@ export const useGameStore = create<GameState>((set) => ({
   crossConnects: [],
   inRowCoolers: [],
   coolingUnits: [],
+  chillerPlants: [],
+  coolingPipes: [],
 
   // Sandbox Mode
   sandboxMode: false,
@@ -4420,6 +4596,56 @@ export const useGameStore = create<GameState>((set) => ({
   removeCoolingUnit: (id: string) =>
     set((state) => ({
       coolingUnits: state.coolingUnits.filter((u) => u.id !== id),
+    })),
+
+  placeChillerPlant: (tier: ChillerTier, col: number, row: number) =>
+    set((state) => {
+      const config = CHILLER_PLANT_CONFIG.find((c) => c.tier === tier)
+      if (!config) return state
+      if (!state.sandboxMode && state.money < config.cost) return state
+      if (config.requiresTech && !state.unlockedTech.includes(config.requiresTech)) return state
+      if (state.chillerPlants.length >= MAX_CHILLER_PLANTS) return state
+      // No duplicate placement on same tile
+      if (state.chillerPlants.some((p) => p.col === col && p.row === row)) return state
+      if (state.coolingUnits.some((u) => u.col === col && u.row === row)) return state
+
+      const plant: ChillerPlant = {
+        id: `chiller-${Date.now()}-${state.chillerPlants.length}`,
+        col, row,
+        tier,
+        operational: true,
+      }
+      return {
+        chillerPlants: [...state.chillerPlants, plant],
+        money: state.sandboxMode ? state.money : state.money - config.cost,
+      }
+    }),
+
+  removeChillerPlant: (id: string) =>
+    set((state) => ({
+      chillerPlants: state.chillerPlants.filter((p) => p.id !== id),
+    })),
+
+  placeCoolingPipe: (col: number, row: number) =>
+    set((state) => {
+      if (!state.sandboxMode && state.money < COOLING_PIPE_CONFIG.cost) return state
+      if (state.coolingPipes.length >= COOLING_PIPE_CONFIG.maxPipes) return state
+      // No duplicate placement
+      if (state.coolingPipes.some((p) => p.col === col && p.row === row)) return state
+
+      const pipe: CoolingPipe = {
+        id: `pipe-${Date.now()}-${state.coolingPipes.length}`,
+        col, row,
+      }
+      return {
+        coolingPipes: [...state.coolingPipes, pipe],
+        money: state.sandboxMode ? state.money : state.money - COOLING_PIPE_CONFIG.cost,
+      }
+    }),
+
+  removeCoolingPipe: (id: string) =>
+    set((state) => ({
+      coolingPipes: state.coolingPipes.filter((p) => p.id !== id),
     })),
 
   // ── Sandbox Mode ───────────────────────────────────────────────
@@ -5412,6 +5638,8 @@ export const useGameStore = create<GameState>((set) => ({
       crossConnects: [],
       inRowCoolers: [],
       coolingUnits: [],
+      chillerPlants: [],
+      coolingPipes: [],
       sandboxMode: false,
       activeScenario: null,
       scenarioProgress: {},
@@ -5548,6 +5776,8 @@ export const useGameStore = create<GameState>((set) => ({
         crossConnects: state.crossConnects,
         inRowCoolers: state.inRowCoolers,
         coolingUnits: state.coolingUnits,
+        chillerPlants: state.chillerPlants,
+        coolingPipes: state.coolingPipes,
         sandboxMode: state.sandboxMode,
         aisleContainments: state.aisleContainments,
         stockPrice: state.stockPrice,
@@ -5630,6 +5860,8 @@ export const useGameStore = create<GameState>((set) => ({
         crossConnects: data.crossConnects ?? state.crossConnects,
         inRowCoolers: data.inRowCoolers ?? state.inRowCoolers,
         coolingUnits: data.coolingUnits ?? state.coolingUnits,
+        chillerPlants: data.chillerPlants ?? state.chillerPlants,
+        coolingPipes: data.coolingPipes ?? state.coolingPipes,
         sandboxMode: data.sandboxMode ?? state.sandboxMode,
         aisleContainments: data.aisleContainments ?? state.aisleContainments,
         stockPrice: data.stockPrice ?? state.stockPrice,
@@ -5755,6 +5987,8 @@ export const useGameStore = create<GameState>((set) => ({
       crossConnects: [],
       inRowCoolers: [],
       coolingUnits: [],
+      chillerPlants: [],
+      coolingPipes: [],
       sandboxMode: false,
       activeScenario: null,
       scenarioProgress: {},
@@ -5873,6 +6107,8 @@ export const useGameStore = create<GameState>((set) => ({
       let incidentLog = [...state.incidentLog]
       const resolvedCount = state.resolvedCount
       let coolingUnits = [...state.coolingUnits]
+      let chillerPlants = [...state.chillerPlants]
+      let coolingPipes = [...state.coolingPipes]
       // Clean up resolved incidents and track hardware that needs restoration
       const justResolved = activeIncidents.filter((i) => i.resolved)
       activeIncidents = activeIncidents.filter((i) => !i.resolved)
@@ -5892,6 +6128,14 @@ export const useGameStore = create<GameState>((set) => ({
             coolingUnits = coolingUnits.map((u) => u.id === disabled.id ? { ...u, operational: true } : u)
           }
         }
+        // Restore a disabled chiller plant when a chiller_failure incident resolves
+        if (inc.def.effect === 'chiller_failure') {
+          const disabled = chillerPlants.find((p) => !p.operational)
+          if (disabled) {
+            chillerPlants = chillerPlants.map((p) => p.id === disabled.id ? { ...p, operational: true } : p)
+          }
+        }
+        // pipe_failure: no restore — pipe was destroyed, must be rebuilt
       }
 
       // ── Operations tier benefits ──────────────────────────────
@@ -5939,6 +6183,18 @@ export const useGameStore = create<GameState>((set) => ({
             }
           }
 
+          // Chiller failure needs an operational chiller plant — fall back if none
+          if (selectedDef.effect === 'chiller_failure' && chillerPlants.filter(p => p.operational).length === 0) {
+            const fallbackDefs = INCIDENT_CATALOG.filter(d => d.effect !== 'chiller_failure' && d.effect !== 'hardware_failure' && d.effect !== 'pipe_failure')
+            selectedDef = fallbackDefs[Math.floor(Math.random() * fallbackDefs.length)]
+          }
+
+          // Pipe failure needs pipes — fall back if none
+          if (selectedDef.effect === 'pipe_failure' && coolingPipes.length === 0) {
+            const fallbackDefs = INCIDENT_CATALOG.filter(d => d.effect !== 'pipe_failure' && d.effect !== 'hardware_failure' && d.effect !== 'chiller_failure')
+            selectedDef = fallbackDefs[Math.floor(Math.random() * fallbackDefs.length)]
+          }
+
           const incident: ActiveIncident = {
             id: `inc-${nextIncidentId++}`,
             def: selectedDef,
@@ -5954,6 +6210,23 @@ export const useGameStore = create<GameState>((set) => ({
               const target = operational[Math.floor(Math.random() * operational.length)]
               coolingUnits = coolingUnits.map((u) => u.id === target.id ? { ...u, operational: false } : u)
               incidentLog = [`Cooling unit offline: ${COOLING_UNIT_CONFIG.find(c => c.type === target.type)?.label ?? target.type} at (${target.col},${target.row})`, ...incidentLog].slice(0, 10)
+            }
+          }
+          // Chiller failure: disable a random operational chiller plant
+          if (selectedDef.effect === 'chiller_failure') {
+            const operational = chillerPlants.filter((p) => p.operational)
+            if (operational.length > 0) {
+              const target = operational[Math.floor(Math.random() * operational.length)]
+              chillerPlants = chillerPlants.map((p) => p.id === target.id ? { ...p, operational: false } : p)
+              incidentLog = [`Chiller plant offline: ${target.tier} at (${target.col},${target.row})`, ...incidentLog].slice(0, 10)
+            }
+          }
+          // Pipe failure: destroy a random cooling pipe
+          if (selectedDef.effect === 'pipe_failure') {
+            if (coolingPipes.length > 0) {
+              const target = coolingPipes[Math.floor(Math.random() * coolingPipes.length)]
+              coolingPipes = coolingPipes.filter((p) => p.id !== target.id)
+              incidentLog = [`Cooling pipe destroyed at (${target.col},${target.row}) — must be rebuilt`, ...incidentLog].slice(0, 10)
             }
           }
           incidentLog = [`New: ${selectedDef.label} — ${selectedDef.description}`, ...incidentLog].slice(0, 10)
@@ -6003,6 +6276,8 @@ export const useGameStore = create<GameState>((set) => ({
           case 'cooling_failure': incidentCoolingMult *= inc.def.effectMagnitude; break
           case 'heat_spike': incidentHeatAdd += inc.def.effectMagnitude; break
           case 'traffic_drop': incidentTrafficMult *= inc.def.effectMagnitude; break
+          case 'chiller_failure': break  // effect handled via disabled chiller plant
+          case 'pipe_failure': break     // effect handled via destroyed pipe
         }
       }
 
@@ -6472,7 +6747,7 @@ export const useGameStore = create<GameState>((set) => ({
         }
 
         // Cooling unit infrastructure: per-cabinet coverage from placed cooling units
-        const unitCooling = calcCabinetCooling(cab, state.coolingUnits, state.cabinets)
+        const unitCooling = calcCabinetCooling(cab, coolingUnits, state.cabinets, chillerPlants, coolingPipes)
 
         // Zone adjacency heat reduction
         const zoneBonus = cabinetZoneBonuses.get(cab.id)
@@ -6679,7 +6954,13 @@ export const useGameStore = create<GameState>((set) => ({
         return sum + (cfg?.powerDraw ?? 0)
       }, 0)
       const coolingUnitPowerCost = +(coolingUnitPower / 1000 * spotPowerCost).toFixed(2)
-      const expenses = +(powerCost + coolingCost + coolingUnitPowerCost + generatorFuelCost).toFixed(2)
+      // Chiller plant power draw
+      const chillerPower = state.chillerPlants.filter((p) => p.operational).reduce((sum, p) => {
+        const cfg = CHILLER_PLANT_CONFIG.find((c) => c.tier === p.tier)
+        return sum + (cfg?.powerDraw ?? 0)
+      }, 0)
+      const chillerPowerCost = +(chillerPower / 1000 * spotPowerCost).toFixed(2)
+      const expenses = +(powerCost + coolingCost + coolingUnitPowerCost + chillerPowerCost + generatorFuelCost).toFixed(2)
 
       // 5. Process loan payments
       let loanPayments = 0
@@ -7615,6 +7896,16 @@ export const useGameStore = create<GameState>((set) => ({
       if (coolingUnits.length >= 1) unlock('first_cooling_unit')
       if (coolingUnits.filter((u) => u.operational).length >= 10) unlock('cooling_fleet')
       if (coolingUnits.some((u) => u.type === 'immersion_pod')) unlock('immersion_pioneer')
+      // Chiller & pipe achievements
+      if (chillerPlants.length >= 1) unlock('chiller_installed')
+      if (coolingPipes.length >= 10) unlock('pipe_network')
+      {
+        const connectedCrahCount = coolingUnits
+          .filter((u) => u.operational && u.type === 'crah')
+          .filter((u) => getChillerConnection(u, chillerPlants, coolingPipes).connected)
+          .length
+        if (connectedCrahCount >= 3) unlock('cold_chain')
+      }
       if (state.sandboxMode) unlock('sandbox_activated')
       if (state.hasSaved) unlock('game_saved')
       if (scenariosCompleted.length > state.scenariosCompleted.length) unlock('scenario_complete')
@@ -7873,6 +8164,8 @@ export const useGameStore = create<GameState>((set) => ({
         opsPreventedCount,
         // Cooling infrastructure
         coolingUnits,
+        chillerPlants,
+        coolingPipes,
         // Phase 6 — Multi-Site Expansion
         multiSiteUnlocked,
         sites: updatedSites,
