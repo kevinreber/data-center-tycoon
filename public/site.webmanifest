@@ -1,6 +1,6 @@
 {
-  "name": "Fabric Tycoon: Data Center Simulator",
-  "short_name": "Fabric Tycoon",
+  "name": "Data Center Tycoon: Data Center Simulator",
+  "short_name": "Data Center Tycoon",
   "description": "Build and manage your own data center in this free browser-based tycoon game. Design network fabrics, balance power and cooling, and scale to a global operation.",
   "start_url": "/data-center-tycoon/",
   "scope": "/data-center-tycoon/",
