@@ -182,7 +182,7 @@ A suggested sequencing that layers features for maximum impact at each stage:
 11. ~~Spot power pricing and hardware depreciation~~
 12. ~~Reputation score affecting customer quality~~
 13. ~~Loan system for early expansion~~
-14. Power distribution and structured cabling (builds on manual cabinet placement)
+14. ~~Power distribution and structured cabling~~
 
 ### Phase 4 — Add World (make it immersive) ✅
 15. ~~Staff & HR with skill levels~~
@@ -190,11 +190,11 @@ A suggested sequencing that layers features for maximum impact at each stage:
 17. ~~Security tiers and compliance certifications~~
 18. ~~Competitor AI~~
 
-### Phase 5 — Add Longevity (make it replayable)
-19. ~~Achievement system~~ (moved earlier — already implemented)
-20. Sandbox mode
-21. Scenario challenges
-22. Multi-site expansion
+### Phase 5 — Add Longevity (make it replayable) ✅
+19. ~~Achievement system~~ (89 achievements implemented)
+20. ~~Sandbox mode~~
+21. ~~Scenario challenges~~ (5 scenarios)
+22. Multi-site expansion (Phase 6A store/types done, 6B–6D pending)
 
 ---
 

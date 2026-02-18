@@ -3043,7 +3043,7 @@ export const useGameStore = create<GameState>((set) => ({
   saveGame: (slotId: number, name?: string) =>
     set((state) => {
       const saveData = {
-        version: 'v0.3.0',
+        version: 'v0.4.0',
         timestamp: Date.now(),
         cabinets: state.cabinets,
         spineSwitches: state.spineSwitches,

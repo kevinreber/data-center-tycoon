@@ -33,9 +33,13 @@ A web-based, 2D isometric Tycoon game (think Roller Coaster Tycoon) where the pl
 ### Infrastructure
 - **Cabinet Environments** — Set cabinets to Production (standard), Lab (low heat/revenue), or Management (bonus to all servers).
 - **Custom Server Configs** — Choose from Balanced, CPU-Optimized, GPU-Accelerated, Storage-Dense, or Memory-Optimized builds for new servers.
-- **Cooling** — Air cooling (free, basic) or Water cooling ($25K upgrade, 75% more effective). Weather and season affect cooling demand.
-- **PDUs & Cable Trays** — Place power distribution units and cable management. Overloaded PDUs cause heat; messy cables reduce revenue.
-- **Hot/Cold Aisles** — Alternate cabinet facing for cooling efficiency bonuses.
+- **42U Rack Model** — Detailed per-U equipment slots in the cabinet detail view with 8 equipment types (servers, switches, patch panels, UPS, etc.).
+- **Cooling** — Air cooling (free, basic) or Water cooling ($25K upgrade, 75% more effective). Placeable cooling units (fan trays, CRACs, CRAHs, immersion pods) with coverage zones. Chiller plants boost CRAH efficiency via cooling pipe networks.
+- **PDUs & Cable Management** — Place power distribution units, overhead trays, or underfloor conduits. Overloaded PDUs cause heat; cable management tiers reduce mess incidents.
+- **Hot/Cold Aisles** — Alternate cabinet facing for cooling efficiency bonuses. Aisle containment and width upgrades for additional cooling.
+- **Raised Floor** — Install 12" or 24" raised floors for underfloor cooling distribution and cable routing.
+- **Row-End Slots** — Mount PDUs, coolers, fire panels, or network patch panels at row ends for per-row bonuses.
+- **Workloads** — Assign AI training, batch processing, rendering, or database migration jobs to cabinets for completion payouts.
 
 ### Networking
 - **Clos Fabric** — Build a Spine-Leaf network. Every leaf switch connects to every spine via ECMP for fault-tolerant traffic routing.
@@ -60,11 +64,12 @@ A web-based, 2D isometric Tycoon game (think Roller Coaster Tycoon) where the pl
 - **Sound Barriers** — Install barriers to reduce noise output and stay within limits.
 
 ### Progression
-- **Suite Tiers** — Scale from Starter (4x2 grid) to Enterprise (10x5 grid) by purchasing upgrades.
+- **Suite Tiers** — Scale from Starter (4x2 grid) to Enterprise (10x5 grid), then unlock Nuclear and Fusion advanced tiers.
 - **Tech Tree** — Research 9 technologies across Efficiency, Performance, and Resilience branches.
 - **Reputation** — Build reputation from Unknown to Legendary through uptime, SLA compliance, and incident management.
-- **Achievements** — Unlock 67 achievements for milestones across all game systems.
+- **Achievements** — Unlock 89 achievements for milestones across all game systems.
 - **Scenarios** — Play themed challenges with specific goals and constraints.
+- **Leaderboards** — Track your best revenue, uptime, and cabinet count across sessions.
 
 ### Staff & Operations
 - **Hiring** — Recruit Network Engineers, System Admins, Security Specialists, and Facilities Managers.
@@ -76,7 +81,12 @@ A web-based, 2D isometric Tycoon game (think Roller Coaster Tycoon) where the pl
 - **Event Log** — Chronological record of all data center events with severity-based color coding.
 - **Capacity Planning** — Track space, power, heat, and financial runway. Monitor revenue trends over time.
 - **Lifetime Statistics** — Cumulative stats including total revenue, expenses, peak temperature, uptime streaks, and more.
-- **Tutorial System** — Contextual tips that appear as you encounter new game mechanics for the first time.
+- **Tutorial System** — 34 contextual tips that appear as you encounter new game mechanics for the first time.
+
+### Views & Audio
+- **Cabinet View** — Standard isometric view of your data center floor.
+- **Sub-Floor View** — See cooling pipes, power conduits, and infrastructure beneath the raised floor.
+- **Sound Effects** — Procedural audio feedback for placement, alerts, achievements, and ambient data center hum with volume controls.
 
 ## 🎲 Incident System
 - **Real-World:** Squirrels chewing cables, fiber cuts, DDoSed tenants, leaking pipes.

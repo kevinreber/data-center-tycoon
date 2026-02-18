@@ -4,7 +4,7 @@
 
 **Fabric Tycoon: Data Center Simulator** is a web-based isometric tycoon game where players build and manage a data center. Players place cabinets, install servers and network switches, design a Clos (spine-leaf) network fabric, and balance power, heat, and revenue to scale from a single rack to a global operation.
 
-**Current version:** v0.3.0
+**Current version:** v0.4.0
 
 ## Tech Stack
 
@@ -74,10 +74,21 @@ src/
 │   ├── PhaserGame.ts           # Phaser scene: isometric rendering, traffic visualization, placement mode
 │   └── CLAUDE.md               # Phaser-specific coding rules (see Sub-module Rules below)
 ├── stores/
-│   ├── gameStore.ts            # Single Zustand store (~7100 lines): all game state, types, constants, actions
+│   ├── gameStore.ts            # Single Zustand store (~5600 lines): game state, actions, tick loop
+│   ├── types.ts                # All TypeScript type definitions (~975 lines)
+│   ├── constants.ts            # Simulation constants (SIM, POWER_DRAW, TRAFFIC, etc.)
+│   ├── calculations.ts         # Pure calculation functions (calcStats, calcCabinetCooling, etc.)
+│   ├── chiller.ts              # Chiller plant connection algorithm (BFS through pipes)
+│   ├── configs/
+│   │   ├── economy.ts          # Loan, depreciation, power market, insurance, valuation configs
+│   │   ├── equipment.ts        # Cooling, server config, PDU, cable tray, aisle configs
+│   │   ├── features.ts         # Row-end slots, aisle widths, raised floor, cable mgmt, workloads, advanced tiers, rack equipment, audio
+│   │   ├── infrastructure.ts   # Busway, cross-connect, in-row cooling, spacing, zone configs
+│   │   ├── progression.ts      # Tech tree, achievements (89), incidents (17), contracts, scenarios, tutorial tips (34)
+│   │   └── world.ts            # Staff, supply chain, weather, interconnection, peering, competitors, regions
 │   ├── gameStore.test.ts       # Vitest tests for cabinet placement and placement hints
 │   ├── __tests__/
-│   │   └── gameStore.test.ts   # Vitest tests for Phase 5 systems (supply chain, weather, etc.)
+│   │   └── gameStore.test.ts   # Vitest tests for Phase 5+ systems (250 tests)
 │   └── CLAUDE.md               # Store-specific coding rules (see Sub-module Rules below)
 └── lib/
     └── utils.ts                # cn() utility for Tailwind class merging
@@ -117,7 +128,7 @@ The codebase has module-specific `CLAUDE.md` files with focused rules:
 
 ### State Management — `src/stores/gameStore.ts`
 
-All game state lives in a **single Zustand store** (`useGameStore`). This ~7100-line file contains:
+All game state lives in a **single Zustand store** (`useGameStore`). The store (~5600 lines) plus modular config/type files contain:
 
 - **Type definitions** (see Types section below)
 - **Simulation constants** (`SIM`): revenue rates, power costs, heat generation/dissipation, temperature thresholds
@@ -129,7 +140,7 @@ All game state lives in a **single Zustand store** (`useGameStore`). This ~7100-
 - **Spacing & layout configs** (`SPACING_CONFIG`): adjacency heat penalties, aisle bonuses, airflow bonuses, maintenance access, fire spread mechanics
 - **Zone bonus configs** (`ZONE_BONUS_CONFIG`): minimum cluster size (3), environment and customer type bonuses
 - **Economy configs**: loan options, depreciation, power market parameters, insurance options, valuation milestones
-- **Progression configs**: tech tree (9 techs), contracts (9 base + 4 compliance-gated), achievements (70), incidents (17 types), scenarios (5)
+- **Progression configs**: tech tree (9 techs), contracts (9 base + 4 compliance-gated + zone contracts), achievements (89), incidents (17 types), scenarios (5)
 - **Staff configs** (`STAFF_ROLE_CONFIG`, `STAFF_CERT_CONFIG`, `SHIFT_PATTERN_CONFIG`): roles, certifications, shift costs
 - **Supply chain configs** (`SUPPLY_CHAIN_CONFIG`): lead times, bulk discounts, shortage mechanics
 - **Weather configs** (`SEASON_CONFIG`, `WEATHER_CONDITION_CONFIG`): seasonal/weather ambient modifiers
@@ -140,7 +151,7 @@ All game state lives in a **single Zustand store** (`useGameStore`). This ~7100-
 - **Power redundancy configs** (`POWER_REDUNDANCY_CONFIG`): N, N+1, 2N levels
 - **Noise configs** (`NOISE_CONFIG`): noise generation, complaints, fines, sound barriers
 - **Spot compute configs** (`SPOT_COMPUTE_CONFIG`): dynamic spot market pricing
-- **Tutorial tips** (`TUTORIAL_TIPS`): 32 contextual gameplay tips (including carbon, security, market, operations, and cooling tips)
+- **Tutorial tips** (`TUTORIAL_TIPS`): 34 contextual gameplay tips (including carbon, security, market, operations, cooling, and infrastructure tips)
 - **Energy source configs** (`ENERGY_SOURCE_CONFIG`): 4 energy sources with cost/carbon/reliability
 - **Green cert configs** (`GREEN_CERT_CONFIG`): 4 green certifications with requirements and bonuses
 - **Carbon tax schedule** (`CARBON_TAX_SCHEDULE`): escalating carbon tax brackets
@@ -149,6 +160,14 @@ All game state lives in a **single Zustand store** (`useGameStore`). This ~7100-
 - **Compliance cert configs** (`COMPLIANCE_CERT_CONFIG`): 5 compliance certifications with audit mechanics
 - **Competitor configs** (`COMPETITOR_PERSONALITIES`): 5 AI competitor personality profiles
 - **Operations Progression configs** (`OPS_TIER_CONFIG`): 4 ops tiers with unlock requirements, benefits, and upgrade costs
+- **Row-end slot configs** (`ROW_END_SLOT_CONFIG`): 4 row-end infrastructure types with costs and effects
+- **Aisle width configs** (`AISLE_WIDTH_CONFIG`): 3 width options with maintenance/cooling bonuses
+- **Raised floor configs** (`RAISED_FLOOR_CONFIG`): 3 tiers with cooling distribution bonuses
+- **Cable management configs** (`CABLE_MANAGEMENT_CONFIG`): 3 types with cable mess reduction
+- **Workload configs** (`WORKLOAD_CONFIG`): 5 workload types with duration, payout, heat multiplier
+- **Advanced tier configs** (`ADVANCED_TIER_CONFIG`): Nuclear and Fusion late-game tiers
+- **Rack equipment configs** (`RACK_EQUIPMENT_CONFIG`): 8 equipment types for 42U rack model
+- **Chiller plant configs** (`CHILLER_PLANT_CONFIG`): 2 tiers (basic/advanced) with range and efficiency
 - **Traffic constants** (`TRAFFIC`): bandwidth per server, link capacity
 - **Pure calculation functions**: `calcStats()`, `calcTraffic()`, `calcTrafficWithCapacity()`, `coolingOverheadFactor()`, `calcManagementBonus()`, `calcAisleBonus()`, `calcCabinetCooling()`, `getPlacementHints()`, and more
 - **Store actions**: build, power, visual, simulation, finance, infrastructure, incidents, contracts, research, staff, supply chain, interconnection, peering, maintenance, operations progression, save/load, and more
@@ -240,7 +259,33 @@ Power & insurance types:
 Infrastructure entity types:
 - `CoolingUnit` — id, type (CoolingUnitType), col, row, operational
 - `CoolingUnitConfig` — type, label, cost, coolingRate, range, maxCabinets, powerDraw, waterUsage, requiresTech
+- `ChillerPlant` — id, col, row, tier (ChillerTier), operational
+- `CoolingPipe` — id, col, row
 - `Busway`, `CrossConnect`, `InRowCooling` interfaces
+
+View & rendering types:
+- `ViewMode` = `'cabinet' | 'above_cabinet' | 'sub_floor'`
+
+Infrastructure upgrade types:
+- `RowEndSlotType` = `'pdu_slot' | 'cooling_slot' | 'fire_panel' | 'network_patch'`
+- `AisleWidthType` = `'standard' | 'wide' | 'extra_wide'`
+- `RaisedFloorTier` = `'none' | 'basic' | 'advanced'`
+- `CableManagementType` = `'none' | 'overhead' | 'underfloor'`
+
+Workload types:
+- `WorkloadType` = `'ai_training' | 'batch_processing' | 'live_migration' | 'rendering' | 'database_migration'`
+- `Workload` — id, type, cabinetId, progress, durationTicks, basePayout, status
+
+Advanced tier types:
+- `AdvancedTier` = `'nuclear' | 'fusion'`
+- `AdvancedTierConfig` — tier, label, cost, maxCabinets, coolingBonus, carbonMultiplier, requiresTier
+
+42U rack types:
+- `RackEquipmentType` = `'1u_server' | '2u_server' | '4u_storage' | '1u_switch' | '2u_patch_panel' | '1u_pdu' | '3u_ups' | '2u_cable_mgmt'`
+- `RackSlot` — u position, equipment type, equipment label
+
+Audio types:
+- `AudioSettings` — masterVolume, sfxVolume, ambientVolume, muted
 
 Event & analytics types:
 - `EventCategory` = `'incident' | 'finance' | 'contract' | 'achievement' | 'infrastructure' | 'staff' | 'research' | 'system'`
@@ -272,7 +317,7 @@ Key interfaces (core):
 | Simulation | `setGameSpeed`, `upgradeCooling`, `tick` |
 | Finance | `takeLoan`, `refreshServers`, `upgradeSuite` |
 | Infrastructure | `placePDU`, `placeCableTray`, `autoRouteCables`, `toggleCabinetFacing`, `installAisleContainment`, `placeBusway`, `placeCrossConnect`, `placeInRowCooling` |
-| Cooling Units | `placeCoolingUnit`, `removeCoolingUnit` |
+| Cooling Units | `placeCoolingUnit`, `removeCoolingUnit`, `placeChillerPlant`, `removeChillerPlant`, `placeCoolingPipe`, `removeCoolingPipe` |
 | Incidents | `resolveIncident`, `buyGenerator`, `activateGenerator`, `upgradeSuppression` |
 | Operations Progression | `upgradeOpsTier` |
 | Contracts | `acceptContract` |
@@ -297,6 +342,16 @@ Key interfaces (core):
 | Competitor AI | `counterPoachOffer` |
 | Tutorial | `dismissTip`, `toggleTutorial` |
 | Save/Load | `saveGame`, `loadGame`, `deleteGame`, `resetGame`, `refreshSaveSlots` |
+| Workloads | `launchWorkload`, `migrateWorkload` |
+| Row-End Slots | `installRowEndSlot` |
+| Aisle Widths | `upgradeAisleWidth` |
+| Raised Floor | `upgradeRaisedFloor` |
+| Cable Management | `upgradeCableManagement` |
+| Advanced Tiers | `unlockAdvancedTier` |
+| 42U Rack | `installRackEquipment`, `removeRackEquipment` |
+| View Mode | `setViewMode` |
+| Audio | `updateAudioSettings` |
+| Leaderboard | `submitLeaderboardEntry` |
 | Sandbox/Demo | `toggleSandboxMode`, `loadDemoState`, `exitDemo` |
 | Misc | `dismissAchievement`, `selectCabinet` |
 
@@ -426,7 +481,7 @@ A `setInterval` in `App.tsx` calls `tick()` at the rate determined by `gameSpeed
 17. **Contracts**: Checks SLA compliance, termination/completion logic
 18. **Reputation**: Adjusts score based on SLAs, outages, fires, violations
 19. **Depreciation**: Ages servers, reduces efficiency after 30% of 800-tick lifespan
-20. **Achievements**: Checks 70 achievement conditions
+20. **Achievements**: Checks 89 achievement conditions
 21. **Traffic**: ECMP distribution across active spines
 22. **Capacity history**: Records snapshot of current stats each tick (capped at 100 entries)
 23. **Lifetime stats**: Updates running totals (revenue, expenses, peak temp, uptime streaks, etc.)
@@ -554,11 +609,32 @@ A `setInterval` in `App.tsx` calls `tick()` at the rate determined by `gameSpeed
 - **Events**: Price wars (15% revenue reduction), staff poaching (counter-offer or lose), competitor outages
 - **Market share**: Tracked as player vs competitor strength ratio
 
+**Workload Simulation:**
+- 5 workload types: ai_training, batch_processing, live_migration, rendering, database_migration
+- Per-cabinet workload assignment with progress tracking and overheat failure
+- Revenue payout on completion; failed workloads lose progress
+
+**Infrastructure Upgrades:**
+- **Row-end slots**: 4 types (PDU, cooler, fire panel, patch panel) mountable at row ends
+- **Aisle width upgrades**: standard, wide, extra_wide with maintenance/cooling bonuses
+- **Raised floor**: none, basic (12"), advanced (24") for underfloor cooling distribution
+- **Cable management**: none, overhead trays, underfloor conduits for cable mess reduction
+- **42U rack model**: Detailed per-U equipment placement in cabinet detail view (8 equipment types)
+
+**Advanced Progression:**
+- **Advanced scaling tiers**: Nuclear (SMR, $150K) and Fusion/Kugelblitz ($500K) beyond Enterprise
+- **Leaderboards**: Local localStorage-based tracking for revenue, uptime, and cabinet count
+
+**Views & Audio:**
+- **Sub-floor view**: Third view mode showing cooling pipes, power conduits, and below-floor infrastructure
+- **Sound effects**: Procedural Web Audio API synthesis (placement, alerts, achievements, ambient hum)
+- **Placement animations**: Expanding neon ring effect on equipment placement
+
 **Additional Systems:**
 - **Patents**: Patent unlocked technologies for ongoing royalty income
 - **RFP Bidding**: Compete for contract wins/losses
 - **Scenario Challenges**: 5 predefined challenges with special rules and objectives
-- **Tutorial System**: 32 contextual tips triggered during gameplay (including carbon, security, market, operations, and cooling tips)
+- **Tutorial System**: 34 contextual tips triggered during gameplay (including carbon, security, market, operations, cooling, and infrastructure tips)
 - **Event Logging**: Filterable log of significant events (capped at 200)
 - **Capacity History**: Per-tick snapshot of key metrics (capped at 100)
 - **Lifetime Statistics**: Revenue, expenses, peak temp, uptime streaks, fires survived, etc.

@@ -1,7 +1,7 @@
 # Fabric Tycoon — Consolidated Feature Tracker
 
 > Single source of truth for all features — completed, in progress, and pending.
-> Last audited: 2026-02-17
+> Last audited: 2026-02-18
 
 ---
 
@@ -420,7 +420,10 @@ Ideas for further encouraging organized cabinet layouts. Zone Adjacency Bonus (w
 | Phase 5 (Longevity) | 60+ | 60+ | 0 |
 | Rendering & Views | 21 | 21 | 0 |
 | UX / Camera | 6 | 6 | 0 |
-| **Pending Features** | **~31** | **~21** | **~10** |
+| **Pending Features** | **~35** | **~25** | **~10** |
 
-**Implemented features:** 180+ items across Phases 1–5, rendering, UX, capacity planning, operations progression, cabinet organization incentives, sub-floor view, 42U rack model, advanced scaling tiers, workload simulation, sound effects, placement animations, leaderboards, row-end slots, aisle widths, raised floor, and cable management.
-**Remaining features:** ~10 items, primarily multi-site expansion (Phase 6) and player-built row layouts.
+**Current version:** v0.4.0 — 89 achievements, 34 tutorial tips, 250 tests passing.
+
+**Implemented features:** 190+ items across Phases 1–5, rendering, UX, capacity planning, operations progression, cooling infrastructure (placeable units + chiller plants + pipes), cabinet organization incentives, sub-floor view, 42U rack model, advanced scaling tiers (Nuclear/Fusion), workload simulation, sound effects, placement animations, leaderboards, row-end slots, aisle width upgrades, raised floor, and cable management.
+
+**Remaining features:** ~10 items, primarily multi-site expansion (Phase 6B–6D).
