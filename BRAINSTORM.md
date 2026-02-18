@@ -1768,7 +1768,7 @@ Implementation: Phaser `Text` objects with `this.tweens.add({ y: y - 40, alpha: 
 
 ---
 
-### Placement Pop & Build Animations
+### Placement Pop & Build Animations (Partial ✅)
 
 **Impact: Medium | Effort: Low**
 
@@ -1810,7 +1810,7 @@ Phaser has a built-in particle system (`Phaser.GameObjects.Particles`) that's cu
 
 ---
 
-### Ambient Animations & Visual Life
+### Ambient Animations & Visual Life (Partial ✅)
 
 **Impact: Medium | Effort: Low-Medium**
 
@@ -1851,7 +1851,7 @@ Implementation options: Web Audio API for procedural tones (low effort, no asset
 
 ---
 
-### Camera Juice
+### Camera Juice (Partial ✅)
 
 **Impact: Low-Medium | Effort: Low**
 
@@ -1894,7 +1894,7 @@ Currently many important states are invisible on the isometric grid. Players mus
 
 ---
 
-### Sidebar Panel Slide Animation
+### Sidebar Panel Slide Animation ✅
 
 **Impact: Low | Effort: Low**
 

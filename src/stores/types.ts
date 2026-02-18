@@ -1145,3 +1145,11 @@ export interface FloatingTextEvent {
   fontSize?: string  // optional font size override (default '11px')
   center?: boolean   // if true, display at viewport center
 }
+
+export type CameraEffectType = 'shake_light' | 'shake_medium' | 'shake_heavy' | 'zoom_pulse' | 'zoom_reveal'
+
+export interface CameraEffect {
+  type: CameraEffectType
+  col?: number       // optional grid target for pan effects
+  row?: number
+}

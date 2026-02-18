@@ -422,16 +422,16 @@ Revenue/expense/warning text that rises from game objects each tick.
 
 ---
 
-#### Placement Pop & Build Animations (Enhanced)
+#### Placement Pop & Build Animations (Enhanced) ✅
 
 Enhanced tweens and visual feedback beyond the current expanding ring animation.
 
-- [ ] Cabinet place: scale 0→1 with `Back.easeOut` bounce + green flash
+- [x] Cabinet place: expanding ring + green flash + alpha fade-in with `Back.easeOut`
+- [x] Spine switch add: orange expanding ring + flash + fade-in
 - [ ] Server install: scale pulse on cabinet + green particle burst
 - [ ] Leaf switch add: cyan flash on top of cabinet
-- [ ] Spine switch add: orange scale-in with glow
 - [ ] Equipment removal: scale 1→0 with red flash
-- [ ] Suite tier upgrade: camera zoom out, grid expand animation
+- [x] Suite tier upgrade: camera zoom out reveal animation
 
 **Effort:** Low | **Impact:** Medium — Makes building feel satisfying instead of instant.
 
@@ -453,13 +453,13 @@ Phaser particle system (`Phaser.GameObjects.Particles`) for physical event feedb
 
 ---
 
-#### Ambient Animations & Visual Life
+#### Ambient Animations & Visual Life (Partial) ✅
 
 Small animations that make the facility feel like a living, operational space.
 
-- [ ] Cabinet LED pulse tweens (slow when idle, fast under load, off when powered down)
-- [ ] Cooling unit fan rotation indicators
-- [ ] Spine switch glow pulse when handling traffic
+- [x] Cabinet LED pulse tweens (slow when idle, fast under load, off when powered down)
+- [x] Cooling unit fan rotation indicators
+- [x] Spine switch glow pulse when handling traffic
 - [ ] Power-off cabinet dimming (darkened graphic, LEDs off)
 - [ ] Throttled cabinet red/orange tint overlay
 - [ ] Weather particle overlays (rain, snow, heat shimmer)
@@ -483,15 +483,15 @@ Additional audio feedback beyond the current procedural synthesis system.
 
 ---
 
-#### Camera Juice
+#### Camera Juice ✅
 
 Camera effects tied to significant game events.
 
-- [ ] Screen shake on critical incidents (fire, major outage)
+- [x] Screen shake on critical incidents (fire, major outage) — 3 intensity levels
 - [ ] Smooth camera pan to newly placed cabinet
-- [ ] Zoom pulse on achievement unlock
-- [ ] Camera zoom out on suite tier upgrade to reveal expanded grid
-- [ ] Larger screen shake for explosions/fire suppression
+- [x] Zoom pulse on achievement unlock
+- [x] Camera zoom out on suite tier upgrade to reveal expanded grid
+- [x] Larger screen shake for explosions/fire suppression
 
 **Effort:** Low | **Impact:** Low-Medium — Draws attention to important events.
 
@@ -514,11 +514,11 @@ Make important game states visible on the isometric grid without opening panels.
 
 ---
 
-#### Sidebar Panel Slide Animation
+#### Sidebar Panel Slide Animation ✅
 
-- [ ] CSS slide-in transition on panel open (`transform: translateX(-100%) → 0`, 200ms ease-out)
-- [ ] Slide-out animation on panel close
-- [ ] Staggered content fade-in (50ms delay after panel reaches position)
+- [x] CSS width transition on panel open/close (200ms ease-out)
+- [x] Slide-out animation on panel close with content persistence during transition
+- [x] Opacity fade-in synchronized with width transition
 
 **Effort:** Low | **Impact:** Low — Small UI polish eliminating jarring pop-in.
 
@@ -572,11 +572,11 @@ Ideas for further encouraging organized cabinet layouts. Zone Adjacency Bonus (w
 | Phase 5 (Longevity) | 60+ | 60+ | 0 |
 | Rendering & Views | 21 | 21 | 0 |
 | UX / Camera | 6 | 6 | 0 |
-| Game Feel & Polish (RCT-Style) | ~60 | 15 | ~45 |
+| Game Feel & Polish (RCT-Style) | ~60 | 25 | ~35 |
 | **Other Pending Features** | **~35** | **~25** | **~10** |
 
-**Current version:** v0.4.1 — 89 achievements, 34 tutorial tips, 250 tests passing.
+**Current version:** v0.4.2 — 89 achievements, 34 tutorial tips, 250 tests passing.
 
-**Implemented features:** 190+ items across Phases 1–5, rendering, UX, capacity planning, operations progression, cooling infrastructure (placeable units + chiller plants + pipes), cabinet organization incentives, sub-floor view, 42U rack model, advanced scaling tiers (Nuclear/Fusion), workload simulation, sound effects, placement animations, leaderboards, row-end slots, aisle width upgrades, raised floor, cable management, floating world-space text, and visual state differentiation.
+**Implemented features:** 200+ items across Phases 1–5, rendering, UX, capacity planning, operations progression, cooling infrastructure (placeable units + chiller plants + pipes), cabinet organization incentives, sub-floor view, 42U rack model, advanced scaling tiers (Nuclear/Fusion), workload simulation, sound effects, placement animations with Phaser tweens, camera juice effects (shake/zoom pulse/zoom reveal), ambient animations (LED pulses, fan rotation, spine glow), sidebar slide transitions, leaderboards, row-end slots, aisle width upgrades, raised floor, cable management, floating world-space text, and visual state differentiation.
 
-**Remaining features:** ~55 items, including RCT-style game feel improvements (worker sprites, particles, enhanced animations, camera juice), multi-site expansion (Phase 6B–6D), and UI polish.
+**Remaining features:** ~45 items, including RCT-style game feel improvements (worker sprites, particles, enhanced sound, weather overlays), multi-site expansion (Phase 6B–6D), scenario framing, and UI polish.

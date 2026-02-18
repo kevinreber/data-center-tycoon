@@ -367,7 +367,6 @@ export function GameCanvas() {
     const state = useGameStore.getState()
     const texts = state.pendingFloatingTexts
     if (texts.length === 0) return
-    // Clear the queue immediately
     useGameStore.setState({ pendingFloatingTexts: [] })
     for (const evt of texts) {
       if (evt.center) {
@@ -377,6 +376,24 @@ export function GameCanvas() {
       }
     }
   }, [tickCount, sceneReady])
+
+  // Dispatch camera effects from store to Phaser (fires on tick or non-tick triggers like suite upgrade)
+  const pendingCameraEffects = useGameStore((s) => s.pendingCameraEffects)
+  useEffect(() => {
+    if (!gameRef.current || pendingCameraEffects.length === 0) return
+    const scene = getScene(gameRef.current)
+    if (!scene) return
+    useGameStore.setState({ pendingCameraEffects: [] })
+    for (const fx of pendingCameraEffects) {
+      switch (fx.type) {
+        case 'shake_light': scene.cameraShake('light'); break
+        case 'shake_medium': scene.cameraShake('medium'); break
+        case 'shake_heavy': scene.cameraShake('heavy'); break
+        case 'zoom_pulse': scene.cameraZoomPulse(); break
+        case 'zoom_reveal': scene.cameraZoomReveal(); break
+      }
+    }
+  }, [pendingCameraEffects, sceneReady])
 
   const handleCenterGrid = useCallback(() => {
     if (gameRef.current) {

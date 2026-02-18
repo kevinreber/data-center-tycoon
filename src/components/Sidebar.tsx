@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import {
   Cpu, Server, DollarSign, Radio, Zap, Plug,
@@ -114,17 +114,36 @@ function PanelContent({ panelId }: { panelId: PanelId }) {
 
 export function Sidebar() {
   const [activePanel, setActivePanel] = useState<PanelId | null>(null)
+  // Track the panel being rendered (persists during close animation)
+  const [renderedPanel, setRenderedPanel] = useState<PanelId | null>(null)
+  const [isOpen, setIsOpen] = useState(false)
+  const panelRef = useRef<HTMLDivElement>(null)
   const incidentCount = useGameStore((s) => s.activeIncidents.filter((i) => !i.resolved).length)
 
   const togglePanel = (id: PanelId) => {
-    setActivePanel(prev => prev === id ? null : id)
+    const newPanel = activePanel === id ? null : id
+    setActivePanel(newPanel)
+    if (newPanel) {
+      setRenderedPanel(newPanel)
+      // Trigger slide-in on next frame so the CSS transition fires
+      requestAnimationFrame(() => setIsOpen(true))
+    } else {
+      setIsOpen(false)
+    }
+  }
+
+  // Unmount panel content after slide-out transition ends
+  const handleTransitionEnd = () => {
+    if (!isOpen) {
+      setRenderedPanel(null)
+    }
   }
 
   const topItems = SIDEBAR_ITEMS.filter(i => i.section === 'top')
   const middleItems = SIDEBAR_ITEMS.filter(i => i.section === 'middle')
   const bottomItems = SIDEBAR_ITEMS.filter(i => i.section === 'bottom')
 
-  const activeItem = SIDEBAR_ITEMS.find(i => i.id === activePanel)
+  const renderedItem = SIDEBAR_ITEMS.find(i => i.id === renderedPanel)
 
   return (
     <TooltipProvider>
@@ -175,36 +194,47 @@ export function Sidebar() {
           </div>
         </div>
 
-        {/* Panel slide-out */}
-        {activePanel && activeItem && (
-          <div className="w-80 bg-card/95 border-r border-border flex flex-col shrink-0 overflow-hidden">
-            {/* Panel header */}
-            <div className="flex items-center justify-between px-3 py-2 border-b border-border shrink-0">
-              <div className="flex items-center gap-2">
-                <activeItem.icon className="size-3.5" style={{ color: activeItem.color }} />
-                <span
-                  className="text-xs font-bold tracking-widest"
-                  style={{ color: activeItem.color }}
+        {/* Panel slide-out with CSS transition */}
+        <div
+          ref={panelRef}
+          className="bg-card/95 border-r border-border flex flex-col shrink-0 overflow-hidden"
+          style={{
+            width: isOpen ? '20rem' : '0rem',
+            opacity: isOpen ? 1 : 0,
+            transition: 'width 200ms ease-out, opacity 150ms ease-out',
+          }}
+          onTransitionEnd={handleTransitionEnd}
+        >
+          {renderedPanel && renderedItem && (
+            <>
+              {/* Panel header */}
+              <div className="flex items-center justify-between px-3 py-2 border-b border-border shrink-0 min-w-[20rem]">
+                <div className="flex items-center gap-2">
+                  <renderedItem.icon className="size-3.5" style={{ color: renderedItem.color }} />
+                  <span
+                    className="text-xs font-bold tracking-widest"
+                    style={{ color: renderedItem.color }}
+                  >
+                    {PANEL_TITLES[renderedPanel]}
+                  </span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  onClick={() => { setActivePanel(null); setIsOpen(false) }}
+                  className="text-muted-foreground hover:text-foreground p-0.5 h-auto"
                 >
-                  {PANEL_TITLES[activePanel]}
-                </span>
+                  <X className="size-3.5" />
+                </Button>
               </div>
-              <Button
-                variant="ghost"
-                size="xs"
-                onClick={() => setActivePanel(null)}
-                className="text-muted-foreground hover:text-foreground p-0.5 h-auto"
-              >
-                <X className="size-3.5" />
-              </Button>
-            </div>
 
-            {/* Panel content */}
-            <div className="flex-1 overflow-y-auto p-3">
-              <PanelContent panelId={activePanel} />
-            </div>
-          </div>
-        )}
+              {/* Panel content */}
+              <div className="flex-1 overflow-y-auto p-3 min-w-[20rem]">
+                <PanelContent panelId={renderedPanel} />
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </TooltipProvider>
   )
