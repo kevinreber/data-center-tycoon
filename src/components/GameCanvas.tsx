@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback, useState } from 'react'
 import type Phaser from 'phaser'
 import { createGame, getScene } from '@/game/PhaserGame'
 import { useGameStore, getSuiteLimits, getPlacementHints, SUITE_TIERS, ENVIRONMENT_CONFIG, CUSTOMER_TYPE_CONFIG } from '@/stores/gameStore'
+import { SIM } from '@/stores/constants'
 import type { DedicatedRowInfo } from '@/stores/gameStore'
 import { Crosshair } from 'lucide-react'
 
@@ -28,6 +29,9 @@ export function GameCanvas() {
   const cableTrays = useGameStore((s) => s.cableTrays)
   const pduOverloaded = useGameStore((s) => s.pduOverloaded)
   const heatMapVisible = useGameStore((s) => s.heatMapVisible)
+  const fireActive = useGameStore((s) => s.fireActive)
+  const activeIncidents = useGameStore((s) => s.activeIncidents)
+  const maintenanceWindows = useGameStore((s) => s.maintenanceWindows)
   const aisleContainments = useGameStore((s) => s.aisleContainments)
   const zones = useGameStore((s) => s.zones)
   const dedicatedRows = useGameStore((s) => s.dedicatedRows)
@@ -130,11 +134,25 @@ export function GameCanvas() {
     scene.setGridSize(limits.cols, layout.totalGridRows, limits.maxSpines, layout)
   }, [suiteTier, sceneReady])
 
-  // Sync cabinets to Phaser
+  // Sync cabinets to Phaser (including visual state for state differentiation)
   useEffect(() => {
     if (!gameRef.current) return
     const scene = getScene(gameRef.current)
     if (!scene) return
+
+    // Build sets of cabinet IDs with active incidents or maintenance
+    const incidentCabIds = new Set<string>()
+    for (const incident of activeIncidents) {
+      if (!incident.resolved && incident.affectedHardwareId) {
+        incidentCabIds.add(incident.affectedHardwareId)
+      }
+    }
+    const maintCabIds = new Set<string>()
+    for (const mw of maintenanceWindows) {
+      if (mw.targetType === 'cabinet' && mw.status !== 'completed') {
+        maintCabIds.add(mw.targetId)
+      }
+    }
 
     // Add new cabinets (with explicit positions)
     for (let i = prevCabCount.current; i < cabinets.length; i++) {
@@ -143,15 +161,22 @@ export function GameCanvas() {
     }
     prevCabCount.current = cabinets.length
 
-    // Update all existing cabinets (server count, leaf switch, power, environment, facing may have changed)
+    // Update all existing cabinets (server count, leaf switch, power, environment, facing, visual state)
     for (const cab of cabinets) {
-      scene.updateCabinet(cab.id, cab.serverCount, cab.hasLeafSwitch, cab.powerStatus, cab.environment, cab.facing)
+      scene.updateCabinet(cab.id, cab.serverCount, cab.hasLeafSwitch, cab.powerStatus, cab.environment, cab.facing, {
+        heatLevel: cab.heatLevel,
+        isThrottled: cab.heatLevel >= SIM.throttleTemp && cab.powerStatus,
+        isOnFire: fireActive && cab.heatLevel >= SIM.criticalTemp,
+        hasIncident: incidentCabIds.has(cab.id),
+        inMaintenance: maintCabIds.has(cab.id),
+        serverAge: cab.serverAge,
+      })
     }
 
     // Sync occupied tiles
     const occupied = new Set<string>(cabinets.map((c) => `${c.col},${c.row}`))
     scene.syncOccupiedTiles(occupied)
-  }, [cabinets, sceneReady])
+  }, [cabinets, fireActive, activeIncidents, maintenanceWindows, sceneReady])
 
   // Sync spine switches to Phaser
   useEffect(() => {
@@ -266,13 +291,13 @@ export function GameCanvas() {
     scene.setTrafficVisible(trafficVisible)
   }, [trafficVisible, sceneReady])
 
-  // Sync heat map visibility to Phaser
+  // Sync heat map visibility to Phaser (re-render when cabinets change to update temperatures)
   useEffect(() => {
     if (!gameRef.current) return
     const scene = getScene(gameRef.current)
     if (!scene) return
     scene.setHeatMapVisible(heatMapVisible)
-  }, [heatMapVisible, sceneReady])
+  }, [heatMapVisible, cabinets, sceneReady])
 
   // Sync aisle containment state to Phaser
   useEffect(() => {

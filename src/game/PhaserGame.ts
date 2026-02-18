@@ -50,6 +50,14 @@ interface CabinetEntry {
   powerOn: boolean
   environment: CabinetEnvironment
   facing: CabinetFacing
+  // Visual state differentiation fields
+  heatLevel: number        // actual temperature (°C)
+  isThrottled: boolean     // above throttle temp (80°C)
+  isOnFire: boolean        // cabinet is on fire
+  hasIncident: boolean     // has an active incident affecting it
+  inMaintenance: boolean   // currently under maintenance
+  serverAge: number        // server age in ticks (for depreciation tint)
+  recentlyPlaced: number   // timestamp (ms) when placed, 0 = not recent
 }
 
 interface PDUEntry {
@@ -1209,6 +1217,128 @@ class DataCenterScene extends Phaser.Scene {
       labels.push(warnLabel)
     }
 
+    // ── Visual State Differentiation ────────────────────────────
+    // Helper: draw an isometric tile overlay (diamond fill) on the cabinet
+    const drawTileOverlay = (color: number, alpha: number) => {
+      g.fillStyle(color, alpha)
+      g.beginPath()
+      g.moveTo(cx, cy - CABINET_ENCLOSURE_DEPTH)
+      g.lineTo(cx + CUBE_W / 2, cy + CUBE_H / 2 - CABINET_ENCLOSURE_DEPTH)
+      g.lineTo(cx, cy + CUBE_H - CABINET_ENCLOSURE_DEPTH)
+      g.lineTo(cx - CUBE_W / 2, cy + CUBE_H / 2 - CABINET_ENCLOSURE_DEPTH)
+      g.closePath()
+      g.fillPath()
+    }
+
+    let statusLabelY = topY + (hasAccess || !entry.powerOn ? 24 : 30)
+
+    // 1. Throttled — red/orange pulsing tint overlay
+    if (entry.isThrottled && entry.powerOn && !entry.isOnFire) {
+      drawTileOverlay(0xff4400, 0.18)
+      const throttleLabel = this.add
+        .text(cx, statusLabelY, '⚠ THROTTLED', {
+          fontFamily: 'monospace',
+          fontSize: '5px',
+          color: '#ff6622',
+        })
+        .setOrigin(0.5)
+        .setAlpha(0.7)
+        .setDepth(baseDepth + 2)
+      labels.push(throttleLabel)
+      statusLabelY += 8
+    }
+
+    // 2. On fire — orange tint + fire icon
+    if (entry.isOnFire) {
+      drawTileOverlay(0xff2200, 0.25)
+      const fireLabel = this.add
+        .text(cx, statusLabelY, '🔥 FIRE', {
+          fontFamily: 'monospace',
+          fontSize: '5px',
+          color: '#ff4400',
+        })
+        .setOrigin(0.5)
+        .setAlpha(0.9)
+        .setDepth(baseDepth + 2)
+      labels.push(fireLabel)
+      statusLabelY += 8
+    }
+
+    // 3. Active incident — yellow warning triangle icon
+    if (entry.hasIncident && !entry.isOnFire) {
+      const incidentLabel = this.add
+        .text(cx + CUBE_W / 2 + 2, topY + 2, '⚠', {
+          fontFamily: 'monospace',
+          fontSize: '8px',
+          color: '#ffcc00',
+        })
+        .setOrigin(0.5)
+        .setAlpha(0.8)
+        .setDepth(baseDepth + 2)
+      labels.push(incidentLabel)
+    }
+
+    // 4. Maintenance in progress — blue wrench icon + dimmed tint
+    if (entry.inMaintenance) {
+      drawTileOverlay(0x0066ff, 0.12)
+      const maintLabel = this.add
+        .text(cx + CUBE_W / 2 + 2, topY + 2, '🔧', {
+          fontFamily: 'monospace',
+          fontSize: '7px',
+          color: '#4488ff',
+        })
+        .setOrigin(0.5)
+        .setAlpha(0.8)
+        .setDepth(baseDepth + 2)
+      labels.push(maintLabel)
+    }
+
+    // 5. Powered-off cabinet — dark dimming overlay
+    if (!entry.powerOn && entry.serverCount > 0) {
+      drawTileOverlay(0x000000, 0.3)
+      const offLabel = this.add
+        .text(cx, statusLabelY, 'OFFLINE', {
+          fontFamily: 'monospace',
+          fontSize: '5px',
+          color: '#556677',
+        })
+        .setOrigin(0.5)
+        .setAlpha(0.5)
+        .setDepth(baseDepth + 2)
+      labels.push(offLabel)
+      statusLabelY += 8
+    }
+
+    // 6. Aged/deprecated servers — yellowed tint (when server age > 60% of lifespan)
+    if (entry.serverAge > 480 && entry.powerOn && entry.serverCount > 0) {
+      const ageFactor = Math.min(1, (entry.serverAge - 480) / 320) // 480–800 range
+      drawTileOverlay(0xccaa00, 0.06 + ageFactor * 0.1)
+      if (entry.serverAge > 640) {
+        const ageLabel = this.add
+          .text(cx, statusLabelY, 'AGING', {
+            fontFamily: 'monospace',
+            fontSize: '4px',
+            color: '#bbaa44',
+          })
+          .setOrigin(0.5)
+          .setAlpha(0.5)
+          .setDepth(baseDepth + 2)
+        labels.push(ageLabel)
+        statusLabelY += 8
+      }
+    }
+
+    // 7. Recently placed — green highlight glow (fades over 3s)
+    if (entry.recentlyPlaced > 0) {
+      const elapsed = Date.now() - entry.recentlyPlaced
+      if (elapsed < 3000) {
+        const fadeAlpha = 0.2 * (1 - elapsed / 3000)
+        drawTileOverlay(0x00ff88, fadeAlpha)
+      } else {
+        entry.recentlyPlaced = 0  // stop checking
+      }
+    }
+
     g.setDepth(baseDepth)
     this.cabinetGraphics.set(entry.id, g)
     this.cabinetLabels.set(entry.id, labels)
@@ -1425,13 +1555,13 @@ class DataCenterScene extends Phaser.Scene {
   addCabinetToScene(id: string, col: number, row: number, serverCount: number, hasLeafSwitch: boolean, environment: CabinetEnvironment = 'production', facing: CabinetFacing = 'north') {
     this.cabCount++
 
-    const entry: CabinetEntry = { id, col, row, serverCount, hasLeafSwitch, powerOn: true, environment, facing }
+    const entry: CabinetEntry = { id, col, row, serverCount, hasLeafSwitch, powerOn: true, environment, facing, heatLevel: 22, isThrottled: false, isOnFire: false, hasIncident: false, inMaintenance: false, serverAge: 0, recentlyPlaced: Date.now() }
     this.cabEntries.set(id, entry)
     this.occupiedTiles.add(`${col},${row}`)
     this.renderCabinet(entry)
   }
 
-  updateCabinet(id: string, serverCount: number, hasLeafSwitch: boolean, powerOn: boolean, environment: CabinetEnvironment = 'production', facing: CabinetFacing = 'north') {
+  updateCabinet(id: string, serverCount: number, hasLeafSwitch: boolean, powerOn: boolean, environment: CabinetEnvironment = 'production', facing: CabinetFacing = 'north', visualState?: { heatLevel: number; isThrottled: boolean; isOnFire: boolean; hasIncident: boolean; inMaintenance: boolean; serverAge: number }) {
     const entry = this.cabEntries.get(id)
     if (!entry) return
     entry.serverCount = serverCount
@@ -1439,6 +1569,14 @@ class DataCenterScene extends Phaser.Scene {
     entry.powerOn = powerOn
     entry.environment = environment
     entry.facing = facing
+    if (visualState) {
+      entry.heatLevel = visualState.heatLevel
+      entry.isThrottled = visualState.isThrottled
+      entry.isOnFire = visualState.isOnFire
+      entry.hasIncident = visualState.hasIncident
+      entry.inMaintenance = visualState.inMaintenance
+      entry.serverAge = visualState.serverAge
+    }
     this.renderCabinet(entry)
   }
 
@@ -2108,24 +2246,36 @@ class DataCenterScene extends Phaser.Scene {
     }
   }
 
-  /** Render heat map overlay showing temperature per cabinet */
+  /** Render heat map overlay showing temperature per cabinet (uses actual heatLevel) */
   private renderHeatMap() {
     if (this.heatMapGraphics) this.heatMapGraphics.destroy()
+    // Clean up heat map text labels from previous render
+    this.children.getAll().forEach((child) => {
+      if (child instanceof Phaser.GameObjects.Text && child.getData('heatMapLabel')) {
+        child.destroy()
+      }
+    })
     if (!this.heatMapVisible) return
 
     this.heatMapGraphics = this.add.graphics()
     this.heatMapGraphics.setDepth(45)
 
+    // Temperature range: ambient (22°C) = green, throttle (80°C) = yellow, critical (95°C) = red
+    const tempMin = 22   // ambient
+    const tempMax = 95   // critical/fire threshold
     for (const [, entry] of this.cabEntries) {
       const { x, y } = this.isoToScreen(entry.col, entry.row)
-      // Color based on implicit heat from server count and power status
-      const heatFactor = entry.powerOn ? Math.min(1, entry.serverCount / 4) : 0
-      const r = Math.round(255 * heatFactor)
-      const g = Math.round(255 * (1 - heatFactor))
+      // Use actual heatLevel for accurate heat map coloring
+      const heatFactor = entry.powerOn
+        ? Math.min(1, Math.max(0, (entry.heatLevel - tempMin) / (tempMax - tempMin)))
+        : 0
+      // Green → Yellow → Red gradient
+      const r = Math.round(255 * Math.min(1, heatFactor * 2))
+      const g = Math.round(255 * Math.min(1, (1 - heatFactor) * 2))
       const b = 0
       const color = (r << 16) | (g << 8) | b
 
-      this.heatMapGraphics.fillStyle(color, 0.25)
+      this.heatMapGraphics.fillStyle(color, 0.3)
       this.heatMapGraphics.beginPath()
       this.heatMapGraphics.moveTo(x, y)
       this.heatMapGraphics.lineTo(x + TILE_W / 2, y + TILE_H / 2)
@@ -2133,6 +2283,19 @@ class DataCenterScene extends Phaser.Scene {
       this.heatMapGraphics.lineTo(x - TILE_W / 2, y + TILE_H / 2)
       this.heatMapGraphics.closePath()
       this.heatMapGraphics.fillPath()
+
+      // Temperature label on each tile
+      if (entry.heatLevel > tempMin + 5) {
+        const tempText = `${Math.round(entry.heatLevel)}°`
+        const tempColor = heatFactor > 0.7 ? '#ff4400' : heatFactor > 0.4 ? '#ffaa00' : '#88cc44'
+        const tempLabel = this.add.text(x, y + TILE_H / 2, tempText, {
+          fontFamily: 'monospace',
+          fontSize: '6px',
+          color: tempColor,
+        }).setOrigin(0.5).setAlpha(0.7).setDepth(46)
+        // Store reference for cleanup (use a simple tag approach)
+        tempLabel.setData('heatMapLabel', true)
+      }
     }
   }
 

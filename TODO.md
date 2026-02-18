@@ -497,18 +497,18 @@ Camera effects tied to significant game events.
 
 ---
 
-#### Visual State Differentiation
+#### Visual State Differentiation ✅
 
 Make important game states visible on the isometric grid without opening panels.
 
-- [ ] Throttled cabinets: red/orange pulsing tint overlay
-- [ ] Powered-off cabinets: darkened/dimmed graphic
-- [ ] Cabinets on fire: orange tint + fire particles (not just React banner)
-- [ ] Active incident: yellow warning triangle icon above cabinet
-- [ ] Maintenance in progress: blue wrench icon, dimmed graphic
-- [ ] Recently placed: green highlight glow fading over 3s
-- [ ] Aged/deprecated servers: yellowed tint on cabinet
-- [ ] Fix heat map to use actual `heatLevel` from store (currently uses server count)
+- [x] Throttled cabinets: red/orange tint overlay with THROTTLED label
+- [x] Powered-off cabinets: darkened/dimmed graphic with OFFLINE label
+- [x] Cabinets on fire: orange tint + FIRE label on the grid
+- [x] Active incident: yellow warning triangle icon above cabinet
+- [x] Maintenance in progress: blue wrench icon + blue tint overlay
+- [x] Recently placed: green highlight glow fading over 3s
+- [x] Aged/deprecated servers: yellowed tint on cabinet with AGING label
+- [x] Fix heat map to use actual `heatLevel` from store (green→yellow→red gradient with temperature labels)
 
 **Effort:** Low | **Impact:** Medium — Enables "glance and react" gameplay.
 
@@ -572,11 +572,11 @@ Ideas for further encouraging organized cabinet layouts. Zone Adjacency Bonus (w
 | Phase 5 (Longevity) | 60+ | 60+ | 0 |
 | Rendering & Views | 21 | 21 | 0 |
 | UX / Camera | 6 | 6 | 0 |
-| Game Feel & Polish (RCT-Style) | ~60 | 7 | ~53 |
+| Game Feel & Polish (RCT-Style) | ~60 | 15 | ~45 |
 | **Other Pending Features** | **~35** | **~25** | **~10** |
 
-**Current version:** v0.4.0 — 89 achievements, 34 tutorial tips, 250 tests passing.
+**Current version:** v0.4.1 — 89 achievements, 34 tutorial tips, 250 tests passing.
 
-**Implemented features:** 190+ items across Phases 1–5, rendering, UX, capacity planning, operations progression, cooling infrastructure (placeable units + chiller plants + pipes), cabinet organization incentives, sub-floor view, 42U rack model, advanced scaling tiers (Nuclear/Fusion), workload simulation, sound effects, placement animations, leaderboards, row-end slots, aisle width upgrades, raised floor, cable management, and floating world-space text.
+**Implemented features:** 190+ items across Phases 1–5, rendering, UX, capacity planning, operations progression, cooling infrastructure (placeable units + chiller plants + pipes), cabinet organization incentives, sub-floor view, 42U rack model, advanced scaling tiers (Nuclear/Fusion), workload simulation, sound effects, placement animations, leaderboards, row-end slots, aisle width upgrades, raised floor, cable management, floating world-space text, and visual state differentiation.
 
-**Remaining features:** ~63 items, including RCT-style game feel improvements (worker sprites, particles, enhanced animations, camera juice, visual states), multi-site expansion (Phase 6B–6D), and UI polish.
+**Remaining features:** ~55 items, including RCT-style game feel improvements (worker sprites, particles, enhanced animations, camera juice), multi-site expansion (Phase 6B–6D), and UI polish.
