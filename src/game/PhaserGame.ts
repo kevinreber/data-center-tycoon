@@ -205,6 +205,11 @@ class DataCenterScene extends Phaser.Scene {
   private ambientOscillator: OscillatorNode | null = null
   private ambientGain: GainNode | null = null
 
+  // Floating text pool (world-space "damage numbers")
+  private floatingTextPool: Phaser.GameObjects.Text[] = []
+  private activeFloatingTexts: Phaser.GameObjects.Text[] = []
+  private readonly FLOATING_TEXT_POOL_SIZE = 30
+
   // Selected cabinet
   private selectedCabinetId: string | null = null
   private selectionGraphics: Phaser.GameObjects.Graphics | null = null
@@ -245,6 +250,7 @@ class DataCenterScene extends Phaser.Scene {
     this.drawGrid()
     this.drawAisles()
     this.drawCorridors()
+    this.initFloatingTextPool()
 
     // Set up pointer events for placement mode
     this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
@@ -2388,6 +2394,107 @@ class DataCenterScene extends Phaser.Scene {
       }).setOrigin(0.5).setDepth(6).setAlpha(0.8)
       this.rowEndLabels.set(slot.id, label)
     }
+  }
+
+  // ── Floating Text System ("Damage Numbers") ──────────────────
+
+  /** Initialize the text pool during scene create */
+  private initFloatingTextPool() {
+    for (let i = 0; i < this.FLOATING_TEXT_POOL_SIZE; i++) {
+      const txt = this.add.text(0, 0, '', {
+        fontFamily: 'monospace',
+        fontSize: '11px',
+        color: '#00ff88',
+        stroke: '#000000',
+        strokeThickness: 3,
+        shadow: { offsetX: 0, offsetY: 0, color: '#000', blur: 4, fill: true, stroke: true },
+      })
+      txt.setOrigin(0.5, 1)
+      txt.setDepth(100)
+      txt.setVisible(false)
+      txt.setAlpha(0)
+      this.floatingTextPool.push(txt)
+    }
+  }
+
+  /** Get a text object from the pool (or recycle the oldest active one) */
+  private getPooledText(): Phaser.GameObjects.Text {
+    // Try to find an inactive pooled text
+    const available = this.floatingTextPool.find((t) => !t.visible)
+    if (available) return available
+
+    // All in use — recycle the oldest active one
+    if (this.activeFloatingTexts.length > 0) {
+      const oldest = this.activeFloatingTexts.shift()!
+      this.tweens.killTweensOf(oldest)
+      oldest.setVisible(false)
+      oldest.setAlpha(0)
+      return oldest
+    }
+
+    // Shouldn't happen, but create a new one as fallback
+    const txt = this.add.text(0, 0, '', {
+      fontFamily: 'monospace',
+      fontSize: '11px',
+      color: '#00ff88',
+      stroke: '#000000',
+      strokeThickness: 3,
+    })
+    txt.setOrigin(0.5, 1)
+    txt.setDepth(100)
+    this.floatingTextPool.push(txt)
+    return txt
+  }
+
+  /** Spawn floating text at a grid tile position */
+  spawnFloatingText(col: number, row: number, text: string, color: string, fontSize?: string) {
+    const pos = this.isoToScreen(col, row)
+    this.spawnFloatingTextAtScreen(pos.x, pos.y, text, color, fontSize)
+  }
+
+  /** Spawn floating text at a specific screen position */
+  spawnFloatingTextAtScreen(screenX: number, screenY: number, text: string, color: string, fontSize?: string) {
+    const txt = this.getPooledText()
+    txt.setText(text)
+    txt.setStyle({
+      fontFamily: 'monospace',
+      fontSize: fontSize ?? '11px',
+      color,
+      stroke: '#000000',
+      strokeThickness: 3,
+      shadow: { offsetX: 0, offsetY: 0, color: '#000', blur: 4, fill: true, stroke: true },
+    })
+    // Add small random horizontal offset to prevent text stacking
+    const offsetX = (Math.random() - 0.5) * 20
+    txt.setPosition(screenX + offsetX, screenY)
+    txt.setAlpha(1)
+    txt.setVisible(true)
+    txt.setScale(1)
+
+    this.activeFloatingTexts.push(txt)
+
+    // Animate: rise upward and fade out
+    this.tweens.add({
+      targets: txt,
+      y: screenY - 40,
+      alpha: 0,
+      duration: 1500,
+      ease: 'Power2',
+      onComplete: () => {
+        txt.setVisible(false)
+        txt.setAlpha(0)
+        const idx = this.activeFloatingTexts.indexOf(txt)
+        if (idx >= 0) this.activeFloatingTexts.splice(idx, 1)
+      },
+    })
+  }
+
+  /** Spawn floating text at the center of the viewport */
+  spawnCenterText(text: string, color: string, fontSize?: string) {
+    const cam = this.cameras.main
+    const cx = cam.scrollX + cam.width / 2
+    const cy = cam.scrollY + cam.height / 2
+    this.spawnFloatingTextAtScreen(cx, cy, text, color, fontSize ?? '14px')
   }
 
   // ── Placement Animation ───────────────────────────────────────

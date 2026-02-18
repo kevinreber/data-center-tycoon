@@ -406,17 +406,17 @@ Procedurally-drawn technician sprites that walk corridors, respond to incidents,
 
 ---
 
-#### Floating World-Space Text ("Damage Numbers")
+#### Floating World-Space Text ("Damage Numbers") ✅
 
 Revenue/expense/warning text that rises from game objects each tick.
 
-- [ ] `+$` revenue text rising from cabinets on tick
-- [ ] `-$` expense text from cost sources
-- [ ] `THROTTLED` / temperature warnings above hot cabinets
-- [ ] `FIRE!` text above burning cabinets
-- [ ] `⚠ INCIDENT` / `RESOLVED ✓` text for incidents
-- [ ] `★ ACHIEVEMENT` text on unlock
-- [ ] Text pooling and recycling for performance
+- [x] `+$` revenue text rising from cabinets on tick (sampled every 4 ticks)
+- [x] `THROTTLED` / temperature warnings above hot cabinets
+- [x] `FIRE!` text above burning cabinets
+- [x] `⚠ INCIDENT` / `RESOLVED ✓` text for incidents
+- [x] `★ ACHIEVEMENT` text on unlock
+- [x] `CONTRACT COMPLETE` text on contract completion
+- [x] Text pooling and recycling for performance (30-object pool with recycling)
 
 **Effort:** Low-Medium | **Impact:** High — Constant visual heartbeat. Players see the simulation running without opening panels.
 
@@ -572,11 +572,11 @@ Ideas for further encouraging organized cabinet layouts. Zone Adjacency Bonus (w
 | Phase 5 (Longevity) | 60+ | 60+ | 0 |
 | Rendering & Views | 21 | 21 | 0 |
 | UX / Camera | 6 | 6 | 0 |
-| Game Feel & Polish (RCT-Style) | ~60 | 0 | ~60 |
+| Game Feel & Polish (RCT-Style) | ~60 | 7 | ~53 |
 | **Other Pending Features** | **~35** | **~25** | **~10** |
 
 **Current version:** v0.4.0 — 89 achievements, 34 tutorial tips, 250 tests passing.
 
-**Implemented features:** 190+ items across Phases 1–5, rendering, UX, capacity planning, operations progression, cooling infrastructure (placeable units + chiller plants + pipes), cabinet organization incentives, sub-floor view, 42U rack model, advanced scaling tiers (Nuclear/Fusion), workload simulation, sound effects, placement animations, leaderboards, row-end slots, aisle width upgrades, raised floor, and cable management.
+**Implemented features:** 190+ items across Phases 1–5, rendering, UX, capacity planning, operations progression, cooling infrastructure (placeable units + chiller plants + pipes), cabinet organization incentives, sub-floor view, 42U rack model, advanced scaling tiers (Nuclear/Fusion), workload simulation, sound effects, placement animations, leaderboards, row-end slots, aisle width upgrades, raised floor, cable management, and floating world-space text.
 
-**Remaining features:** ~70 items, including RCT-style game feel improvements (worker sprites, floating text, particles, enhanced animations, camera juice, visual states), multi-site expansion (Phase 6B–6D), and UI polish.
+**Remaining features:** ~63 items, including RCT-style game feel improvements (worker sprites, particles, enhanced animations, camera juice, visual states), multi-site expansion (Phase 6B–6D), and UI polish.
