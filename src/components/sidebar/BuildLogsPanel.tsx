@@ -16,6 +16,23 @@ interface VersionEntry {
 
 const CHANGELOG: VersionEntry[] = [
   {
+    version: 'v0.4.1',
+    date: 'Feb 2026',
+    title: 'Visual State Differentiation',
+    highlights: 'Cabinets now visually communicate their state — see throttling, fires, incidents, maintenance, and aging at a glance.',
+    changes: [
+      { text: 'Throttled cabinets show red/orange tint overlay with THROTTLED label', type: 'new' },
+      { text: 'Cabinets on fire display orange tint with FIRE label directly on the grid', type: 'new' },
+      { text: 'Active incidents show yellow warning triangle icon above affected cabinets', type: 'new' },
+      { text: 'Maintenance in progress shown with blue wrench icon and blue tint overlay', type: 'new' },
+      { text: 'Powered-off cabinets appear dimmed with dark overlay and OFFLINE label', type: 'new' },
+      { text: 'Aged/deprecated servers get yellowed tint with AGING label past 80% lifespan', type: 'new' },
+      { text: 'Newly placed cabinets get a green highlight glow that fades over 3 seconds', type: 'new' },
+      { text: 'Heat map now uses actual cabinet temperature instead of server count', type: 'improved' },
+      { text: 'Heat map shows green-to-yellow-to-red gradient with per-cabinet temperature labels', type: 'improved' },
+    ],
+  },
+  {
     version: 'v0.4.0',
     date: 'Feb 2026',
     title: 'The Infrastructure Update',

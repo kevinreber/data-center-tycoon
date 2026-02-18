@@ -47,7 +47,7 @@ export function StatusBar({ activeNodes, totalNodes }: StatusBarProps) {
             DEBT: ${loans.reduce((s, l) => s + l.remaining, 0).toFixed(0)}
           </span>
         )}
-        <span className="text-muted-foreground/50">v0.4.0</span>
+        <span className="text-muted-foreground/50">v0.4.1</span>
       </div>
     </footer>
   )
