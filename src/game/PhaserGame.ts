@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
-import type { LayerVisibility, LayerOpacity, LayerColors, LayerColorOverrides, TrafficLink, CabinetEnvironment, CabinetFacing, PlacementHint, DataCenterLayout, CoolingUnitType, ChillerTier } from '@/stores/gameStore'
-import { DEFAULT_COLORS, ENVIRONMENT_CONFIG, MAX_SERVERS_PER_CABINET, getFacingOffsets, COOLING_UNIT_CONFIG, CHILLER_PLANT_CONFIG } from '@/stores/gameStore'
+import type { LayerVisibility, LayerOpacity, LayerColors, LayerColorOverrides, TrafficLink, CabinetEnvironment, CabinetFacing, PlacementHint, DataCenterLayout, CoolingUnitType, ChillerTier, ViewMode, RowEndSlot } from '@/stores/gameStore'
+import { DEFAULT_COLORS, ENVIRONMENT_CONFIG, MAX_SERVERS_PER_CABINET, getFacingOffsets, COOLING_UNIT_CONFIG, CHILLER_PLANT_CONFIG, ROW_END_SLOT_CONFIG } from '@/stores/gameStore'
 
 const COLORS = DEFAULT_COLORS
 
@@ -185,6 +185,25 @@ class DataCenterScene extends Phaser.Scene {
   // Heat map overlay
   private heatMapGraphics: Phaser.GameObjects.Graphics | null = null
   private heatMapVisible = false
+
+  // View mode
+  private viewMode: ViewMode = 'cabinet'
+
+  // Sub-floor view
+  private subFloorGraphics: Phaser.GameObjects.Graphics | null = null
+
+  // Row-end slot rendering
+  private rowEndGraphics: Map<string, Phaser.GameObjects.Graphics> = new Map()
+  private rowEndLabels: Map<string, Phaser.GameObjects.Text> = new Map()
+
+  // Audio context for procedural sounds
+  private audioCtx: AudioContext | null = null
+  private audioMuted = false
+  private audioMasterVolume = 0.5
+  private audioSfxVolume = 0.7
+  private audioAmbientVolume = 0.3
+  private ambientOscillator: OscillatorNode | null = null
+  private ambientGain: GainNode | null = null
 
   // Selected cabinet
   private selectedCabinetId: string | null = null
@@ -2242,6 +2261,263 @@ class DataCenterScene extends Phaser.Scene {
     }
   }
 
+  // ── View Mode API ──────────────────────────────────────────────
+
+  /** Switch the rendering view mode */
+  setViewMode(mode: ViewMode) {
+    if (mode === this.viewMode) return
+    this.viewMode = mode
+
+    if (mode === 'sub_floor') {
+      this.renderSubFloorView()
+      // Fade cabinet layer
+      for (const [, g] of this.cabinetGraphics) g.setAlpha(0.15)
+      for (const [, labels] of this.cabinetLabels) labels.forEach(l => l.setAlpha(0.1))
+      for (const [, g] of this.spineGraphics) g.setAlpha(0.15)
+    } else {
+      // Restore normal view
+      this.clearSubFloorView()
+      for (const [, g] of this.cabinetGraphics) g.setAlpha(1)
+      for (const [, labels] of this.cabinetLabels) labels.forEach(l => l.setAlpha(1))
+      for (const [, g] of this.spineGraphics) g.setAlpha(1)
+    }
+  }
+
+  private renderSubFloorView() {
+    this.clearSubFloorView()
+    this.subFloorGraphics = this.add.graphics()
+    this.subFloorGraphics.setDepth(0)
+
+    // Draw underfloor grid with pipe routes
+    for (let c = 0; c < this.cabCols; c++) {
+      for (let r = 0; r < this.cabRows; r++) {
+        const pos = this.isoToScreen(c, r)
+        // Underfloor tile
+        this.subFloorGraphics.fillStyle(0x1a2a3a, 0.6)
+        this.subFloorGraphics.beginPath()
+        this.subFloorGraphics.moveTo(pos.x, pos.y)
+        this.subFloorGraphics.lineTo(pos.x + TILE_W / 2, pos.y + TILE_H / 2)
+        this.subFloorGraphics.lineTo(pos.x, pos.y + TILE_H)
+        this.subFloorGraphics.lineTo(pos.x - TILE_W / 2, pos.y + TILE_H / 2)
+        this.subFloorGraphics.closePath()
+        this.subFloorGraphics.fillPath()
+
+        // Draw conduit lines
+        this.subFloorGraphics.lineStyle(1, 0x00aaff, 0.3)
+        this.subFloorGraphics.lineBetween(pos.x - TILE_W / 4, pos.y + TILE_H / 4, pos.x + TILE_W / 4, pos.y + TILE_H / 4)
+      }
+    }
+
+    // Draw cooling pipe routes
+    for (const [, pipe] of this.pipeEntries) {
+      const pos = this.isoToScreen(pipe.col, pipe.row)
+      this.subFloorGraphics.fillStyle(0x00ccff, 0.7)
+      this.subFloorGraphics.fillCircle(pos.x, pos.y + TILE_H / 2, 4)
+      // Draw pipe connections to adjacent pipes
+      this.subFloorGraphics.lineStyle(2, 0x00ccff, 0.5)
+      for (const [, otherPipe] of this.pipeEntries) {
+        if (otherPipe.id === pipe.id) continue
+        const dx = Math.abs(otherPipe.col - pipe.col)
+        const dy = Math.abs(otherPipe.row - pipe.row)
+        if (dx + dy === 1) {
+          const otherPos = this.isoToScreen(otherPipe.col, otherPipe.row)
+          this.subFloorGraphics.lineBetween(pos.x, pos.y + TILE_H / 2, otherPos.x, otherPos.y + TILE_H / 2)
+        }
+      }
+    }
+
+    // Draw power conduits under PDUs
+    for (const [, pdu] of this.pduEntries) {
+      const pos = this.isoToScreen(pdu.col, pdu.row)
+      this.subFloorGraphics.fillStyle(0xffaa00, 0.6)
+      this.subFloorGraphics.fillCircle(pos.x, pos.y + TILE_H / 2, 5)
+      this.subFloorGraphics.lineStyle(2, 0xffaa00, 0.4)
+      // Draw conduit lines from PDU outward
+      const left = this.isoToScreen(pdu.col - 1, pdu.row)
+      const right = this.isoToScreen(pdu.col + 1, pdu.row)
+      this.subFloorGraphics.lineBetween(left.x, left.y + TILE_H / 2, right.x, right.y + TILE_H / 2)
+    }
+  }
+
+  private clearSubFloorView() {
+    if (this.subFloorGraphics) {
+      this.subFloorGraphics.destroy()
+      this.subFloorGraphics = null
+    }
+  }
+
+  // ── Row-End Slot Rendering ────────────────────────────────────
+
+  /** Render row-end infrastructure slots */
+  setRowEndSlots(slots: RowEndSlot[]) {
+    // Clear existing
+    for (const [, g] of this.rowEndGraphics) g.destroy()
+    for (const [, l] of this.rowEndLabels) l.destroy()
+    this.rowEndGraphics.clear()
+    this.rowEndLabels.clear()
+
+    for (const slot of slots) {
+      const config = ROW_END_SLOT_CONFIG.find(c => c.type === slot.type)
+      if (!config) continue
+      const col = slot.side === 'left' ? -1 : this.cabCols
+      const pos = this.isoToScreen(col, slot.row)
+
+      const g = this.add.graphics()
+      g.setDepth(5)
+      const color = parseInt(config.color.replace('#', ''), 16)
+      // Draw a small isometric block for the slot
+      g.fillStyle(color, 0.7)
+      g.beginPath()
+      const hw = TILE_W * 0.3
+      const hh = TILE_H * 0.3
+      g.moveTo(pos.x, pos.y - 6)
+      g.lineTo(pos.x + hw, pos.y - 6 + hh)
+      g.lineTo(pos.x, pos.y - 6 + hh * 2)
+      g.lineTo(pos.x - hw, pos.y - 6 + hh)
+      g.closePath()
+      g.fillPath()
+      g.lineStyle(1, color, 1)
+      g.strokePath()
+
+      this.rowEndGraphics.set(slot.id, g)
+
+      const label = this.add.text(pos.x, pos.y + 10, config.label.substring(0, 8), {
+        fontFamily: 'monospace',
+        fontSize: '6px',
+        color: config.color,
+      }).setOrigin(0.5).setDepth(6).setAlpha(0.8)
+      this.rowEndLabels.set(slot.id, label)
+    }
+  }
+
+  // ── Placement Animation ───────────────────────────────────────
+
+  /** Animate a build/placement effect at a tile position */
+  playPlacementAnimation(col: number, row: number) {
+    const pos = this.isoToScreen(col, row)
+    const g = this.add.graphics()
+    g.setDepth(50)
+
+    // Expanding ring animation
+    let radius = 2
+    let alpha = 1.0
+    const timer = this.time.addEvent({
+      delay: 30,
+      repeat: 15,
+      callback: () => {
+        g.clear()
+        alpha -= 0.06
+        radius += 2
+        if (alpha <= 0) {
+          g.destroy()
+          timer.destroy()
+          return
+        }
+        g.lineStyle(2, 0x00ff88, alpha)
+        g.strokeCircle(pos.x, pos.y + TILE_H / 2, radius)
+      },
+    })
+  }
+
+  // ── Audio System ──────────────────────────────────────────────
+
+  /** Initialize the Web Audio context */
+  initAudio() {
+    if (this.audioCtx) return
+    try {
+      this.audioCtx = new AudioContext()
+    } catch {
+      // Audio not supported
+    }
+  }
+
+  /** Play a procedural SFX (build, alert, etc.) */
+  playSFX(type: 'build' | 'alert' | 'upgrade' | 'error') {
+    if (!this.audioCtx || this.audioMuted) return
+    const ctx = this.audioCtx
+    const gain = ctx.createGain()
+    gain.connect(ctx.destination)
+    const vol = this.audioMasterVolume * this.audioSfxVolume
+
+    const osc = ctx.createOscillator()
+    osc.connect(gain)
+
+    switch (type) {
+      case 'build':
+        osc.frequency.setValueAtTime(440, ctx.currentTime)
+        osc.frequency.linearRampToValueAtTime(880, ctx.currentTime + 0.1)
+        gain.gain.setValueAtTime(vol * 0.3, ctx.currentTime)
+        gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.15)
+        osc.start(ctx.currentTime)
+        osc.stop(ctx.currentTime + 0.15)
+        break
+      case 'alert':
+        osc.frequency.setValueAtTime(800, ctx.currentTime)
+        osc.frequency.linearRampToValueAtTime(400, ctx.currentTime + 0.3)
+        gain.gain.setValueAtTime(vol * 0.4, ctx.currentTime)
+        gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.3)
+        osc.start(ctx.currentTime)
+        osc.stop(ctx.currentTime + 0.3)
+        break
+      case 'upgrade':
+        osc.frequency.setValueAtTime(330, ctx.currentTime)
+        osc.frequency.linearRampToValueAtTime(660, ctx.currentTime + 0.1)
+        osc.frequency.linearRampToValueAtTime(990, ctx.currentTime + 0.2)
+        gain.gain.setValueAtTime(vol * 0.3, ctx.currentTime)
+        gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.25)
+        osc.start(ctx.currentTime)
+        osc.stop(ctx.currentTime + 0.25)
+        break
+      case 'error':
+        osc.type = 'square'
+        osc.frequency.setValueAtTime(200, ctx.currentTime)
+        gain.gain.setValueAtTime(vol * 0.2, ctx.currentTime)
+        gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.2)
+        osc.start(ctx.currentTime)
+        osc.stop(ctx.currentTime + 0.2)
+        break
+    }
+  }
+
+  /** Start/stop ambient data center hum */
+  setAmbientAudio(active: boolean) {
+    if (!this.audioCtx) return
+    if (active && !this.ambientOscillator && !this.audioMuted) {
+      const ctx = this.audioCtx
+      this.ambientGain = ctx.createGain()
+      this.ambientGain.gain.setValueAtTime(this.audioMasterVolume * this.audioAmbientVolume * 0.05, ctx.currentTime)
+      this.ambientGain.connect(ctx.destination)
+
+      this.ambientOscillator = ctx.createOscillator()
+      this.ambientOscillator.type = 'sawtooth'
+      this.ambientOscillator.frequency.setValueAtTime(60, ctx.currentTime)
+      this.ambientOscillator.connect(this.ambientGain)
+      this.ambientOscillator.start()
+    } else if (!active && this.ambientOscillator) {
+      this.ambientOscillator.stop()
+      this.ambientOscillator = null
+      this.ambientGain = null
+    }
+  }
+
+  /** Update audio settings */
+  setAudioSettings(muted: boolean, masterVolume: number, sfxVolume: number, ambientVolume: number) {
+    this.audioMuted = muted
+    this.audioMasterVolume = masterVolume
+    this.audioSfxVolume = sfxVolume
+    this.audioAmbientVolume = ambientVolume
+    if (this.ambientGain && this.audioCtx) {
+      if (muted) {
+        this.ambientGain.gain.setValueAtTime(0, this.audioCtx.currentTime)
+      } else {
+        this.ambientGain.gain.setValueAtTime(masterVolume * ambientVolume * 0.05, this.audioCtx.currentTime)
+      }
+    }
+    if (muted && this.ambientOscillator) {
+      this.setAmbientAudio(false)
+    }
+  }
+
   /** Reset camera to default position and zoom, centered on content */
   resetCamera() {
     this.zoomLevel = 1
@@ -2276,6 +2552,7 @@ export function createGame(parent: string): Phaser.Game {
     height,
     parent,
     transparent: true,
+    audio: { disableWebAudio: false },
     scene: DataCenterScene,
     scale: {
       mode: Phaser.Scale.RESIZE,

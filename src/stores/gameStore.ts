@@ -30,6 +30,14 @@ export type {
   Busway, BuswayConfig, CrossConnect, CrossConnectConfig, InRowCooling, InRowCoolingConfig,
   ScenarioDef, ScenarioObjective, NetworkLink, NetworkTopologyStats,
   Zone, ZoneRequirement, DedicatedRowInfo, ReputationTier,
+  // New feature types
+  ViewMode, RowEndSlotType, RowEndSlot, RowEndSlotConfig,
+  AisleWidth, AisleWidthConfig, RaisedFloorTier, RaisedFloorConfig,
+  CableManagementType, CableManagementConfig,
+  WorkloadType, WorkloadStatus, Workload, WorkloadConfig,
+  AdvancedTier, AdvancedTierConfig,
+  CustomRow, RackEquipmentType, RackSlot, RackEquipmentConfig, RackDetail,
+  LeaderboardCategory, LeaderboardEntry, AudioSettings,
 } from './types'
 
 import type {
@@ -50,6 +58,10 @@ import type {
   EventLogEntry, EventCategory, HistoryPoint, LifetimeStats, TutorialTip,
   ScenarioDef, Site, Patent, RFPOffer, DrillResult, NetworkTopologyStats,
   SaveSlotMeta,
+  // New feature types
+  ViewMode, RowEndSlotType, RowEndSlot, AisleWidth, RaisedFloorTier,
+  CableManagementType, WorkloadType, Workload, AdvancedTier,
+  RackDetail, LeaderboardEntry, LeaderboardCategory, AudioSettings,
 } from './types'
 
 // ── Re-export constants ────────────────────────────────────────
@@ -78,6 +90,10 @@ import { calcStats, calcTraffic, calcTrafficWithCapacity, calcCabinetCooling, is
 
 export { getChillerConnection } from './chiller'
 import { getChillerConnection } from './chiller'
+
+// ── Re-export new feature configs ─────────────────────────────
+export { ROW_END_SLOT_CONFIG, MAX_ROW_END_SLOTS, AISLE_WIDTH_CONFIG, RAISED_FLOOR_CONFIG, CABLE_MANAGEMENT_CONFIG, WORKLOAD_CONFIG, MAX_WORKLOADS_PER_CABINET, MAX_ACTIVE_WORKLOADS, ADVANCED_TIER_CONFIG, RACK_EQUIPMENT_CONFIG, RACK_TOTAL_U, DEFAULT_AUDIO_SETTINGS, LEADERBOARD_STORAGE_KEY, MAX_LEADERBOARD_ENTRIES } from './configs/features'
+import { ROW_END_SLOT_CONFIG, AISLE_WIDTH_CONFIG, RAISED_FLOOR_CONFIG, CABLE_MANAGEMENT_CONFIG, WORKLOAD_CONFIG, MAX_ACTIVE_WORKLOADS, ADVANCED_TIER_CONFIG, RACK_EQUIPMENT_CONFIG, RACK_TOTAL_U, DEFAULT_AUDIO_SETTINGS, LEADERBOARD_STORAGE_KEY, MAX_LEADERBOARD_ENTRIES } from './configs/features'
 
 
 // ── Save/Load Helpers (private) ─────────────────────────────────
@@ -440,6 +456,42 @@ interface GameState {
   totalSiteRevenue: number               // aggregate revenue from background sites per tick
   totalSiteExpenses: number              // aggregate expenses from background sites per tick
 
+  // ── New Features ─────────────────────────────────────────────
+
+  // View Mode (sub-floor view)
+  viewMode: ViewMode
+
+  // Row-End Infrastructure Slots
+  rowEndSlots: RowEndSlot[]
+
+  // Aisle Width Upgrades
+  aisleWidths: Record<number, AisleWidth>  // aisle ID → width
+
+  // Raised Floor & Cable Management
+  raisedFloorTier: RaisedFloorTier
+  cableManagementType: CableManagementType
+
+  // Workload Simulation
+  activeWorkloads: Workload[]
+  completedWorkloads: number
+  failedWorkloads: number
+  workloadRevenue: number
+
+  // Advanced Scaling Tiers
+  advancedTier: AdvancedTier | null
+
+  // Player-Built Rows (custom row mode)
+  customRowMode: boolean
+
+  // 42U Rack Model
+  rackDetails: Record<string, RackDetail>   // cabinet ID → rack detail
+
+  // Leaderboards (local)
+  leaderboardEntries: LeaderboardEntry[]
+
+  // Audio Settings
+  audioSettings: AudioSettings
+
   // Save / Load
   hasSaved: boolean
   activeSlotId: number | null
@@ -547,6 +599,22 @@ interface GameState {
   researchRegion: (regionId: RegionId) => void
   purchaseSite: (regionId: RegionId, siteType: SiteType, name: string) => void
   switchSite: (siteId: string | null) => void
+  // New Feature Actions
+  setViewMode: (mode: ViewMode) => void
+  placeRowEndSlot: (rowId: number, side: 'left' | 'right', type: RowEndSlotType) => void
+  removeRowEndSlot: (slotId: string) => void
+  upgradeAisleWidth: (aisleId: number, width: AisleWidth) => void
+  installRaisedFloor: (tier: RaisedFloorTier) => void
+  setCableManagement: (type: CableManagementType) => void
+  startWorkload: (type: WorkloadType, cabinetId: string) => void
+  migrateWorkload: (workloadId: string, targetCabinetId: string) => void
+  cancelWorkload: (workloadId: string) => void
+  unlockAdvancedTier: (tier: AdvancedTier) => void
+  toggleCustomRowMode: () => void
+  installRackEquipment: (cabinetId: string, position: number, equipmentType: string) => void
+  removeRackEquipment: (cabinetId: string, position: number) => void
+  submitLeaderboardEntry: (playerName: string, category: LeaderboardCategory) => void
+  setAudioSettings: (settings: Partial<AudioSettings>) => void
   // Tutorial actions
   dismissTip: (tipId: string) => void
   toggleTutorial: () => void
@@ -895,6 +963,42 @@ export const useGameStore = create<GameState>((set) => ({
   researchedRegions: [] as RegionId[],
   totalSiteRevenue: 0,
   totalSiteExpenses: 0,
+
+  // ── New Features ────────────────────────────────────────────
+
+  // View Mode
+  viewMode: 'cabinet' as ViewMode,
+
+  // Row-End Infrastructure Slots
+  rowEndSlots: [] as RowEndSlot[],
+
+  // Aisle Width Upgrades
+  aisleWidths: {} as Record<number, AisleWidth>,
+
+  // Raised Floor & Cable Management
+  raisedFloorTier: 'none' as RaisedFloorTier,
+  cableManagementType: 'none' as CableManagementType,
+
+  // Workload Simulation
+  activeWorkloads: [] as Workload[],
+  completedWorkloads: 0,
+  failedWorkloads: 0,
+  workloadRevenue: 0,
+
+  // Advanced Scaling Tiers
+  advancedTier: null as AdvancedTier | null,
+
+  // Player-Built Rows
+  customRowMode: false,
+
+  // 42U Rack Model
+  rackDetails: {} as Record<string, RackDetail>,
+
+  // Leaderboards
+  leaderboardEntries: [] as LeaderboardEntry[],
+
+  // Audio Settings
+  audioSettings: { ...DEFAULT_AUDIO_SETTINGS },
 
   // Demo mode
   isDemo: false,
@@ -2146,6 +2250,207 @@ export const useGameStore = create<GameState>((set) => ({
       return { activeSiteId: siteId }
     }),
 
+  // ── New Feature Actions ──────────────────────────────────────────
+
+  setViewMode: (mode: ViewMode) =>
+    set({ viewMode: mode }),
+
+  placeRowEndSlot: (rowId: number, side: 'left' | 'right', type: RowEndSlotType) =>
+    set((state) => {
+      const config = ROW_END_SLOT_CONFIG.find((c) => c.type === type)
+      if (!config) return state
+      if (state.money < config.cost && !state.sandboxMode) return state
+      // Check if slot already occupied
+      if (state.rowEndSlots.some((s) => s.rowId === rowId && s.side === side)) return state
+      const layout = SUITE_TIERS[state.suiteTier].layout
+      const cabRow = layout.cabinetRows.find((r) => r.id === rowId)
+      if (!cabRow) return state
+      const col = side === 'left' ? -1 : layout.cabinetRows[0].slots
+      const newSlot: RowEndSlot = {
+        id: `res-${rowId}-${side}`,
+        rowId,
+        side,
+        type,
+        col,
+        row: cabRow.gridRow,
+      }
+      const stats = calcStats(state.cabinets, state.spineSwitches)
+      return {
+        rowEndSlots: [...state.rowEndSlots, newSlot],
+        money: state.sandboxMode ? state.money : state.money - config.cost,
+        ...stats,
+      }
+    }),
+
+  removeRowEndSlot: (slotId: string) =>
+    set((state) => ({
+      rowEndSlots: state.rowEndSlots.filter((s) => s.id !== slotId),
+    })),
+
+  upgradeAisleWidth: (aisleId: number, width: AisleWidth) =>
+    set((state) => {
+      const config = AISLE_WIDTH_CONFIG.find((c) => c.width === width)
+      if (!config) return state
+      if (state.money < config.cost && !state.sandboxMode) return state
+      return {
+        aisleWidths: { ...state.aisleWidths, [aisleId]: width },
+        money: state.sandboxMode ? state.money : state.money - config.cost,
+      }
+    }),
+
+  installRaisedFloor: (tier: RaisedFloorTier) =>
+    set((state) => {
+      const config = RAISED_FLOOR_CONFIG.find((c) => c.tier === tier)
+      if (!config) return state
+      if (state.money < config.cost && !state.sandboxMode) return state
+      return {
+        raisedFloorTier: tier,
+        money: state.sandboxMode ? state.money : state.money - config.cost,
+      }
+    }),
+
+  setCableManagement: (type: CableManagementType) =>
+    set((state) => {
+      const config = CABLE_MANAGEMENT_CONFIG.find((c) => c.type === type)
+      if (!config) return state
+      if (state.money < config.cost && !state.sandboxMode) return state
+      // Underfloor requires raised floor
+      if (type === 'underfloor' && state.raisedFloorTier === 'none') return state
+      return {
+        cableManagementType: type,
+        money: state.sandboxMode ? state.money : state.money - config.cost,
+      }
+    }),
+
+  startWorkload: (type: WorkloadType, cabinetId: string) =>
+    set((state) => {
+      const config = WORKLOAD_CONFIG.find((c) => c.type === type)
+      if (!config) return state
+      const cabinet = state.cabinets.find((c) => c.id === cabinetId)
+      if (!cabinet || !cabinet.powerStatus) return state
+      if (cabinet.serverCount < config.minServers) return state
+      if (state.activeWorkloads.length >= MAX_ACTIVE_WORKLOADS) return state
+      // Only one workload per cabinet
+      if (state.activeWorkloads.some((w) => w.cabinetId === cabinetId && w.status === 'running')) return state
+      const newWorkload: Workload = {
+        id: `wl-${state.tickCount}-${cabinetId}`,
+        type,
+        cabinetId,
+        serversRequired: config.minServers,
+        ticksTotal: config.durationTicks,
+        ticksRemaining: config.durationTicks,
+        status: 'running',
+        heatMultiplier: config.heatMultiplier,
+        payoutOnComplete: config.basePayout,
+        startedAtTick: state.tickCount,
+      }
+      return { activeWorkloads: [...state.activeWorkloads, newWorkload] }
+    }),
+
+  migrateWorkload: (workloadId: string, targetCabinetId: string) =>
+    set((state) => {
+      const workload = state.activeWorkloads.find((w) => w.id === workloadId)
+      if (!workload || workload.status !== 'running') return state
+      const target = state.cabinets.find((c) => c.id === targetCabinetId)
+      if (!target || !target.powerStatus) return state
+      if (target.serverCount < workload.serversRequired) return state
+      if (state.activeWorkloads.some((w) => w.cabinetId === targetCabinetId && w.status === 'running' && w.id !== workloadId)) return state
+      return {
+        activeWorkloads: state.activeWorkloads.map((w) =>
+          w.id === workloadId ? { ...w, cabinetId: targetCabinetId, status: 'migrating' as const, ticksRemaining: w.ticksRemaining + 3 } : w
+        ),
+      }
+    }),
+
+  cancelWorkload: (workloadId: string) =>
+    set((state) => ({
+      activeWorkloads: state.activeWorkloads.filter((w) => w.id !== workloadId),
+    })),
+
+  unlockAdvancedTier: (tier: AdvancedTier) =>
+    set((state) => {
+      const config = ADVANCED_TIER_CONFIG.find((c) => c.tier === tier)
+      if (!config) return state
+      if (state.suiteTier !== config.prerequisiteSuiteTier) return state
+      if (state.money < config.unlockCost && !state.sandboxMode) return state
+      if (state.advancedTier === tier) return state
+      // Nuclear requires completing enterprise; fusion requires nuclear
+      if (tier === 'fusion' && state.advancedTier !== 'nuclear') return state
+      return {
+        advancedTier: tier,
+        money: state.sandboxMode ? state.money : state.money - config.unlockCost,
+      }
+    }),
+
+  toggleCustomRowMode: () =>
+    set((state) => ({ customRowMode: !state.customRowMode })),
+
+  installRackEquipment: (cabinetId: string, position: number, equipmentType: string) =>
+    set((state) => {
+      const cabinet = state.cabinets.find((c) => c.id === cabinetId)
+      if (!cabinet) return state
+      const equipConfig = RACK_EQUIPMENT_CONFIG.find((c) => c.type === equipmentType)
+      if (!equipConfig) return state
+      if (state.money < equipConfig.cost && !state.sandboxMode) return state
+      if (position < 1 || position + equipConfig.heightU - 1 > RACK_TOTAL_U) return state
+      const existing = state.rackDetails[cabinetId] ?? { cabinetId, slots: [], totalUsedU: 0, totalCapacityU: RACK_TOTAL_U }
+      // Check for overlap
+      for (const slot of existing.slots) {
+        if (slot.equipment && position < slot.position + slot.height && position + equipConfig.heightU > slot.position) return state
+      }
+      const newSlot = { position, height: equipConfig.heightU, equipment: equipmentType as RackDetail['slots'][0]['equipment'] }
+      const newSlots = [...existing.slots, newSlot].sort((a, b) => a.position - b.position)
+      const totalUsedU = newSlots.reduce((sum, s) => sum + (s.equipment ? s.height : 0), 0)
+      return {
+        rackDetails: { ...state.rackDetails, [cabinetId]: { ...existing, slots: newSlots, totalUsedU, totalCapacityU: RACK_TOTAL_U } },
+        money: state.sandboxMode ? state.money : state.money - equipConfig.cost,
+      }
+    }),
+
+  removeRackEquipment: (cabinetId: string, position: number) =>
+    set((state) => {
+      const detail = state.rackDetails[cabinetId]
+      if (!detail) return state
+      const newSlots = detail.slots.filter((s) => s.position !== position)
+      const totalUsedU = newSlots.reduce((sum, s) => sum + (s.equipment ? s.height : 0), 0)
+      return {
+        rackDetails: { ...state.rackDetails, [cabinetId]: { ...detail, slots: newSlots, totalUsedU } },
+      }
+    }),
+
+  submitLeaderboardEntry: (playerName: string, category: LeaderboardCategory) =>
+    set((state) => {
+      let value = 0
+      switch (category) {
+        case 'revenue': value = state.lifetimeStats.totalRevenueEarned; break
+        case 'uptime': value = state.lifetimeStats.longestUptimeStreak; break
+        case 'pue': value = state.pue > 0 ? state.pue : 999; break
+        case 'cabinets': value = state.cabinets.length; break
+        case 'green_energy': value = state.greenCertifications.length; break
+        case 'net_worth': value = state.money; break
+      }
+      const entry: LeaderboardEntry = {
+        id: `lb-${Date.now()}`,
+        playerName,
+        category,
+        value,
+        suiteTier: state.suiteTier,
+        tickCount: state.tickCount,
+        timestamp: Date.now(),
+      }
+      const entries = [...state.leaderboardEntries, entry]
+        .sort((a, b) => category === 'pue' ? a.value - b.value : b.value - a.value)
+        .slice(0, MAX_LEADERBOARD_ENTRIES)
+      // Persist to localStorage
+      try { localStorage.setItem(LEADERBOARD_STORAGE_KEY, JSON.stringify(entries)) } catch { /* ignore */ }
+      return { leaderboardEntries: entries }
+    }),
+
+  setAudioSettings: (settings: Partial<AudioSettings>) =>
+    set((state) => ({
+      audioSettings: { ...state.audioSettings, ...settings },
+    })),
+
   // ── Tutorial Actions ────────────────────────────────────────────
 
   dismissTip: (tipId: string) =>
@@ -2738,7 +3043,7 @@ export const useGameStore = create<GameState>((set) => ({
   saveGame: (slotId: number, name?: string) =>
     set((state) => {
       const saveData = {
-        version: 'v0.3.0',
+        version: 'v0.4.0',
         timestamp: Date.now(),
         cabinets: state.cabinets,
         spineSwitches: state.spineSwitches,
@@ -3062,6 +3367,20 @@ export const useGameStore = create<GameState>((set) => ({
       researchedRegions: [],
       totalSiteRevenue: 0,
       totalSiteExpenses: 0,
+      // New Features
+      viewMode: 'cabinet' as ViewMode,
+      rowEndSlots: [],
+      aisleWidths: {},
+      raisedFloorTier: 'none' as RaisedFloorTier,
+      cableManagementType: 'none' as CableManagementType,
+      activeWorkloads: [],
+      completedWorkloads: 0,
+      failedWorkloads: 0,
+      workloadRevenue: 0,
+      advancedTier: null,
+      customRowMode: false,
+      rackDetails: {},
+      audioSettings: { ...DEFAULT_AUDIO_SETTINGS },
     })
   },
 
@@ -3693,6 +4012,27 @@ export const useGameStore = create<GameState>((set) => ({
         infraIncidentBonus = messyCableCount * AISLE_CONFIG.messyCablingPenalty
       }
 
+      // ── Row-End Slot Effects ──────────────────────────────────────────
+      let facilityRowEndCooling = 0
+      for (const slot of state.rowEndSlots) {
+        if (slot.type === 'cooling_slot') facilityRowEndCooling += 1.0
+      }
+
+      // ── Aisle Width Effects ───────────────────────────────────────────
+      let facilityAisleWidthCooling = 0
+      for (const [, width] of Object.entries(state.aisleWidths)) {
+        const config = AISLE_WIDTH_CONFIG.find((c) => c.width === width)
+        if (config) facilityAisleWidthCooling += config.coolingBonus
+      }
+
+      // ── Raised Floor Effects ──────────────────────────────────────────
+      const raisedFloorConfig = RAISED_FLOOR_CONFIG.find((c) => c.tier === state.raisedFloorTier)
+      const facilityRaisedFloorCooling = raisedFloorConfig?.coolingDistributionBonus ?? 0
+
+      // ── Cable Management Effects ──────────────────────────────────────
+      const cableMgmtConfig = CABLE_MANAGEMENT_CONFIG.find((c) => c.type === state.cableManagementType)
+      const facilityCableMessReduction = cableMgmtConfig?.cableMessReduction ?? 0
+
       // 1. Update heat per cabinet (with customer type, spacing, and tech modifiers)
       const newCabinets = state.cabinets.map((cab) => {
         let heat = cab.heatLevel
@@ -3760,7 +4100,8 @@ export const useGameStore = create<GameState>((set) => ({
         const aisleCoolingBoost = currentAisleBonus * 2 // up to +0.6°C/tick extra cooling
         const zoneHeatBoost = zoneHeatReduction * SIM.heatPerServer // scale zone heat reduction relative to heat generation
         const baseCooling = state.coolingUnits.length > 0 ? unitCooling : coolingConfig.coolingRate
-        heat -= (baseCooling + techCoolingBonus + aisleCoolingBoost + inRowBonus + staffCoolingBonus + zoneHeatBoost + dedicatedRowCoolingBonus) * incidentCoolingMult
+        const infraCooling = facilityRowEndCooling + facilityAisleWidthCooling + facilityRaisedFloorCooling + facilityCableMessReduction
+        heat -= (baseCooling + techCoolingBonus + aisleCoolingBoost + inRowBonus + staffCoolingBonus + zoneHeatBoost + dedicatedRowCoolingBonus + infraCooling) * incidentCoolingMult
 
         // Incident heat spike
         heat += incidentHeatAdd
@@ -4764,6 +5105,51 @@ export const useGameStore = create<GameState>((set) => ({
       const spotRevenue = +(spotCapacity * SIM.revenuePerServer * spotPriceMultiplier).toFixed(2)
       const spotHistoryPrices = [...state.spotHistoryPrices, spotPriceMultiplier].slice(-50)
 
+      // ── Workload Simulation ──────────────────────────────────────────
+      let activeWorkloads = [...state.activeWorkloads]
+      let completedWorkloads = state.completedWorkloads
+      let failedWorkloads = state.failedWorkloads
+      let workloadRevenue = 0
+      activeWorkloads = activeWorkloads.map((w) => {
+        if (w.status === 'completed' || w.status === 'failed') return w
+        if (w.status === 'migrating') {
+          // Migration takes 3 ticks then resumes as running
+          return w.ticksRemaining <= w.ticksTotal - 3
+            ? { ...w, status: 'running' as const }
+            : { ...w, ticksRemaining: w.ticksRemaining - 1 }
+        }
+        // Running workload
+        const cabinet = newCabinets.find((c) => c.id === w.cabinetId)
+        if (!cabinet || !cabinet.powerStatus) {
+          failedWorkloads++
+          return { ...w, status: 'failed' as const }
+        }
+        // Check overheat failure
+        const wConfig = WORKLOAD_CONFIG.find((c) => c.type === w.type)
+        if (wConfig?.failOnOverheat && cabinet.heatLevel >= wConfig.failTemp) {
+          failedWorkloads++
+          return { ...w, status: 'failed' as const }
+        }
+        const remaining = w.ticksRemaining - 1
+        if (remaining <= 0) {
+          completedWorkloads++
+          workloadRevenue += w.payoutOnComplete
+          return { ...w, ticksRemaining: 0, status: 'completed' as const }
+        }
+        return { ...w, ticksRemaining: remaining }
+      })
+      // Clean up finished workloads (keep last 5 for display, remove old completed/failed)
+      const finishedCount = activeWorkloads.filter((w) => w.status === 'completed' || w.status === 'failed').length
+      if (finishedCount > 5) {
+        const toRemove = finishedCount - 5
+        let removed = 0
+        activeWorkloads = activeWorkloads.filter((w) => {
+          if (removed >= toRemove) return true
+          if (w.status === 'completed' || w.status === 'failed') { removed++; return false }
+          return true
+        })
+      }
+
       // ── Event log ─────────────────────────────────────────────────
       const eventLog = [...state.eventLog]
       const logEvent = (category: EventCategory, message: string, severity: EventSeverity = 'info') => {
@@ -4784,6 +5170,9 @@ export const useGameStore = create<GameState>((set) => ({
       if (complianceCerts.some((c) => !c.auditInProgress && c.grantedAtTick === newTickCount)) logEvent('achievement', 'Compliance certification granted!', 'success')
       if (opsAutoResolvedCount > state.opsAutoResolvedCount) logEvent('system', 'Ops automation auto-resolved an incident', 'success')
       if (opsPreventedCount > state.opsPreventedCount) logEvent('system', 'Ops monitoring prevented an incident', 'info')
+      // Workload events
+      if (completedWorkloads > state.completedWorkloads) logEvent('finance', `Workload completed! +$${workloadRevenue.toFixed(0)}`, 'success')
+      if (failedWorkloads > state.failedWorkloads) logEvent('incident', 'Workload failed due to overheating!', 'error')
 
       // ── Capacity history ──────────────────────────────────────────
       const capacityHistory = [...state.capacityHistory, {
@@ -4793,7 +5182,7 @@ export const useGameStore = create<GameState>((set) => ({
 
       // ── Lifetime stats ────────────────────────────────────────────
       const lifetimeStats = { ...state.lifetimeStats }
-      lifetimeStats.totalRevenueEarned += revenue + contractRevenue + spotRevenue + meetMeRevenue
+      lifetimeStats.totalRevenueEarned += revenue + contractRevenue + spotRevenue + meetMeRevenue + workloadRevenue
       lifetimeStats.totalExpensesPaid += expenses + loanPayments + contractPenalties + insuranceCost + staffCostPerTick + peeringCostPerTick + powerRedundancyCost + meetMeMaintenanceCost + carbonTaxPerTick + waterCostPerTick + securityMaintenanceCost
       lifetimeStats.totalMoneyEarned += revenue + contractRevenue + spotRevenue + meetMeRevenue + patentIncome
       lifetimeStats.peakTemperatureReached = Math.max(lifetimeStats.peakTemperatureReached, stats.avgHeat)
@@ -4956,6 +5345,15 @@ export const useGameStore = create<GameState>((set) => ({
       if (state.opsTier === 'automation' || OPS_TIER_ORDER.indexOf(state.opsTier) >= 2) unlock('sre')
       if (state.opsTier === 'orchestration') unlock('platform_engineer')
       if (opsAutoResolvedCount >= 20) unlock('lights_out')
+      // New Feature achievements
+      if (completedWorkloads >= 1) unlock('first_workload')
+      if (completedWorkloads >= 10) unlock('workload_master')
+      if (state.raisedFloorTier === 'advanced') unlock('raised_floor')
+      if (state.advancedTier === 'nuclear') unlock('nuclear_power')
+      if (state.advancedTier === 'fusion') unlock('fusion_power')
+      if (state.rowEndSlots.length >= 4) unlock('row_end_equipped')
+      if (Object.keys(state.aisleWidths).length >= 2) unlock('wide_aisles')
+      if (Object.keys(state.rackDetails).length >= 1) unlock('rack_detailed')
 
       // ── Phase 6 — Multi-Site Expansion Tick ────────────────────
       const suiteTierOrder: SuiteTier[] = ['starter', 'standard', 'professional', 'enterprise']
@@ -5002,15 +5400,16 @@ export const useGameStore = create<GameState>((set) => ({
       // Apply Phase 4 bonuses to contract revenue
       const adjustedContractRevenue = +(contractRevenue * (1 + complianceRevenueBonus + greenCertRevenueBonus) * priceWarPenalty).toFixed(2)
 
-      // Recalculate final money with all income/expenses (Phase 4 + 5 + 6 + ops included)
+      // Recalculate final money with all income/expenses (Phase 4 + 5 + 6 + workloads + ops included)
       const phase5Income = spotRevenue + meetMeRevenue
       const phase5Expenses = peeringCostPerTick + powerRedundancyCost + meetMeMaintenanceCost + (noiseComplaints > state.noiseComplaints && noiseComplaints % NOISE_CONFIG.fineThreshold === 0 ? NOISE_CONFIG.fineAmount : 0)
       const phase4Expenses = carbonTaxPerTick + waterCostPerTick + securityMaintenanceCost
       const phase6Income = totalSiteRevenue
       const phase6Expenses = totalSiteExpenses
+      const newFeatureIncome = workloadRevenue
       const finalNewMoney = state.sandboxMode
         ? 999999999
-        : Math.round((state.money + revenue + adjustedContractRevenue + patentIncome + milestoneMoney + phase5Income + phase6Income + (insurancePayouts - state.insurancePayouts) - expenses - loanPayments - contractPenalties - insuranceCost - staffCostPerTick - phase5Expenses - phase4Expenses - phase6Expenses) * 100) / 100
+        : Math.round((state.money + revenue + adjustedContractRevenue + patentIncome + milestoneMoney + phase5Income + phase6Income + newFeatureIncome + (insurancePayouts - state.insurancePayouts) - expenses - loanPayments - contractPenalties - insuranceCost - staffCostPerTick - phase5Expenses - phase4Expenses - phase6Expenses) * 100) / 100
 
       return {
         cabinets: newCabinets,
@@ -5168,6 +5567,11 @@ export const useGameStore = create<GameState>((set) => ({
         sites: updatedSites,
         totalSiteRevenue: +totalSiteRevenue.toFixed(2),
         totalSiteExpenses: +totalSiteExpenses.toFixed(2),
+        // New Features
+        activeWorkloads,
+        completedWorkloads,
+        failedWorkloads,
+        workloadRevenue: +workloadRevenue.toFixed(2),
       }
     }),
 }))

@@ -1,4 +1,5 @@
-import { useGameStore, SIM, ENVIRONMENT_CONFIG, CUSTOMER_TYPE_CONFIG, DEPRECIATION } from '@/stores/gameStore'
+import { useGameStore, SIM, ENVIRONMENT_CONFIG, CUSTOMER_TYPE_CONFIG, DEPRECIATION, WORKLOAD_CONFIG, MAX_ACTIVE_WORKLOADS } from '@/stores/gameStore'
+import type { WorkloadType } from '@/stores/gameStore'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -11,6 +12,7 @@ export function EquipmentPanel() {
   const {
     cabinets, spineSwitches,
     toggleCabinetPower, toggleSpinePower, refreshServers,
+    activeWorkloads, completedWorkloads, failedWorkloads, startWorkload, cancelWorkload,
   } = useGameStore()
 
   const prodCount = cabinets.filter((c) => c.environment === 'production').length
@@ -122,6 +124,57 @@ export function EquipmentPanel() {
               </TooltipContent>
             </Tooltip>
           ))}
+        </div>
+      )}
+
+      {/* Workload Simulation */}
+      {cabinets.length > 0 && (
+        <div className="border-t border-border pt-3">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xs font-bold text-neon-purple">WORKLOADS</span>
+            <Badge className="ml-auto font-mono text-xs border bg-neon-purple/20 text-neon-purple border-neon-purple/30">
+              {activeWorkloads.filter(w => w.status === 'running').length}/{MAX_ACTIVE_WORKLOADS}
+            </Badge>
+          </div>
+          <div className="text-[10px] text-muted-foreground mb-2">
+            {completedWorkloads > 0 && <span className="text-neon-green">{completedWorkloads} completed</span>}
+            {completedWorkloads > 0 && failedWorkloads > 0 && ' · '}
+            {failedWorkloads > 0 && <span className="text-neon-red">{failedWorkloads} failed</span>}
+          </div>
+
+          {/* Active workloads */}
+          {activeWorkloads.filter(w => w.status === 'running' || w.status === 'migrating').map((wl) => {
+            const config = WORKLOAD_CONFIG.find(c => c.type === wl.type)
+            const progress = ((wl.ticksTotal - wl.ticksRemaining) / wl.ticksTotal * 100).toFixed(0)
+            return (
+              <div key={wl.id} className="text-xs flex items-center gap-1 mb-1">
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: config?.color ?? '#888' }} />
+                <span className="text-muted-foreground truncate">{config?.label ?? wl.type}</span>
+                <span className="ml-auto tabular-nums text-neon-green/80">{progress}%</span>
+                <Button variant="ghost" size="xs" className="text-[9px] text-neon-red/60 hover:text-neon-red h-4 px-1" onClick={() => cancelWorkload(wl.id)}>x</Button>
+              </div>
+            )
+          })}
+
+          {/* Start new workload */}
+          <div className="flex flex-col gap-1 mt-2">
+            {WORKLOAD_CONFIG.filter(c => c.type !== 'live_migration').map((config) => {
+              const eligibleCab = cabinets.find(c => c.powerStatus && c.serverCount >= config.minServers && !activeWorkloads.some(w => w.cabinetId === c.id && w.status === 'running'))
+              return (
+                <Tooltip key={config.type}>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" size="xs" className="text-[9px] w-full justify-start"
+                      disabled={!eligibleCab || activeWorkloads.filter(w => w.status === 'running').length >= MAX_ACTIVE_WORKLOADS}
+                      onClick={() => { if (eligibleCab) startWorkload(config.type as WorkloadType, eligibleCab.id) }}>
+                      <span className="w-1.5 h-1.5 rounded-full mr-1" style={{ background: config.color }} />
+                      {config.label} — ${config.basePayout.toLocaleString()}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">{config.description}</TooltipContent>
+                </Tooltip>
+              )
+            })}
+          </div>
         </div>
       )}
     </div>

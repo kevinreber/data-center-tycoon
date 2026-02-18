@@ -1,5 +1,6 @@
-import { useGameStore, SIM, DEPRECIATION, POWER_DRAW, ENVIRONMENT_CONFIG, CUSTOMER_TYPE_CONFIG, MAX_SERVERS_PER_CABINET, ZONE_BONUS_CONFIG, calcMixedEnvPenalties, DEDICATED_ROW_BONUS_CONFIG } from '@/stores/gameStore'
-import type { Cabinet } from '@/stores/gameStore'
+import { useState } from 'react'
+import { useGameStore, SIM, DEPRECIATION, POWER_DRAW, ENVIRONMENT_CONFIG, CUSTOMER_TYPE_CONFIG, MAX_SERVERS_PER_CABINET, ZONE_BONUS_CONFIG, calcMixedEnvPenalties, DEDICATED_ROW_BONUS_CONFIG, RACK_EQUIPMENT_CONFIG, RACK_TOTAL_U } from '@/stores/gameStore'
+import type { Cabinet, RackEquipmentType } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -79,9 +80,11 @@ function StatRow({ icon: Icon, label, value, color, sub }: {
 }
 
 function CabinetDetail({ cabinet }: { cabinet: Cabinet }) {
+  const [showRackDetail, setShowRackDetail] = useState(false)
   const {
     toggleCabinetPower, refreshServers, money,
     selectCabinet, coolingType, trafficStats, zones, cabinets, dedicatedRows,
+    rackDetails, installRackEquipment, removeRackEquipment,
   } = useGameStore()
 
   const envConfig = ENVIRONMENT_CONFIG[cabinet.environment]
@@ -329,6 +332,56 @@ function CabinetDetail({ cabinet }: { cabinet: Cabinet }) {
                   {money < refreshCost && <span className="text-neon-red">Insufficient funds</span>}
                 </TooltipContent>
               </Tooltip>
+            )}
+          </div>
+
+          {/* 42U Rack Detail */}
+          <div className="border-t border-border/30 pt-2 mt-1">
+            <Button variant="ghost" size="xs" className="text-[10px] w-full justify-start text-muted-foreground hover:text-neon-cyan"
+              onClick={() => setShowRackDetail(!showRackDetail)}>
+              {showRackDetail ? '▼' : '►'} 42U Rack Detail ({rackDetails[cabinet.id]?.totalUsedU ?? 0}/{RACK_TOTAL_U}U)
+            </Button>
+            {showRackDetail && (
+              <div className="mt-1">
+                <div className="flex flex-col gap-0.5 max-h-32 overflow-y-auto">
+                  {Array.from({ length: RACK_TOTAL_U }, (_, i) => {
+                    const slot = rackDetails[cabinet.id]?.slots.find(s => s.position === i + 1)
+                    const equip = slot?.equipment ? RACK_EQUIPMENT_CONFIG.find(c => c.type === slot.equipment) : null
+                    return (
+                      <div key={i} className={`flex items-center text-[9px] px-1 py-0.5 rounded ${equip ? 'bg-neon-green/10' : 'bg-muted/10'}`}>
+                        <span className="w-4 text-muted-foreground tabular-nums">{i + 1}U</span>
+                        {equip ? (
+                          <>
+                            <span className="w-1.5 h-1.5 rounded-full ml-1" style={{ background: equip.color }} />
+                            <span className="ml-1 text-muted-foreground">{equip.label}</span>
+                            <Button variant="ghost" size="xs" className="ml-auto h-3 px-0.5 text-[8px] text-neon-red/60 hover:text-neon-red"
+                              onClick={() => removeRackEquipment(cabinet.id, i + 1)}>x</Button>
+                          </>
+                        ) : (
+                          <span className="ml-1 text-muted-foreground/30">empty</span>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+                <div className="flex flex-wrap gap-0.5 mt-1">
+                  {RACK_EQUIPMENT_CONFIG.filter(c => c.type !== 'blank_1u').slice(0, 4).map((config) => (
+                    <Button key={config.type} variant="outline" size="xs" className="text-[8px] h-4 px-1"
+                      disabled={money < config.cost}
+                      onClick={() => {
+                        const detail = rackDetails[cabinet.id]
+                        const usedPositions = new Set(detail?.slots.flatMap(s => Array.from({ length: s.height }, (_, k) => s.position + k)) ?? [])
+                        for (let pos = 1; pos <= RACK_TOTAL_U - config.heightU + 1; pos++) {
+                          const fits = Array.from({ length: config.heightU }, (_, k) => pos + k).every(p => !usedPositions.has(p))
+                          if (fits) { installRackEquipment(cabinet.id, pos, config.type as RackEquipmentType); break }
+                        }
+                      }}>
+                      <span className="w-1 h-1 rounded-full mr-0.5" style={{ background: config.color }} />
+                      {config.label.split(' ').slice(0, 2).join(' ')}
+                    </Button>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
         </div>

@@ -1,7 +1,7 @@
 # Fabric Tycoon — Consolidated Feature Tracker
 
 > Single source of truth for all features — completed, in progress, and pending.
-> Last audited: 2026-02-17
+> Last audited: 2026-02-18
 
 ---
 
@@ -242,43 +242,36 @@ Everything below is **not yet implemented**. Organized by priority/effort.
 
 ---
 
-### Sub-Floor View (Rendering)
+### Sub-Floor View (Rendering) ✅
 
 A third view mode showing the space below the raised floor.
 
-- [ ] Third view mode: raised floor plenum
-- [ ] Cooling pipes and chilled air flow visualization
-- [ ] Power conduit routing
-- [ ] Dashed cabinet outlines from below
-
-**Effort:** Medium | **Impact:** Medium — Adds visual depth but not critical for gameplay.
+- [x] Third view mode: raised floor plenum (`sub_floor` view mode)
+- [x] Cooling pipes and chilled air flow visualization
+- [x] Power conduit routing
+- [x] Dashed cabinet outlines from below
 
 ---
 
-### 42U Rack Model
+### 42U Rack Model ✅
 
-Replace the simple server-count cabinet with a detailed rack unit model.
+Detailed rack unit overlay for cabinets (optional detail view, preserves core 4-server model).
 
-- [ ] Proper Rack model with 42U slots (per SPEC.md)
-- [ ] ToR leaf switch placement inside rack vs. spine switches overhead
-- [ ] Per-U slot equipment placement (servers, switches, patch panels)
-- [ ] Cabinet detail panel showing 42U slot layout
-
-**Effort:** High | **Impact:** Medium — Significant data model change. Adds realism but current 4-server model works fine for gameplay.
+- [x] 42U rack slot model with per-U equipment placement
+- [x] 8 equipment types: 1U server, 2U server, 4U storage, 1U switch, 2U patch panel, 1U PDU, 3U UPS, 2U cable management
+- [x] Per-U slot equipment placement with overlap detection
+- [x] Cabinet detail panel showing 42U slot layout with install/remove controls
 
 ---
 
-### Advanced Scaling Tiers
+### Advanced Scaling Tiers ✅
 
 Late-game sci-fi progression beyond the current 4 suite tiers.
 
-- [ ] Tier 1: Solar/Grid Power + Air Cooling (current ceiling)
-- [ ] Tier 2: Modular Nuclear (SMR) + Water Cooling
-- [ ] Tier 3: Fusion/Kugelblitz + Alien Cryo-Fluid
-- [ ] Tier unlock progression and costs
-- [ ] New equipment and cooling types per tier
-
-**Effort:** High | **Impact:** High — Extends endgame significantly. Requires new constants, rendering, and balance work.
+- [x] Nuclear tier: Modular Nuclear (SMR) — $150k unlock, +100 cabinets, 50% cooling bonus
+- [x] Fusion tier: Fusion/Kugelblitz — $500k unlock (requires Nuclear), +200 cabinets, 75% cooling bonus, zero carbon
+- [x] Tier unlock progression with sequential gating (Enterprise → Nuclear → Fusion)
+- [x] UI in Facility panel showing advanced tier options
 
 ---
 
@@ -302,29 +295,22 @@ A progression system for incident and infrastructure management, inspired by the
 
 ---
 
-### Cooling Infrastructure Redesign
+### Cooling Infrastructure Redesign ✅
 
-Rethink cooling upgrades as physical, placeable infrastructure rather than instant facility-wide toggles. Players should design their cooling layout to match their cabinet density and heat profile.
-
-- [ ] Water cooling requires physical placement (e.g., CRAH/CRAC units on the grid) with limited range
-- [ ] Cooling coverage zones — cabinets outside a cooler's range get reduced or no cooling benefit
-- [ ] Cooling capacity planning — units have max BTU/kW capacity; overloading degrades performance
-- [ ] Immersion cooling as a third tier — per-cabinet upgrade, extreme heat removal but very expensive
-- [ ] Cooling pipe routing — connect CRAH units to a chiller plant; pipe layout affects efficiency
-- [ ] Cooling failure modes — individual units can break down, creating hot spots until repaired
-
-**Effort:** High | **Impact:** High — Transforms cooling from a one-click upgrade into a core strategic system. Forces players to think about physical layout, capacity planning, and redundancy. Aligns with the game's identity as "The Heat/Water/Power Triangle."
+Previously implemented. Cooling units (fan trays, CRACs, CRAHs, immersion pods) are placeable infrastructure with range, capacity, and per-cabinet coverage zones. Chiller plants and cooling pipes connect the system.
 
 ---
 
-### Workload Simulation (Advanced)
+### Workload Simulation ✅
 
 Deeper workload mechanics beyond the current traffic/server model.
 
-- [ ] AI training jobs — long-running GPU workloads generating massive heat; completion earns big payouts, failure means starting over
-- [ ] Workload migration — manually or automatically migrate VMs when racks overheat or switches fail
-
-**Effort:** Medium-High | **Impact:** Medium — AI training jobs would add high-risk/high-reward gameplay. Migration adds active management during incidents.
+- [x] 4 workload types: batch_compute (60 ticks, $5k), ai_training (120 ticks, $15k), rendering (40 ticks, $3k), database_migration (80 ticks, $8k)
+- [x] Per-cabinet workload assignment with progress tracking
+- [x] Overheat failure — workloads fail if cabinet exceeds failure temperature
+- [x] Workload migration between cabinets
+- [x] Revenue payout on completion, event logging for completion/failure
+- [x] UI in Equipment panel showing active workloads and launch controls
 
 ---
 
@@ -378,6 +364,29 @@ Forecasting tools for proactive management.
 
 ---
 
+### Sound Effects & Audio ✅
+
+Audio feedback for game events using procedural Web Audio API synthesis.
+
+- [x] Placement sounds (build — rising tone)
+- [x] Incident alert sounds (alert — descending tone)
+- [x] Achievement unlock chime (upgrade — ascending arpeggio)
+- [x] Ambient data center hum (60Hz sawtooth)
+- [x] Error sound (error — low buzz)
+- [x] Volume controls in Settings panel (master, SFX, ambient, mute toggle)
+
+---
+
+### Placement Animations ✅
+
+Visual feedback when placing or building equipment.
+
+- [x] Expanding ring animation on cabinet/equipment placement
+- [x] Neon cyan color with fade-out effect
+- [x] Phaser time event driven animation
+
+---
+
 ### Game Feel & Polish — RCT-Style Improvements
 
 Inspired by RollerCoaster Tycoon's feedback loops and "aliveness." Full design details in BRAINSTORM.md under "Game Feel & Polish — RCT-Style Improvements."
@@ -413,9 +422,9 @@ Revenue/expense/warning text that rises from game objects each tick.
 
 ---
 
-#### Placement Pop & Build Animations
+#### Placement Pop & Build Animations (Enhanced)
 
-Tweens and visual feedback when placing or building equipment.
+Enhanced tweens and visual feedback beyond the current expanding ring animation.
 
 - [ ] Cabinet place: scale 0→1 with `Back.easeOut` bounce + green flash
 - [ ] Server install: scale pulse on cabinet + green particle burst
@@ -460,18 +469,15 @@ Small animations that make the facility feel like a living, operational space.
 
 ---
 
-#### Sound Effects & Audio
+#### Enhanced Sound Effects & Audio
 
-Audio feedback for game events and ambient atmosphere.
+Additional audio feedback beyond the current procedural synthesis system.
 
-- [ ] Ambient server hum (looped, volume scales with cabinet count)
 - [ ] HVAC white noise for cooling
 - [ ] Placement sounds (click/thunk for cabinet, metallic slide for server, switch click for leaf/spine)
 - [ ] Alert sounds (alarm for fire/critical, warning tone for throttling)
 - [ ] Economy sounds (cash register ding on contract, coin sound on milestone)
-- [ ] Achievement unlock chime
 - [ ] UI interaction sounds (button click, panel slide, toggle)
-- [ ] Volume controls and master mute in Settings panel
 
 **Effort:** Medium | **Impact:** Medium — Sound creates subconscious connection to game state.
 
@@ -533,17 +539,13 @@ Make scenarios a first-class feature rather than a settings toggle.
 
 ---
 
-### Leaderboards
+### Leaderboards ✅
 
-Compare performance metrics with other players.
+Local leaderboard system using localStorage.
 
-- [ ] PUE comparison
-- [ ] Uptime percentage ranking
-- [ ] Revenue leaderboard
-- [ ] Green energy percentage ranking
-- [ ] Requires backend infrastructure
-
-**Effort:** High | **Impact:** Low — Requires server infrastructure. Only meaningful with an active player base.
+- [x] Revenue, uptime, and cabinets categories
+- [x] Submit entries from Settings panel
+- [x] Persistent storage across sessions
 
 ---
 
@@ -568,10 +570,13 @@ Ideas for further encouraging organized cabinet layouts. Zone Adjacency Bonus (w
 | Phase 3 (Depth) | 9 | 9 | 0 |
 | Phase 4 (World) | 44 | 44 | 0 |
 | Phase 5 (Longevity) | 60+ | 60+ | 0 |
-| Rendering & Views | 17 | 17 | 0 |
+| Rendering & Views | 21 | 21 | 0 |
 | UX / Camera | 6 | 6 | 0 |
 | Game Feel & Polish (RCT-Style) | ~60 | 0 | ~60 |
-| **Other Pending Features** | **~25** | **10** | **~15** |
+| **Other Pending Features** | **~35** | **~25** | **~10** |
 
-**Implemented features:** 160+ items across Phases 1–5, rendering, UX, capacity planning, operations progression, and cabinet organization incentives.
-**Remaining features:** ~75 items, including RCT-style game feel improvements (worker sprites, floating text, particles, sound, animations, camera juice, visual states), cooling infrastructure redesign, high-effort late-game content (multi-site, scaling tiers, 42U racks), visualization (sub-floor view), and advanced simulation (workload migration, AI training jobs, leaderboards).
+**Current version:** v0.4.0 — 89 achievements, 34 tutorial tips, 250 tests passing.
+
+**Implemented features:** 190+ items across Phases 1–5, rendering, UX, capacity planning, operations progression, cooling infrastructure (placeable units + chiller plants + pipes), cabinet organization incentives, sub-floor view, 42U rack model, advanced scaling tiers (Nuclear/Fusion), workload simulation, sound effects, placement animations, leaderboards, row-end slots, aisle width upgrades, raised floor, and cable management.
+
+**Remaining features:** ~70 items, including RCT-style game feel improvements (worker sprites, floating text, particles, enhanced animations, camera juice, visual states), multi-site expansion (Phase 6B–6D), and UI polish.

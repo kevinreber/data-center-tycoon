@@ -1,7 +1,8 @@
-import { useGameStore, PDU_OPTIONS, CABLE_TRAY_OPTIONS, AISLE_CONFIG, getSuiteLimits, getPDULoad, isPDUOverloaded, BUSWAY_OPTIONS, CROSSCONNECT_OPTIONS, INROW_COOLING_OPTIONS, ZONE_BONUS_CONFIG, ENVIRONMENT_CONFIG, CUSTOMER_TYPE_CONFIG } from '@/stores/gameStore'
+import { useGameStore, PDU_OPTIONS, CABLE_TRAY_OPTIONS, AISLE_CONFIG, getSuiteLimits, getPDULoad, isPDUOverloaded, BUSWAY_OPTIONS, CROSSCONNECT_OPTIONS, INROW_COOLING_OPTIONS, ZONE_BONUS_CONFIG, ENVIRONMENT_CONFIG, CUSTOMER_TYPE_CONFIG, ROW_END_SLOT_CONFIG, AISLE_WIDTH_CONFIG, RAISED_FLOOR_CONFIG, CABLE_MANAGEMENT_CONFIG, SUITE_TIERS } from '@/stores/gameStore'
+import type { RowEndSlotType, AisleWidth, RaisedFloorTier, CableManagementType } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Plug, Cable, Network, Thermometer, AlertTriangle, Info, ArrowUpDown, Zap, Wifi, Snowflake, LayoutGrid } from 'lucide-react'
+import { Plug, Cable, Network, Thermometer, AlertTriangle, Info, ArrowUpDown, Zap, Wifi, Snowflake, LayoutGrid, Square, MoveHorizontal, Layers, CableCar } from 'lucide-react'
 import {
   Tooltip,
   TooltipContent,
@@ -17,6 +18,11 @@ export function InfrastructurePanel() {
     busways, crossConnects, inRowCoolers,
     placeBusway, placeCrossConnect, placeInRowCooling,
     zones, zoneBonusRevenue,
+    // New features
+    rowEndSlots, placeRowEndSlot, removeRowEndSlot,
+    aisleWidths, upgradeAisleWidth,
+    raisedFloorTier, installRaisedFloor,
+    cableManagementType, setCableManagement,
   } = useGameStore()
 
   const suiteLimits = getSuiteLimits(suiteTier)
@@ -352,6 +358,136 @@ export function InfrastructurePanel() {
             </TooltipTrigger>
             <TooltipContent side="right">{INROW_COOLING_OPTIONS[0].description} (${INROW_COOLING_OPTIONS[0].cost})</TooltipContent>
           </Tooltip>
+        </div>
+      </div>
+
+      {/* Row-End Infrastructure Slots */}
+      <div>
+        <div className="flex items-center gap-2 mb-2">
+          <Square className="size-3 text-neon-cyan" />
+          <span className="text-xs font-bold text-neon-cyan">Row-End Slots</span>
+          {rowEndSlots.length > 0 && (
+            <Badge className="ml-auto font-mono text-xs border bg-neon-cyan/20 text-neon-cyan border-neon-cyan/30">
+              {rowEndSlots.length} INSTALLED
+            </Badge>
+          )}
+        </div>
+        <p className="text-[10px] text-muted-foreground mb-2">Mount equipment at row ends for targeted effects.</p>
+        {rowEndSlots.length > 0 && (
+          <div className="flex flex-col gap-1 mb-2 pb-2 border-b border-border/50">
+            {rowEndSlots.map((slot) => (
+              <div key={slot.id} className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">{ROW_END_SLOT_CONFIG.find(c => c.type === slot.type)?.label ?? slot.type}</span>
+                <Button variant="ghost" size="xs" className="text-[9px] text-neon-red/60 hover:text-neon-red h-4 px-1" onClick={() => removeRowEndSlot(slot.id)}>x</Button>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="flex flex-wrap gap-1">
+          {ROW_END_SLOT_CONFIG.map((config) => (
+            <Tooltip key={config.type}>
+              <TooltipTrigger asChild>
+                <Button variant="outline" size="xs" className="text-[9px]"
+                  disabled={!sandboxMode && money < config.cost}
+                  onClick={() => {
+                    const layout = SUITE_TIERS[suiteTier].layout
+                    const availableRow = layout.cabinetRows.find(r => !rowEndSlots.some(s => s.rowId === r.id && s.side === 'left'))
+                    if (availableRow) placeRowEndSlot(availableRow.id, 'left', config.type as RowEndSlotType)
+                  }}>
+                  {config.label.split(' ').pop()} ${(config.cost / 1000).toFixed(0)}k
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">{config.description} — {config.effect}</TooltipContent>
+            </Tooltip>
+          ))}
+        </div>
+      </div>
+
+      {/* Aisle Width Upgrades */}
+      <div>
+        <div className="flex items-center gap-2 mb-2">
+          <MoveHorizontal className="size-3 text-neon-green" />
+          <span className="text-xs font-bold text-neon-green">Aisle Widths</span>
+        </div>
+        <p className="text-[10px] text-muted-foreground mb-2">Wider aisles improve maintenance speed and cooling.</p>
+        <div className="flex flex-col gap-1">
+          {AISLE_WIDTH_CONFIG.filter(c => c.width !== 'standard').map((config) => (
+            <Tooltip key={config.width}>
+              <TooltipTrigger asChild>
+                <Button variant="outline" size="xs" className="text-[9px] w-full justify-start"
+                  disabled={!sandboxMode && money < config.cost}
+                  onClick={() => {
+                    const layout = SUITE_TIERS[suiteTier].layout
+                    const nextAisle = layout.aisles.find(a => !aisleWidths[a.id] || aisleWidths[a.id] === 'standard')
+                    if (nextAisle) upgradeAisleWidth(nextAisle.id, config.width as AisleWidth)
+                  }}>
+                  <MoveHorizontal className="size-2.5 mr-1" />
+                  {config.label} — ${config.cost.toLocaleString()}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">{config.description}</TooltipContent>
+            </Tooltip>
+          ))}
+        </div>
+        {Object.keys(aisleWidths).length > 0 && (
+          <div className="mt-1 text-[10px] text-neon-green/70">
+            {Object.values(aisleWidths).filter(w => w !== 'standard').length} aisles upgraded
+          </div>
+        )}
+      </div>
+
+      {/* Raised Floor & Cable Management */}
+      <div>
+        <div className="flex items-center gap-2 mb-2">
+          <Layers className="size-3 text-neon-purple" />
+          <span className="text-xs font-bold text-neon-purple">Raised Floor</span>
+          {raisedFloorTier !== 'none' && (
+            <Badge className="ml-auto font-mono text-xs border bg-neon-purple/20 text-neon-purple border-neon-purple/30">
+              {raisedFloorTier.toUpperCase()}
+            </Badge>
+          )}
+        </div>
+        <div className="flex flex-col gap-1 mb-3">
+          {RAISED_FLOOR_CONFIG.filter(c => c.tier !== 'none').map((config) => (
+            <Tooltip key={config.tier}>
+              <TooltipTrigger asChild>
+                <Button variant="outline" size="xs" className="text-[9px] w-full justify-start"
+                  disabled={raisedFloorTier === config.tier || (!sandboxMode && money < config.cost)}
+                  onClick={() => installRaisedFloor(config.tier as RaisedFloorTier)}>
+                  <Layers className="size-2.5 mr-1" />
+                  {config.label} — ${config.cost.toLocaleString()}
+                  {raisedFloorTier === config.tier && <span className="ml-auto text-neon-green">INSTALLED</span>}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">{config.description} (+{(config.coolingDistributionBonus * 100).toFixed(0)}% cooling)</TooltipContent>
+            </Tooltip>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-2 mb-2">
+          <CableCar className="size-3 text-neon-orange" />
+          <span className="text-xs font-bold text-neon-orange">Cable Management</span>
+          {cableManagementType !== 'none' && (
+            <Badge className="ml-auto font-mono text-xs border bg-neon-orange/20 text-neon-orange border-neon-orange/30">
+              {cableManagementType.toUpperCase().replace('_', ' ')}
+            </Badge>
+          )}
+        </div>
+        <div className="flex flex-col gap-1">
+          {CABLE_MANAGEMENT_CONFIG.filter(c => c.type !== 'none').map((config) => (
+            <Tooltip key={config.type}>
+              <TooltipTrigger asChild>
+                <Button variant="outline" size="xs" className="text-[9px] w-full justify-start"
+                  disabled={cableManagementType === config.type || (!sandboxMode && money < config.cost) || (config.type === 'underfloor' && raisedFloorTier === 'none')}
+                  onClick={() => setCableManagement(config.type as CableManagementType)}>
+                  <CableCar className="size-2.5 mr-1" />
+                  {config.label} — ${config.cost.toLocaleString()}
+                  {cableManagementType === config.type && <span className="ml-auto text-neon-green">ACTIVE</span>}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">{config.description}{config.type === 'underfloor' && raisedFloorTier === 'none' ? ' (Requires raised floor)' : ''}</TooltipContent>
+            </Tooltip>
+          ))}
         </div>
       </div>
     </div>

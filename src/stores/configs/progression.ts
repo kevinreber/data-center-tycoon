@@ -244,6 +244,15 @@ export const ACHIEVEMENT_CATALOG: AchievementDef[] = [
   { id: 'global_network', label: 'Global Network', description: 'Have 3 or more operational sites.', icon: '🗺️' },
   { id: 'three_continents', label: 'Three Continents', description: 'Operate sites on 3 different continents.', icon: '✈️' },
   { id: 'world_domination', label: 'World Domination', description: 'Fill all available site slots.', icon: '👑' },
+  // New Feature achievements
+  { id: 'first_workload', label: 'Job Runner', description: 'Complete your first workload job.', icon: '🏋️' },
+  { id: 'workload_master', label: 'Workload Master', description: 'Complete 10 workload jobs.', icon: '🎯' },
+  { id: 'raised_floor', label: 'Floor Upgrade', description: 'Install an advanced raised floor.', icon: '🏗️' },
+  { id: 'nuclear_power', label: 'Nuclear Age', description: 'Unlock the Nuclear (SMR) advanced tier.', icon: '☢️' },
+  { id: 'fusion_power', label: 'Fusion Era', description: 'Unlock the Fusion advanced tier.', icon: '⚡' },
+  { id: 'row_end_equipped', label: 'End Cap Pro', description: 'Install 4 or more row-end infrastructure slots.', icon: '🔌' },
+  { id: 'wide_aisles', label: 'Room to Breathe', description: 'Upgrade 2 or more aisles to wider widths.', icon: '↔️' },
+  { id: 'rack_detailed', label: 'Rack Architect', description: 'Configure a cabinet with 42U rack detail.', icon: '🗄️' },
 ]
 
 // ── Incident System ─────────────────────────────────────────────

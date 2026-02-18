@@ -34,6 +34,9 @@ export function GameCanvas() {
   const coolingUnits = useGameStore((s) => s.coolingUnits)
   const chillerPlants = useGameStore((s) => s.chillerPlants)
   const coolingPipes = useGameStore((s) => s.coolingPipes)
+  const viewMode = useGameStore((s) => s.viewMode)
+  const rowEndSlots = useGameStore((s) => s.rowEndSlots)
+  const audioSettings = useGameStore((s) => s.audioSettings)
 
   // Tile click handler — called from Phaser when user clicks a grid tile
   const handleTileClick = useCallback((col: number, row: number) => {
@@ -304,6 +307,31 @@ export function GameCanvas() {
     }))
     scene.setDedicatedRows(rowData)
   }, [dedicatedRows, sceneReady])
+
+  // Sync view mode to Phaser
+  useEffect(() => {
+    if (!gameRef.current) return
+    const scene = getScene(gameRef.current)
+    if (!scene) return
+    scene.setViewMode(viewMode)
+  }, [viewMode, sceneReady])
+
+  // Sync row-end slots to Phaser
+  useEffect(() => {
+    if (!gameRef.current) return
+    const scene = getScene(gameRef.current)
+    if (!scene) return
+    scene.setRowEndSlots(rowEndSlots)
+  }, [rowEndSlots, sceneReady])
+
+  // Sync audio settings to Phaser
+  useEffect(() => {
+    if (!gameRef.current) return
+    const scene = getScene(gameRef.current)
+    if (!scene) return
+    scene.initAudio()
+    scene.setAudioSettings(audioSettings.muted, audioSettings.masterVolume, audioSettings.sfxVolume, audioSettings.ambientVolume)
+  }, [audioSettings, sceneReady])
 
   const handleCenterGrid = useCallback(() => {
     if (gameRef.current) {

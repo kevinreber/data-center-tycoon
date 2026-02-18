@@ -1,7 +1,8 @@
-import { useGameStore, SUITE_TIERS, SUITE_TIER_ORDER, getSuiteLimits, SCENARIO_CATALOG, AISLE_CONTAINMENT_CONFIG } from '@/stores/gameStore'
+import { useGameStore, SUITE_TIERS, SUITE_TIER_ORDER, getSuiteLimits, SCENARIO_CATALOG, AISLE_CONTAINMENT_CONFIG, ADVANCED_TIER_CONFIG } from '@/stores/gameStore'
+import type { AdvancedTier, ViewMode } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Building, Lock, Target, Check, Clock, Shield } from 'lucide-react'
+import { Building, Lock, Target, Check, Clock, Shield, Atom, Eye } from 'lucide-react'
 import {
   Tooltip,
   TooltipContent,
@@ -15,6 +16,8 @@ export function FacilityPanel() {
     activeScenario, scenarioProgress, scenariosCompleted,
     startScenario, abandonScenario,
     sandboxMode,
+    advancedTier, unlockAdvancedTier,
+    viewMode, setViewMode,
   } = useGameStore()
 
   const suiteLimits = getSuiteLimits(suiteTier)
@@ -227,6 +230,65 @@ export function FacilityPanel() {
           </div>
         )}
       </div>
+
+      {/* View Mode */}
+      <div>
+        <div className="flex items-center gap-2 mb-2">
+          <Eye className="size-3 text-neon-cyan" />
+          <span className="text-xs font-bold text-neon-cyan">View Mode</span>
+        </div>
+        <div className="flex gap-1">
+          {(['cabinet', 'above_cabinet', 'sub_floor'] as ViewMode[]).map((mode) => (
+            <Button key={mode} variant={viewMode === mode ? 'default' : 'outline'} size="xs"
+              className={`text-[9px] flex-1 ${viewMode === mode ? 'bg-neon-cyan/20 text-neon-cyan border-neon-cyan/40' : ''}`}
+              onClick={() => setViewMode(mode)}>
+              {mode === 'cabinet' ? 'Normal' : mode === 'above_cabinet' ? 'Top-Down' : 'Sub-Floor'}
+            </Button>
+          ))}
+        </div>
+        <p className="text-[10px] text-muted-foreground mt-1">Sub-floor view shows cooling pipes, power conduits, and cable routing.</p>
+      </div>
+
+      {/* Advanced Scaling Tiers */}
+      {suiteTier === 'enterprise' && (
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <Atom className="size-3 text-neon-green" />
+            <span className="text-xs font-bold text-neon-green">ADVANCED POWER</span>
+            {advancedTier && (
+              <Badge className="ml-auto font-mono text-xs border bg-neon-green/20 text-neon-green border-neon-green/30">
+                {advancedTier.toUpperCase()}
+              </Badge>
+            )}
+          </div>
+          <p className="text-[10px] text-muted-foreground mb-2">Sci-fi power tiers unlock expanded capacity and zero-carbon energy.</p>
+          <div className="flex flex-col gap-1">
+            {ADVANCED_TIER_CONFIG.map((config) => {
+              const locked = config.tier === 'fusion' && advancedTier !== 'nuclear'
+              const active = advancedTier === config.tier
+              return (
+                <Tooltip key={config.tier}>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" size="xs" className={`text-[9px] w-full justify-start ${active ? 'border-neon-green/50 text-neon-green' : ''}`}
+                      disabled={active || locked || (!sandboxMode && money < config.unlockCost)}>
+                      <Atom className="size-2.5 mr-1" />
+                      <span onClick={() => { if (!active && !locked) unlockAdvancedTier(config.tier as AdvancedTier) }}>
+                        {config.label} — ${(config.unlockCost / 1000).toFixed(0)}k
+                      </span>
+                      {active && <span className="ml-auto text-neon-green">ACTIVE</span>}
+                      {locked && <Lock className="size-2.5 ml-auto text-muted-foreground" />}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    {config.description}
+                    {locked ? ' (Requires Nuclear first)' : ''}
+                  </TooltipContent>
+                </Tooltip>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
