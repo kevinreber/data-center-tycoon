@@ -223,6 +223,10 @@ class DataCenterScene extends Phaser.Scene {
   private selectionGraphics: Phaser.GameObjects.Graphics | null = null
   private onCabinetSelect: ((id: string | null) => void) | null = null
 
+  // Ambient animation state
+  private ambientTime = 0           // accumulated time for ambient cycles (seconds)
+  private ambientGraphicsLayer: Phaser.GameObjects.Graphics | null = null
+
   constructor() {
     super({ key: 'DataCenterScene' })
   }
@@ -1394,11 +1398,93 @@ class DataCenterScene extends Phaser.Scene {
     this.renderTraffic()
   }
 
-  /** Phaser update loop — animate packet dots */
+  /** Phaser update loop — animate packet dots and ambient effects */
   update(_time: number, delta: number) {
-    if (!this.trafficVisible || this.trafficLinks.length === 0) return
-    this.packetTime += delta * 0.001
-    this.renderPackets()
+    const dt = delta * 0.001
+    this.ambientTime += dt
+
+    // Traffic packet animation
+    if (this.trafficVisible && this.trafficLinks.length > 0) {
+      this.packetTime += dt
+      this.renderPackets()
+    }
+
+    // Ambient LED and activity indicators (runs every frame)
+    this.renderAmbientOverlay()
+  }
+
+  /** Draw ambient animated overlays: LED pulses on cabinets, glow on active spines, cooling fan indicators */
+  private renderAmbientOverlay() {
+    if (!this.ambientGraphicsLayer) {
+      this.ambientGraphicsLayer = this.add.graphics()
+    }
+    const g = this.ambientGraphicsLayer
+    g.clear()
+    g.setDepth(200) // above cabinets but below UI overlays
+
+    const t = this.ambientTime
+
+    // Cabinet LED pulse: slow blink (2s cycle) when idle, fast (0.4s) when hot, off when powered down
+    for (const entry of this.cabEntries.values()) {
+      if (!entry.powerOn || entry.serverCount === 0) continue
+
+      const { x, y } = this.isoToScreen(entry.col, entry.row)
+      // LED position: small dot to the right of the cabinet
+      const ledX = x + CUBE_W / 2 - 6
+      const ledY = y - CABINET_ENCLOSURE_DEPTH + BASE_DEPTH + 4
+
+      // Determine blink speed based on heat level
+      let blinkSpeed: number
+      let ledColor: number
+      if (entry.isOnFire) {
+        blinkSpeed = 4    // very fast blink
+        ledColor = 0xff4444
+      } else if (entry.isThrottled) {
+        blinkSpeed = 2.5  // fast blink
+        ledColor = 0xff8844
+      } else if (entry.heatLevel > 60) {
+        blinkSpeed = 1.5  // moderate blink
+        ledColor = 0xffcc00
+      } else {
+        blinkSpeed = 0.5  // slow pulse
+        ledColor = 0x00ff88
+      }
+
+      // Sinusoidal alpha modulation
+      const alpha = 0.3 + 0.7 * (0.5 + 0.5 * Math.sin(t * blinkSpeed * Math.PI * 2))
+      g.fillStyle(ledColor, alpha)
+      g.fillCircle(ledX, ledY, 2)
+    }
+
+    // Spine switch activity glow: pulse when handling traffic
+    for (const entry of this.spineEntries.values()) {
+      if (!entry.powerOn) continue
+      const { x, y } = this.spineToScreen(entry.slot)
+      // Subtle glow pulse (1.5s cycle)
+      const glowAlpha = 0.08 + 0.12 * (0.5 + 0.5 * Math.sin(t * 0.67 * Math.PI * 2 + entry.slot * 1.2))
+      g.fillStyle(0xff6644, glowAlpha)
+      g.fillCircle(x, y + SPINE_H / 2, SPINE_W / 2)
+    }
+
+    // Cooling unit fan indicator: rotating line segments
+    for (const entry of this.coolingUnitEntries.values()) {
+      if (!entry.operational) continue
+      const { x, y } = this.isoToScreen(entry.col, entry.row)
+      const fanCenterY = y - 8
+      const fanRadius = 5
+      const rotAngle = t * 3 // 3 radians/sec rotation
+      // Draw 3 rotating fan blade lines
+      g.lineStyle(1.5, 0x00aaff, 0.5)
+      for (let i = 0; i < 3; i++) {
+        const angle = rotAngle + (i * Math.PI * 2) / 3
+        const bx = x + Math.cos(angle) * fanRadius
+        const by = fanCenterY + Math.sin(angle) * fanRadius * 0.5 // compressed for isometric
+        g.beginPath()
+        g.moveTo(x, fanCenterY)
+        g.lineTo(bx, by)
+        g.strokePath()
+      }
+    }
   }
 
   /** Get the screen position of a leaf switch on top of a cabinet */
@@ -1550,6 +1636,76 @@ class DataCenterScene extends Phaser.Scene {
     }
   }
 
+  // ── Placement Animations ────────────────────────────────
+
+  /** Play an expanding ring + flash effect at an isometric tile position */
+  private playPlacementEffect(screenX: number, screenY: number, color: number) {
+    // Expanding ring
+    const ring = this.add.graphics()
+    ring.setPosition(screenX, screenY)
+    ring.setDepth(9999)
+    const maxRadius = TILE_W * 0.8
+    this.tweens.add({
+      targets: { radius: 4, alpha: 0.8 },
+      radius: maxRadius,
+      alpha: 0,
+      duration: 500,
+      ease: 'Power2',
+      onUpdate: (_tween: Phaser.Tweens.Tween, target: { radius: number; alpha: number }) => {
+        ring.clear()
+        ring.lineStyle(2, color, target.alpha)
+        ring.strokeCircle(0, 0, target.radius)
+      },
+      onComplete: () => ring.destroy(),
+    })
+
+    // Flash overlay (isometric diamond)
+    const flash = this.add.graphics()
+    flash.setDepth(9998)
+    const hw = TILE_W / 2
+    const hh = TILE_H / 2
+    flash.fillStyle(color, 0.35)
+    flash.beginPath()
+    flash.moveTo(screenX, screenY - hh)
+    flash.lineTo(screenX + hw, screenY)
+    flash.lineTo(screenX, screenY + hh)
+    flash.lineTo(screenX - hw, screenY)
+    flash.closePath()
+    flash.fillPath()
+    this.tweens.add({
+      targets: flash,
+      alpha: 0,
+      duration: 400,
+      ease: 'Power2',
+      onComplete: () => flash.destroy(),
+    })
+  }
+
+  /** Play a scale-in bounce on a cabinet's graphics */
+  private playCabinetScaleIn(id: string) {
+    const gfx = this.cabinetGraphics.get(id)
+    const labels = this.cabinetLabels.get(id) ?? []
+    if (!gfx) return
+    // Phaser Graphics don't support setScale nicely, so we animate alpha as a pop-in
+    gfx.setAlpha(0)
+    this.tweens.add({
+      targets: gfx,
+      alpha: 1,
+      duration: 300,
+      ease: 'Back.easeOut',
+    })
+    for (const label of labels) {
+      label.setAlpha(0)
+      this.tweens.add({
+        targets: label,
+        alpha: 1,
+        duration: 300,
+        ease: 'Back.easeOut',
+        delay: 50,
+      })
+    }
+  }
+
   // ── Public API ──────────────────────────────────────────
 
   addCabinetToScene(id: string, col: number, row: number, serverCount: number, hasLeafSwitch: boolean, environment: CabinetEnvironment = 'production', facing: CabinetFacing = 'north') {
@@ -1559,6 +1715,12 @@ class DataCenterScene extends Phaser.Scene {
     this.cabEntries.set(id, entry)
     this.occupiedTiles.add(`${col},${row}`)
     this.renderCabinet(entry)
+
+    // Placement animation: expanding ring + flash + fade-in
+    const { x, y } = this.isoToScreen(col, row)
+    this.playPlacementEffect(x, y, 0x00ff88)
+    this.playCabinetScaleIn(id)
+    this.playSFX('build')
   }
 
   updateCabinet(id: string, serverCount: number, hasLeafSwitch: boolean, powerOn: boolean, environment: CabinetEnvironment = 'production', facing: CabinetFacing = 'north', visualState?: { heatLevel: number; isThrottled: boolean; isOnFire: boolean; hasIncident: boolean; inMaintenance: boolean; serverAge: number }) {
@@ -1585,6 +1747,21 @@ class DataCenterScene extends Phaser.Scene {
     const entry: SpineEntry = { id, slot, powerOn: true }
     this.spineEntries.set(id, entry)
     this.renderSpine(entry)
+
+    // Placement animation: orange ring + flash + fade-in
+    const { x, y } = this.spineToScreen(slot)
+    this.playPlacementEffect(x, y, 0xff6644)
+    const gfx = this.spineGraphics.get(id)
+    if (gfx) {
+      gfx.setAlpha(0)
+      this.tweens.add({ targets: gfx, alpha: 1, duration: 300, ease: 'Back.easeOut' })
+    }
+    const label = this.spineNodeLabels.get(id)
+    if (label) {
+      label.setAlpha(0)
+      this.tweens.add({ targets: label, alpha: 1, duration: 300, ease: 'Back.easeOut', delay: 50 })
+    }
+    this.playSFX('build')
   }
 
   updateSpine(id: string, powerOn: boolean) {
@@ -2786,6 +2963,52 @@ class DataCenterScene extends Phaser.Scene {
     if (muted && this.ambientOscillator) {
       this.setAmbientAudio(false)
     }
+  }
+
+  // ── Camera Juice ──────────────────────────────────────
+
+  /** Brief screen shake for critical incidents (fire, major outage) */
+  cameraShake(intensity: 'light' | 'medium' | 'heavy' = 'medium') {
+    const config: Record<string, { duration: number; intensity: number }> = {
+      light: { duration: 80, intensity: 0.003 },
+      medium: { duration: 120, intensity: 0.006 },
+      heavy: { duration: 200, intensity: 0.01 },
+    }
+    const { duration, intensity: amt } = config[intensity]
+    this.cameras.main.shake(duration, amt)
+  }
+
+  /** Smooth camera pan to a grid tile position */
+  cameraPanTo(col: number, row: number, duration = 400) {
+    const { x, y } = this.isoToScreen(col, row)
+    const cam = this.cameras.main
+    cam.pan(x, y, duration, 'Power2')
+    // After pan completes, sync our internal offsets so manual drag continues smoothly
+    this.time.delayedCall(duration, () => {
+      this.panOffsetX = -cam.scrollX
+      this.panOffsetY = -cam.scrollY
+    })
+  }
+
+  /** Quick zoom pulse for achievements or upgrades (zoom in 5%, back out) */
+  cameraZoomPulse() {
+    const cam = this.cameras.main
+    const baseZoom = this.zoomLevel
+    cam.zoomTo(baseZoom * 1.05, 150, 'Quad.easeOut', false, (_camera: Phaser.Cameras.Scene2D.Camera, progress: number) => {
+      if (progress >= 1) {
+        cam.zoomTo(baseZoom, 200, 'Quad.easeIn')
+      }
+    })
+  }
+
+  /** Camera zoom out to reveal expanded grid on suite tier upgrade */
+  cameraZoomReveal() {
+    const cam = this.cameras.main
+    const targetZoom = Math.max(0.6, this.zoomLevel * 0.75)
+    cam.zoomTo(targetZoom, 800, 'Power2')
+    this.time.delayedCall(800, () => {
+      this.zoomLevel = targetZoom
+    })
   }
 
   /** Reset camera to default position and zoom, centered on content */

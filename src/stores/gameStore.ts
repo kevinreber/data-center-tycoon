@@ -38,7 +38,7 @@ export type {
   AdvancedTier, AdvancedTierConfig,
   CustomRow, RackEquipmentType, RackSlot, RackEquipmentConfig, RackDetail,
   LeaderboardCategory, LeaderboardEntry, AudioSettings,
-  FloatingTextEvent,
+  FloatingTextEvent, CameraEffect, CameraEffectType,
 } from './types'
 
 import type {
@@ -63,7 +63,7 @@ import type {
   ViewMode, RowEndSlotType, RowEndSlot, AisleWidth, RaisedFloorTier,
   CableManagementType, WorkloadType, Workload, AdvancedTier,
   RackDetail, LeaderboardEntry, LeaderboardCategory, AudioSettings,
-  FloatingTextEvent,
+  FloatingTextEvent, CameraEffect,
 } from './types'
 
 // ── Re-export constants ────────────────────────────────────────
@@ -496,6 +496,9 @@ interface GameState {
 
   // Floating Text Events (consumed by GameCanvas → Phaser each tick)
   pendingFloatingTexts: FloatingTextEvent[]
+
+  // Camera Effects (consumed by GameCanvas → Phaser each tick)
+  pendingCameraEffects: CameraEffect[]
 
   // Save / Load
   hasSaved: boolean
@@ -1008,6 +1011,9 @@ export const useGameStore = create<GameState>((set) => ({
   // Floating Text Events
   pendingFloatingTexts: [],
 
+  // Camera Effects
+  pendingCameraEffects: [] as CameraEffect[],
+
   // Demo mode
   isDemo: false,
 
@@ -1378,6 +1384,7 @@ export const useGameStore = create<GameState>((set) => ({
       return {
         suiteTier: tier,
         money: state.money - config.upgradeCost,
+        pendingCameraEffects: [...state.pendingCameraEffects, { type: 'zoom_reveal' as const }],
       }
     }),
 
@@ -3390,6 +3397,7 @@ export const useGameStore = create<GameState>((set) => ({
       rackDetails: {},
       audioSettings: { ...DEFAULT_AUDIO_SETTINGS },
       pendingFloatingTexts: [],
+      pendingCameraEffects: [],
     })
   },
 
@@ -3401,6 +3409,7 @@ export const useGameStore = create<GameState>((set) => ({
     set((state) => {
       const newTickCount = state.tickCount + 1
       const floatingTexts: FloatingTextEvent[] = []
+      const cameraEffects: CameraEffect[] = []
 
       // Advance in-game clock (wraps at 24)
       const newHour = (state.gameHour + MINUTES_PER_TICK / 60) % 24
@@ -3560,6 +3569,9 @@ export const useGameStore = create<GameState>((set) => ({
           // Floating text for new incident
           const sevColor = selectedDef.severity === 'critical' ? '#ff4444' : selectedDef.severity === 'major' ? '#ff8844' : '#ffcc00'
           floatingTexts.push({ text: `⚠ ${selectedDef.label}`, color: sevColor, center: true, fontSize: '13px' })
+          // Camera shake for critical/major incidents
+          if (selectedDef.severity === 'critical') cameraEffects.push({ type: 'shake_heavy' })
+          else if (selectedDef.severity === 'major') cameraEffects.push({ type: 'shake_medium' })
         } else if (opsSpawnReduction > 0 && Math.random() < baseSpawnChance) {
           // Incident was prevented by ops tier
           opsPreventedCount++
@@ -3880,6 +3892,7 @@ export const useGameStore = create<GameState>((set) => ({
         // Show fire text above hottest cabinet
         const hottest = state.cabinets.reduce((a, b) => a.heatLevel > b.heatLevel ? a : b)
         floatingTexts.push({ col: hottest.col, row: hottest.row, text: 'FIRE!', color: '#ff4444', fontSize: '16px' })
+        cameraEffects.push({ type: 'shake_heavy' })
       }
 
       // ── Main simulation ────────────────────────────────────
@@ -4522,6 +4535,7 @@ export const useGameStore = create<GameState>((set) => ({
         unlockedIds.add(id)
         newAchievement = ach
         floatingTexts.push({ text: `★ ${def.label}`, color: '#ffd700', center: true, fontSize: '14px' })
+        cameraEffects.push({ type: 'zoom_pulse' })
       }
 
       if (newCabinets.length >= 1) unlock('first_cabinet')
@@ -5624,6 +5638,8 @@ export const useGameStore = create<GameState>((set) => ({
         workloadRevenue: +workloadRevenue.toFixed(2),
         // Floating text events
         pendingFloatingTexts: floatingTexts,
+        // Camera effects
+        pendingCameraEffects: cameraEffects,
       }
     }),
 }))
