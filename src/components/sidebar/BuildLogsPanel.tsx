@@ -16,6 +16,26 @@ interface VersionEntry {
 
 const CHANGELOG: VersionEntry[] = [
   {
+    version: 'v0.5.0',
+    date: 'Feb 2026',
+    title: 'The Game Feel Update',
+    highlights: 'Worker sprites walk your corridors, particle effects bring events to life, weather overlays, day/night cycle, scenario select screen, and polished animations throughout.',
+    changes: [
+      { text: 'Animated worker sprites ("peeps") — staff walk corridors, respond to incidents, and patrol when idle with role-colored uniforms', type: 'new' },
+      { text: 'Particle effects — fire flickering, PDU sparks, cooling mist, heat shimmer, server refresh sparkles, incident pulse rings, achievement gold shower', type: 'new' },
+      { text: 'Weather particle overlays — rain streaks during storms, snow in winter, heat shimmer during heatwaves', type: 'new' },
+      { text: 'Day/night ambient light cycle — facility darkens at night (20:00–06:00) with dawn/dusk transitions', type: 'new' },
+      { text: 'Scenario select screen — dedicated panel with scenario cards, 1-3 star ratings, locked progression, and victory/defeat results', type: 'new' },
+      { text: 'Server install animation — scale pulse + green particle burst when adding servers to cabinets', type: 'new' },
+      { text: 'Leaf switch install animation — cyan flash effect on top of cabinet', type: 'new' },
+      { text: 'Equipment removal animation — red flash + shrink effect', type: 'new' },
+      { text: 'Smooth camera pan to newly placed cabinets', type: 'new' },
+      { text: 'Enhanced sound effects — metallic slide for server install, switch click for leaf/spine, fire alarm, cash register ding, HVAC burst, UI click, removal sound', type: 'improved' },
+      { text: 'Scenario system now tracks best completion times and calculates star ratings', type: 'improved' },
+      { text: 'Scenarios panel added to sidebar with Target icon', type: 'improved' },
+    ],
+  },
+  {
     version: 'v0.4.1',
     date: 'Feb 2026',
     title: 'Visual State Differentiation',

@@ -391,16 +391,16 @@ Visual feedback when placing or building equipment.
 
 Inspired by RollerCoaster Tycoon's feedback loops and "aliveness." Full design details in BRAINSTORM.md under "Game Feel & Polish — RCT-Style Improvements."
 
-#### Animated Worker Sprites ("Peeps")
+#### Animated Worker Sprites ("Peeps") ✅
 
 Procedurally-drawn technician sprites that walk corridors, respond to incidents, and install equipment. Role-colored uniforms (green/yellow/blue/red by role). The single highest-impact "game feel" feature.
 
-- [ ] Worker sprite rendering (procedural `Graphics`, consistent with no-asset approach)
-- [ ] Pathfinding along corridors and aisles
-- [ ] Walk-to-incident behavior when incident fires
-- [ ] Walk-to-cabinet behavior during placement/maintenance
-- [ ] Idle patrol behavior for on-shift staff
-- [ ] Role-colored uniforms and busy/idle indicators
+- [x] Worker sprite rendering (procedural `Graphics`, consistent with no-asset approach)
+- [x] Pathfinding along corridors and aisles
+- [x] Walk-to-incident behavior when incident fires
+- [x] Walk-to-cabinet behavior during placement/maintenance
+- [x] Idle patrol behavior for on-shift staff
+- [x] Role-colored uniforms and busy/idle indicators
 
 **Effort:** High | **Impact:** High — Makes the data center feel alive. Workers create ambient motion and make staffing visible.
 
@@ -428,26 +428,26 @@ Enhanced tweens and visual feedback beyond the current expanding ring animation.
 
 - [x] Cabinet place: expanding ring + green flash + alpha fade-in with `Back.easeOut`
 - [x] Spine switch add: orange expanding ring + flash + fade-in
-- [ ] Server install: scale pulse on cabinet + green particle burst
-- [ ] Leaf switch add: cyan flash on top of cabinet
-- [ ] Equipment removal: scale 1→0 with red flash
+- [x] Server install: scale pulse on cabinet + green particle burst
+- [x] Leaf switch add: cyan flash on top of cabinet
+- [x] Equipment removal: scale 1→0 with red flash
 - [x] Suite tier upgrade: camera zoom out reveal animation
 
 **Effort:** Low | **Impact:** Medium — Makes building feel satisfying instead of instant.
 
 ---
 
-#### Particle Effects for Events
+#### Particle Effects for Events ✅
 
 Phaser particle system (`Phaser.GameObjects.Particles`) for physical event feedback.
 
-- [ ] Fire: orange/red flickering particles over burning cabinet
-- [ ] Overloaded PDU: electric spark particles (yellow/white bursts)
-- [ ] Cooling units: subtle blue mist/cold air particles
-- [ ] Thermal throttle: heat shimmer (wavy transparent particles rising)
-- [ ] Server refresh: cyan sparkle burst
-- [ ] Critical incident: red warning pulse ring expanding outward
-- [ ] Achievement: gold particle shower from top of screen
+- [x] Fire: orange/red flickering particles over burning cabinet
+- [x] Overloaded PDU: electric spark particles (yellow/white bursts)
+- [x] Cooling units: subtle blue mist/cold air particles
+- [x] Thermal throttle: heat shimmer (wavy transparent particles rising)
+- [x] Server refresh: cyan sparkle burst
+- [x] Critical incident: red warning pulse ring expanding outward
+- [x] Achievement: gold particle shower from top of screen
 
 **Effort:** Medium | **Impact:** Medium — Makes events feel physical rather than just notifications.
 
@@ -460,24 +460,24 @@ Small animations that make the facility feel like a living, operational space.
 - [x] Cabinet LED pulse tweens (slow when idle, fast under load, off when powered down)
 - [x] Cooling unit fan rotation indicators
 - [x] Spine switch glow pulse when handling traffic
-- [ ] Power-off cabinet dimming (darkened graphic, LEDs off)
-- [ ] Throttled cabinet red/orange tint overlay
-- [ ] Weather particle overlays (rain, snow, heat shimmer)
-- [ ] Day/night ambient light shift
+- [x] Power-off cabinet dimming (darkened graphic, LEDs off)
+- [x] Throttled cabinet red/orange tint overlay
+- [x] Weather particle overlays (rain, snow, heat shimmer)
+- [x] Day/night ambient light shift
 
 **Effort:** Low-Medium | **Impact:** Medium — The data center equivalent of RCT rides running and guests wandering.
 
 ---
 
-#### Enhanced Sound Effects & Audio
+#### Enhanced Sound Effects & Audio ✅
 
 Additional audio feedback beyond the current procedural synthesis system.
 
-- [ ] HVAC white noise for cooling
-- [ ] Placement sounds (click/thunk for cabinet, metallic slide for server, switch click for leaf/spine)
-- [ ] Alert sounds (alarm for fire/critical, warning tone for throttling)
-- [ ] Economy sounds (cash register ding on contract, coin sound on milestone)
-- [ ] UI interaction sounds (button click, panel slide, toggle)
+- [x] HVAC white noise for cooling
+- [x] Placement sounds (click/thunk for cabinet, metallic slide for server, switch click for leaf/spine)
+- [x] Alert sounds (alarm for fire/critical, warning tone for throttling)
+- [x] Economy sounds (cash register ding on contract, coin sound on milestone)
+- [x] UI interaction sounds (button click, panel slide, toggle)
 
 **Effort:** Medium | **Impact:** Medium — Sound creates subconscious connection to game state.
 
@@ -488,7 +488,7 @@ Additional audio feedback beyond the current procedural synthesis system.
 Camera effects tied to significant game events.
 
 - [x] Screen shake on critical incidents (fire, major outage) — 3 intensity levels
-- [ ] Smooth camera pan to newly placed cabinet
+- [x] Smooth camera pan to newly placed cabinet
 - [x] Zoom pulse on achievement unlock
 - [x] Camera zoom out on suite tier upgrade to reveal expanded grid
 - [x] Larger screen shake for explosions/fire suppression
@@ -524,16 +524,16 @@ Make important game states visible on the isometric grid without opening panels.
 
 ---
 
-#### Scenario Presentation & Framing
+#### Scenario Presentation & Framing ✅
 
 Make scenarios a first-class feature rather than a settings toggle.
 
-- [ ] Dedicated scenario select screen with scenario cards
-- [ ] 1-3 star ratings based on completion quality
-- [ ] Locked progression (later scenarios require completing earlier ones)
-- [ ] Scenario preview showing starting state
-- [ ] Victory/defeat results screen with stats
-- [ ] Local best times/scores per scenario
+- [x] Dedicated scenario select screen with scenario cards
+- [x] 1-3 star ratings based on completion quality
+- [x] Locked progression (later scenarios require completing earlier ones)
+- [x] Scenario preview showing starting state
+- [x] Victory/defeat results screen with stats
+- [x] Local best times/scores per scenario
 
 **Effort:** Medium | **Impact:** Medium — RCT's "one more scenario" pull driven by visible progress.
 
@@ -572,11 +572,11 @@ Ideas for further encouraging organized cabinet layouts. Zone Adjacency Bonus (w
 | Phase 5 (Longevity) | 60+ | 60+ | 0 |
 | Rendering & Views | 21 | 21 | 0 |
 | UX / Camera | 6 | 6 | 0 |
-| Game Feel & Polish (RCT-Style) | ~60 | 25 | ~35 |
-| **Other Pending Features** | **~35** | **~25** | **~10** |
+| Game Feel & Polish (RCT-Style) | ~60 | ~57 | ~3 |
+| **Other Pending Features** | **~35** | **~32** | **~3** |
 
-**Current version:** v0.4.2 — 89 achievements, 34 tutorial tips, 250 tests passing.
+**Current version:** v0.5.0 — 89 achievements, 34 tutorial tips, 250 tests passing.
 
-**Implemented features:** 200+ items across Phases 1–5, rendering, UX, capacity planning, operations progression, cooling infrastructure (placeable units + chiller plants + pipes), cabinet organization incentives, sub-floor view, 42U rack model, advanced scaling tiers (Nuclear/Fusion), workload simulation, sound effects, placement animations with Phaser tweens, camera juice effects (shake/zoom pulse/zoom reveal), ambient animations (LED pulses, fan rotation, spine glow), sidebar slide transitions, leaderboards, row-end slots, aisle width upgrades, raised floor, cable management, floating world-space text, and visual state differentiation.
+**Implemented features:** 230+ items across Phases 1–5, rendering, UX, capacity planning, operations progression, cooling infrastructure (placeable units + chiller plants + pipes), cabinet organization incentives, sub-floor view, 42U rack model, advanced scaling tiers (Nuclear/Fusion), workload simulation, sound effects, enhanced sound effects (HVAC noise, per-equipment placement sounds, alert/economy/UI sounds), placement animations with Phaser tweens, enhanced build animations (server install pulse, leaf switch flash, equipment removal), camera juice effects (shake/zoom pulse/zoom reveal/smooth pan to placed cabinet), ambient animations (LED pulses, fan rotation, spine glow), weather particle overlays (rain, snow, heat shimmer), day/night ambient light cycle, particle effects for events (fire, sparks, cooling mist, heat shimmer, sparkle bursts, warning pulses, achievement showers), worker sprites with pathfinding and role-colored uniforms, scenario presentation with star ratings and progression, sidebar slide transitions, leaderboards, row-end slots, aisle width upgrades, raised floor, cable management, floating world-space text, and visual state differentiation.
 
-**Remaining features:** ~45 items, including RCT-style game feel improvements (worker sprites, particles, enhanced sound, weather overlays), multi-site expansion (Phase 6B–6D), scenario framing, and UI polish.
+**Remaining features:** ~20 items, primarily multi-site expansion (Phase 6A–6D) and a couple of ambient animation items already covered by visual state differentiation.

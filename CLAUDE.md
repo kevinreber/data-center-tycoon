@@ -4,7 +4,7 @@
 
 **Fabric Tycoon: Data Center Simulator** is a web-based isometric tycoon game where players build and manage a data center. Players place cabinets, install servers and network switches, design a Clos (spine-leaf) network fabric, and balance power, heat, and revenue to scale from a single rack to a global operation.
 
-**Current version:** v0.4.0
+**Current version:** v0.5.0
 
 ## Tech Stack
 
@@ -69,7 +69,8 @@ src/
 │       ├── ProgressPanel.tsx   # Achievements, reputation, lifetime stats
 │       ├── SettingsPanel.tsx   # Save/load, sandbox mode, reset, demo
 │       ├── GuidePanel.tsx      # How to play / tutorial (with Phase 4 system guides)
-│       └── BuildLogsPanel.tsx  # What's New changelog (version history, player-facing)
+│       ├── BuildLogsPanel.tsx  # What's New changelog (version history, player-facing)
+│       └── ScenarioPanel.tsx    # Scenario select screen with cards, star ratings, locked progression
 ├── game/
 │   ├── PhaserGame.ts           # Phaser scene: isometric rendering, traffic visualization, placement mode
 │   └── CLAUDE.md               # Phaser-specific coding rules (see Sub-module Rules below)
@@ -431,6 +432,12 @@ gridRow 4: Corridor (bottom access)
 - `addCableTrayToScene(id, col, row)`
 - `addCoolingUnitToScene(id, col, row, type, operational)` / `updateCoolingUnit(id, operational)` / `removeCoolingUnitFromScene(id)` / `clearCoolingUnits()`
 - `clearInfrastructure()` — clears PDUs, cable trays, and cooling units
+- `syncWorkers(staffList)` — sync staff to animated worker sprites
+- `dispatchWorkerToIncident(col, row)` — send nearest idle worker to incident
+- `setWeatherCondition(weather, season, gameHour)` — set weather/day-night state
+- `spawnFireParticles(col, row)` / `spawnSparkParticles(col, row)` / `spawnCoolMist(col, row)` / `spawnHeatShimmer(col, row)` / `spawnRefreshSparkle(col, row)` — particle effects
+- `spawnIncidentPulse(col, row)` / `spawnAchievementShower()` — event particles
+- `playRemovalEffect(col, row)` — equipment removal animation
 
 ### UI Architecture
 
@@ -441,12 +448,13 @@ The UI uses a **sidebar-driven navigation pattern**:
 - **`CabinetDetailPanel.tsx`** — Floating detail panel shown when a cabinet is selected; displays hardware slots, real-time stats (power, temp, revenue, age, traffic), and actions (power toggle, flip facing, refresh servers)
 - **`LayersPopup.tsx`** — Layer controls popup for toggling visibility, opacity, and custom colors per network layer
 - **`HUD.tsx`** — Legacy monolithic control panel (still present, ~2940 lines)
+- **`ScenarioPanel.tsx`** — Scenario select screen with cards, star ratings, locked progression, and victory/defeat results
 
 ### React-Phaser Bridge — `src/components/GameCanvas.tsx`
 
 `GameCanvas` manages the Phaser game instance lifecycle and syncs Zustand state changes to the Phaser scene via `useEffect` hooks. It tracks previous counts via `useRef` to only add new objects, not re-create existing ones.
 
-**Sync effects (10 total):**
+**Sync effects (16 total):**
 1. Initialize/destroy Phaser game on mount
 2. Register tile click/hover callbacks for placement
 3. Sync placement mode to Phaser
@@ -457,6 +465,11 @@ The UI uses a **sidebar-driven navigation pattern**:
 8. Sync traffic data
 9. Sync PDUs and cable trays
 10. Sync traffic visibility
+11. Sync worker sprites from staff state
+12. Dispatch workers to active incidents
+13. Sync weather/day-night conditions
+14. Spawn particle effects for fires, throttling, PDU overloads, cooling
+15. Spawn achievement gold shower particles
 
 ### Game Tick Loop — `src/App.tsx`
 
@@ -634,6 +647,7 @@ A `setInterval` in `App.tsx` calls `tick()` at the rate determined by `gameSpeed
 - **Patents**: Patent unlocked technologies for ongoing royalty income
 - **RFP Bidding**: Compete for contract wins/losses
 - **Scenario Challenges**: 5 predefined challenges with special rules and objectives
+- **Scenario Presentation**: Dedicated scenario select screen with scenario cards showing objectives and special rules; 1-3 star rating system based on completion speed; locked progression (later scenarios require completing earlier ones); victory/defeat results screen with stats and star display; best completion times tracked per scenario
 - **Tutorial System**: 34 contextual tips triggered during gameplay (including carbon, security, market, operations, cooling, and infrastructure tips)
 - **Event Logging**: Filterable log of significant events (capped at 200)
 - **Capacity History**: Per-tick snapshot of key metrics (capped at 100)

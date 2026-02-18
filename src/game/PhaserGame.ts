@@ -41,6 +41,44 @@ const FACING_COLOR: Record<CabinetFacing, string> = { north: '#00ccff', south: '
 const FACING_LABEL: Record<CabinetFacing, string> = { north: 'INTAKE ▲', south: 'INTAKE ▼', east: 'INTAKE ►', west: 'INTAKE ◄' }
 
 
+// ── Worker Sprite (Peep) ──────────────────────────────────
+interface WorkerSprite {
+  id: string
+  role: 'network_engineer' | 'electrician' | 'cooling_specialist' | 'security_officer'
+  screenX: number
+  screenY: number
+  targetX: number
+  targetY: number
+  speed: number         // pixels per second
+  busy: boolean         // walking to incident vs patrolling
+  patrolDir: number     // +1 or -1 along current corridor row
+  patrolRow: number     // gridRow the worker patrols on (corridor/aisle)
+}
+
+const WORKER_ROLE_COLORS: Record<string, number> = {
+  network_engineer: 0x00ff88,   // green
+  electrician: 0xffcc00,        // yellow
+  cooling_specialist: 0x00aaff, // blue
+  security_officer: 0xff4444,   // red
+}
+
+// ── Particle Effect ──────────────────────────────────────
+interface Particle {
+  x: number; y: number
+  vx: number; vy: number
+  color: number; alpha: number
+  life: number; maxLife: number
+  size: number
+}
+
+// ── Weather Particle ─────────────────────────────────────
+interface WeatherParticle {
+  x: number; y: number
+  vx: number; vy: number
+  alpha: number; size: number
+  color: number
+}
+
 interface CabinetEntry {
   id: string
   col: number
@@ -226,6 +264,26 @@ class DataCenterScene extends Phaser.Scene {
   // Ambient animation state
   private ambientTime = 0           // accumulated time for ambient cycles (seconds)
   private ambientGraphicsLayer: Phaser.GameObjects.Graphics | null = null
+
+  // Worker sprites (peeps)
+  private workers: WorkerSprite[] = []
+  private workerGraphicsLayer: Phaser.GameObjects.Graphics | null = null
+
+  // Particle effects
+  private particles: Particle[] = []
+  private particleGraphicsLayer: Phaser.GameObjects.Graphics | null = null
+
+  // Weather/day-night overlay
+  private weatherOverlayGraphics: Phaser.GameObjects.Graphics | null = null
+  private dayNightOverlay: Phaser.GameObjects.Graphics | null = null
+  private currentWeather = 'clear'
+  private currentSeason = 'spring'
+  private currentGameHour = 8
+  private weatherParticles: WeatherParticle[] = []
+
+  // Previous server counts per cabinet (for detecting server installs)
+  private prevServerCounts: Map<string, number> = new Map()
+  private prevLeafSwitches: Map<string, boolean> = new Map()
 
   constructor() {
     super({ key: 'DataCenterScene' })
@@ -1411,6 +1469,18 @@ class DataCenterScene extends Phaser.Scene {
 
     // Ambient LED and activity indicators (runs every frame)
     this.renderAmbientOverlay()
+
+    // Worker sprites (peeps) — move and draw
+    this.updateWorkers(dt)
+
+    // Particle effects — update and draw
+    this.updateParticles(dt)
+
+    // Weather overlay particles
+    this.updateWeatherOverlay(dt)
+
+    // Day/night ambient light
+    this.renderDayNightOverlay()
   }
 
   /** Draw ambient animated overlays: LED pulses on cabinets, glow on active spines, cooling fan indicators */
@@ -1636,6 +1706,398 @@ class DataCenterScene extends Phaser.Scene {
     }
   }
 
+  // ── Worker Sprites (Peeps) ──────────────────────────────
+
+  /** Sync worker list from game state staff members */
+  syncWorkers(staffList: { id: string; role: string; onShift: boolean }[]) {
+    // Remove workers that no longer exist
+    this.workers = this.workers.filter(w =>
+      staffList.some(s => s.id === w.id && s.onShift)
+    )
+
+    // Add new workers
+    for (const s of staffList) {
+      if (!s.onShift) continue
+      if (this.workers.some(w => w.id === s.id)) continue
+
+      // Pick a patrol row: corridors or aisles
+      const patrolRows: number[] = []
+      if (this.layout) {
+        patrolRows.push(this.layout.corridorTop, this.layout.corridorBottom)
+        for (const a of this.layout.aisles) patrolRows.push(a.gridRow)
+      }
+      const patrolRow = patrolRows.length > 0
+        ? patrolRows[Math.floor(Math.random() * patrolRows.length)]
+        : 0
+      const startCol = Math.random() * this.cabCols
+      const pos = this.isoToScreen(startCol, patrolRow)
+
+      this.workers.push({
+        id: s.id,
+        role: s.role as WorkerSprite['role'],
+        screenX: pos.x,
+        screenY: pos.y + TILE_H / 2,
+        targetX: pos.x,
+        targetY: pos.y + TILE_H / 2,
+        speed: 30 + Math.random() * 20,
+        busy: false,
+        patrolDir: Math.random() > 0.5 ? 1 : -1,
+        patrolRow,
+      })
+    }
+  }
+
+  /** Dispatch nearest idle worker to an incident's cabinet location */
+  dispatchWorkerToIncident(cabinetCol: number, cabinetRow: number) {
+    const target = this.isoToScreen(cabinetCol, cabinetRow)
+    let best: WorkerSprite | null = null
+    let bestDist = Infinity
+    for (const w of this.workers) {
+      if (w.busy) continue
+      const dist = Math.abs(w.screenX - target.x) + Math.abs(w.screenY - target.y)
+      if (dist < bestDist) { bestDist = dist; best = w }
+    }
+    if (best) {
+      best.busy = true
+      best.targetX = target.x
+      best.targetY = target.y + TILE_H / 2
+    }
+  }
+
+  /** Update worker positions and draw them */
+  private updateWorkers(dt: number) {
+    if (this.workers.length === 0) return
+    if (!this.workerGraphicsLayer) {
+      this.workerGraphicsLayer = this.add.graphics()
+    }
+    const g = this.workerGraphicsLayer
+    g.clear()
+    g.setDepth(250) // above ambient overlays
+
+    for (const w of this.workers) {
+      // Move toward target
+      const dx = w.targetX - w.screenX
+      const dy = w.targetY - w.screenY
+      const dist = Math.sqrt(dx * dx + dy * dy)
+
+      if (dist > 2) {
+        const step = w.speed * dt
+        if (step >= dist) {
+          w.screenX = w.targetX
+          w.screenY = w.targetY
+        } else {
+          w.screenX += (dx / dist) * step
+          w.screenY += (dy / dist) * step
+        }
+      } else {
+        // Reached target — if busy, go back to patrolling
+        if (w.busy) {
+          w.busy = false
+        }
+        // Patrol: pick next patrol waypoint
+        if (!w.busy) {
+          const edgeLeft = this.isoToScreen(0, w.patrolRow)
+          const edgeRight = this.isoToScreen(this.cabCols - 1, w.patrolRow)
+          // Move along row in patrol direction
+          if (w.patrolDir > 0 && w.screenX >= edgeRight.x - 10) {
+            w.patrolDir = -1
+          } else if (w.patrolDir < 0 && w.screenX <= edgeLeft.x + 10) {
+            w.patrolDir = 1
+          }
+          const nextCol = Math.max(0, Math.min(this.cabCols - 1,
+            w.patrolDir > 0 ? this.cabCols - 1 : 0
+          ))
+          const nextPos = this.isoToScreen(nextCol, w.patrolRow)
+          w.targetX = nextPos.x
+          w.targetY = nextPos.y + TILE_H / 2
+        }
+      }
+
+      // Draw worker: small procedural figure
+      const color = WORKER_ROLE_COLORS[w.role] ?? 0xcccccc
+      const x = w.screenX
+      const y = w.screenY
+
+      // Body (small isometric diamond)
+      g.fillStyle(color, 0.8)
+      g.beginPath()
+      g.moveTo(x, y - 8)
+      g.lineTo(x + 4, y - 3)
+      g.lineTo(x, y + 1)
+      g.lineTo(x - 4, y - 3)
+      g.closePath()
+      g.fillPath()
+
+      // Head (circle)
+      g.fillStyle(color, 0.9)
+      g.fillCircle(x, y - 10, 2.5)
+
+      // Busy indicator: small exclamation mark
+      if (w.busy) {
+        g.fillStyle(0xff4444, 0.9)
+        g.fillCircle(x, y - 14, 1.5)
+      }
+    }
+  }
+
+  // ── Particle Effects ──────────────────────────────────
+
+  /** Spawn particles at a screen position */
+  spawnParticles(screenX: number, screenY: number, count: number, color: number, spread = 30, speed = 40, life = 0.6, size = 2) {
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2
+      const v = speed * (0.5 + Math.random() * 0.5)
+      this.particles.push({
+        x: screenX + (Math.random() - 0.5) * 4,
+        y: screenY + (Math.random() - 0.5) * 4,
+        vx: Math.cos(angle) * v * (spread / 30),
+        vy: Math.sin(angle) * v * (spread / 30) - speed * 0.3,
+        color,
+        alpha: 0.8 + Math.random() * 0.2,
+        life: life * (0.7 + Math.random() * 0.3),
+        maxLife: life,
+        size: size * (0.5 + Math.random() * 0.5),
+      })
+    }
+  }
+
+  /** Spawn fire particles over a cabinet */
+  spawnFireParticles(col: number, row: number) {
+    const pos = this.isoToScreen(col, row)
+    this.spawnParticles(pos.x, pos.y - CABINET_ENCLOSURE_DEPTH / 2, 5, 0xff4400, 15, 25, 0.8, 3)
+    this.spawnParticles(pos.x, pos.y - CABINET_ENCLOSURE_DEPTH / 2, 3, 0xff8800, 10, 20, 0.6, 2)
+  }
+
+  /** Spawn electric spark particles (overloaded PDU) */
+  spawnSparkParticles(col: number, row: number) {
+    const pos = this.isoToScreen(col, row)
+    this.spawnParticles(pos.x, pos.y + TILE_H / 4, 6, 0xffff00, 20, 50, 0.3, 1.5)
+    this.spawnParticles(pos.x, pos.y + TILE_H / 4, 3, 0xffffff, 15, 40, 0.2, 1)
+  }
+
+  /** Spawn cooling mist particles */
+  spawnCoolMist(col: number, row: number) {
+    const pos = this.isoToScreen(col, row)
+    this.spawnParticles(pos.x, pos.y + TILE_H / 4, 4, 0x00aaff, 20, 10, 1.0, 3)
+  }
+
+  /** Spawn heat shimmer particles (throttled cabinet) */
+  spawnHeatShimmer(col: number, row: number) {
+    const pos = this.isoToScreen(col, row)
+    for (let i = 0; i < 3; i++) {
+      this.particles.push({
+        x: pos.x + (Math.random() - 0.5) * CUBE_W * 0.6,
+        y: pos.y - CABINET_ENCLOSURE_DEPTH * 0.3,
+        vx: (Math.random() - 0.5) * 5,
+        vy: -8 - Math.random() * 5,
+        color: 0xff8844,
+        alpha: 0.15,
+        life: 1.5,
+        maxLife: 1.5,
+        size: 4 + Math.random() * 3,
+      })
+    }
+  }
+
+  /** Spawn cyan sparkle burst (server refresh) */
+  spawnRefreshSparkle(col: number, row: number) {
+    const pos = this.isoToScreen(col, row)
+    this.spawnParticles(pos.x, pos.y - CABINET_ENCLOSURE_DEPTH / 2, 10, 0x00ffcc, 25, 35, 0.5, 2)
+  }
+
+  /** Spawn red warning pulse ring (critical incident) */
+  spawnIncidentPulse(col: number, row: number) {
+    const pos = this.isoToScreen(col, row)
+    const ring = this.add.graphics()
+    ring.setDepth(300)
+    let radius = 5
+    let alpha = 0.8
+    const timer = this.time.addEvent({
+      delay: 30, repeat: 20,
+      callback: () => {
+        ring.clear()
+        alpha -= 0.04
+        radius += 3
+        if (alpha <= 0) { ring.destroy(); timer.destroy(); return }
+        ring.lineStyle(2.5, 0xff2222, alpha)
+        ring.strokeCircle(pos.x, pos.y + TILE_H / 2, radius)
+      },
+    })
+  }
+
+  /** Spawn gold particle shower (achievement) */
+  spawnAchievementShower() {
+    const w = this.scale.width
+    for (let i = 0; i < 20; i++) {
+      this.particles.push({
+        x: Math.random() * w,
+        y: -10,
+        vx: (Math.random() - 0.5) * 20,
+        vy: 40 + Math.random() * 30,
+        color: Math.random() > 0.5 ? 0xffd700 : 0xffaa00,
+        alpha: 0.9,
+        life: 2.0 + Math.random(),
+        maxLife: 2.5,
+        size: 2 + Math.random() * 2,
+      })
+    }
+  }
+
+  /** Update and render all active particles */
+  private updateParticles(dt: number) {
+    if (this.particles.length === 0 && this.particleGraphicsLayer) {
+      this.particleGraphicsLayer.clear()
+      return
+    }
+    if (this.particles.length === 0) return
+
+    if (!this.particleGraphicsLayer) {
+      this.particleGraphicsLayer = this.add.graphics()
+    }
+    const g = this.particleGraphicsLayer
+    g.clear()
+    g.setDepth(280)
+
+    // Update and cull
+    this.particles = this.particles.filter(p => {
+      p.life -= dt
+      if (p.life <= 0) return false
+      p.x += p.vx * dt
+      p.y += p.vy * dt
+      p.vy += 15 * dt // gravity
+      return true
+    })
+
+    // Draw
+    for (const p of this.particles) {
+      const lifeFrac = p.life / p.maxLife
+      g.fillStyle(p.color, p.alpha * lifeFrac)
+      g.fillCircle(p.x, p.y, p.size * (0.3 + lifeFrac * 0.7))
+    }
+  }
+
+  // ── Weather Overlay ──────────────────────────────────
+
+  /** Set current weather conditions for overlay rendering */
+  setWeatherCondition(weather: string, season: string, gameHour: number) {
+    this.currentWeather = weather
+    this.currentSeason = season
+    this.currentGameHour = gameHour
+  }
+
+  /** Update weather particle overlay (rain, snow, heat shimmer) */
+  private updateWeatherOverlay(dt: number) {
+    if (!this.weatherOverlayGraphics) {
+      this.weatherOverlayGraphics = this.add.graphics()
+    }
+    const g = this.weatherOverlayGraphics
+    g.clear()
+    g.setDepth(290)
+
+    const w = this.scale.width
+    const h = this.scale.height
+    const cam = this.cameras.main
+
+    const isRain = this.currentWeather === 'rain' || this.currentWeather === 'storm'
+    const isSnow = this.currentSeason === 'winter' && (this.currentWeather === 'cloudy' || this.currentWeather === 'storm')
+    const isHeatwave = this.currentWeather === 'heatwave'
+
+    if (!isRain && !isSnow && !isHeatwave) {
+      this.weatherParticles = []
+      return
+    }
+
+    // Spawn new weather particles
+    const spawnRate = this.currentWeather === 'storm' ? 8 : 3
+    for (let i = 0; i < spawnRate; i++) {
+      if (this.weatherParticles.length > 200) break
+      if (isRain) {
+        this.weatherParticles.push({
+          x: cam.scrollX + Math.random() * w * 1.5,
+          y: cam.scrollY - 10,
+          vx: -30 - Math.random() * 20,
+          vy: 180 + Math.random() * 80,
+          alpha: 0.2 + Math.random() * 0.3,
+          size: 1,
+          color: 0x6688cc,
+        })
+      } else if (isSnow) {
+        this.weatherParticles.push({
+          x: cam.scrollX + Math.random() * w * 1.5,
+          y: cam.scrollY - 10,
+          vx: (Math.random() - 0.5) * 20,
+          vy: 20 + Math.random() * 15,
+          alpha: 0.4 + Math.random() * 0.3,
+          size: 1.5 + Math.random(),
+          color: 0xccddff,
+        })
+      } else if (isHeatwave) {
+        this.weatherParticles.push({
+          x: cam.scrollX + Math.random() * w,
+          y: cam.scrollY + h * 0.6 + Math.random() * h * 0.4,
+          vx: (Math.random() - 0.5) * 8,
+          vy: -10 - Math.random() * 8,
+          alpha: 0.06 + Math.random() * 0.06,
+          size: 8 + Math.random() * 12,
+          color: 0xff6644,
+        })
+      }
+    }
+
+    // Update and render
+    this.weatherParticles = this.weatherParticles.filter(p => {
+      p.x += p.vx * dt
+      p.y += p.vy * dt
+      // Remove if off screen
+      return p.y < cam.scrollY + h + 20 && p.y > cam.scrollY - 20 &&
+             p.x > cam.scrollX - 50 && p.x < cam.scrollX + w + 50
+    })
+
+    for (const p of this.weatherParticles) {
+      if (isRain) {
+        // Rain streaks
+        g.lineStyle(p.size, p.color, p.alpha)
+        g.lineBetween(p.x, p.y, p.x + p.vx * 0.02, p.y + p.vy * 0.02)
+      } else {
+        // Snow and heat shimmer dots
+        g.fillStyle(p.color, p.alpha)
+        g.fillCircle(p.x, p.y, p.size)
+      }
+    }
+  }
+
+  // ── Day/Night Overlay ──────────────────────────────────
+
+  /** Render day/night ambient light shift */
+  private renderDayNightOverlay() {
+    if (!this.dayNightOverlay) {
+      this.dayNightOverlay = this.add.graphics()
+    }
+    const g = this.dayNightOverlay
+    g.clear()
+    g.setDepth(285)
+
+    // Calculate darkness based on game hour (0-24)
+    // Night: 20:00 - 06:00 → darker overlay
+    // Dusk/dawn: 06:00-08:00, 18:00-20:00 → gradual transition
+    let darkness = 0
+    const h = this.currentGameHour
+    if (h >= 21 || h < 5) {
+      darkness = 0.15 // full night
+    } else if (h >= 5 && h < 7) {
+      darkness = 0.15 * (1 - (h - 5) / 2) // dawn
+    } else if (h >= 19 && h < 21) {
+      darkness = 0.15 * ((h - 19) / 2) // dusk
+    }
+
+    if (darkness > 0.01) {
+      const cam = this.cameras.main
+      g.fillStyle(0x000022, darkness)
+      g.fillRect(cam.scrollX - 100, cam.scrollY - 100,
+        this.scale.width + 200, this.scale.height + 200)
+    }
+  }
+
   // ── Placement Animations ────────────────────────────────
 
   /** Play an expanding ring + flash effect at an isometric tile position */
@@ -1706,6 +2168,68 @@ class DataCenterScene extends Phaser.Scene {
     }
   }
 
+  /** Play a scale pulse on a cabinet's graphics when a server is installed */
+  private playServerInstallPulse(id: string) {
+    const gfx = this.cabinetGraphics.get(id)
+    if (!gfx) return
+    this.tweens.add({
+      targets: gfx,
+      alpha: { from: 0.5, to: 1 },
+      duration: 200,
+      ease: 'Bounce.easeOut',
+    })
+  }
+
+  /** Play a cyan flash at a screen position (leaf switch install) */
+  private playCyanFlash(screenX: number, screenY: number) {
+    const flash = this.add.graphics()
+    flash.setDepth(9999)
+    flash.fillStyle(0x00aaff, 0.6)
+    const hw = CUBE_W / 2
+    const hh = CUBE_H / 4
+    flash.beginPath()
+    flash.moveTo(screenX, screenY)
+    flash.lineTo(screenX + hw, screenY + hh)
+    flash.lineTo(screenX, screenY + hh * 2)
+    flash.lineTo(screenX - hw, screenY + hh)
+    flash.closePath()
+    flash.fillPath()
+    this.tweens.add({
+      targets: flash,
+      alpha: 0,
+      duration: 350,
+      ease: 'Power2',
+      onComplete: () => flash.destroy(),
+    })
+  }
+
+  /** Play a removal animation: red flash + fade out */
+  playRemovalEffect(col: number, row: number) {
+    const pos = this.isoToScreen(col, row)
+    const flash = this.add.graphics()
+    flash.setDepth(9999)
+    flash.fillStyle(0xff2222, 0.5)
+    const hw = TILE_W / 2
+    const hh = TILE_H / 2
+    flash.beginPath()
+    flash.moveTo(pos.x, pos.y)
+    flash.lineTo(pos.x + hw, pos.y + hh)
+    flash.lineTo(pos.x, pos.y + TILE_H)
+    flash.lineTo(pos.x - hw, pos.y + hh)
+    flash.closePath()
+    flash.fillPath()
+    this.tweens.add({
+      targets: flash,
+      alpha: 0,
+      scaleX: 0.3,
+      scaleY: 0.3,
+      duration: 300,
+      ease: 'Power2',
+      onComplete: () => flash.destroy(),
+    })
+    this.playSFX('remove')
+  }
+
   // ── Public API ──────────────────────────────────────────
 
   addCabinetToScene(id: string, col: number, row: number, serverCount: number, hasLeafSwitch: boolean, environment: CabinetEnvironment = 'production', facing: CabinetFacing = 'north') {
@@ -1716,16 +2240,43 @@ class DataCenterScene extends Phaser.Scene {
     this.occupiedTiles.add(`${col},${row}`)
     this.renderCabinet(entry)
 
+    // Track initial state for detecting installs
+    this.prevServerCounts.set(id, serverCount)
+    this.prevLeafSwitches.set(id, hasLeafSwitch)
+
     // Placement animation: expanding ring + flash + fade-in
     const { x, y } = this.isoToScreen(col, row)
     this.playPlacementEffect(x, y, 0x00ff88)
     this.playCabinetScaleIn(id)
     this.playSFX('build')
+
+    // Smooth camera pan to newly placed cabinet
+    this.cameraPanTo(col, row, 300)
   }
 
   updateCabinet(id: string, serverCount: number, hasLeafSwitch: boolean, powerOn: boolean, environment: CabinetEnvironment = 'production', facing: CabinetFacing = 'north', visualState?: { heatLevel: number; isThrottled: boolean; isOnFire: boolean; hasIncident: boolean; inMaintenance: boolean; serverAge: number }) {
     const entry = this.cabEntries.get(id)
     if (!entry) return
+
+    // Detect server install → scale pulse + green particle burst
+    const prevServers = this.prevServerCounts.get(id) ?? 0
+    if (serverCount > prevServers && prevServers >= 0) {
+      const pos = this.isoToScreen(entry.col, entry.row)
+      this.spawnParticles(pos.x, pos.y - CABINET_ENCLOSURE_DEPTH / 2, 8, 0x00ff88, 20, 30, 0.4, 2)
+      this.playServerInstallPulse(id)
+      this.playSFX('server_install')
+    }
+    this.prevServerCounts.set(id, serverCount)
+
+    // Detect leaf switch add → cyan flash on top
+    const hadLeaf = this.prevLeafSwitches.get(id) ?? false
+    if (hasLeafSwitch && !hadLeaf) {
+      const pos = this.isoToScreen(entry.col, entry.row)
+      this.playCyanFlash(pos.x, pos.y - CABINET_ENCLOSURE_DEPTH)
+      this.playSFX('switch_click')
+    }
+    this.prevLeafSwitches.set(id, hasLeafSwitch)
+
     entry.serverCount = serverCount
     entry.hasLeafSwitch = hasLeafSwitch
     entry.powerOn = powerOn
@@ -2878,8 +3429,8 @@ class DataCenterScene extends Phaser.Scene {
     }
   }
 
-  /** Play a procedural SFX (build, alert, etc.) */
-  playSFX(type: 'build' | 'alert' | 'upgrade' | 'error') {
+  /** Play a procedural SFX */
+  playSFX(type: 'build' | 'alert' | 'upgrade' | 'error' | 'server_install' | 'switch_click' | 'fire_alarm' | 'cash' | 'ui_click' | 'hvac_burst' | 'remove') {
     if (!this.audioCtx || this.audioMuted) return
     const ctx = this.audioCtx
     const gain = ctx.createGain()
@@ -2923,6 +3474,95 @@ class DataCenterScene extends Phaser.Scene {
         osc.start(ctx.currentTime)
         osc.stop(ctx.currentTime + 0.2)
         break
+      case 'server_install': {
+        // Metallic slide sound: quick rising noise burst
+        osc.type = 'sawtooth'
+        osc.frequency.setValueAtTime(200, ctx.currentTime)
+        osc.frequency.linearRampToValueAtTime(600, ctx.currentTime + 0.05)
+        osc.frequency.linearRampToValueAtTime(300, ctx.currentTime + 0.1)
+        gain.gain.setValueAtTime(vol * 0.15, ctx.currentTime)
+        gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.12)
+        osc.start(ctx.currentTime)
+        osc.stop(ctx.currentTime + 0.12)
+        break
+      }
+      case 'switch_click': {
+        // Short click/snap
+        osc.type = 'square'
+        osc.frequency.setValueAtTime(1200, ctx.currentTime)
+        osc.frequency.linearRampToValueAtTime(800, ctx.currentTime + 0.03)
+        gain.gain.setValueAtTime(vol * 0.2, ctx.currentTime)
+        gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.05)
+        osc.start(ctx.currentTime)
+        osc.stop(ctx.currentTime + 0.05)
+        break
+      }
+      case 'fire_alarm': {
+        // Urgent alarm: repeating high-low oscillation
+        osc.frequency.setValueAtTime(1000, ctx.currentTime)
+        osc.frequency.linearRampToValueAtTime(600, ctx.currentTime + 0.15)
+        osc.frequency.linearRampToValueAtTime(1000, ctx.currentTime + 0.3)
+        osc.frequency.linearRampToValueAtTime(600, ctx.currentTime + 0.45)
+        gain.gain.setValueAtTime(vol * 0.35, ctx.currentTime)
+        gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.5)
+        osc.start(ctx.currentTime)
+        osc.stop(ctx.currentTime + 0.5)
+        break
+      }
+      case 'cash': {
+        // Cash register ding: bright short tone
+        osc.type = 'sine'
+        osc.frequency.setValueAtTime(1400, ctx.currentTime)
+        osc.frequency.linearRampToValueAtTime(1600, ctx.currentTime + 0.05)
+        gain.gain.setValueAtTime(vol * 0.2, ctx.currentTime)
+        gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.15)
+        osc.start(ctx.currentTime)
+        osc.stop(ctx.currentTime + 0.15)
+        break
+      }
+      case 'ui_click': {
+        // Subtle UI click
+        osc.type = 'sine'
+        osc.frequency.setValueAtTime(600, ctx.currentTime)
+        gain.gain.setValueAtTime(vol * 0.08, ctx.currentTime)
+        gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.04)
+        osc.start(ctx.currentTime)
+        osc.stop(ctx.currentTime + 0.04)
+        break
+      }
+      case 'hvac_burst': {
+        // HVAC white noise burst via detuned oscillators
+        osc.type = 'sawtooth'
+        osc.frequency.setValueAtTime(100, ctx.currentTime)
+        gain.gain.setValueAtTime(vol * 0.05, ctx.currentTime)
+        gain.gain.linearRampToValueAtTime(vol * 0.08, ctx.currentTime + 0.2)
+        gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.5)
+        osc.start(ctx.currentTime)
+        osc.stop(ctx.currentTime + 0.5)
+        // Second detuned oscillator for richness
+        const osc2 = ctx.createOscillator()
+        const gain2 = ctx.createGain()
+        osc2.connect(gain2)
+        gain2.connect(ctx.destination)
+        osc2.type = 'sawtooth'
+        osc2.frequency.setValueAtTime(103, ctx.currentTime)
+        gain2.gain.setValueAtTime(vol * 0.04, ctx.currentTime)
+        gain2.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.5)
+        osc2.start(ctx.currentTime)
+        osc2.stop(ctx.currentTime + 0.5)
+        break
+      }
+      case 'remove': {
+        // Descending tone for removal/deletion
+        osc.type = 'triangle'
+        osc.frequency.setValueAtTime(600, ctx.currentTime)
+        osc.frequency.linearRampToValueAtTime(200, ctx.currentTime + 0.15)
+        gain.gain.setValueAtTime(vol * 0.25, ctx.currentTime)
+        gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.2)
+        osc.start(ctx.currentTime)
+        osc.stop(ctx.currentTime + 0.2)
+        break
+      }
     }
   }
 
