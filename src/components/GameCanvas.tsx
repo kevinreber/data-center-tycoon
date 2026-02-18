@@ -333,6 +333,26 @@ export function GameCanvas() {
     scene.setAudioSettings(audioSettings.muted, audioSettings.masterVolume, audioSettings.sfxVolume, audioSettings.ambientVolume)
   }, [audioSettings, sceneReady])
 
+  // Dispatch floating text events from store to Phaser each tick
+  const tickCount = useGameStore((s) => s.tickCount)
+  useEffect(() => {
+    if (!gameRef.current) return
+    const scene = getScene(gameRef.current)
+    if (!scene) return
+    const state = useGameStore.getState()
+    const texts = state.pendingFloatingTexts
+    if (texts.length === 0) return
+    // Clear the queue immediately
+    useGameStore.setState({ pendingFloatingTexts: [] })
+    for (const evt of texts) {
+      if (evt.center) {
+        scene.spawnCenterText(evt.text, evt.color, evt.fontSize)
+      } else if (evt.col != null && evt.row != null) {
+        scene.spawnFloatingText(evt.col, evt.row, evt.text, evt.color, evt.fontSize)
+      }
+    }
+  }, [tickCount, sceneReady])
+
   const handleCenterGrid = useCallback(() => {
     if (gameRef.current) {
       const scene = getScene(gameRef.current)

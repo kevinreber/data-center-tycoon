@@ -1135,3 +1135,13 @@ export interface AudioSettings {
   ambientVolume: number
   muted: boolean
 }
+
+// ── Floating Text Event Types ────────────────────────────────
+export interface FloatingTextEvent {
+  col?: number       // grid col (for positioned text); omit for center-screen text
+  row?: number       // grid row (for positioned text); omit for center-screen text
+  text: string       // display text
+  color: string      // CSS hex color string (e.g., '#00ff88')
+  fontSize?: string  // optional font size override (default '11px')
+  center?: boolean   // if true, display at viewport center
+}

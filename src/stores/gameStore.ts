@@ -38,6 +38,7 @@ export type {
   AdvancedTier, AdvancedTierConfig,
   CustomRow, RackEquipmentType, RackSlot, RackEquipmentConfig, RackDetail,
   LeaderboardCategory, LeaderboardEntry, AudioSettings,
+  FloatingTextEvent,
 } from './types'
 
 import type {
@@ -62,6 +63,7 @@ import type {
   ViewMode, RowEndSlotType, RowEndSlot, AisleWidth, RaisedFloorTier,
   CableManagementType, WorkloadType, Workload, AdvancedTier,
   RackDetail, LeaderboardEntry, LeaderboardCategory, AudioSettings,
+  FloatingTextEvent,
 } from './types'
 
 // ── Re-export constants ────────────────────────────────────────
@@ -491,6 +493,9 @@ interface GameState {
 
   // Audio Settings
   audioSettings: AudioSettings
+
+  // Floating Text Events (consumed by GameCanvas → Phaser each tick)
+  pendingFloatingTexts: FloatingTextEvent[]
 
   // Save / Load
   hasSaved: boolean
@@ -999,6 +1004,9 @@ export const useGameStore = create<GameState>((set) => ({
 
   // Audio Settings
   audioSettings: { ...DEFAULT_AUDIO_SETTINGS },
+
+  // Floating Text Events
+  pendingFloatingTexts: [],
 
   // Demo mode
   isDemo: false,
@@ -3381,15 +3389,18 @@ export const useGameStore = create<GameState>((set) => ({
       customRowMode: false,
       rackDetails: {},
       audioSettings: { ...DEFAULT_AUDIO_SETTINGS },
+      pendingFloatingTexts: [],
     })
   },
 
   refreshSaveSlots: () =>
     set({ saveSlots: getSaveIndex() }),
 
+
   tick: () =>
     set((state) => {
       const newTickCount = state.tickCount + 1
+      const floatingTexts: FloatingTextEvent[] = []
 
       // Advance in-game clock (wraps at 24)
       const newHour = (state.gameHour + MINUTES_PER_TICK / 60) % 24
@@ -3546,6 +3557,9 @@ export const useGameStore = create<GameState>((set) => ({
             }
           }
           incidentLog = [`New: ${selectedDef.label} — ${selectedDef.description}`, ...incidentLog].slice(0, 10)
+          // Floating text for new incident
+          const sevColor = selectedDef.severity === 'critical' ? '#ff4444' : selectedDef.severity === 'major' ? '#ff8844' : '#ffcc00'
+          floatingTexts.push({ text: `⚠ ${selectedDef.label}`, color: sevColor, center: true, fontSize: '13px' })
         } else if (opsSpawnReduction > 0 && Math.random() < baseSpawnChance) {
           // Incident was prevented by ops tier
           opsPreventedCount++
@@ -3662,6 +3676,7 @@ export const useGameStore = create<GameState>((set) => ({
           const remaining = i.ticksRemaining - extraReduction
           if (remaining <= 0) {
             incidentLog = [`Staff resolved: ${i.def.label}`, ...incidentLog].slice(0, 10)
+            floatingTexts.push({ text: `RESOLVED ✓ ${i.def.label}`, color: '#00ff88', center: true })
             // Track resolved count for staff
             staffIncidentsResolved++
             // Track hardware restoration for staff-resolved incidents
@@ -3708,6 +3723,7 @@ export const useGameStore = create<GameState>((set) => ({
           if (opsBonus > 0) {
             incidentLog = [`Auto-resolved: ${i.def.label}`, ...incidentLog].slice(0, 10)
             opsAutoResolvedCount++
+            floatingTexts.push({ text: `RESOLVED ✓ ${i.def.label}`, color: '#00ff88', center: true })
           } else {
             incidentLog = [`Expired: ${i.def.label}`, ...incidentLog].slice(0, 10)
           }
@@ -3861,6 +3877,9 @@ export const useGameStore = create<GameState>((set) => ({
       if (!fireActive && hasCriticalTemp && Math.random() < 0.03) {
         fireActive = true
         incidentLog = ['FIRE DETECTED! Suppression system activating...', ...incidentLog].slice(0, 10)
+        // Show fire text above hottest cabinet
+        const hottest = state.cabinets.reduce((a, b) => a.heatLevel > b.heatLevel ? a : b)
+        floatingTexts.push({ col: hottest.col, row: hottest.row, text: 'FIRE!', color: '#ff4444', fontSize: '16px' })
       }
 
       // ── Main simulation ────────────────────────────────────
@@ -4121,6 +4140,17 @@ export const useGameStore = create<GameState>((set) => ({
         return { ...cab, heatLevel: Math.round(heat * 10) / 10, serverAge: newAge, ...(leafFailed ? { hasLeafSwitch: false } : leafRestored ? { hasLeafSwitch: true } : {}) }
       })
 
+      // Floating text: temperature warnings for hot cabinets (every 8 ticks, limit to 3)
+      if (newTickCount % 8 === 0) {
+        const hotCabs = newCabinets
+          .filter((c) => c.heatLevel >= 70 && c.heatLevel < SIM.throttleTemp && c.powerStatus)
+          .sort((a, b) => b.heatLevel - a.heatLevel)
+          .slice(0, 3)
+        for (const cab of hotCabs) {
+          floatingTexts.push({ col: cab.col, row: cab.row, text: `${Math.round(cab.heatLevel)}°C ▲`, color: '#ff8844' })
+        }
+      }
+
       // Handle fire suppression
       let fireEquipmentDamage = 0
       if (fireActive) {
@@ -4252,9 +4282,27 @@ export const useGameStore = create<GameState>((set) => ({
           // Throttled servers earn half revenue
           const throttled = cab.heatLevel >= SIM.throttleTemp
           revenue += throttled ? baseRevenue * 0.5 : baseRevenue
+
+          // Floating text: throttle warning (only when transitioning into throttle)
+          if (throttled) {
+            const prevCab = state.cabinets.find((c) => c.id === cab.id)
+            if (prevCab && prevCab.heatLevel < SIM.throttleTemp) {
+              floatingTexts.push({ col: cab.col, row: cab.row, text: 'THROTTLED', color: '#ff8844' })
+            }
+          }
         }
       }
       revenue *= incidentRevenueMult * outagePenalty
+
+      // Floating text: aggregate revenue (show every 4th tick to reduce visual noise)
+      if (revenue > 0 && newTickCount % 4 === 0) {
+        // Pick a random active cabinet to show revenue above
+        const activeCabs = newCabinets.filter((c) => c.powerStatus && c.serverCount > 0)
+        if (activeCabs.length > 0) {
+          const sample = activeCabs[Math.floor(Math.random() * activeCabs.length)]
+          floatingTexts.push({ col: sample.col, row: sample.row, text: `+$${Math.round(revenue * 4)}`, color: '#00ff88' })
+        }
+      }
 
       // Calculate zone bonus revenue for display (difference vs. what revenue would be without zone bonuses)
       let zoneBonusRevenue = 0
@@ -4367,6 +4415,7 @@ export const useGameStore = create<GameState>((set) => ({
             contractRevenue += contract.def.completionBonus
             totalEarned += contract.def.completionBonus
             contractLog = [`COMPLETED: ${contract.def.company} — Bonus $${contract.def.completionBonus.toLocaleString()}!`, ...contractLog].slice(0, 10)
+            floatingTexts.push({ text: `CONTRACT COMPLETE +$${contract.def.completionBonus.toLocaleString()}`, color: '#00ccff', center: true, fontSize: '13px' })
             return { ...contract, consecutiveViolations, totalViolationTicks, totalEarned, totalPenalties, status: status as 'completed', ticksRemaining: 0 }
           }
 
@@ -4472,6 +4521,7 @@ export const useGameStore = create<GameState>((set) => ({
         newAchievements.push(ach)
         unlockedIds.add(id)
         newAchievement = ach
+        floatingTexts.push({ text: `★ ${def.label}`, color: '#ffd700', center: true, fontSize: '14px' })
       }
 
       if (newCabinets.length >= 1) unlock('first_cabinet')
@@ -5572,6 +5622,8 @@ export const useGameStore = create<GameState>((set) => ({
         completedWorkloads,
         failedWorkloads,
         workloadRevenue: +workloadRevenue.toFixed(2),
+        // Floating text events
+        pendingFloatingTexts: floatingTexts,
       }
     }),
 }))
