@@ -3,7 +3,7 @@ import type { LucideIcon } from 'lucide-react'
 import {
   Cpu, Server, DollarSign, Radio, Zap, Plug,
   FlaskConical, FileText, Siren, Building, Trophy,
-  Save, X, HelpCircle, Leaf, Shield, TrendingUp, Newspaper, BarChart3, Globe,
+  Save, X, HelpCircle, Leaf, Shield, TrendingUp, Newspaper, BarChart3, Globe, Target,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -33,8 +33,9 @@ import { MarketPanel } from '@/components/sidebar/MarketPanel'
 import { BuildLogsPanel } from '@/components/sidebar/BuildLogsPanel'
 import { CapacityPanel } from '@/components/sidebar/CapacityPanel'
 import { WorldMapPanel } from '@/components/sidebar/WorldMapPanel'
+import { ScenarioPanel } from '@/components/sidebar/ScenarioPanel'
 
-type PanelId = 'guide' | 'build' | 'equipment' | 'finance' | 'network' | 'operations' | 'infrastructure' | 'research' | 'contracts' | 'incidents' | 'facility' | 'carbon' | 'security' | 'market' | 'capacity' | 'world_map' | 'progress' | 'settings' | 'build_logs'
+type PanelId = 'guide' | 'build' | 'equipment' | 'finance' | 'network' | 'operations' | 'infrastructure' | 'research' | 'contracts' | 'incidents' | 'facility' | 'carbon' | 'security' | 'market' | 'capacity' | 'world_map' | 'progress' | 'scenarios' | 'settings' | 'build_logs'
 
 interface SidebarItem {
   id: PanelId
@@ -62,6 +63,7 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
   { id: 'capacity', icon: BarChart3, label: 'Capacity', color: '#00ddff', section: 'middle' },
   { id: 'world_map', icon: Globe, label: 'World Map', color: '#00ccff', section: 'middle' },
   { id: 'progress', icon: Trophy, label: 'Progress', color: '#ffaa00', section: 'middle' },
+  { id: 'scenarios', icon: Target, label: 'Scenarios', color: '#ff8844', section: 'bottom' },
   { id: 'build_logs', icon: Newspaper, label: "What's New", color: '#00ff88', section: 'bottom' },
   { id: 'settings', icon: Save, label: 'Settings', color: '#556677', section: 'bottom' },
 ]
@@ -84,6 +86,7 @@ const PANEL_TITLES: Record<PanelId, string> = {
   capacity: 'CAPACITY PLANNING',
   world_map: 'GLOBAL EXPANSION',
   progress: 'PROGRESS',
+  scenarios: 'SCENARIOS',
   build_logs: "WHAT'S NEW",
   settings: 'SETTINGS',
 }
@@ -107,6 +110,7 @@ function PanelContent({ panelId }: { panelId: PanelId }) {
     case 'capacity': return <CapacityPanel />
     case 'world_map': return <WorldMapPanel />
     case 'progress': return <ProgressPanel />
+    case 'scenarios': return <ScenarioPanel />
     case 'build_logs': return <BuildLogsPanel />
     case 'settings': return <SettingsPanel />
   }

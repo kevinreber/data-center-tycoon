@@ -328,6 +328,8 @@ interface GameState {
   activeScenario: ScenarioDef | null
   scenarioProgress: Record<string, boolean>   // objective ID → completed
   scenariosCompleted: string[]                // IDs of completed scenarios
+  scenarioBestTicks: Record<string, number>   // scenario ID → best completion tick count
+  scenarioStartTick: number                   // tick when current scenario was started
 
   // Network Topology
   networkTopology: NetworkTopologyStats
@@ -836,6 +838,8 @@ export const useGameStore = create<GameState>((set) => ({
   activeScenario: null,
   scenarioProgress: {},
   scenariosCompleted: [],
+  scenarioBestTicks: {},
+  scenarioStartTick: 0,
 
   // Network Topology
   networkTopology: { totalLinks: 0, healthyLinks: 0, oversubscriptionRatio: 0, avgUtilization: 0, redundancyLevel: 0 },
@@ -1789,11 +1793,12 @@ export const useGameStore = create<GameState>((set) => ({
         activeScenario: scenario,
         scenarioProgress: progress,
         money: scenario.startingMoney,
+        scenarioStartTick: state.tickCount,
       }
     }),
 
   abandonScenario: () =>
-    set({ activeScenario: null, scenarioProgress: {} }),
+    set({ activeScenario: null, scenarioProgress: {}, scenarioStartTick: 0 }),
 
   // ── Heat Map ───────────────────────────────────────────────────
 
@@ -2961,6 +2966,8 @@ export const useGameStore = create<GameState>((set) => ({
       activeScenario: null,
       scenarioProgress: {},
       scenariosCompleted: [],
+      scenarioBestTicks: {},
+      scenarioStartTick: 0,
       networkTopology: { totalLinks: 0, healthyLinks: 0, oversubscriptionRatio: 0, avgUtilization: 0, redundancyLevel: 0 },
       heatMapVisible: false,
       hasSaved: false,
@@ -3103,6 +3110,7 @@ export const useGameStore = create<GameState>((set) => ({
         drillsCompleted: state.drillsCompleted,
         drillsPassed: state.drillsPassed,
         scenariosCompleted: state.scenariosCompleted,
+        scenarioBestTicks: state.scenarioBestTicks,
         // Staff & HR
         staff: state.staff,
         shiftPattern: state.shiftPattern,
@@ -3187,6 +3195,7 @@ export const useGameStore = create<GameState>((set) => ({
         drillsCompleted: data.drillsCompleted ?? state.drillsCompleted,
         drillsPassed: data.drillsPassed ?? state.drillsPassed,
         scenariosCompleted: data.scenariosCompleted ?? state.scenariosCompleted,
+        scenarioBestTicks: data.scenarioBestTicks ?? state.scenarioBestTicks,
         // Staff & HR
         staff: data.staff ?? state.staff,
         shiftPattern: data.shiftPattern ?? state.shiftPattern,
@@ -3310,6 +3319,8 @@ export const useGameStore = create<GameState>((set) => ({
       activeScenario: null,
       scenarioProgress: {},
       scenariosCompleted: [],
+      scenarioBestTicks: {},
+      scenarioStartTick: 0,
       networkTopology: { totalLinks: 0, healthyLinks: 0, oversubscriptionRatio: 0, avgUtilization: 0, redundancyLevel: 0 },
       heatMapVisible: false,
       hasSaved: false,
@@ -4701,6 +4712,7 @@ export const useGameStore = create<GameState>((set) => ({
       // ── Scenario progress check ───────────────────────────────
       const scenarioProgress = { ...state.scenarioProgress }
       let scenariosCompleted = [...state.scenariosCompleted]
+      let scenarioBestTicks = { ...state.scenarioBestTicks }
       if (state.activeScenario) {
         let allComplete = true
         for (const obj of state.activeScenario.objectives) {
@@ -4722,6 +4734,11 @@ export const useGameStore = create<GameState>((set) => ({
         }
         if (allComplete && !scenariosCompleted.includes(state.activeScenario.id)) {
           scenariosCompleted = [...scenariosCompleted, state.activeScenario.id]
+          const elapsedTicks = newTickCount - state.scenarioStartTick
+          const prevBest = state.scenarioBestTicks[state.activeScenario.id]
+          if (!prevBest || elapsedTicks < prevBest) {
+            scenarioBestTicks = { ...state.scenarioBestTicks, [state.activeScenario.id]: elapsedTicks }
+          }
           incidentLog = [`SCENARIO COMPLETE: ${state.activeScenario.label}!`, ...incidentLog].slice(0, 10)
         }
       }
@@ -5543,6 +5560,7 @@ export const useGameStore = create<GameState>((set) => ({
         networkTopology,
         scenarioProgress,
         scenariosCompleted,
+        scenarioBestTicks,
         // Staff & HR
         staff: updatedStaff,
         trainingQueue,

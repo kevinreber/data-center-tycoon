@@ -395,6 +395,99 @@ export function GameCanvas() {
     }
   }, [pendingCameraEffects, sceneReady])
 
+  // Sync worker sprites (peeps) from staff state to Phaser
+  const staff = useGameStore((s) => s.staff)
+  const gameHour = useGameStore((s) => s.gameHour)
+  const shiftPattern = useGameStore((s) => s.shiftPattern)
+  useEffect(() => {
+    if (!gameRef.current) return
+    const scene = getScene(gameRef.current)
+    if (!scene) return
+    const isNight = gameHour < 6 || gameHour >= 22
+    const isDayNight = shiftPattern === 'day_night' || shiftPattern === 'round_the_clock'
+    const isRoundClock = shiftPattern === 'round_the_clock'
+    const staffList = staff.map(s => ({
+      id: s.id,
+      role: s.role,
+      onShift: isRoundClock || (isDayNight && !isNight) || (!isNight && shiftPattern === 'day_only') || s.fatigueLevel < 90,
+    }))
+    scene.syncWorkers(staffList)
+  }, [staff, gameHour, shiftPattern, sceneReady])
+
+  // Dispatch workers to incidents
+  useEffect(() => {
+    if (!gameRef.current) return
+    const scene = getScene(gameRef.current)
+    if (!scene) return
+    for (const incident of activeIncidents) {
+      if (!incident.resolved && incident.affectedHardwareId) {
+        const cab = cabinets.find(c => c.id === incident.affectedHardwareId)
+        if (cab) scene.dispatchWorkerToIncident(cab.col, cab.row)
+      }
+    }
+  }, [activeIncidents, cabinets, sceneReady])
+
+  // Sync weather/day-night to Phaser
+  const weatherCondition = useGameStore((s) => s.currentCondition)
+  const season = useGameStore((s) => s.currentSeason)
+  useEffect(() => {
+    if (!gameRef.current) return
+    const scene = getScene(gameRef.current)
+    if (!scene) return
+    scene.setWeatherCondition(weatherCondition, season, gameHour)
+  }, [weatherCondition, season, gameHour, sceneReady])
+
+  // Spawn particle effects for events each tick
+  useEffect(() => {
+    if (!gameRef.current) return
+    const scene = getScene(gameRef.current)
+    if (!scene) return
+    const state = useGameStore.getState()
+
+    // Fire particles on burning cabinets
+    if (state.fireActive) {
+      for (const cab of cabinets) {
+        if (cab.heatLevel >= SIM.criticalTemp && cab.powerStatus) {
+          scene.spawnFireParticles(cab.col, cab.row)
+        }
+      }
+    }
+
+    // Heat shimmer on throttled cabinets (sample every 8 ticks)
+    if (tickCount % 8 === 0) {
+      for (const cab of cabinets) {
+        if (cab.heatLevel >= SIM.throttleTemp && cab.powerStatus) {
+          scene.spawnHeatShimmer(cab.col, cab.row)
+        }
+      }
+    }
+
+    // Spark particles on overloaded PDUs (sample every 12 ticks)
+    if (tickCount % 12 === 0 && state.pduOverloaded) {
+      for (const pdu of state.pdus) {
+        scene.spawnSparkParticles(pdu.col, pdu.row)
+      }
+    }
+
+    // Cooling mist on operational cooling units (sample every 16 ticks)
+    if (tickCount % 16 === 0) {
+      for (const unit of coolingUnits) {
+        if (unit.operational) {
+          scene.spawnCoolMist(unit.col, unit.row)
+        }
+      }
+    }
+  }, [tickCount, cabinets, coolingUnits, fireActive, sceneReady])
+
+  // Spawn achievement gold shower
+  const newAchievement = useGameStore((s) => s.newAchievement)
+  useEffect(() => {
+    if (!gameRef.current || !newAchievement) return
+    const scene = getScene(gameRef.current)
+    if (!scene) return
+    scene.spawnAchievementShower()
+  }, [newAchievement, sceneReady])
+
   const handleCenterGrid = useCallback(() => {
     if (gameRef.current) {
       const scene = getScene(gameRef.current)
