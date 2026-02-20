@@ -115,6 +115,9 @@ src/
 
 - `.claude/settings.json` — Hooks: ESLint runs after Edit/Write on `.ts/.tsx` files; lint + type-check on session start
 - `.claude/skills/add-feature/SKILL.md` — 9-step feature addition checklist (invoked with `/add-feature`)
+- `.claude/skills/add-incident/SKILL.md` — Guided incident type creation (invoked with `/add-incident`)
+- `.claude/skills/add-achievement/SKILL.md` — Guided achievement creation (invoked with `/add-achievement`)
+- `.claude/skills/add-scenario/SKILL.md` — Guided scenario challenge creation (invoked with `/add-scenario`)
 - `.claude/skills/update-build-logs/SKILL.md` — Changelog update checklist (invoked with `/update-build-logs`)
 - `.claude/skills/validate-pr-docs/SKILL.md` — Pre-PR documentation validation (invoked with `/validate-pr-docs`)
 
@@ -807,7 +810,9 @@ Add to `TECH_TREE` in `gameStore.ts`. Research is managed by `startResearch` act
 - Phaser is split into a separate chunk via `manualChunks` in `vite.config.ts`
 - Base path configured as `/data-center-tycoon/` for GitHub Pages
 - Production build: `npm run build` outputs to `dist/`
-- **CI/CD**: GitHub Actions workflow (`.github/workflows/deploy.yml`) deploys to GitHub Pages on push to `main`
+- **CI**: GitHub Actions workflow (`.github/workflows/ci.yml`) runs lint, test, and build on every PR and push to `main`
+- **CD**: GitHub Actions workflow (`.github/workflows/deploy.yml`) deploys to GitHub Pages on push to `main`
 - Validate changes with `npm run lint`, `npm run test`, and `npm run build`
 - **Before creating a PR**, run `/validate-pr-docs` to ensure all documentation is consistent with the codebase
+- **PR template**: `.github/PULL_REQUEST_TEMPLATE.md` standardizes pull request descriptions
 - Demo available at deployment URL with `?demo=true` parameter
