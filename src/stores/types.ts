@@ -135,6 +135,35 @@ export interface Site {
   snapshot: SiteSnapshot | null  // full state when not active; null for HQ or not-yet-built
 }
 
+// ── Inter-Site Networking Types (Phase 6B) ────────────────────
+export type InterSiteLinkType = 'ip_transit' | 'leased_wavelength' | 'dark_fiber' | 'submarine_cable'
+
+export interface InterSiteLink {
+  id: string
+  type: InterSiteLinkType
+  siteAId: string | null    // null = HQ
+  siteBId: string
+  bandwidthGbps: number
+  latencyMs: number
+  costPerTick: number
+  installedAtTick: number
+  utilization: number       // 0–1, current bandwidth usage
+  operational: boolean
+}
+
+export interface InterSiteLinkConfig {
+  type: InterSiteLinkType
+  label: string
+  description: string
+  bandwidthGbps: number
+  baseLatencyMs: number
+  installCost: number
+  costPerTick: number
+  crossContinentOnly: boolean   // submarine_cable requires cross-continent
+  sameContinentOnly: boolean    // leased_wavelength / dark_fiber require same continent
+  reliability: number           // 0–1, probability of staying operational each tick
+}
+
 // ── Save Slot Types ────────────────────────────────────────────
 export interface SaveSlotMeta {
   slotId: number

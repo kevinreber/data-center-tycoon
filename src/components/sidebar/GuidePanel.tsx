@@ -1,5 +1,5 @@
 import { Github, Bug, GitPullRequest } from 'lucide-react'
-import { useGameStore, ENVIRONMENT_CONFIG, SIM, SPACING_CONFIG, COOLING_CONFIG, INROW_COOLING_OPTIONS, COOLING_UNIT_CONFIG, OPS_TIER_CONFIG } from '@/stores/gameStore'
+import { useGameStore, ENVIRONMENT_CONFIG, SIM, SPACING_CONFIG, COOLING_CONFIG, INROW_COOLING_OPTIONS, COOLING_UNIT_CONFIG, OPS_TIER_CONFIG, SERVER_CONFIG_OPTIONS, ZONE_BONUS_CONFIG, WORKLOAD_CONFIG, ADVANCED_TIER_CONFIG, SPOT_COMPUTE_CONFIG, SITE_TYPE_CONFIG, INTER_SITE_LINK_CONFIG, MAX_LINKS_PER_SITE, EDGE_POP_CDN_REVENUE_PER_GBPS } from '@/stores/gameStore'
 
 const REPO_URL = 'https://github.com/kevinreber/data-center-tycoon'
 
@@ -197,6 +197,201 @@ export function GuidePanel() {
         <div className="mt-2 pt-2 border-t border-neon-yellow/10">
           <p className="text-[10px] font-mono text-muted-foreground">
             <strong className="text-foreground">Key benefits:</strong> Fewer incidents, faster auto-resolve, cheaper resolve costs, and boosted staff effectiveness. Unlock higher tiers by hiring staff, researching tech, and building reputation.
+          </p>
+        </div>
+      </div>
+
+      {/* Server configurations */}
+      <div className="rounded-lg border border-neon-green/20 bg-neon-green/5 p-3">
+        <p className="text-xs font-bold text-neon-green mb-2">SERVER CONFIGURATIONS</p>
+        <p className="text-xs font-mono text-muted-foreground mb-2">
+          Choose a server build to match your customer base. Set in the <span className="text-neon-cyan">EQUIPMENT</span> panel.
+        </p>
+        <div className="space-y-1.5">
+          {SERVER_CONFIG_OPTIONS.map((cfg) => (
+            <div key={cfg.id} className="flex gap-2 items-start">
+              <div className="w-3 h-3 rounded-sm shrink-0 mt-0.5" style={{ backgroundColor: cfg.color }} />
+              <div className="text-xs font-mono">
+                <strong style={{ color: cfg.color }}>{cfg.label}</strong>
+                <span className="text-muted-foreground"> &mdash; {cfg.revenueMultiplier}x revenue, {cfg.heatMultiplier}x heat, {cfg.powerMultiplier}x power. Best for {cfg.bestFor.join(', ')}.</span>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-2 pt-2 border-t border-neon-green/10">
+          <p className="text-[10px] font-mono text-muted-foreground">
+            <strong className="text-foreground">Pro tip:</strong> Match server configs to customer types for up to 30% bonus revenue. GPU Accelerated is high risk/high reward &mdash; 2.2x heat!
+          </p>
+        </div>
+      </div>
+
+      {/* Zone bonuses */}
+      <div className="rounded-lg border border-neon-yellow/20 bg-neon-yellow/5 p-3">
+        <p className="text-xs font-bold text-neon-yellow mb-2">ZONE BONUSES</p>
+        <p className="text-xs font-mono text-muted-foreground mb-2">
+          Place <strong className="text-foreground">{ZONE_BONUS_CONFIG.minClusterSize}+ adjacent cabinets</strong> of the same environment or customer type to form a zone. Zones grant passive bonuses.
+        </p>
+        <div className="space-y-1">
+          <p className="text-[10px] font-mono font-bold text-neon-yellow">ENVIRONMENT ZONES</p>
+          <ul className="text-xs font-mono text-muted-foreground space-y-0.5 list-disc list-inside">
+            <li><span style={{ color: ENVIRONMENT_CONFIG.production.color }}>Production</span> zone: <span className="text-neon-green">+{ZONE_BONUS_CONFIG.environmentBonus.production.revenueBonus}%</span> revenue</li>
+            <li><span style={{ color: ENVIRONMENT_CONFIG.lab.color }}>Lab</span> zone: <span className="text-neon-green">-{Math.abs(ZONE_BONUS_CONFIG.environmentBonus.lab.heatReduction)}%</span> heat</li>
+            <li><span style={{ color: ENVIRONMENT_CONFIG.management.color }}>Management</span> zone: <span className="text-neon-green">-{Math.abs(ZONE_BONUS_CONFIG.environmentBonus.management.heatReduction)}%</span> heat</li>
+          </ul>
+        </div>
+        <div className="mt-1.5 space-y-1">
+          <p className="text-[10px] font-mono font-bold text-neon-yellow">CUSTOMER TYPE ZONES</p>
+          <p className="text-xs font-mono text-muted-foreground">
+            Same customer type clusters grant <span className="text-neon-green">+5&ndash;10%</span> revenue. AI Training zones give the highest bonus (+10%).
+          </p>
+        </div>
+      </div>
+
+      {/* Infrastructure upgrades */}
+      <div className="rounded-lg border border-[#8888ff]/20 bg-[#8888ff]/5 p-3">
+        <p className="text-xs font-bold text-[#8888ff] mb-2">INFRASTRUCTURE UPGRADES</p>
+        <p className="text-xs font-mono text-muted-foreground mb-2">
+          Upgrade your facility&rsquo;s infrastructure in the <span className="text-neon-cyan">INFRASTRUCTURE</span> panel.
+        </p>
+        <div className="space-y-2">
+          <div className="text-xs font-mono">
+            <strong className="text-foreground">Row-end slots</strong>
+            <span className="text-muted-foreground"> &mdash; Mount PDUs ($4k, +15% efficiency), coolers ($6k, -1&deg;C/row), fire panels ($3.5k), or patch panels ($2.5k) at row ends.</span>
+          </div>
+          <div className="text-xs font-mono">
+            <strong className="text-foreground">Aisle widths</strong>
+            <span className="text-muted-foreground"> &mdash; Standard (free) &rarr; Wide ($8k, +15% maint speed, +3% cooling) &rarr; Extra Wide ($15k, +30% maint, +6% cooling).</span>
+          </div>
+          <div className="text-xs font-mono">
+            <strong className="text-foreground">Raised floor</strong>
+            <span className="text-muted-foreground"> &mdash; None &rarr; Basic 12&quot; ($25k, +8% cooling) &rarr; Advanced 24&quot; ($60k, +15% cooling). Enables underfloor cable conduits.</span>
+          </div>
+          <div className="text-xs font-mono">
+            <strong className="text-foreground">Cable management</strong>
+            <span className="text-muted-foreground"> &mdash; None &rarr; Overhead trays ($15k, 40% mess reduction) &rarr; Underfloor conduits ($20k, 60% reduction, requires raised floor).</span>
+          </div>
+          <div className="text-xs font-mono">
+            <strong className="text-foreground">Busways &amp; cross-connects</strong>
+            <span className="text-muted-foreground"> &mdash; Overhead power distribution and direct physical connections between equipment.</span>
+          </div>
+          <div className="text-xs font-mono">
+            <strong className="text-foreground">Chiller plants &amp; pipes</strong>
+            <span className="text-muted-foreground"> &mdash; Connect chiller plants to CRAH units via cooling pipes for boosted cooling efficiency.</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Workloads */}
+      <div className="rounded-lg border border-[#ff44aa]/20 bg-[#ff44aa]/5 p-3">
+        <p className="text-xs font-bold text-[#ff44aa] mb-2">WORKLOADS</p>
+        <p className="text-xs font-mono text-muted-foreground mb-2">
+          Assign temporary compute jobs to cabinets for bonus payouts. Found in the <span className="text-neon-cyan">EQUIPMENT</span> panel.
+        </p>
+        <div className="space-y-1.5">
+          {WORKLOAD_CONFIG.map((wl) => (
+            <div key={wl.type} className="flex gap-2 items-start">
+              <div className="w-3 h-3 rounded-sm shrink-0 mt-0.5" style={{ backgroundColor: wl.color }} />
+              <div className="text-xs font-mono">
+                <strong style={{ color: wl.color }}>{wl.label}</strong>
+                <span className="text-muted-foreground"> &mdash; {wl.durationTicks} ticks, ${wl.basePayout.toLocaleString()} payout, {wl.heatMultiplier}x heat.{wl.failOnOverheat ? ` Fails above ${wl.failTemp}\u00B0C!` : ''}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-2 pt-2 border-t border-[#ff44aa]/10">
+          <p className="text-[10px] font-mono text-muted-foreground">
+            <strong className="text-foreground">Warning:</strong> Workloads multiply heat generation. Ensure adequate cooling before launching AI Training jobs &mdash; overheating kills the workload and you lose the payout.
+          </p>
+        </div>
+      </div>
+
+      {/* Spot compute market */}
+      <div className="rounded-lg border border-neon-yellow/20 bg-neon-yellow/5 p-3">
+        <p className="text-xs font-bold text-neon-yellow mb-2">SPOT COMPUTE MARKET</p>
+        <p className="text-xs font-mono text-muted-foreground mb-2">
+          Allocate spare server capacity to the dynamic spot market for extra revenue. Managed in <span className="text-neon-cyan">OPERATIONS</span>.
+        </p>
+        <ul className="text-xs font-mono text-muted-foreground space-y-1 list-disc list-inside">
+          <li>Spot price fluctuates between <span className="text-neon-green">{SPOT_COMPUTE_CONFIG.minPriceMultiplier}x</span>&ndash;<span className="text-neon-green">{SPOT_COMPUTE_CONFIG.maxPriceMultiplier}x</span> base rate</li>
+          <li>Prices are <strong className="text-foreground">inversely correlated</strong> with regular demand &mdash; sell when regular traffic is low</li>
+          <li>Volatility: {Math.round(SPOT_COMPUTE_CONFIG.volatility * 100)}% max change per tick</li>
+        </ul>
+      </div>
+
+      {/* 42U rack model */}
+      <div className="rounded-lg border border-neon-cyan/20 bg-neon-cyan/5 p-3">
+        <p className="text-xs font-bold text-neon-cyan mb-2">42U RACK MODEL</p>
+        <p className="text-xs font-mono text-muted-foreground mb-2">
+          Click any cabinet to open its detail panel. The <strong className="text-foreground">42U rack view</strong> shows per-U equipment placement &mdash; install servers, switches, UPS, patch panels, and more in specific rack positions.
+        </p>
+        <ul className="text-xs font-mono text-muted-foreground space-y-1 list-disc list-inside">
+          <li>8 equipment types from 1U servers to 4U storage arrays</li>
+          <li>Each piece has unique power draw, heat output, and revenue</li>
+          <li>Plan rack layout carefully &mdash; 42U fills up fast!</li>
+        </ul>
+      </div>
+
+      {/* Advanced tiers */}
+      <div className="rounded-lg border border-[#ff4444]/20 bg-[#ff4444]/5 p-3">
+        <p className="text-xs font-bold text-[#ff4444] mb-2">ADVANCED SCALING TIERS</p>
+        <p className="text-xs font-mono text-muted-foreground mb-2">
+          Beyond Enterprise, unlock ultra-late-game tiers in the <span className="text-neon-cyan">FACILITY</span> panel.
+        </p>
+        <div className="space-y-1.5">
+          {ADVANCED_TIER_CONFIG.map((tier) => (
+            <div key={tier.tier} className="text-xs font-mono">
+              <strong className="text-foreground">{tier.label}</strong>
+              <span className="text-muted-foreground"> &mdash; ${tier.unlockCost.toLocaleString()} unlock. {tier.maxCabinets} max cabinets, {tier.coolingRate}&deg;C/tick cooling, {tier.powerCostMultiplier}x power cost.</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Multi-site expansion */}
+      <div className="rounded-lg border border-[#00ccff]/20 bg-[#00ccff]/5 p-3">
+        <p className="text-xs font-bold text-[#00ccff] mb-2">MULTI-SITE EXPANSION</p>
+        <p className="text-xs font-mono text-muted-foreground mb-2">
+          Expand beyond a single facility! Open the <span className="text-neon-cyan">WORLD MAP</span> panel to build a global network.
+        </p>
+        <div className="space-y-2">
+          <div>
+            <p className="text-[10px] font-mono font-bold text-[#00ccff] mb-1">SITE TYPES</p>
+            <div className="space-y-1">
+              {Object.values(SITE_TYPE_CONFIG).map((st) => (
+                <div key={st.type} className="text-xs font-mono">
+                  <strong className="text-foreground">{st.label}</strong>
+                  <span className="text-muted-foreground"> &mdash; ${st.purchaseCost.toLocaleString()}, {st.constructionTicks} tick build, up to {st.maxCabinets} cabinets.</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="text-[10px] font-mono font-bold text-[#00ccff] mb-1">REGIONS</p>
+            <p className="text-xs font-mono text-muted-foreground">
+              15 global regions with unique profiles &mdash; power costs, labor rates, climate, demand, and disaster risks all vary by location. Research regions before expanding.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Inter-site networking */}
+      <div className="rounded-lg border border-[#ff44ff]/20 bg-[#ff44ff]/5 p-3">
+        <p className="text-xs font-bold text-[#ff44ff] mb-2">INTER-SITE NETWORKING</p>
+        <p className="text-xs font-mono text-muted-foreground mb-2">
+          Connect your sites with dedicated network links. Managed in the <span className="text-neon-cyan">WORLD MAP</span> panel.
+        </p>
+        <div className="space-y-1.5 mb-2">
+          {Object.values(INTER_SITE_LINK_CONFIG).map((link) => (
+            <div key={link.type} className="text-xs font-mono">
+              <strong className="text-foreground">{link.label}</strong>
+              <span className="text-muted-foreground"> &mdash; {link.bandwidthGbps} Gbps, {link.baseLatencyMs}ms, ${link.installCost.toLocaleString()} install, ${link.costPerTick}/tick. {Math.round(link.reliability * 100)}% uptime.{link.sameContinentOnly ? ' Same continent only.' : ''}{link.crossContinentOnly ? ' Cross-continent only.' : ''}</span>
+            </div>
+          ))}
+        </div>
+        <div className="mt-2 pt-2 border-t border-[#ff44ff]/10">
+          <p className="text-[10px] font-mono text-muted-foreground">
+            <strong className="text-foreground">Edge PoPs</strong> generate <span className="text-neon-green">${EDGE_POP_CDN_REVENUE_PER_GBPS}/Gbps</span> CDN revenue when connected with a backhaul link.
+            Max {MAX_LINKS_PER_SITE} links per site.
           </p>
         </div>
       </div>

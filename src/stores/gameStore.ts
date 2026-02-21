@@ -7,6 +7,7 @@ export type {
   ShiftPattern, EnergySource, GreenCert, SecurityTier, SecurityFeatureId, ComplianceCertId,
   CompetitorPersonality, OpsTier, SiteType, Continent, RegionId,
   RegionProfile, RegionDemandProfile, RegionDisasterProfile, Region, SiteTypeConfig, Site,
+  InterSiteLinkType, InterSiteLink, InterSiteLinkConfig,
   SaveSlotMeta, CustomerTypeConfig, GeneratorConfig, Generator, SuppressionConfig,
   TechDef, ActiveResearch, OpsTierConfig, CabinetFacing,
   PDU, PDUConfig, CableTray, CableTrayConfig, CableRun,
@@ -45,7 +46,7 @@ import type {
   GameSpeed, CabinetEnvironment, CoolingType, CoolingUnitType, CustomerType,
   GeneratorStatus, SuppressionType, SuiteTier, StaffRole, StaffSkillLevel, ShiftPattern,
   EnergySource, GreenCert, SecurityTier, SecurityFeatureId, ComplianceCertId, OpsTier,
-  CompetitorPersonality, SiteType, RegionId, CabinetFacing, ServerConfig,
+  CompetitorPersonality, SiteType, RegionId, CabinetFacing, ServerConfig, InterSiteLinkType,
   InterconnectPortType, MaintenanceTargetType, MaintenanceStatus, PowerRedundancy, InsurancePolicyType,
   OrderStatus, Season, WeatherCondition, EventSeverity,
   ChillerTier, Cabinet, SpineSwitch, TrafficStats, LayerColors,
@@ -57,7 +58,7 @@ import type {
   StaffMember, StaffTraining, HardwareOrder, InterconnectPort, PeeringAgreement,
   MaintenanceWindow, ActiveComplianceCert, Competitor, CompetitorBid,
   EventLogEntry, EventCategory, HistoryPoint, LifetimeStats, TutorialTip,
-  ScenarioDef, Site, SiteSnapshot, Patent, RFPOffer, DrillResult, NetworkTopologyStats,
+  ScenarioDef, Site, SiteSnapshot, Patent, RFPOffer, DrillResult, NetworkTopologyStats, InterSiteLink,
   SaveSlotMeta,
   // New feature types
   ViewMode, RowEndSlotType, RowEndSlot, AisleWidth, RaisedFloorTier,
@@ -83,8 +84,8 @@ import { TECH_TREE, OPS_TIER_CONFIG, OPS_TIER_ORDER, CONTRACT_CATALOG, CONTRACT_
 export { LOAN_OPTIONS, POWER_MARKET, DEPRECIATION, INSURANCE_OPTIONS, DRILL_CONFIG, VALUATION_MILESTONES, PATENT_CONFIG, RFP_CONFIG, SPOT_COMPUTE_CONFIG, MAINTENANCE_CONFIG, PEERING_OPTIONS, INTERCONNECT_PORT_CONFIG, MEETME_ROOM_CONFIG, INTERCONNECT_TENANTS, SUPPLY_CHAIN_CONFIG, SEASON_CONFIG, WEATHER_CONDITION_CONFIG, STAFF_ROLE_CONFIG, STAFF_CERT_CONFIG, SHIFT_PATTERN_CONFIG, MAX_STAFF_BY_TIER, FIRST_NAMES, LAST_NAMES, generateStaffName } from './configs/economy'
 import { LOAN_OPTIONS, POWER_MARKET, DEPRECIATION, INSURANCE_OPTIONS, DRILL_CONFIG, VALUATION_MILESTONES, PATENT_CONFIG, RFP_CONFIG, SPOT_COMPUTE_CONFIG, MAINTENANCE_CONFIG, PEERING_OPTIONS, INTERCONNECT_PORT_CONFIG, MEETME_ROOM_CONFIG, INTERCONNECT_TENANTS, SUPPLY_CHAIN_CONFIG, SEASON_CONFIG, WEATHER_CONDITION_CONFIG, STAFF_ROLE_CONFIG, STAFF_CERT_CONFIG, SHIFT_PATTERN_CONFIG, MAX_STAFF_BY_TIER, generateStaffName } from './configs/economy'
 
-export { ENERGY_SOURCE_CONFIG, GREEN_CERT_CONFIG, CARBON_TAX_SCHEDULE, WATER_USAGE_CONFIG, EWASTE_CONFIG, SECURITY_FEATURE_CONFIG, SECURITY_TIER_CONFIG, COMPLIANCE_CERT_CONFIG, COMPETITOR_PERSONALITIES, COMPETITOR_NAMES, COMPETITOR_SCALE_CONFIG, MULTI_SITE_GATE, SITE_TYPE_CONFIG, REGION_CATALOG, REGION_RESEARCH_COST, MAX_SITES } from './configs/world'
-import { ENERGY_SOURCE_CONFIG, GREEN_CERT_CONFIG, CARBON_TAX_SCHEDULE, WATER_USAGE_CONFIG, EWASTE_CONFIG, SECURITY_FEATURE_CONFIG, SECURITY_TIER_CONFIG, COMPLIANCE_CERT_CONFIG, COMPETITOR_PERSONALITIES, COMPETITOR_NAMES, COMPETITOR_SCALE_CONFIG, MULTI_SITE_GATE, SITE_TYPE_CONFIG, REGION_CATALOG, REGION_RESEARCH_COST, MAX_SITES } from './configs/world'
+export { ENERGY_SOURCE_CONFIG, GREEN_CERT_CONFIG, CARBON_TAX_SCHEDULE, WATER_USAGE_CONFIG, EWASTE_CONFIG, SECURITY_FEATURE_CONFIG, SECURITY_TIER_CONFIG, COMPLIANCE_CERT_CONFIG, COMPETITOR_PERSONALITIES, COMPETITOR_NAMES, COMPETITOR_SCALE_CONFIG, MULTI_SITE_GATE, SITE_TYPE_CONFIG, REGION_CATALOG, REGION_RESEARCH_COST, MAX_SITES, INTER_SITE_LINK_CONFIG, DISTANCE_LATENCY_MODIFIER, EDGE_POP_CDN_REVENUE_PER_GBPS, MAX_LINKS_PER_SITE, BANDWIDTH_OVERAGE_COST } from './configs/world'
+import { ENERGY_SOURCE_CONFIG, GREEN_CERT_CONFIG, CARBON_TAX_SCHEDULE, WATER_USAGE_CONFIG, EWASTE_CONFIG, SECURITY_FEATURE_CONFIG, SECURITY_TIER_CONFIG, COMPLIANCE_CERT_CONFIG, COMPETITOR_PERSONALITIES, COMPETITOR_NAMES, COMPETITOR_SCALE_CONFIG, MULTI_SITE_GATE, SITE_TYPE_CONFIG, REGION_CATALOG, REGION_RESEARCH_COST, MAX_SITES, INTER_SITE_LINK_CONFIG, DISTANCE_LATENCY_MODIFIER, EDGE_POP_CDN_REVENUE_PER_GBPS, MAX_LINKS_PER_SITE } from './configs/world'
 
 // ── Re-export calculations ─────────────────────────────────────
 export { coolingOverheadFactor, calcManagementBonus, calcTrafficWithCapacity, calcCabinetCooling, getCabinetsInPDURange, getPDULoad, isPDUOverloaded, calcCableLength, getFacingOffsets, calcAisleBonus, countAisleViolations, getAdjacentCabinets, hasMaintenanceAccess, calcSpacingHeatEffect, countMessyCables, calcZones, isZoneRequirementMet, calcMixedEnvPenalties, calcDedicatedRows, getSuiteLimits, getCabinetRowAtGrid, getValidCabinetGridRows, getRowFacing, getPlacementHints, formatGameTime, getReputationTier } from './calculations'
@@ -461,6 +462,11 @@ interface GameState {
   totalSiteRevenue: number               // aggregate revenue from background sites per tick
   totalSiteExpenses: number              // aggregate expenses from background sites per tick
 
+  // Phase 6B — Inter-Site Networking
+  interSiteLinks: InterSiteLink[]        // connections between sites
+  interSiteLinkCost: number              // total link costs per tick
+  edgePopCDNRevenue: number              // CDN revenue from edge PoPs with backhaul
+
   // ── New Features ─────────────────────────────────────────────
 
   // View Mode (sub-floor view)
@@ -610,6 +616,9 @@ interface GameState {
   researchRegion: (regionId: RegionId) => void
   purchaseSite: (regionId: RegionId, siteType: SiteType, name: string) => void
   switchSite: (siteId: string | null) => void
+  // Phase 6B — Inter-Site Networking actions
+  installInterSiteLink: (siteAId: string | null, siteBId: string, linkType: InterSiteLinkType) => void
+  removeInterSiteLink: (linkId: string) => void
   // New Feature Actions
   setViewMode: (mode: ViewMode) => void
   placeRowEndSlot: (rowId: number, side: 'left' | 'right', type: RowEndSlotType) => void
@@ -650,6 +659,7 @@ let nextGeneratorId = 1
 let nextStaffId = 1
 let nextCompetitorId = 1
 let nextSiteId = 1
+let nextLinkId = 1
 
 function maxIdNum(items: { id: string }[], prefix: string): number {
   let max = 0
@@ -977,6 +987,11 @@ export const useGameStore = create<GameState>((set) => ({
   researchedRegions: [] as RegionId[],
   totalSiteRevenue: 0,
   totalSiteExpenses: 0,
+
+  // Phase 6B — Inter-Site Networking
+  interSiteLinks: [] as InterSiteLink[],
+  interSiteLinkCost: 0,
+  edgePopCDNRevenue: 0,
 
   // ── New Features ────────────────────────────────────────────
 
@@ -2416,6 +2431,88 @@ export const useGameStore = create<GameState>((set) => ({
       }
     }),
 
+  // ── Phase 6B — Inter-Site Networking Actions ─────────────────────
+
+  installInterSiteLink: (siteAId: string | null, siteBId: string, linkType: InterSiteLinkType) =>
+    set((state) => {
+      if (!state.multiSiteUnlocked) return state
+      // Validate sites exist and are operational
+      if (siteAId !== null) {
+        const siteA = state.sites.find((s) => s.id === siteAId)
+        if (!siteA || !siteA.operational) return state
+      }
+      const siteB = state.sites.find((s) => s.id === siteBId)
+      if (!siteB || !siteB.operational) return state
+
+      // Can't link a site to itself
+      if (siteAId === siteBId) return state
+
+      // Check max links per site
+      const linksForA = state.interSiteLinks.filter((l) => l.siteAId === siteAId || l.siteBId === siteAId || (siteAId === null && (l.siteAId === null)))
+      const linksForB = state.interSiteLinks.filter((l) => l.siteAId === siteBId || l.siteBId === siteBId)
+      if (linksForA.length >= MAX_LINKS_PER_SITE || linksForB.length >= MAX_LINKS_PER_SITE) return state
+
+      // Check if link already exists between these two sites
+      if (state.interSiteLinks.some((l) =>
+        (l.siteAId === siteAId && l.siteBId === siteBId) ||
+        (l.siteAId === siteBId && l.siteBId === siteAId) ||
+        (siteAId === null && l.siteAId === null && l.siteBId === siteBId) ||
+        (siteAId === null && l.siteBId === siteAId && l.siteAId === siteBId)
+      )) return state
+
+      const config = INTER_SITE_LINK_CONFIG[linkType]
+      if (state.money < config.installCost && !state.sandboxMode) return state
+
+      // Determine continents of both sites
+      const regionA = siteAId === null ? null : REGION_CATALOG.find((r) => r.id === state.sites.find((s) => s.id === siteAId)?.regionId)
+      const regionB = REGION_CATALOG.find((r) => r.id === siteB.regionId)
+      // For HQ, use the first site's region or default to 'ashburn' (HQ is the original data center)
+      const continentA = siteAId === null ? 'north_america' : regionA?.continent
+      const continentB = regionB?.continent
+      const sameCont = continentA === continentB
+
+      // Validate continent constraints
+      if (config.crossContinentOnly && sameCont) return state
+      if (config.sameContinentOnly && !sameCont) return state
+
+      // Calculate latency based on distance
+      let distLatency = DISTANCE_LATENCY_MODIFIER.same_continent
+      if (sameCont) {
+        // Check if same region (metro)
+        const regionIdA = siteAId === null ? 'ashburn' : state.sites.find((s) => s.id === siteAId)?.regionId
+        const regionIdB = siteB.regionId
+        distLatency = regionIdA === regionIdB ? DISTANCE_LATENCY_MODIFIER.same_metro : DISTANCE_LATENCY_MODIFIER.same_continent
+      } else {
+        distLatency = DISTANCE_LATENCY_MODIFIER.cross_continent
+      }
+
+      const newLink: InterSiteLink = {
+        id: `link-${nextLinkId++}`,
+        type: linkType,
+        siteAId,
+        siteBId,
+        bandwidthGbps: config.bandwidthGbps,
+        latencyMs: config.baseLatencyMs + distLatency,
+        costPerTick: config.costPerTick,
+        installedAtTick: state.tickCount,
+        utilization: 0,
+        operational: true,
+      }
+      return {
+        interSiteLinks: [...state.interSiteLinks, newLink],
+        money: state.sandboxMode ? state.money : state.money - config.installCost,
+      }
+    }),
+
+  removeInterSiteLink: (linkId: string) =>
+    set((state) => {
+      const link = state.interSiteLinks.find((l) => l.id === linkId)
+      if (!link) return state
+      return {
+        interSiteLinks: state.interSiteLinks.filter((l) => l.id !== linkId),
+      }
+    }),
+
   // ── New Feature Actions ──────────────────────────────────────────
 
   setViewMode: (mode: ViewMode) =>
@@ -3377,6 +3474,7 @@ export const useGameStore = create<GameState>((set) => ({
     nextGeneratorId = 1
     nextCompetitorId = 1
     nextSiteId = 1
+    nextLinkId = 1
     set({
       cabinets: [],
       spineSwitches: [],
@@ -3540,6 +3638,10 @@ export const useGameStore = create<GameState>((set) => ({
       researchedRegions: [],
       totalSiteRevenue: 0,
       totalSiteExpenses: 0,
+      // Phase 6B — Inter-Site Networking
+      interSiteLinks: [],
+      interSiteLinkCost: 0,
+      edgePopCDNRevenue: 0,
       // New Features
       viewMode: 'cabinet' as ViewMode,
       rowEndSlots: [],
@@ -4115,6 +4217,36 @@ export const useGameStore = create<GameState>((set) => ({
           state.reputationScore >= MULTI_SITE_GATE.minReputation
         )
 
+        // Phase 6B — tick inter-site links (even with no equipment)
+        let earlyLinkCost = 0
+        let earlyEdgePopCDNRevenue = 0
+        const earlyUpdatedLinks = state.interSiteLinks.map((link) => {
+          const linkConfig = INTER_SITE_LINK_CONFIG[link.type]
+          let operational = link.operational
+          if (operational && Math.random() > linkConfig.reliability) {
+            operational = false
+          } else if (!operational && Math.random() < 0.2) {
+            operational = true
+          }
+          if (operational) earlyLinkCost += link.costPerTick
+          return { ...link, operational, utilization: 0 }
+        })
+
+        // Edge PoP CDN revenue in early return path
+        for (const ep of earlyReturnSites.filter((s) => s.type === 'edge_pop' && s.operational)) {
+          const hasBackhaul = earlyUpdatedLinks.some((l) => l.operational && (l.siteAId === ep.id || l.siteBId === ep.id))
+          if (hasBackhaul) {
+            const bestLink = earlyUpdatedLinks
+              .filter((l) => l.operational && (l.siteAId === ep.id || l.siteBId === ep.id))
+              .sort((a, b) => b.bandwidthGbps - a.bandwidthGbps)[0]
+            if (bestLink) {
+              const region = REGION_CATALOG.find((r) => r.id === ep.regionId)
+              const demandBonus = region ? Math.max(region.demandProfile.streaming, region.demandProfile.general) : 0.5
+              earlyEdgePopCDNRevenue += bestLink.bandwidthGbps * EDGE_POP_CDN_REVENUE_PER_GBPS * demandBonus
+            }
+          }
+        }
+
         return {
           tickCount: newTickCount,
           gameHour: newHour,
@@ -4124,7 +4256,7 @@ export const useGameStore = create<GameState>((set) => ({
           spikeMagnitude,
           loans: updatedLoans,
           loanPayments: +loanPayments.toFixed(2),
-          money: state.sandboxMode ? 999999999 : Math.round((state.money - loanPayments) * 100) / 100,
+          money: state.sandboxMode ? 999999999 : Math.round((state.money - loanPayments - earlyLinkCost + earlyEdgePopCDNRevenue) * 100) / 100,
           activeIncidents,
           incidentLog,
           resolvedCount,
@@ -4144,6 +4276,10 @@ export const useGameStore = create<GameState>((set) => ({
           multiSiteUnlocked: earlyMultiSiteUnlocked,
           eventLog: earlyEventLog,
           pendingFloatingTexts: floatingTexts,
+          // Phase 6B
+          interSiteLinks: earlyUpdatedLinks,
+          interSiteLinkCost: +earlyLinkCost.toFixed(2),
+          edgePopCDNRevenue: +earlyEdgePopCDNRevenue.toFixed(2),
         }
       }
 
@@ -5513,6 +5649,9 @@ export const useGameStore = create<GameState>((set) => ({
           // Phase 6 — Multi-Site tips
           if (tip.id === 'multi_site_unlocked' && !state.multiSiteUnlocked && state.suiteTier === 'enterprise' && state.money >= MULTI_SITE_GATE.minCash && reputationScore >= MULTI_SITE_GATE.minReputation) trigger = true
           if (tip.id === 'site_under_construction' && state.sites.some((s) => !s.operational && s.constructionTicksRemaining > 0)) trigger = true
+          // Phase 6B — Inter-Site Networking tips
+          if (tip.id === 'first_link_hint' && state.sites.filter((s) => s.operational).length >= 1 && state.interSiteLinks.length === 0) trigger = true
+          if (tip.id === 'edge_pop_backhaul' && state.sites.some((s) => s.type === 'edge_pop' && s.operational) && !state.interSiteLinks.some((l) => l.operational && state.sites.some((ep) => ep.type === 'edge_pop' && (l.siteAId === ep.id || l.siteBId === ep.id)))) trigger = true
           if (trigger) { activeTip = tip; break }
         }
       }
@@ -5683,15 +5822,76 @@ export const useGameStore = create<GameState>((set) => ({
       const continentsWithSites = new Set(updatedSites.filter((s) => s.operational).map((s) => REGION_CATALOG.find((r) => r.id === s.regionId)?.continent).filter(Boolean))
       if (continentsWithSites.size >= 3) unlock('three_continents')
 
+      // ── Phase 6B — Inter-Site Networking Tick ──────────────────────
+      let interSiteLinkCost = 0
+      let edgePopCDNRevenue = 0
+      const updatedLinks = state.interSiteLinks.map((link) => {
+        // Link reliability check — occasionally take links offline
+        const linkConfig = INTER_SITE_LINK_CONFIG[link.type]
+        let operational = link.operational
+        if (operational && Math.random() > linkConfig.reliability) {
+          operational = false
+          eventLog.push({ tick: newTickCount, gameHour: +(newHour.toFixed(1)), category: 'infrastructure' as EventCategory, message: `Inter-site link ${linkConfig.label} went offline!`, severity: 'warning' as EventSeverity })
+        } else if (!operational && Math.random() < 0.2) {
+          // 20% chance per tick to come back online
+          operational = true
+          eventLog.push({ tick: newTickCount, gameHour: +(newHour.toFixed(1)), category: 'infrastructure' as EventCategory, message: `Inter-site link ${linkConfig.label} restored.`, severity: 'success' as EventSeverity })
+        }
+
+        // Calculate utilization based on connected site server counts
+        let util = 0
+        if (operational) {
+          const siteAServers = link.siteAId === null
+            ? newCabinets.reduce((sum, c) => sum + c.serverCount, 0)
+            : (() => { const s = updatedSites.find((st) => st.id === link.siteAId); return s ? s.servers : 0 })()
+          const siteBServers = (() => { const s = updatedSites.find((st) => st.id === link.siteBId); return s ? s.servers : 0 })()
+          const totalTraffic = (siteAServers + siteBServers) * TRAFFIC.gbpsPerServer * 0.1 // 10% of local traffic goes inter-site
+          util = Math.min(1, totalTraffic / link.bandwidthGbps)
+        }
+
+        // Link cost
+        if (operational) interSiteLinkCost += link.costPerTick
+
+        return { ...link, operational, utilization: +util.toFixed(3) }
+      })
+
+      // Edge PoP CDN revenue — edge PoPs with a backhaul link to HQ or a core site earn CDN revenue
+      const operationalEdgePops = updatedSites.filter((s) => s.type === 'edge_pop' && s.operational)
+      for (const ep of operationalEdgePops) {
+        // Check if this edge PoP has a backhaul link to any other operational site
+        const hasBackhaul = updatedLinks.some((l) =>
+          l.operational &&
+          ((l.siteAId === ep.id || l.siteBId === ep.id))
+        )
+        if (hasBackhaul) {
+          // CDN revenue based on the bandwidth of the best link to this edge PoP
+          const bestLink = updatedLinks
+            .filter((l) => l.operational && (l.siteAId === ep.id || l.siteBId === ep.id))
+            .sort((a, b) => b.bandwidthGbps - a.bandwidthGbps)[0]
+          if (bestLink) {
+            const region = REGION_CATALOG.find((r) => r.id === ep.regionId)
+            const demandBonus = region ? Math.max(region.demandProfile.streaming, region.demandProfile.general) : 0.5
+            edgePopCDNRevenue += bestLink.bandwidthGbps * EDGE_POP_CDN_REVENUE_PER_GBPS * demandBonus
+          }
+        }
+      }
+
+      // Phase 6B achievements
+      if (updatedLinks.length >= 1) unlock('first_link')
+      if (updatedLinks.filter((l) => l.operational).length >= 3) unlock('network_architect')
+      if (updatedLinks.some((l) => l.type === 'dark_fiber')) unlock('dark_fiber')
+      if (updatedLinks.some((l) => l.type === 'submarine_cable')) unlock('submarine_cable')
+      if (edgePopCDNRevenue > 0) unlock('cdn_revenue')
+
       // Apply Phase 4 bonuses to contract revenue
       const adjustedContractRevenue = +(contractRevenue * (1 + complianceRevenueBonus + greenCertRevenueBonus) * priceWarPenalty).toFixed(2)
 
-      // Recalculate final money with all income/expenses (Phase 4 + 5 + 6 + workloads + ops included)
+      // Recalculate final money with all income/expenses (Phase 4 + 5 + 6 + 6B + workloads + ops included)
       const phase5Income = spotRevenue + meetMeRevenue
       const phase5Expenses = peeringCostPerTick + powerRedundancyCost + meetMeMaintenanceCost + (noiseComplaints > state.noiseComplaints && noiseComplaints % NOISE_CONFIG.fineThreshold === 0 ? NOISE_CONFIG.fineAmount : 0)
       const phase4Expenses = carbonTaxPerTick + waterCostPerTick + securityMaintenanceCost
-      const phase6Income = totalSiteRevenue
-      const phase6Expenses = totalSiteExpenses
+      const phase6Income = totalSiteRevenue + edgePopCDNRevenue
+      const phase6Expenses = totalSiteExpenses + interSiteLinkCost
       const newFeatureIncome = workloadRevenue
       const finalNewMoney = state.sandboxMode
         ? 999999999
@@ -5854,6 +6054,10 @@ export const useGameStore = create<GameState>((set) => ({
         sites: updatedSites,
         totalSiteRevenue: +totalSiteRevenue.toFixed(2),
         totalSiteExpenses: +totalSiteExpenses.toFixed(2),
+        // Phase 6B — Inter-Site Networking
+        interSiteLinks: updatedLinks,
+        interSiteLinkCost: +interSiteLinkCost.toFixed(2),
+        edgePopCDNRevenue: +edgePopCDNRevenue.toFixed(2),
         // New Features
         activeWorkloads,
         completedWorkloads,

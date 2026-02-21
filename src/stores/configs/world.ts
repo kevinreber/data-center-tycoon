@@ -10,6 +10,8 @@ import type {
   SiteType,
   SiteTypeConfig,
   Region,
+  InterSiteLinkType,
+  InterSiteLinkConfig,
 } from '../types'
 
 // ── Carbon & Environmental Config ───────────────────────────────────
@@ -344,3 +346,72 @@ export const REGION_CATALOG: Region[] = [
 ]
 
 export const MAX_SITES = 8
+
+// ── Phase 6B — Inter-Site Networking Config ───────────────────────────
+
+export const INTER_SITE_LINK_CONFIG: Record<InterSiteLinkType, InterSiteLinkConfig> = {
+  ip_transit: {
+    type: 'ip_transit',
+    label: 'IP Transit',
+    description: 'Cheapest option. Uses public internet with highest latency and lowest reliability.',
+    bandwidthGbps: 10,
+    baseLatencyMs: 30,
+    installCost: 5000,
+    costPerTick: 8,
+    crossContinentOnly: false,
+    sameContinentOnly: false,
+    reliability: 0.95,
+  },
+  leased_wavelength: {
+    type: 'leased_wavelength',
+    label: 'Leased Wavelength',
+    description: 'Leased capacity on existing fiber. Good bandwidth, moderate latency. Same continent only.',
+    bandwidthGbps: 40,
+    baseLatencyMs: 15,
+    installCost: 50000,
+    costPerTick: 25,
+    crossContinentOnly: false,
+    sameContinentOnly: true,
+    reliability: 0.98,
+  },
+  dark_fiber: {
+    type: 'dark_fiber',
+    label: 'Dark Fiber',
+    description: 'Own the fiber. Highest capacity, lowest latency. Same continent only.',
+    bandwidthGbps: 100,
+    baseLatencyMs: 5,
+    installCost: 200000,
+    costPerTick: 15,
+    crossContinentOnly: false,
+    sameContinentOnly: true,
+    reliability: 0.99,
+  },
+  submarine_cable: {
+    type: 'submarine_cable',
+    label: 'Submarine Cable',
+    description: 'Required for intercontinental links. Expensive but essential for global reach.',
+    bandwidthGbps: 100,
+    baseLatencyMs: 80,
+    installCost: 500000,
+    costPerTick: 40,
+    crossContinentOnly: true,
+    sameContinentOnly: false,
+    reliability: 0.97,
+  },
+}
+
+/** Latency modifier based on distance category between sites */
+export const DISTANCE_LATENCY_MODIFIER = {
+  same_metro: 0,       // two sites same region
+  same_continent: 20,  // same continent, different region
+  cross_continent: 80, // different continents
+}
+
+/** Edge PoP CDN revenue per Gbps of backhaul bandwidth */
+export const EDGE_POP_CDN_REVENUE_PER_GBPS = 0.5
+
+/** Max inter-site links per site */
+export const MAX_LINKS_PER_SITE = 4
+
+/** Bandwidth overage cost per Gbps over capacity per tick */
+export const BANDWIDTH_OVERAGE_COST = 2

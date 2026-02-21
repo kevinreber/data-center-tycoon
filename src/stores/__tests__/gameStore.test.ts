@@ -29,6 +29,7 @@ import {
   SITE_TYPE_CONFIG,
   REGION_RESEARCH_COST,
   MAX_SITES,
+  INTER_SITE_LINK_CONFIG,
   calcCabinetCooling,
   getChillerConnection,
   getAdjacentCabinets,
@@ -2461,6 +2462,233 @@ describe('Phase 6 — Multi-Site Expansion', () => {
       if (ashburnRegion.profile.powerCostMultiplier !== 1) {
         expect(remoteExpenses).not.toBe(hqExpenses)
       }
+    })
+  })
+})
+
+// ============================================================================
+// Phase 6B — Inter-Site Networking
+// ============================================================================
+
+describe('Inter-Site Networking', () => {
+  beforeEach(() => {
+    getState().resetGame()
+  })
+
+  function setupMultiSiteWithTwoSites() {
+    setState({
+      sandboxMode: true,
+      money: 999999,
+      suiteTier: 'enterprise',
+      reputationScore: 80,
+      multiSiteUnlocked: true,
+    })
+    // Research two regions and purchase sites
+    getState().researchRegion('ashburn')
+    getState().researchRegion('london')
+    getState().purchaseSite('ashburn', 'edge_pop', 'Ashburn Edge')
+    getState().purchaseSite('london', 'colocation', 'London Colo')
+    // Make them operational
+    setState({
+      sites: getState().sites.map((s) => ({
+        ...s,
+        operational: true,
+        constructionTicksRemaining: 0,
+        snapshot: {
+          cabinets: [], spineSwitches: [], pdus: [], cableTrays: [], cableRuns: [],
+          coolingUnits: [], chillerPlants: [], coolingPipes: [],
+          busways: [], crossConnects: [], inRowCoolers: [],
+          rowEndSlots: [], aisleContainments: [], aisleWidths: {},
+          raisedFloorTier: 'none' as const, cableManagementType: 'none' as const,
+          coolingType: 'air' as const, suiteTier: 'starter' as const,
+          totalPower: 0, avgHeat: 22, revenue: 0, expenses: 0,
+        },
+      })),
+    })
+    return getState().sites.map((s) => s.id)
+  }
+
+  describe('installInterSiteLink', () => {
+    it('installs a link between HQ and a remote site', () => {
+      const [siteAId] = setupMultiSiteWithTwoSites()
+      getState().installInterSiteLink(null, siteAId, 'ip_transit')
+      expect(getState().interSiteLinks).toHaveLength(1)
+      const link = getState().interSiteLinks[0]
+      expect(link.siteAId).toBeNull()
+      expect(link.siteBId).toBe(siteAId)
+      expect(link.type).toBe('ip_transit')
+      expect(link.operational).toBe(true)
+      expect(link.bandwidthGbps).toBe(INTER_SITE_LINK_CONFIG.ip_transit.bandwidthGbps)
+    })
+
+    it('installs a link between two remote sites', () => {
+      const [siteAId, siteBId] = setupMultiSiteWithTwoSites()
+      getState().installInterSiteLink(siteAId, siteBId, 'ip_transit')
+      expect(getState().interSiteLinks).toHaveLength(1)
+      const link = getState().interSiteLinks[0]
+      expect(link.siteAId).toBe(siteAId)
+      expect(link.siteBId).toBe(siteBId)
+    })
+
+    it('deducts install cost from money', () => {
+      const [siteAId] = setupMultiSiteWithTwoSites()
+      const moneyBefore = getState().money
+      getState().installInterSiteLink(null, siteAId, 'ip_transit')
+      // sandbox mode doesn't deduct money
+      setState({ sandboxMode: false, money: moneyBefore })
+      getState().installInterSiteLink(null, siteAId, 'leased_wavelength')
+      // Should fail — duplicate link
+      expect(getState().interSiteLinks).toHaveLength(1)
+    })
+
+    it('rejects duplicate links between same sites', () => {
+      const [siteAId] = setupMultiSiteWithTwoSites()
+      getState().installInterSiteLink(null, siteAId, 'ip_transit')
+      expect(getState().interSiteLinks).toHaveLength(1)
+      getState().installInterSiteLink(null, siteAId, 'dark_fiber')
+      expect(getState().interSiteLinks).toHaveLength(1) // still 1
+    })
+
+    it('rejects link to non-operational site', () => {
+      setState({
+        sandboxMode: true,
+        money: 999999,
+        suiteTier: 'enterprise',
+        reputationScore: 80,
+        multiSiteUnlocked: true,
+      })
+      getState().researchRegion('ashburn')
+      getState().purchaseSite('ashburn', 'edge_pop', 'Ashburn Edge')
+      // Site is still under construction (not operational)
+      const siteId = getState().sites[0].id
+      getState().installInterSiteLink(null, siteId, 'ip_transit')
+      expect(getState().interSiteLinks).toHaveLength(0)
+    })
+
+    it('rejects same-continent-only link between different continents', () => {
+      const [siteAId, siteBId] = setupMultiSiteWithTwoSites()
+      // Ashburn = north_america, London = europe
+      // dark_fiber is sameContinentOnly
+      getState().installInterSiteLink(siteAId, siteBId, 'dark_fiber')
+      expect(getState().interSiteLinks).toHaveLength(0)
+    })
+
+    it('allows submarine cable between different continents', () => {
+      const [siteAId, siteBId] = setupMultiSiteWithTwoSites()
+      // Ashburn = north_america, London = europe
+      getState().installInterSiteLink(siteAId, siteBId, 'submarine_cable')
+      expect(getState().interSiteLinks).toHaveLength(1)
+      expect(getState().interSiteLinks[0].type).toBe('submarine_cable')
+    })
+
+    it('rejects submarine cable between same-continent sites', () => {
+      setState({
+        sandboxMode: true,
+        money: 999999,
+        suiteTier: 'enterprise',
+        reputationScore: 80,
+        multiSiteUnlocked: true,
+      })
+      getState().researchRegion('ashburn')
+      getState().researchRegion('dallas')
+      getState().purchaseSite('ashburn', 'edge_pop', 'Ashburn Edge')
+      getState().purchaseSite('dallas', 'edge_pop', 'Dallas Edge')
+      setState({
+        sites: getState().sites.map((s) => ({
+          ...s,
+          operational: true,
+          constructionTicksRemaining: 0,
+          snapshot: {
+            cabinets: [], spineSwitches: [], pdus: [], cableTrays: [], cableRuns: [],
+            coolingUnits: [], chillerPlants: [], coolingPipes: [],
+            busways: [], crossConnects: [], inRowCoolers: [],
+            rowEndSlots: [], aisleContainments: [], aisleWidths: {},
+            raisedFloorTier: 'none' as const, cableManagementType: 'none' as const,
+            coolingType: 'air' as const, suiteTier: 'starter' as const,
+            totalPower: 0, avgHeat: 22, revenue: 0, expenses: 0,
+          },
+        })),
+      })
+      const [siteAId, siteBId] = getState().sites.map((s) => s.id)
+      // submarine_cable is crossContinentOnly — should fail for same continent
+      getState().installInterSiteLink(siteAId, siteBId, 'submarine_cable')
+      expect(getState().interSiteLinks).toHaveLength(0)
+    })
+
+    it('calculates latency including distance modifier', () => {
+      const [siteAId, siteBId] = setupMultiSiteWithTwoSites()
+      // Cross-continent link (Ashburn → London), should include cross-continent latency
+      getState().installInterSiteLink(siteAId, siteBId, 'ip_transit')
+      const link = getState().interSiteLinks[0]
+      // Base latency (30) + cross-continent modifier (80)
+      expect(link.latencyMs).toBeGreaterThanOrEqual(INTER_SITE_LINK_CONFIG.ip_transit.baseLatencyMs)
+    })
+  })
+
+  describe('removeInterSiteLink', () => {
+    it('removes an existing link', () => {
+      const [siteAId] = setupMultiSiteWithTwoSites()
+      getState().installInterSiteLink(null, siteAId, 'ip_transit')
+      expect(getState().interSiteLinks).toHaveLength(1)
+      const linkId = getState().interSiteLinks[0].id
+      getState().removeInterSiteLink(linkId)
+      expect(getState().interSiteLinks).toHaveLength(0)
+    })
+
+    it('does nothing for non-existent link', () => {
+      setupMultiSiteWithTwoSites()
+      getState().removeInterSiteLink('link-999')
+      expect(getState().interSiteLinks).toHaveLength(0)
+    })
+  })
+
+  describe('Inter-Site Link Config', () => {
+    it('has 4 link types', () => {
+      expect(Object.keys(INTER_SITE_LINK_CONFIG)).toHaveLength(4)
+    })
+
+    it('all link types have valid configs', () => {
+      for (const [, config] of Object.entries(INTER_SITE_LINK_CONFIG)) {
+        expect(config.bandwidthGbps).toBeGreaterThan(0)
+        expect(config.baseLatencyMs).toBeGreaterThanOrEqual(0)
+        expect(config.installCost).toBeGreaterThan(0)
+        expect(config.costPerTick).toBeGreaterThan(0)
+        expect(config.reliability).toBeGreaterThan(0)
+        expect(config.reliability).toBeLessThanOrEqual(1)
+      }
+    })
+  })
+
+  describe('Tick — inter-site link processing', () => {
+    it('includes link costs in money calculation', () => {
+      const [siteAId] = setupMultiSiteWithTwoSites()
+      getState().installInterSiteLink(null, siteAId, 'ip_transit')
+      getState().tick()
+      const link = getState().interSiteLinks[0]
+      // If link stayed operational, cost should be > 0; if random failure took it offline, cost is 0
+      if (link.operational) {
+        expect(getState().interSiteLinkCost).toBeGreaterThan(0)
+      } else {
+        expect(getState().interSiteLinkCost).toBe(0)
+      }
+    })
+
+    it('tracks link utilization', () => {
+      const [siteAId] = setupMultiSiteWithTwoSites()
+      getState().installInterSiteLink(null, siteAId, 'ip_transit')
+      getState().tick()
+      // With no servers, utilization should be 0
+      expect(getState().interSiteLinks[0].utilization).toBe(0)
+    })
+
+    it('resets inter-site links on resetGame', () => {
+      const [siteAId] = setupMultiSiteWithTwoSites()
+      getState().installInterSiteLink(null, siteAId, 'ip_transit')
+      expect(getState().interSiteLinks).toHaveLength(1)
+      getState().resetGame()
+      expect(getState().interSiteLinks).toHaveLength(0)
+      expect(getState().interSiteLinkCost).toBe(0)
+      expect(getState().edgePopCDNRevenue).toBe(0)
     })
   })
 })

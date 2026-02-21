@@ -244,6 +244,12 @@ export const ACHIEVEMENT_CATALOG: AchievementDef[] = [
   { id: 'global_network', label: 'Global Network', description: 'Have 3 or more operational sites.', icon: '🗺️' },
   { id: 'three_continents', label: 'Three Continents', description: 'Operate sites on 3 different continents.', icon: '✈️' },
   { id: 'world_domination', label: 'World Domination', description: 'Fill all available site slots.', icon: '👑' },
+  // Phase 6B — Inter-Site Networking achievements
+  { id: 'first_link', label: 'Connected', description: 'Install your first inter-site network link.', icon: '🔗' },
+  { id: 'network_architect', label: 'Network Architect', description: 'Have 3 operational inter-site links simultaneously.', icon: '🕸️' },
+  { id: 'dark_fiber', label: 'Dark Fiber', description: 'Install a dark fiber connection between sites.', icon: '🌑' },
+  { id: 'submarine_cable', label: 'Submarine Cable', description: 'Lay a submarine cable across continents.', icon: '🌊' },
+  { id: 'cdn_revenue', label: 'CDN Revenue', description: 'Earn CDN revenue from an Edge PoP with backhaul.', icon: '📡' },
   // New Feature achievements
   { id: 'first_workload', label: 'Job Runner', description: 'Complete your first workload job.', icon: '🏋️' },
   { id: 'workload_master', label: 'Workload Master', description: 'Complete 10 workload jobs.', icon: '🎯' },
@@ -397,4 +403,7 @@ export const TUTORIAL_TIPS: TutorialTip[] = [
   // Phase 6 — Multi-Site Expansion tips
   { id: 'multi_site_unlocked', title: 'Global Expansion', message: 'You\'ve unlocked multi-site expansion! Open the Global Expansion panel to research regions and purchase your first expansion site.', category: 'build' },
   { id: 'site_under_construction', title: 'Site Building', message: 'Your new site is under construction. It will become operational after the build timer completes.', category: 'build' },
+  // Phase 6B — Inter-Site Networking tips
+  { id: 'first_link_hint', title: 'Inter-Site Links', message: 'Connect your sites with network links! IP Transit is cheapest, Dark Fiber offers the best latency, and Submarine Cables cross continents.', category: 'network' },
+  { id: 'edge_pop_backhaul', title: 'Edge PoP Backhaul', message: 'Edge PoPs need a backhaul link to earn CDN revenue. Connect them to HQ or another core site.', category: 'network' },
 ]
