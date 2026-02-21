@@ -256,6 +256,11 @@ class DataCenterScene extends Phaser.Scene {
   private activeFloatingTexts: Phaser.GameObjects.Text[] = []
   private readonly FLOATING_TEXT_POOL_SIZE = 30
 
+  // Hover highlight
+  private hoveredCabinetId: string | null = null
+  private hoveredSpineId: string | null = null
+  private hoverGraphics: Phaser.GameObjects.Graphics | null = null
+
   // Selected cabinet
   private selectedCabinetId: string | null = null
   private selectionGraphics: Phaser.GameObjects.Graphics | null = null
@@ -337,6 +342,22 @@ class DataCenterScene extends Phaser.Scene {
           this.placementHintText.setVisible(false)
         }
         this.hoveredTile = null
+
+        // Hover detection for cabinets and spines (only when not dragging)
+        if (!this.isDragging) {
+          const wp = this.cameras.main.getWorldPoint(pointer.x, pointer.y)
+          const cabId = this.findCabinetAtPoint(wp.x, wp.y)
+          const spineId = cabId ? null : this.findSpineAtPoint(wp.x, wp.y)
+
+          if (cabId !== this.hoveredCabinetId || spineId !== this.hoveredSpineId) {
+            this.hoveredCabinetId = cabId
+            this.hoveredSpineId = spineId
+            this.renderHover()
+          }
+
+          this.game.canvas.style.cursor = (cabId || spineId) ? 'pointer' : 'default'
+        }
+
         return
       }
       const worldPoint = this.cameras.main.getWorldPoint(pointer.x, pointer.y)
@@ -408,6 +429,9 @@ class DataCenterScene extends Phaser.Scene {
           this.isDragging = true
           this.isPotentialDrag = false
           this.game.canvas.style.cursor = 'grabbing'
+          this.hoveredCabinetId = null
+          this.hoveredSpineId = null
+          this.renderHover()
         }
       }
       if (this.isDragging) {
@@ -472,6 +496,24 @@ class DataCenterScene extends Phaser.Scene {
     }
 
     return bestId
+  }
+
+  /** Find the spine switch whose visual bounding box contains the given world point. */
+  private findSpineAtPoint(wx: number, wy: number): string | null {
+    for (const [id, entry] of this.spineEntries) {
+      const { x, y } = this.spineToScreen(entry.slot)
+      const cy = y + SPINE_H / 2
+
+      const minX = x - SPINE_W / 2
+      const maxX = x + SPINE_W / 2
+      const minY = cy - SPINE_DEPTH - 10
+      const maxY = cy + SPINE_H / 2
+
+      if (wx >= minX && wx <= maxX && wy >= minY && wy <= maxY) {
+        return id
+      }
+    }
+    return null
   }
 
   /** Draw a filled isometric diamond tile at the given grid position */
@@ -2405,6 +2447,10 @@ class DataCenterScene extends Phaser.Scene {
   /** Enter placement mode — shows hover highlights and accepts tile clicks */
   setPlacementMode(active: boolean) {
     this.placementActive = active
+    // Clear hover when entering/exiting placement mode
+    this.hoveredCabinetId = null
+    this.hoveredSpineId = null
+    this.renderHover()
     if (!active) {
       this.hoveredTile = null
       if (this.placementHighlight) {
@@ -2935,6 +2981,58 @@ class DataCenterScene extends Phaser.Scene {
 
     // Show airflow zone overlays around the selected cabinet
     this.drawCabinetZoneOverlays(entry.col, entry.row, entry.facing)
+  }
+
+  /** Render hover highlight around a cabinet or spine switch */
+  private renderHover() {
+    if (this.hoverGraphics) this.hoverGraphics.clear()
+
+    // Don't show hover on the already-selected cabinet
+    if (this.hoveredCabinetId && this.hoveredCabinetId === this.selectedCabinetId) return
+
+    if (this.hoveredCabinetId) {
+      const entry = this.cabEntries.get(this.hoveredCabinetId)
+      if (!entry) return
+
+      if (!this.hoverGraphics) {
+        this.hoverGraphics = this.add.graphics()
+      }
+      this.hoverGraphics.setDepth(49)
+
+      const { x, y } = this.isoToScreen(entry.col, entry.row)
+      const cx = x
+      const cy = y + TILE_H / 2
+
+      // Glow wireframe around the full cabinet enclosure
+      this.drawIsoWireframe(this.hoverGraphics, cx, cy, CUBE_W + 4, CUBE_H + 2, CABINET_ENCLOSURE_DEPTH + 2, 0x00ffff, 0.5)
+
+      // Subtle filled diamond on the ground tile
+      this.hoverGraphics.fillStyle(0x00ffff, 0.08)
+      this.hoverGraphics.beginPath()
+      this.hoverGraphics.moveTo(x, y)
+      this.hoverGraphics.lineTo(x + TILE_W / 2, y + TILE_H / 2)
+      this.hoverGraphics.lineTo(x, y + TILE_H)
+      this.hoverGraphics.lineTo(x - TILE_W / 2, y + TILE_H / 2)
+      this.hoverGraphics.closePath()
+      this.hoverGraphics.fillPath()
+      return
+    }
+
+    if (this.hoveredSpineId) {
+      const entry = this.spineEntries.get(this.hoveredSpineId)
+      if (!entry) return
+
+      if (!this.hoverGraphics) {
+        this.hoverGraphics = this.add.graphics()
+      }
+      this.hoverGraphics.setDepth(49)
+
+      const { x, y } = this.spineToScreen(entry.slot)
+      const cy = y + SPINE_H / 2
+
+      // Glow wireframe around the spine switch
+      this.drawIsoWireframe(this.hoverGraphics, x, cy, SPINE_W + 4, SPINE_H + 2, SPINE_DEPTH + 2, 0xff6644, 0.5)
+    }
   }
 
   /** Draw airflow zone overlays around a cabinet at the given position/facing */
