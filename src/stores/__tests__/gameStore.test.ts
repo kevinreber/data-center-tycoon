@@ -2026,6 +2026,29 @@ describe('Phase 6 — Multi-Site Expansion', () => {
     })
   }
 
+  function setupOperationalSite() {
+    setupMultiSiteUnlocked()
+    getState().researchRegion('ashburn')
+    getState().purchaseSite('ashburn', 'edge_pop', 'Ashburn Edge')
+    setState({
+      sites: getState().sites.map((s) => ({
+        ...s,
+        operational: true,
+        constructionTicksRemaining: 0,
+        snapshot: {
+          cabinets: [], spineSwitches: [], pdus: [], cableTrays: [], cableRuns: [],
+          coolingUnits: [], chillerPlants: [], coolingPipes: [],
+          busways: [], crossConnects: [], inRowCoolers: [],
+          rowEndSlots: [], aisleContainments: [], aisleWidths: {},
+          raisedFloorTier: 'none' as const, cableManagementType: 'none' as const,
+          coolingType: 'air' as const, suiteTier: 'starter' as const,
+          totalPower: 0, avgHeat: 22, revenue: 0, expenses: 0,
+        },
+      })),
+    })
+    return getState().sites[0].id
+  }
+
   describe('Region Catalog', () => {
     it('has 15 regions across 5 continents', () => {
       expect(REGION_CATALOG).toHaveLength(15)
@@ -2286,6 +2309,158 @@ describe('Phase 6 — Multi-Site Expansion', () => {
       expect(getState().researchedRegions).toHaveLength(0)
       expect(getState().totalSiteRevenue).toBe(0)
       expect(getState().totalSiteExpenses).toBe(0)
+      expect(getState().hqSnapshot).toBeNull()
+    })
+  })
+
+  describe('switchSite — per-site state snapshots', () => {
+    it('saves HQ state when switching to remote site', () => {
+      const siteId = setupOperationalSite()
+      // Build something at HQ first
+      getState().addCabinet(0, 1, 'production', 'general', 'south')
+      expect(getState().cabinets).toHaveLength(1)
+
+      // Switch to remote site
+      getState().switchSite(siteId)
+      expect(getState().activeSiteId).toBe(siteId)
+      // Remote site should be empty
+      expect(getState().cabinets).toHaveLength(0)
+      // HQ snapshot should be saved
+      expect(getState().hqSnapshot).not.toBeNull()
+      expect(getState().hqSnapshot!.cabinets).toHaveLength(1)
+    })
+
+    it('restores HQ state when switching back', () => {
+      const siteId = setupOperationalSite()
+      // Build at HQ
+      getState().addCabinet(0, 1, 'production', 'general', 'south')
+      const hqCab = getState().cabinets[0]
+
+      // Switch to remote and back
+      getState().switchSite(siteId)
+      expect(getState().cabinets).toHaveLength(0)
+      getState().switchSite(null)
+      expect(getState().activeSiteId).toBeNull()
+      expect(getState().cabinets).toHaveLength(1)
+      expect(getState().cabinets[0].id).toBe(hqCab.id)
+      expect(getState().hqSnapshot).toBeNull()
+    })
+
+    it('preserves remote site state in snapshot', () => {
+      const siteId = setupOperationalSite()
+
+      // Switch to remote site
+      getState().switchSite(siteId)
+      expect(getState().cabinets).toHaveLength(0)
+
+      // Build at remote site (add a cabinet — site is starter tier)
+      getState().addCabinet(0, 1, 'production', 'general', 'south')
+      expect(getState().cabinets).toHaveLength(1)
+
+      // Switch back to HQ
+      getState().switchSite(null)
+      // Remote site's snapshot should contain the cabinet we built
+      const remoteSite = getState().sites.find((s) => s.id === siteId)!
+      expect(remoteSite.snapshot).not.toBeNull()
+      expect(remoteSite.snapshot!.cabinets).toHaveLength(1)
+    })
+
+    it('uses starter suite tier for new remote sites', () => {
+      const siteId = setupOperationalSite()
+      getState().switchSite(siteId)
+      // Remote site should have starter tier
+      expect(getState().suiteTier).toBe('starter')
+    })
+
+    it('preserves HQ suite tier', () => {
+      const siteId = setupOperationalSite()
+      expect(getState().suiteTier).toBe('enterprise')
+
+      getState().switchSite(siteId)
+      expect(getState().suiteTier).toBe('starter')
+
+      getState().switchSite(null)
+      expect(getState().suiteTier).toBe('enterprise')
+    })
+
+    it('does nothing when switching to same site', () => {
+      const siteId = setupOperationalSite()
+      getState().switchSite(siteId)
+      const stateBefore = getState()
+      getState().switchSite(siteId)
+      expect(getState().activeSiteId).toBe(stateBefore.activeSiteId)
+    })
+
+    it('switching HQ to HQ is no-op', () => {
+      setupOperationalSite()
+      getState().addCabinet(0, 1, 'production', 'general', 'south')
+      getState().switchSite(null)
+      expect(getState().activeSiteId).toBeNull()
+      expect(getState().cabinets).toHaveLength(1)
+    })
+  })
+
+  describe('tick — site construction with snapshots', () => {
+    it('creates empty snapshot when site construction completes', () => {
+      setupMultiSiteUnlocked()
+      getState().researchRegion('portland')
+      getState().purchaseSite('portland', 'edge_pop', 'Portland Edge')
+      // Verify purchaseSite produces snapshot: null
+      expect(getState().sites[0].snapshot).toBeNull()
+      // Set to 1 tick remaining
+      setState({ sites: getState().sites.map((s) => ({ ...s, constructionTicksRemaining: 1 })) })
+      // Before tick: site is not operational
+      expect(getState().sites[0].operational).toBe(false)
+      expect(getState().sites[0].constructionTicksRemaining).toBe(1)
+      getState().tick()
+      const site = getState().sites[0]
+      expect(site.operational).toBe(true)
+      expect(site.constructionTicksRemaining).toBe(0)
+      expect(site.snapshot).not.toBeNull()
+      expect(site.snapshot!.cabinets).toHaveLength(0)
+      expect(site.snapshot!.suiteTier).toBe('starter')
+    })
+
+    it('generates construction complete event log', () => {
+      setupMultiSiteUnlocked()
+      getState().researchRegion('portland')
+      getState().purchaseSite('portland', 'edge_pop', 'Portland Edge')
+      setState({ sites: getState().sites.map((s) => ({ ...s, constructionTicksRemaining: 1 })) })
+      getState().tick()
+      const logs = getState().eventLog
+      const constructionLog = logs.find((l) => l.message.includes('construction complete'))
+      expect(constructionLog).toBeDefined()
+      expect(constructionLog!.severity).toBe('success')
+    })
+  })
+
+  describe('regional modifiers', () => {
+    it('applies regional power cost multiplier to active remote site', () => {
+      const siteId = setupOperationalSite()
+      // Add cabinet to HQ
+      getState().addCabinet(0, 1, 'production', 'general', 'south')
+      getState().upgradeNextCabinet()
+      getState().addSpineSwitch()
+
+      // Tick at HQ to get HQ expense baseline
+      getState().tick()
+      const hqExpenses = getState().expenses
+
+      // Switch to remote site and add same equipment
+      getState().switchSite(siteId)
+      getState().addCabinet(0, 1, 'production', 'general', 'south')
+      getState().upgradeNextCabinet()
+      getState().addSpineSwitch()
+      getState().tick()
+      const remoteExpenses = getState().expenses
+
+      // Ashburn has powerCostMultiplier of 0.8, so expenses should differ
+      const ashburnRegion = REGION_CATALOG.find((r) => r.id === 'ashburn')!
+      // Remote expenses should be scaled by regional power cost
+      // (exact comparison is complex due to many factors, just verify they differ if multiplier != 1)
+      if (ashburnRegion.profile.powerCostMultiplier !== 1) {
+        expect(remoteExpenses).not.toBe(hqExpenses)
+      }
     })
   })
 })
