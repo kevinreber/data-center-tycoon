@@ -16,6 +16,25 @@ interface VersionEntry {
 
 const CHANGELOG: VersionEntry[] = [
   {
+    version: 'v0.5.1',
+    date: 'Feb 2026',
+    title: 'The Global Expansion Update',
+    highlights: 'Build a worldwide data center empire — multi-site expansion across 15 regions, inter-site networking with 4 link types, edge PoP CDN revenue, and comprehensive in-game guide.',
+    changes: [
+      { text: 'Multi-site expansion — purchase and build data centers across 15 global regions from Ashburn to Tokyo', type: 'new' },
+      { text: '6 site types — Headquarters, Edge PoP, Colocation, Hyperscale, Network Hub/IXP, and Disaster Recovery', type: 'new' },
+      { text: 'World map panel — interactive SVG map showing all sites, links, and regional stats', type: 'new' },
+      { text: 'Region profiles — unique power costs, labor rates, climate, demand patterns, and disaster risks per location', type: 'new' },
+      { text: 'Inter-site networking — connect sites with IP Transit, Leased Wavelength, Dark Fiber, or Submarine Cable links', type: 'new' },
+      { text: 'Edge PoP CDN revenue — edge sites earn passive income per Gbps of backhaul bandwidth', type: 'new' },
+      { text: 'Link reliability — links can go down based on type reliability, with automatic recovery', type: 'new' },
+      { text: 'Geographic link constraints — dark fiber/wavelength for same-continent, submarine cable for cross-continent only', type: 'new' },
+      { text: '5 new achievements for inter-site networking milestones', type: 'new' },
+      { text: 'In-game guide updated with 10 new sections covering all game systems', type: 'improved' },
+      { text: '2 new tutorial tips for first link and edge PoP backhaul', type: 'improved' },
+    ],
+  },
+  {
     version: 'v0.5.0',
     date: 'Feb 2026',
     title: 'The Game Feel Update',
