@@ -113,9 +113,11 @@ src/
 
 ### Claude Code configuration
 
-- `.claude/settings.json` — Hooks: ESLint runs after Edit/Write on `.ts/.tsx` files; lint + type-check on session start
+- `.claude/settings.json` — Hooks: ESLint runs after Edit/Write on `.ts/.tsx` files; lint + type-check on session start; post-commit doc staleness check
+- `.claude/hooks/post-commit-doc-check.sh` — Detects commits touching core game files and prints reminders about which docs may need updating
 - `.claude/skills/add-feature/SKILL.md` — 9-step feature addition checklist (invoked with `/add-feature`)
 - `.claude/skills/update-build-logs/SKILL.md` — Changelog update checklist (invoked with `/update-build-logs`)
+- `.claude/skills/update-docs/SKILL.md` — Combined post-change documentation refresh (invoked with `/update-docs`)
 - `.claude/skills/validate-pr-docs/SKILL.md` — Pre-PR documentation validation (invoked with `/validate-pr-docs`)
 
 ## Sub-module Rules
