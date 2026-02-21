@@ -9,6 +9,8 @@ export type {
   RegionProfile, RegionDemandProfile, RegionDisasterProfile, Region, SiteTypeConfig, Site,
   InterSiteLinkType, InterSiteLink, InterSiteLinkConfig,
   RegionalIncidentType, DisasterPrepType, RegionalIncidentDef, DisasterPrepConfig, SiteDisasterPrep,
+  DemandTrend, SovereigntyRegime, DataSovereigntyRule, MultiSiteContractDef, ActiveMultiSiteContract,
+  StaffTransfer, StaffTransferConfig, CompetitorRegionalPresence,
   SaveSlotMeta, CustomerTypeConfig, GeneratorConfig, Generator, SuppressionConfig,
   TechDef, ActiveResearch, OpsTierConfig, CabinetFacing,
   PDU, PDUConfig, CableTray, CableTrayConfig, CableRun,
@@ -61,6 +63,7 @@ import type {
   EventLogEntry, EventCategory, HistoryPoint, LifetimeStats, TutorialTip,
   ScenarioDef, Site, SiteSnapshot, Patent, RFPOffer, DrillResult, NetworkTopologyStats, InterSiteLink,
   SiteDisasterPrep, DisasterPrepType,
+  ActiveMultiSiteContract, StaffTransfer, CompetitorRegionalPresence,
   SaveSlotMeta,
   // New feature types
   ViewMode, RowEndSlotType, RowEndSlot, AisleWidth, RaisedFloorTier,
@@ -86,8 +89,8 @@ import { TECH_TREE, OPS_TIER_CONFIG, OPS_TIER_ORDER, CONTRACT_CATALOG, CONTRACT_
 export { LOAN_OPTIONS, POWER_MARKET, DEPRECIATION, INSURANCE_OPTIONS, DRILL_CONFIG, VALUATION_MILESTONES, PATENT_CONFIG, RFP_CONFIG, SPOT_COMPUTE_CONFIG, MAINTENANCE_CONFIG, PEERING_OPTIONS, INTERCONNECT_PORT_CONFIG, MEETME_ROOM_CONFIG, INTERCONNECT_TENANTS, SUPPLY_CHAIN_CONFIG, SEASON_CONFIG, WEATHER_CONDITION_CONFIG, STAFF_ROLE_CONFIG, STAFF_CERT_CONFIG, SHIFT_PATTERN_CONFIG, MAX_STAFF_BY_TIER, FIRST_NAMES, LAST_NAMES, generateStaffName } from './configs/economy'
 import { LOAN_OPTIONS, POWER_MARKET, DEPRECIATION, INSURANCE_OPTIONS, DRILL_CONFIG, VALUATION_MILESTONES, PATENT_CONFIG, RFP_CONFIG, SPOT_COMPUTE_CONFIG, MAINTENANCE_CONFIG, PEERING_OPTIONS, INTERCONNECT_PORT_CONFIG, MEETME_ROOM_CONFIG, INTERCONNECT_TENANTS, SUPPLY_CHAIN_CONFIG, SEASON_CONFIG, WEATHER_CONDITION_CONFIG, STAFF_ROLE_CONFIG, STAFF_CERT_CONFIG, SHIFT_PATTERN_CONFIG, MAX_STAFF_BY_TIER, generateStaffName } from './configs/economy'
 
-export { ENERGY_SOURCE_CONFIG, GREEN_CERT_CONFIG, CARBON_TAX_SCHEDULE, WATER_USAGE_CONFIG, EWASTE_CONFIG, SECURITY_FEATURE_CONFIG, SECURITY_TIER_CONFIG, COMPLIANCE_CERT_CONFIG, COMPETITOR_PERSONALITIES, COMPETITOR_NAMES, COMPETITOR_SCALE_CONFIG, MULTI_SITE_GATE, SITE_TYPE_CONFIG, REGION_CATALOG, REGION_RESEARCH_COST, MAX_SITES, INTER_SITE_LINK_CONFIG, DISTANCE_LATENCY_MODIFIER, EDGE_POP_CDN_REVENUE_PER_GBPS, MAX_LINKS_PER_SITE, BANDWIDTH_OVERAGE_COST, REGIONAL_INCIDENT_CATALOG, DISASTER_PREP_CONFIG, MAX_REGIONAL_INCIDENTS } from './configs/world'
-import { ENERGY_SOURCE_CONFIG, GREEN_CERT_CONFIG, CARBON_TAX_SCHEDULE, WATER_USAGE_CONFIG, EWASTE_CONFIG, SECURITY_FEATURE_CONFIG, SECURITY_TIER_CONFIG, COMPLIANCE_CERT_CONFIG, COMPETITOR_PERSONALITIES, COMPETITOR_NAMES, COMPETITOR_SCALE_CONFIG, MULTI_SITE_GATE, SITE_TYPE_CONFIG, REGION_CATALOG, REGION_RESEARCH_COST, MAX_SITES, INTER_SITE_LINK_CONFIG, DISTANCE_LATENCY_MODIFIER, EDGE_POP_CDN_REVENUE_PER_GBPS, MAX_LINKS_PER_SITE, REGIONAL_INCIDENT_CATALOG, DISASTER_PREP_CONFIG, MAX_REGIONAL_INCIDENTS } from './configs/world'
+export { ENERGY_SOURCE_CONFIG, GREEN_CERT_CONFIG, CARBON_TAX_SCHEDULE, WATER_USAGE_CONFIG, EWASTE_CONFIG, SECURITY_FEATURE_CONFIG, SECURITY_TIER_CONFIG, COMPLIANCE_CERT_CONFIG, COMPETITOR_PERSONALITIES, COMPETITOR_NAMES, COMPETITOR_SCALE_CONFIG, MULTI_SITE_GATE, SITE_TYPE_CONFIG, REGION_CATALOG, REGION_RESEARCH_COST, MAX_SITES, INTER_SITE_LINK_CONFIG, DISTANCE_LATENCY_MODIFIER, EDGE_POP_CDN_REVENUE_PER_GBPS, MAX_LINKS_PER_SITE, BANDWIDTH_OVERAGE_COST, REGIONAL_INCIDENT_CATALOG, DISASTER_PREP_CONFIG, MAX_REGIONAL_INCIDENTS, DATA_SOVEREIGNTY_CONFIG, MULTI_SITE_CONTRACT_CATALOG, MAX_MULTI_SITE_CONTRACTS, STAFF_TRANSFER_CONFIG, MAX_STAFF_TRANSFERS, DEMAND_GROWTH_CONFIG, COMPETITOR_REGIONAL_CONFIG, getRegionSovereignty } from './configs/world'
+import { ENERGY_SOURCE_CONFIG, GREEN_CERT_CONFIG, CARBON_TAX_SCHEDULE, WATER_USAGE_CONFIG, EWASTE_CONFIG, SECURITY_FEATURE_CONFIG, SECURITY_TIER_CONFIG, COMPLIANCE_CERT_CONFIG, COMPETITOR_PERSONALITIES, COMPETITOR_NAMES, COMPETITOR_SCALE_CONFIG, MULTI_SITE_GATE, SITE_TYPE_CONFIG, REGION_CATALOG, REGION_RESEARCH_COST, MAX_SITES, INTER_SITE_LINK_CONFIG, DISTANCE_LATENCY_MODIFIER, EDGE_POP_CDN_REVENUE_PER_GBPS, MAX_LINKS_PER_SITE, REGIONAL_INCIDENT_CATALOG, DISASTER_PREP_CONFIG, MAX_REGIONAL_INCIDENTS, DATA_SOVEREIGNTY_CONFIG, MULTI_SITE_CONTRACT_CATALOG, MAX_MULTI_SITE_CONTRACTS, STAFF_TRANSFER_CONFIG, MAX_STAFF_TRANSFERS, DEMAND_GROWTH_CONFIG, COMPETITOR_REGIONAL_CONFIG } from './configs/world'
 
 // ── Re-export calculations ─────────────────────────────────────
 export { coolingOverheadFactor, calcManagementBonus, calcTrafficWithCapacity, calcCabinetCooling, getCabinetsInPDURange, getPDULoad, isPDUOverloaded, calcCableLength, getFacingOffsets, calcAisleBonus, countAisleViolations, getAdjacentCabinets, hasMaintenanceAccess, calcSpacingHeatEffect, countMessyCables, calcZones, isZoneRequirementMet, calcMixedEnvPenalties, calcDedicatedRows, getSuiteLimits, getCabinetRowAtGrid, getValidCabinetGridRows, getRowFacing, getPlacementHints, formatGameTime, getReputationTier } from './calculations'
@@ -475,6 +478,14 @@ interface GameState {
   disasterPrepMaintenanceCost: number     // total maintenance cost per tick for all disaster preps
   regionalIncidentsBlocked: number        // lifetime regional incidents fully mitigated
 
+  // Phase 6D — Global Strategy Layer
+  demandGrowthMultipliers: Record<string, Record<string, number>>  // regionId → customerType → growth multiplier
+  multiSiteContracts: ActiveMultiSiteContract[]
+  multiSiteContractRevenue: number        // aggregate per-tick revenue from multi-site contracts
+  staffTransfers: StaffTransfer[]          // staff currently in transit between sites
+  staffTransfersCompleted: number          // lifetime completed transfers
+  competitorRegionalPresence: CompetitorRegionalPresence[]  // competitors in regions
+
   // ── New Features ─────────────────────────────────────────────
 
   // View Mode (sub-floor view)
@@ -630,6 +641,10 @@ interface GameState {
   // Phase 6C — Disaster Preparedness actions
   installDisasterPrep: (siteId: string, prepType: DisasterPrepType) => void
   removeDisasterPrep: (siteId: string, prepType: DisasterPrepType) => void
+  // Phase 6D — Global Strategy Layer actions
+  acceptMultiSiteContract: (contractId: string) => void
+  transferStaff: (staffId: string, toSiteId: string | null) => void
+  cancelStaffTransfer: (transferId: string) => void
   // New Feature Actions
   setViewMode: (mode: ViewMode) => void
   placeRowEndSlot: (rowId: number, side: 'left' | 'right', type: RowEndSlotType) => void
@@ -1009,6 +1024,14 @@ export const useGameStore = create<GameState>((set) => ({
   regionalIncidentCount: 0,
   disasterPrepMaintenanceCost: 0,
   regionalIncidentsBlocked: 0,
+
+  // Phase 6D — Global Strategy Layer
+  demandGrowthMultipliers: {} as Record<string, Record<string, number>>,
+  multiSiteContracts: [] as ActiveMultiSiteContract[],
+  multiSiteContractRevenue: 0,
+  staffTransfers: [] as StaffTransfer[],
+  staffTransfersCompleted: 0,
+  competitorRegionalPresence: [] as CompetitorRegionalPresence[],
 
   // ── New Features ────────────────────────────────────────────
 
@@ -2555,6 +2578,95 @@ export const useGameStore = create<GameState>((set) => ({
       }
     }),
 
+  // ── Phase 6D — Global Strategy Layer Actions ───────────────────────
+
+  acceptMultiSiteContract: (contractId: string) =>
+    set((state) => {
+      if (!state.multiSiteUnlocked) return state
+      // Check max active
+      const activeContracts = state.multiSiteContracts.filter((c) => c.status === 'active')
+      if (activeContracts.length >= MAX_MULTI_SITE_CONTRACTS) return state
+      // Find contract def
+      const def = MULTI_SITE_CONTRACT_CATALOG.find((c) => c.id === contractId)
+      if (!def) return state
+      // Check not already active
+      if (state.multiSiteContracts.some((c) => c.def.id === contractId && c.status === 'active')) return state
+      // Check all required regions have operational sites
+      const operationalSiteRegions = state.sites.filter((s) => s.operational).map((s) => s.regionId)
+      // HQ is always in ashburn
+      const allRegions = ['ashburn' as const, ...operationalSiteRegions]
+      if (!def.requiredRegions.every((r) => allRegions.includes(r))) return state
+      // Check required site types if specified
+      if (def.requiredSiteTypes && def.requiredSiteTypes.length > 0) {
+        const operationalSiteTypes = state.sites.filter((s) => s.operational).map((s) => s.type)
+        operationalSiteTypes.push('headquarters')
+        if (!def.requiredSiteTypes.some((t) => operationalSiteTypes.includes(t))) return state
+      }
+      const newContract: ActiveMultiSiteContract = {
+        id: `msc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        def,
+        acceptedAtTick: state.tickCount,
+        ticksRemaining: def.durationTicks,
+        totalEarned: 0,
+        totalPenalties: 0,
+        consecutiveViolations: 0,
+        status: 'active',
+      }
+      return {
+        multiSiteContracts: [...state.multiSiteContracts, newContract],
+      }
+    }),
+
+  transferStaff: (staffId: string, toSiteId: string | null) =>
+    set((state) => {
+      if (!state.multiSiteUnlocked) return state
+      // Check max transfers
+      if (state.staffTransfers.length >= MAX_STAFF_TRANSFERS) return state
+      // Staff must exist
+      const staff = state.staff.find((s) => s.id === staffId)
+      if (!staff) return state
+      // Staff can't already be in transit
+      if (state.staffTransfers.some((t) => t.staffId === staffId)) return state
+      // Determine destination region and from site
+      const fromSiteId = state.activeSiteId
+      if (fromSiteId === toSiteId) return state
+      // Calculate cost and duration
+      const cost = STAFF_TRANSFER_CONFIG.baseCost * (1 + STAFF_TRANSFER_CONFIG.costMultiplierPerLevel * (staff.skillLevel - 1))
+      if (!state.sandboxMode && state.money < cost) return state
+      // Determine if same/cross continent
+      const fromRegion = fromSiteId ? state.sites.find((s) => s.id === fromSiteId)?.regionId : 'ashburn'
+      const toRegion = toSiteId ? state.sites.find((s) => s.id === toSiteId)?.regionId : 'ashburn'
+      const fromContinent = REGION_CATALOG.find((r) => r.id === fromRegion)?.continent
+      const toContinent = REGION_CATALOG.find((r) => r.id === toRegion)?.continent
+      const ticks = fromContinent === toContinent ? STAFF_TRANSFER_CONFIG.sameContinentTicks : STAFF_TRANSFER_CONFIG.crossContinentTicks
+      const transfer: StaffTransfer = {
+        id: `xfr-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        staffId,
+        staffName: staff.name,
+        staffRole: staff.role,
+        fromSiteId,
+        toSiteId,
+        cost,
+        ticksRemaining: ticks,
+        startedAtTick: state.tickCount,
+      }
+      return {
+        staffTransfers: [...state.staffTransfers, transfer],
+        staff: state.staff.filter((s) => s.id !== staffId),  // remove from current site roster
+        money: state.sandboxMode ? state.money : state.money - cost,
+      }
+    }),
+
+  cancelStaffTransfer: (transferId: string) =>
+    set((state) => {
+      const transfer = state.staffTransfers.find((t) => t.id === transferId)
+      if (!transfer) return state
+      // Return staff to origin if cancelling (no refund)
+      return {
+        staffTransfers: state.staffTransfers.filter((t) => t.id !== transferId),
+      }
+    }),
+
   // ── New Feature Actions ──────────────────────────────────────────
 
   setViewMode: (mode: ViewMode) =>
@@ -3689,6 +3801,13 @@ export const useGameStore = create<GameState>((set) => ({
       regionalIncidentCount: 0,
       disasterPrepMaintenanceCost: 0,
       regionalIncidentsBlocked: 0,
+      // Phase 6D — Global Strategy Layer
+      demandGrowthMultipliers: {},
+      multiSiteContracts: [],
+      multiSiteContractRevenue: 0,
+      staffTransfers: [],
+      staffTransfersCompleted: 0,
+      competitorRegionalPresence: [],
       // New Features
       viewMode: 'cabinet' as ViewMode,
       rowEndSlots: [],
@@ -5782,6 +5901,11 @@ export const useGameStore = create<GameState>((set) => ({
           // Phase 6C — Regional Incidents & Disaster Preparedness tips
           if (tip.id === 'regional_incident_hint' && state.sites.filter((s) => s.operational).length >= 1 && state.regionalIncidentCount === 0) trigger = true
           if (tip.id === 'disaster_prep_hint' && regionalIncidentCount > 0 && state.siteDisasterPreps.length === 0) trigger = true
+          // Phase 6D — Global Strategy Layer tips
+          if (tip.id === 'multisite_contracts_hint' && state.sites.filter((s) => s.operational).length >= 2 && state.multiSiteContracts.length === 0) trigger = true
+          if (tip.id === 'sovereignty_hint' && state.sites.some((s) => s.operational && ['london', 'amsterdam', 'frankfurt', 'nordics', 'sao_paulo', 'singapore'].includes(s.regionId)) && !state.multiSiteContracts.some((c) => c.def.sovereigntyRegime)) trigger = true
+          if (tip.id === 'staff_transfer_hint' && state.sites.filter((s) => s.operational).length >= 2 && state.staffTransfersCompleted === 0) trigger = true
+          if (tip.id === 'demand_growth_hint' && Object.keys(state.demandGrowthMultipliers).length > 0 && state.multiSiteContracts.length === 0) trigger = true
           if (trigger) { activeTip = tip; break }
         }
       }
@@ -6024,19 +6148,194 @@ export const useGameStore = create<GameState>((set) => ({
       if (prepTypes.size >= 4) unlock('fully_hardened')
       if (regionalIncidentsBlocked >= 5) unlock('regional_blocker')
 
+      // ── Phase 6D — Global Strategy Layer Tick ──────────────────────
+      // Demand growth — update regional demand multipliers periodically
+      const demandGrowthMultipliers = { ...state.demandGrowthMultipliers }
+      if (multiSiteUnlocked && newTickCount % DEMAND_GROWTH_CONFIG.growthInterval === 0) {
+        const customerTypes = ['general', 'ai_training', 'streaming', 'crypto', 'enterprise'] as const
+        for (const region of REGION_CATALOG) {
+          if (!demandGrowthMultipliers[region.id]) {
+            demandGrowthMultipliers[region.id] = {}
+            for (const ct of customerTypes) demandGrowthMultipliers[region.id][ct] = 0
+          }
+          for (const ct of customerTypes) {
+            const baseDemand = region.demandProfile[ct]
+            const currentGrowth = demandGrowthMultipliers[region.id][ct] || 0
+            const effectiveDemand = baseDemand + currentGrowth
+            let delta = 0
+            if (effectiveDemand < DEMAND_GROWTH_CONFIG.emergingThreshold) {
+              delta = DEMAND_GROWTH_CONFIG.emergingGrowthRate
+            } else if (effectiveDemand > DEMAND_GROWTH_CONFIG.saturatedThreshold) {
+              delta = DEMAND_GROWTH_CONFIG.saturatedDecayRate
+            } else {
+              delta = DEMAND_GROWTH_CONFIG.stableGrowthRate
+            }
+            // Random variation ±50%
+            delta *= (0.5 + Math.random())
+            const newGrowth = Math.max(
+              DEMAND_GROWTH_CONFIG.minDemand - baseDemand,
+              Math.min(DEMAND_GROWTH_CONFIG.maxDemand - baseDemand, currentGrowth + delta)
+            )
+            demandGrowthMultipliers[region.id][ct] = +newGrowth.toFixed(4)
+          }
+        }
+      }
+
+      // Multi-site contracts — tick active contracts, check compliance
+      let multiSiteContractRevenue = 0
+      let multiSiteContractPenalties = 0
+      const operationalSiteRegions = updatedSites.filter((s) => s.operational).map((s) => s.regionId)
+      const allPlayerRegions = ['ashburn' as const, ...operationalSiteRegions]
+      const operationalSiteTypes = updatedSites.filter((s) => s.operational).map((s) => s.type)
+      operationalSiteTypes.push('headquarters')
+      const updatedMultiSiteContracts = state.multiSiteContracts.map((contract) => {
+        if (contract.status !== 'active') return contract
+        const def = contract.def
+        // Check region compliance
+        const regionsMet = def.requiredRegions.every((r) => allPlayerRegions.includes(r))
+        const siteTypesMet = !def.requiredSiteTypes || def.requiredSiteTypes.length === 0 || def.requiredSiteTypes.some((t) => operationalSiteTypes.includes(t))
+        const compliant = regionsMet && siteTypesMet
+        const ticks = contract.ticksRemaining - 1
+        if (compliant) {
+          // Apply sovereignty bonus
+          let sovereigntyBonus = 1
+          if (def.sovereigntyRegime && def.sovereigntyRegime !== 'none') {
+            const rule = DATA_SOVEREIGNTY_CONFIG.find((r) => r.regime === def.sovereigntyRegime)
+            if (rule) sovereigntyBonus = 1 + rule.revenueBonus
+          }
+          const rev = def.revenuePerTick * sovereigntyBonus
+          multiSiteContractRevenue += rev
+          if (ticks <= 0) {
+            multiSiteContractRevenue += 0 // completion bonus added to money directly
+            eventLog.push({ tick: newTickCount, gameHour: +(newHour.toFixed(1)), category: 'contract' as EventCategory, message: `Multi-site contract "${def.label}" completed! Bonus: $${def.completionBonus.toLocaleString()}`, severity: 'success' as EventSeverity })
+            floatingTexts.push({ text: `CONTRACT COMPLETE: ${def.label}`, color: '#00ff88', center: true })
+            return { ...contract, ticksRemaining: 0, totalEarned: contract.totalEarned + rev + def.completionBonus, status: 'completed' as const, consecutiveViolations: 0 }
+          }
+          return { ...contract, ticksRemaining: ticks, totalEarned: contract.totalEarned + rev, consecutiveViolations: 0 }
+        } else {
+          // Non-compliant — apply penalty
+          multiSiteContractPenalties += def.penaltyPerTick
+          const violations = contract.consecutiveViolations + 1
+          // Terminate after 20 consecutive violations
+          if (violations >= 20) {
+            eventLog.push({ tick: newTickCount, gameHour: +(newHour.toFixed(1)), category: 'contract' as EventCategory, message: `Multi-site contract "${def.label}" terminated due to non-compliance!`, severity: 'error' as EventSeverity })
+            floatingTexts.push({ text: `CONTRACT TERMINATED: ${def.label}`, color: '#ff4444', center: true })
+            return { ...contract, ticksRemaining: ticks, totalPenalties: contract.totalPenalties + def.penaltyPerTick, consecutiveViolations: violations, status: 'terminated' as const }
+          }
+          return { ...contract, ticksRemaining: ticks, totalPenalties: contract.totalPenalties + def.penaltyPerTick, consecutiveViolations: violations }
+        }
+      })
+      // Add completion bonuses to money
+      const completionBonuses = updatedMultiSiteContracts.filter((c) => c.status === 'completed' && state.multiSiteContracts.find((sc) => sc.id === c.id)?.status === 'active').reduce((sum, c) => sum + c.def.completionBonus, 0)
+
+      // Staff transfers — tick in-transit staff, deliver arrived staff
+      let staffTransfersCompleted = state.staffTransfersCompleted
+      const pendingTransfers: StaffTransfer[] = []
+      const arrivedStaff: StaffTransfer[] = []
+      for (const transfer of state.staffTransfers) {
+        const remaining = transfer.ticksRemaining - 1
+        if (remaining <= 0) {
+          arrivedStaff.push(transfer)
+          staffTransfersCompleted++
+        } else {
+          pendingTransfers.push({ ...transfer, ticksRemaining: remaining })
+        }
+      }
+      // Note: arrived staff will be added to the target site's roster when player switches to that site
+      // For now, log the arrival
+      for (const arrived of arrivedStaff) {
+        const destName = arrived.toSiteId ? updatedSites.find((s) => s.id === arrived.toSiteId)?.name ?? 'site' : 'HQ'
+        eventLog.push({ tick: newTickCount, gameHour: +(newHour.toFixed(1)), category: 'staff' as EventCategory, message: `${arrived.staffName} (${arrived.staffRole}) arrived at ${destName}.`, severity: 'success' as EventSeverity })
+        floatingTexts.push({ text: `STAFF ARRIVED: ${arrived.staffName}`, color: '#00aaff', center: true })
+        // If arriving at HQ (activeSiteId === null) or current active site, add to staff
+        if (arrived.toSiteId === state.activeSiteId) {
+          // Will be handled below via updatedStaffWithArrivals
+        }
+      }
+      const staffArrivingHere = arrivedStaff.filter((a) => a.toSiteId === state.activeSiteId)
+      // Recreate arrived staff members (basic reconstruction)
+      const arrivedStaffMembers: StaffMember[] = staffArrivingHere.map((a) => ({
+        id: a.staffId,
+        name: a.staffName,
+        role: a.staffRole,
+        skillLevel: 1 as StaffSkillLevel,
+        salaryPerTick: STAFF_ROLE_CONFIG.find((r) => r.role === a.staffRole)?.baseSalary ?? 5,
+        hiredAtTick: a.startedAtTick,
+        onShift: true,
+        certifications: [],
+        incidentsResolved: 0,
+        fatigueLevel: 0,
+      }))
+
+      // Competitor regional presence — competitors expand into regions
+      let competitorRegionalPresence = [...state.competitorRegionalPresence]
+      if (multiSiteUnlocked) {
+        for (const comp of competitors) {
+          const compPresence = competitorRegionalPresence.filter((p) => p.competitorId === comp.id)
+          // Grow existing presence
+          competitorRegionalPresence = competitorRegionalPresence.map((p) => {
+            if (p.competitorId !== comp.id) return p
+            const newStrength = Math.min(COMPETITOR_REGIONAL_CONFIG.maxRegionalStrength, p.strength + COMPETITOR_REGIONAL_CONFIG.regionalStrengthGrowth)
+            return { ...p, strength: +newStrength.toFixed(3) }
+          })
+          // Chance to expand to new region
+          if (compPresence.length < COMPETITOR_REGIONAL_CONFIG.maxRegionsPerCompetitor && Math.random() < COMPETITOR_REGIONAL_CONFIG.expansionChance) {
+            // Pick a region the competitor isn't in yet, weighted by demand matching their specialization
+            const existingRegions = new Set(compPresence.map((p) => p.regionId))
+            const candidates = REGION_CATALOG.filter((r) => !existingRegions.has(r.id))
+            if (candidates.length > 0) {
+              const specKey = comp.specialization as keyof typeof candidates[0]['demandProfile']
+              const sorted = candidates.sort((a, b) => (b.demandProfile[specKey] || 0) - (a.demandProfile[specKey] || 0))
+              const chosen = sorted[0]
+              competitorRegionalPresence = [...competitorRegionalPresence, {
+                competitorId: comp.id,
+                regionId: chosen.id,
+                strength: 0.1,
+                establishedAtTick: newTickCount,
+              }]
+              eventLog.push({ tick: newTickCount, gameHour: +(newHour.toFixed(1)), category: 'system' as EventCategory, message: `Competitor ${comp.name} expanded to ${chosen.name}!`, severity: 'warning' as EventSeverity })
+            }
+          }
+        }
+      }
+
+      // Phase 6D achievements
+      if (updatedMultiSiteContracts.some((c) => c.status === 'active' || c.status === 'completed')) unlock('first_multisite_contract')
+      if (updatedMultiSiteContracts.some((c) => (c.status === 'completed') && c.def.sovereigntyRegime && c.def.sovereigntyRegime !== 'none')) unlock('sovereignty_compliant')
+      if (staffTransfersCompleted >= 1) unlock('staff_transferred')
+      // Demand surfer — site in emerging market
+      for (const site of updatedSites.filter((s) => s.operational)) {
+        const growth = demandGrowthMultipliers[site.regionId]
+        if (growth) {
+          const hasEmerging = Object.values(growth).some((g) => g > 0.01)
+          if (hasEmerging) { unlock('demand_surfer'); break }
+        }
+      }
+      const totalMSCRevenue = updatedMultiSiteContracts.filter((c) => c.status === 'active').reduce((sum, c) => {
+        let bonus = 1
+        if (c.def.sovereigntyRegime && c.def.sovereigntyRegime !== 'none') {
+          const rule = DATA_SOVEREIGNTY_CONFIG.find((r) => r.regime === c.def.sovereigntyRegime)
+          if (rule) bonus = 1 + rule.revenueBonus
+        }
+        return sum + c.def.revenuePerTick * bonus
+      }, 0)
+      if (totalMSCRevenue >= 300) unlock('global_empire')
+
       // Apply Phase 4 bonuses to contract revenue
       const adjustedContractRevenue = +(contractRevenue * (1 + complianceRevenueBonus + greenCertRevenueBonus) * priceWarPenalty).toFixed(2)
 
-      // Recalculate final money with all income/expenses (Phase 4 + 5 + 6 + 6B + workloads + ops included)
+      // Recalculate final money with all income/expenses (Phase 4 + 5 + 6 + 6B + 6D + workloads + ops included)
       const phase5Income = spotRevenue + meetMeRevenue
       const phase5Expenses = peeringCostPerTick + powerRedundancyCost + meetMeMaintenanceCost + (noiseComplaints > state.noiseComplaints && noiseComplaints % NOISE_CONFIG.fineThreshold === 0 ? NOISE_CONFIG.fineAmount : 0)
       const phase4Expenses = carbonTaxPerTick + waterCostPerTick + securityMaintenanceCost
       const phase6Income = totalSiteRevenue + edgePopCDNRevenue
       const phase6Expenses = totalSiteExpenses + interSiteLinkCost + disasterPrepMaintenanceCost
+      const phase6DIncome = multiSiteContractRevenue + completionBonuses
+      const phase6DExpenses = multiSiteContractPenalties
       const newFeatureIncome = workloadRevenue
       const finalNewMoney = state.sandboxMode
         ? 999999999
-        : Math.round((state.money + revenue + adjustedContractRevenue + patentIncome + milestoneMoney + phase5Income + phase6Income + newFeatureIncome + (insurancePayouts - state.insurancePayouts) - expenses - loanPayments - contractPenalties - insuranceCost - staffCostPerTick - phase5Expenses - phase4Expenses - phase6Expenses) * 100) / 100
+        : Math.round((state.money + revenue + adjustedContractRevenue + patentIncome + milestoneMoney + phase5Income + phase6Income + phase6DIncome + newFeatureIncome + (insurancePayouts - state.insurancePayouts) - expenses - loanPayments - contractPenalties - insuranceCost - staffCostPerTick - phase5Expenses - phase4Expenses - phase6Expenses - phase6DExpenses) * 100) / 100
 
       return {
         cabinets: newCabinets,
@@ -6107,8 +6406,8 @@ export const useGameStore = create<GameState>((set) => ({
         scenarioProgress,
         scenariosCompleted,
         scenarioBestTicks,
-        // Staff & HR
-        staff: updatedStaff,
+        // Staff & HR (include arrived transfers)
+        staff: [...updatedStaff, ...arrivedStaffMembers],
         trainingQueue,
         staffCostPerTick: +staffCostPerTick.toFixed(2),
         staffIncidentsResolved,
@@ -6203,6 +6502,13 @@ export const useGameStore = create<GameState>((set) => ({
         regionalIncidentCount,
         regionalIncidentsBlocked,
         disasterPrepMaintenanceCost: +disasterPrepMaintenanceCost.toFixed(2),
+        // Phase 6D — Global Strategy Layer
+        demandGrowthMultipliers,
+        multiSiteContracts: updatedMultiSiteContracts,
+        multiSiteContractRevenue: +multiSiteContractRevenue.toFixed(2),
+        staffTransfers: pendingTransfers,
+        staffTransfersCompleted,
+        competitorRegionalPresence,
         // New Features
         activeWorkloads,
         completedWorkloads,

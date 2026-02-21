@@ -15,6 +15,11 @@ import type {
   RegionalIncidentDef,
   DisasterPrepType,
   DisasterPrepConfig,
+  DataSovereigntyRule,
+  MultiSiteContractDef,
+  StaffTransferConfig,
+  SovereigntyRegime,
+  RegionId,
 } from '../types'
 
 // ── Carbon & Environmental Config ───────────────────────────────────
@@ -586,3 +591,110 @@ export const DISASTER_PREP_CONFIG: Record<DisasterPrepType, DisasterPrepConfig> 
 
 /** Max regional incidents active at once per site */
 export const MAX_REGIONAL_INCIDENTS = 2
+
+// ── Phase 6D — Global Strategy Layer ─────────────────────────────────
+
+/** Data sovereignty rules — certain regions require data to stay local */
+export const DATA_SOVEREIGNTY_CONFIG: DataSovereigntyRule[] = [
+  {
+    regime: 'gdpr', label: 'GDPR (EU)', description: 'EU General Data Protection Regulation. Customer data must be stored and processed within EU regions.',
+    regions: ['london', 'amsterdam', 'frankfurt', 'nordics'],
+    revenueBonus: 0.15, nonCompliancePenalty: 0.10,
+  },
+  {
+    regime: 'lgpd', label: 'LGPD (Brazil)', description: 'Lei Geral de Proteção de Dados. Brazilian customer data must remain in-country.',
+    regions: ['sao_paulo'],
+    revenueBonus: 0.20, nonCompliancePenalty: 0.15,
+  },
+  {
+    regime: 'pdpa', label: 'PDPA (Singapore)', description: 'Personal Data Protection Act. Southeast Asian data sovereignty requirements.',
+    regions: ['singapore'],
+    revenueBonus: 0.10, nonCompliancePenalty: 0.08,
+  },
+]
+
+/** Get the sovereignty regime for a region, if any */
+export function getRegionSovereignty(regionId: RegionId): SovereigntyRegime {
+  for (const rule of DATA_SOVEREIGNTY_CONFIG) {
+    if (rule.regions.includes(regionId)) return rule.regime
+  }
+  return 'none'
+}
+
+/** Multi-site contracts requiring presence in multiple regions */
+export const MULTI_SITE_CONTRACT_CATALOG: MultiSiteContractDef[] = [
+  {
+    id: 'global_cdn', company: 'StreamVault Global', label: 'Global CDN Distribution',
+    description: 'Worldwide content delivery network requiring edge presence across 3 continents.',
+    requiredRegions: ['ashburn', 'london', 'singapore'],
+    revenuePerTick: 120, durationTicks: 500, completionBonus: 80000, penaltyPerTick: 30,
+  },
+  {
+    id: 'eu_enterprise_saas', company: 'EuroCloud AG', label: 'EU Enterprise SaaS',
+    description: 'GDPR-compliant enterprise SaaS hosting. Data must stay within EU regions.',
+    requiredRegions: ['frankfurt', 'amsterdam'],
+    sovereigntyRegime: 'gdpr',
+    revenuePerTick: 85, durationTicks: 400, completionBonus: 50000, penaltyPerTick: 25,
+  },
+  {
+    id: 'latam_streaming', company: 'VivaStream', label: 'LatAm Streaming Platform',
+    description: 'Streaming service expansion into Latin America. LGPD compliance required for São Paulo.',
+    requiredRegions: ['ashburn', 'sao_paulo'],
+    sovereigntyRegime: 'lgpd',
+    revenuePerTick: 70, durationTicks: 350, completionBonus: 35000, penaltyPerTick: 20,
+  },
+  {
+    id: 'apac_ai_cluster', company: 'DeepMind Asia', label: 'Asia-Pacific AI Training',
+    description: 'Distributed AI training across Asia-Pacific with low-latency interconnects.',
+    requiredRegions: ['tokyo', 'singapore'],
+    requiredSiteTypes: ['hyperscale', 'colocation'],
+    revenuePerTick: 150, durationTicks: 300, completionBonus: 60000, penaltyPerTick: 40,
+  },
+  {
+    id: 'global_dr', company: 'Resilience Corp', label: 'Global Disaster Recovery',
+    description: 'Worldwide DR service with cross-continent failover capability.',
+    requiredRegions: ['ashburn', 'london', 'tokyo'],
+    requiredSiteTypes: ['disaster_recovery'],
+    revenuePerTick: 100, durationTicks: 600, completionBonus: 100000, penaltyPerTick: 35,
+  },
+  {
+    id: 'transcontinental_finance', company: 'TradeFast Global', label: 'Transcontinental Finance',
+    description: 'High-frequency trading infrastructure spanning North America and Europe.',
+    requiredRegions: ['chicago', 'london', 'frankfurt'],
+    revenuePerTick: 130, durationTicks: 450, completionBonus: 70000, penaltyPerTick: 35,
+  },
+]
+
+/** Max active multi-site contracts at once */
+export const MAX_MULTI_SITE_CONTRACTS = 3
+
+/** Staff transfer configuration */
+export const STAFF_TRANSFER_CONFIG: StaffTransferConfig = {
+  baseCost: 2000,
+  sameContinentTicks: 8,
+  crossContinentTicks: 15,
+  costMultiplierPerLevel: 0.5,  // L1: 1x, L2: 1.5x, L3: 2x
+}
+
+/** Max simultaneous staff transfers */
+export const MAX_STAFF_TRANSFERS = 3
+
+/** Demand growth parameters */
+export const DEMAND_GROWTH_CONFIG = {
+  growthInterval: 50,         // ticks between demand growth updates
+  emergingGrowthRate: 0.02,   // +2% per interval for emerging markets
+  stableGrowthRate: 0.005,    // +0.5% per interval for stable markets
+  saturatedDecayRate: -0.01,  // -1% per interval for saturated markets
+  emergingThreshold: 0.4,     // demand < 0.4 = emerging
+  saturatedThreshold: 0.85,   // demand > 0.85 = saturated
+  maxDemand: 1.0,
+  minDemand: 0.1,
+}
+
+/** Competitor regional expansion config */
+export const COMPETITOR_REGIONAL_CONFIG = {
+  expansionChance: 0.005,       // chance per tick a competitor expands to a new region
+  maxRegionsPerCompetitor: 4,   // max regions a competitor can be in
+  regionalStrengthGrowth: 0.01, // strength growth per tick in a region
+  maxRegionalStrength: 0.8,     // max regional strength
+}

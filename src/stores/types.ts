@@ -183,6 +183,70 @@ export interface SiteDisasterPrep {
   installedAtTick: number
 }
 
+// ── Global Strategy Layer (Phase 6D) ──────────────────────────
+export type DemandTrend = 'emerging' | 'stable' | 'saturated'
+export type SovereigntyRegime = 'gdpr' | 'lgpd' | 'pdpa' | 'none'
+
+export interface DataSovereigntyRule {
+  regime: SovereigntyRegime
+  label: string
+  description: string
+  regions: RegionId[]
+  revenueBonus: number          // bonus for contracts that require local presence
+  nonCompliancePenalty: number   // revenue penalty if data leaves jurisdiction
+}
+
+export interface MultiSiteContractDef {
+  id: string
+  company: string
+  label: string
+  description: string
+  requiredRegions: RegionId[]           // must have operational sites in ALL these regions
+  requiredSiteTypes?: SiteType[]        // optional: specific site types needed
+  sovereigntyRegime?: SovereigntyRegime // optional: data sovereignty compliance
+  revenuePerTick: number
+  durationTicks: number
+  completionBonus: number
+  penaltyPerTick: number                // penalty if requirements stop being met
+}
+
+export interface ActiveMultiSiteContract {
+  id: string
+  def: MultiSiteContractDef
+  acceptedAtTick: number
+  ticksRemaining: number
+  totalEarned: number
+  totalPenalties: number
+  consecutiveViolations: number
+  status: 'active' | 'completed' | 'terminated'
+}
+
+export interface StaffTransfer {
+  id: string
+  staffId: string
+  staffName: string
+  staffRole: StaffRole
+  fromSiteId: string | null     // null = HQ
+  toSiteId: string | null       // null = HQ
+  cost: number
+  ticksRemaining: number
+  startedAtTick: number
+}
+
+export interface StaffTransferConfig {
+  baseCost: number              // base transfer cost
+  sameContinentTicks: number    // travel time same continent
+  crossContinentTicks: number   // travel time cross continent
+  costMultiplierPerLevel: number // skill level multiplier on transfer cost
+}
+
+export interface CompetitorRegionalPresence {
+  competitorId: string
+  regionId: RegionId
+  strength: number              // 0–1 local market strength
+  establishedAtTick: number
+}
+
 // ── Inter-Site Networking Types (Phase 6B) ────────────────────
 export type InterSiteLinkType = 'ip_transit' | 'leased_wavelength' | 'dark_fiber' | 'submarine_cable'
 

@@ -339,13 +339,13 @@ Expand from a single data center to a global data center empire with a world map
 - [x] Disaster preparedness investments (seismic reinforcement, flood barriers, hurricane hardening)
 - [x] Construction time for new sites
 
-#### Phase 6D — Global Strategy Layer
-- [ ] Customer demand heat maps on world map (by customer type)
-- [ ] Demand growth over time (emerging vs. saturated markets)
-- [ ] Multi-site contracts requiring presence in multiple regions
-- [ ] Data sovereignty mechanics (GDPR, LGPD — certain contracts require local presence)
-- [ ] Staff transfers between sites (cost + relocation time)
-- [ ] Regional competitor presence and market share per region
+#### Phase 6D — Global Strategy Layer ✅
+- [x] Customer demand heat maps on world map (by customer type) ✅
+- [x] Demand growth over time (emerging vs. saturated markets) ✅
+- [x] Multi-site contracts requiring presence in multiple regions ✅
+- [x] Data sovereignty mechanics (GDPR, LGPD — certain contracts require local presence) ✅
+- [x] Staff transfers between sites (cost + relocation time) ✅
+- [x] Regional competitor presence and market share per region ✅
 
 **Effort:** Very High | **Impact:** High — Transforms the game from facility management into global infrastructure strategy. Phased delivery: each sub-phase delivers standalone value. Gate: Enterprise tier + $500K+ cash + excellent reputation.
 

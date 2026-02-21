@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { useGameStore, REGION_CATALOG, SITE_TYPE_CONFIG, REGION_RESEARCH_COST, MAX_SITES, MULTI_SITE_GATE, INTER_SITE_LINK_CONFIG, MAX_LINKS_PER_SITE, DISASTER_PREP_CONFIG, REGIONAL_INCIDENT_CATALOG } from '@/stores/gameStore'
-import type { RegionId, SiteType, Region, InterSiteLinkType, InterSiteLink, DisasterPrepType, SiteDisasterPrep } from '@/stores/gameStore'
+import { useGameStore, REGION_CATALOG, SITE_TYPE_CONFIG, REGION_RESEARCH_COST, MAX_SITES, MULTI_SITE_GATE, INTER_SITE_LINK_CONFIG, MAX_LINKS_PER_SITE, DISASTER_PREP_CONFIG, REGIONAL_INCIDENT_CATALOG, DATA_SOVEREIGNTY_CONFIG, STAFF_TRANSFER_CONFIG, DEMAND_GROWTH_CONFIG } from '@/stores/gameStore'
+import type { RegionId, SiteType, Region, InterSiteLinkType, InterSiteLink, DisasterPrepType, SiteDisasterPrep, StaffTransfer, CompetitorRegionalPresence, DemandTrend } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Globe, MapPin, Search, Building, Zap, Thermometer, Wifi, DollarSign, ArrowRight, Link2, Unlink, Radio, Shield, AlertTriangle } from 'lucide-react'
+import { Globe, MapPin, Search, Building, Zap, Thermometer, Wifi, DollarSign, ArrowRight, Link2, Unlink, Radio, Shield, AlertTriangle, TrendingUp, Users, FileText } from 'lucide-react'
 import {
   Tooltip,
   TooltipContent,
@@ -34,6 +34,25 @@ const LINK_COLORS: Record<InterSiteLinkType, string> = {
 }
 
 const SITE_TYPE_OPTIONS: SiteType[] = ['edge_pop', 'colocation', 'hyperscale', 'network_hub', 'disaster_recovery']
+
+const DEMAND_TREND_COLORS: Record<DemandTrend, string> = {
+  emerging: '#00ff88',
+  stable: '#ffaa00',
+  saturated: '#ff4444',
+}
+
+function getDemandTrend(baseDemand: number, growth: number): DemandTrend {
+  const effective = baseDemand + growth
+  if (effective < DEMAND_GROWTH_CONFIG.emergingThreshold) return 'emerging'
+  if (effective > DEMAND_GROWTH_CONFIG.saturatedThreshold) return 'saturated'
+  return 'stable'
+}
+
+const SOVEREIGNTY_LABELS: Record<string, string> = {
+  gdpr: 'GDPR',
+  lgpd: 'LGPD',
+  pdpa: 'PDPA',
+}
 
 // HQ is always in Ashburn
 const HQ_COORDS = { x: 260, y: 195 }
@@ -419,7 +438,7 @@ function DisasterPrepSection({ site, sitePreps, onInstall, onRemove, money, regi
   )
 }
 
-function RegionDetail({ region, researched, site, sitePreps, onResearch, onPurchase, onInstallPrep, onRemovePrep, money }: {
+function RegionDetail({ region, researched, site, sitePreps, onResearch, onPurchase, onInstallPrep, onRemovePrep, money, demandGrowth, competitorPresence }: {
   region: Region
   researched: boolean
   site: { id: string; type: SiteType; operational: boolean; constructionTicksRemaining: number; cabinets: number; servers: number; revenue: number; expenses: number } | null
@@ -429,6 +448,8 @@ function RegionDetail({ region, researched, site, sitePreps, onResearch, onPurch
   onInstallPrep: (siteId: string, prepType: DisasterPrepType) => void
   onRemovePrep: (siteId: string, prepType: DisasterPrepType) => void
   money: number
+  demandGrowth: Record<string, number>
+  competitorPresence: CompetitorRegionalPresence[]
 }) {
   const [selectedType, setSelectedType] = useState<SiteType>('edge_pop')
   const continentColor = CONTINENT_COLORS[region.continent]
@@ -513,30 +534,73 @@ function RegionDetail({ region, researched, site, sitePreps, onResearch, onPurch
         </div>
       </div>
 
-      {/* Demand Profile */}
+      {/* Demand Profile with Growth Trends */}
       <div className="mb-2">
-        <span className="text-[10px] text-muted-foreground">Demand:</span>
-        <div className="flex gap-1 mt-0.5">
-          {Object.entries(region.demandProfile).map(([key, val]) => (
-            <Tooltip key={key}>
-              <TooltipTrigger asChild>
-                <div
-                  className="h-2 rounded-sm"
-                  style={{
-                    width: `${val * 100}%`,
-                    maxWidth: '60px',
-                    backgroundColor: val >= 0.7 ? '#00ff88' : val >= 0.4 ? '#ffaa00' : '#445566',
-                    opacity: 0.8,
-                  }}
-                />
-              </TooltipTrigger>
-              <TooltipContent side="top" className="font-mono text-xs">
-                {key}: {(val * 100).toFixed(0)}%
-              </TooltipContent>
-            </Tooltip>
-          ))}
+        <div className="flex items-center gap-1 mb-0.5">
+          <TrendingUp className="size-2.5 text-neon-cyan" />
+          <span className="text-[10px] text-muted-foreground">Demand & Growth:</span>
+        </div>
+        <div className="flex flex-col gap-0.5">
+          {Object.entries(region.demandProfile).map(([key, val]) => {
+            const growth = demandGrowth[key] || 0
+            const effective = Math.min(1, Math.max(0, val + growth))
+            const trend = getDemandTrend(val, growth)
+            return (
+              <div key={key} className="flex items-center gap-1 text-[10px]">
+                <span className="text-muted-foreground w-14 truncate text-[9px]">{key.replace('_', ' ')}:</span>
+                <div className="flex-1 h-1.5 bg-background rounded-full overflow-hidden border border-border">
+                  <div className="h-full rounded-full" style={{ width: `${effective * 100}%`, backgroundColor: effective >= 0.7 ? '#00ff88' : effective >= 0.4 ? '#ffaa00' : '#445566' }} />
+                </div>
+                <span className="text-[9px] w-8 text-right">{(effective * 100).toFixed(0)}%</span>
+                <span className="text-[8px] w-10 text-right" style={{ color: DEMAND_TREND_COLORS[trend] }}>
+                  {trend === 'emerging' ? '▲ grow' : trend === 'saturated' ? '▼ sat' : '● stbl'}
+                </span>
+              </div>
+            )
+          })}
         </div>
       </div>
+
+      {/* Data Sovereignty */}
+      {DATA_SOVEREIGNTY_CONFIG.some((r) => r.regions.includes(region.id)) && (
+        <div className="mb-2 p-1.5 border border-blue-800 rounded bg-blue-900/10">
+          <div className="flex items-center gap-1 mb-0.5">
+            <FileText className="size-2.5 text-blue-400" />
+            <span className="text-[10px] font-bold text-blue-400">DATA SOVEREIGNTY</span>
+          </div>
+          {DATA_SOVEREIGNTY_CONFIG.filter((r) => r.regions.includes(region.id)).map((rule) => (
+            <div key={rule.regime} className="text-[10px] font-mono">
+              <span className="text-blue-300">{rule.label}</span>
+              <span className="text-muted-foreground"> — {rule.description.split('.')[0]}.</span>
+              <div className="flex gap-2 mt-0.5">
+                <span className="text-neon-green text-[9px]">+{(rule.revenueBonus * 100).toFixed(0)}% revenue bonus</span>
+                <span className="text-red-400 text-[9px]">-{(rule.nonCompliancePenalty * 100).toFixed(0)}% if non-compliant</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Competitor Presence */}
+      {competitorPresence.length > 0 && (
+        <div className="mb-2">
+          <div className="flex items-center gap-1 mb-0.5">
+            <Users className="size-2.5 text-orange-400" />
+            <span className="text-[10px] text-orange-400 font-bold">COMPETITORS HERE</span>
+          </div>
+          <div className="flex flex-col gap-0.5">
+            {competitorPresence.map((cp) => (
+              <div key={cp.competitorId} className="flex items-center gap-1 text-[10px] font-mono">
+                <span className="text-muted-foreground flex-1 truncate">{cp.competitorId}</span>
+                <div className="w-12 h-1.5 bg-background rounded-full overflow-hidden border border-border">
+                  <div className="h-full rounded-full bg-orange-400" style={{ width: `${cp.strength * 100}%` }} />
+                </div>
+                <span className="text-[9px] text-orange-400 w-8 text-right">{(cp.strength * 100).toFixed(0)}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Disaster Risk Profile */}
       {(region.disasterProfile.earthquakeRisk > 0 || region.disasterProfile.floodRisk > 0 || region.disasterProfile.hurricaneRisk > 0 || region.disasterProfile.heatwaveRisk > 0 || region.disasterProfile.gridInstability > 0) && (
@@ -626,6 +690,46 @@ function RegionDetail({ region, researched, site, sitePreps, onResearch, onPurch
   )
 }
 
+function StaffTransferSection({ staffTransfers, sites, onCancel }: {
+  staffTransfers: StaffTransfer[]
+  sites: { id: string; name: string }[]
+  onCancel: (transferId: string) => void
+}) {
+  if (staffTransfers.length === 0) return null
+  return (
+    <div className="border border-border rounded p-2 bg-card">
+      <div className="flex items-center gap-2 mb-1.5">
+        <Users className="size-3 text-neon-cyan" />
+        <span className="text-[10px] font-bold text-neon-cyan">STAFF IN TRANSIT</span>
+        <Badge className="ml-auto text-[8px] font-mono bg-cyan-900/30 text-cyan-400 border-cyan-800">
+          {staffTransfers.length}
+        </Badge>
+      </div>
+      <div className="flex flex-col gap-1">
+        {staffTransfers.map((t) => {
+          const fromName = t.fromSiteId ? sites.find((s) => s.id === t.fromSiteId)?.name ?? '?' : 'HQ'
+          const toName = t.toSiteId ? sites.find((s) => s.id === t.toSiteId)?.name ?? '?' : 'HQ'
+          return (
+            <div key={t.id} className="flex items-center gap-1 text-[10px] font-mono p-1 rounded border border-border bg-background">
+              <span className="text-neon-cyan truncate flex-1">
+                {t.staffName} ({t.staffRole.replace('_', ' ')})
+              </span>
+              <span className="text-muted-foreground text-[9px]">{fromName} → {toName}</span>
+              <span className="text-yellow-400 text-[9px]">{t.ticksRemaining}t</span>
+              <button
+                className="text-red-400 hover:text-red-300 text-[9px] px-1 border border-red-800 rounded"
+                onClick={() => onCancel(t.id)}
+              >
+                X
+              </button>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 export function WorldMapPanel() {
   const {
     multiSiteUnlocked, worldMapOpen, sites, activeSiteId,
@@ -637,6 +741,10 @@ export function WorldMapPanel() {
     siteDisasterPreps, disasterPrepMaintenanceCost,
     regionalIncidentsBlocked,
     installDisasterPrep, removeDisasterPrep,
+    // Phase 6D
+    demandGrowthMultipliers, multiSiteContracts, multiSiteContractRevenue,
+    staffTransfers, competitorRegionalPresence,
+    transferStaff, cancelStaffTransfer, staff,
   } = useGameStore()
   const [selectedRegion, setSelectedRegion] = useState<RegionId | null>(null)
 
@@ -720,6 +828,18 @@ export function WorldMapPanel() {
             <>
               <span className="text-muted-foreground">Incidents Blocked:</span>
               <span className="text-neon-cyan">{regionalIncidentsBlocked}</span>
+            </>
+          )}
+          {multiSiteContractRevenue > 0 && (
+            <>
+              <span className="text-muted-foreground">Global Contracts:</span>
+              <span className="text-neon-green">${multiSiteContractRevenue.toFixed(0)}/t</span>
+            </>
+          )}
+          {staffTransfers.length > 0 && (
+            <>
+              <span className="text-muted-foreground">Staff In Transit:</span>
+              <span className="text-neon-cyan">{staffTransfers.length}</span>
             </>
           )}
           <span className="text-muted-foreground">Regions Scouted:</span>
@@ -811,6 +931,82 @@ export function WorldMapPanel() {
         </div>
       )}
 
+      {/* Staff Transfers */}
+      {staffTransfers.length > 0 && (
+        <StaffTransferSection
+          staffTransfers={staffTransfers}
+          sites={sites}
+          onCancel={cancelStaffTransfer}
+        />
+      )}
+
+      {/* Staff Transfer Quick Action (when viewing a remote site) */}
+      {activeSiteId !== null && staff.length > 0 && operationalSites.length > 0 && (
+        <div className="border border-border rounded p-2 bg-card">
+          <div className="flex items-center gap-2 mb-1.5">
+            <Users className="size-3 text-neon-cyan" />
+            <span className="text-[10px] font-bold text-neon-cyan">TRANSFER STAFF</span>
+          </div>
+          <p className="text-[9px] text-muted-foreground mb-1">Send staff from current site to another location.</p>
+          <div className="flex flex-col gap-0.5">
+            {staff.slice(0, 4).map((s) => (
+              <div key={s.id} className="flex items-center gap-1 text-[10px] font-mono">
+                <span className="flex-1 truncate">{s.name} ({s.role.replace('_', ' ')} L{s.skillLevel})</span>
+                <select
+                  className="text-[9px] bg-background border border-border rounded px-0.5 py-0 text-foreground"
+                  defaultValue=""
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      transferStaff(s.id, e.target.value === 'hq' ? null : e.target.value)
+                      e.target.value = ''
+                    }
+                  }}
+                >
+                  <option value="">Send to...</option>
+                  <option value="hq">HQ</option>
+                  {operationalSites.filter((os) => os.id !== activeSiteId).map((os) => (
+                    <option key={os.id} value={os.id}>{os.name}</option>
+                  ))}
+                </select>
+              </div>
+            ))}
+            {staff.length > 4 && (
+              <span className="text-[9px] text-muted-foreground">+{staff.length - 4} more staff</span>
+            )}
+            <span className="text-[9px] text-muted-foreground">Cost: ${STAFF_TRANSFER_CONFIG.baseCost.toLocaleString()}/person</span>
+          </div>
+        </div>
+      )}
+
+      {/* Active Multi-Site Contracts */}
+      {multiSiteContracts.filter((c) => c.status === 'active').length > 0 && (
+        <div className="border border-border rounded p-2 bg-card">
+          <div className="flex items-center gap-2 mb-1.5">
+            <FileText className="size-3 text-neon-green" />
+            <span className="text-[10px] font-bold text-neon-green">GLOBAL CONTRACTS</span>
+          </div>
+          <div className="flex flex-col gap-1">
+            {multiSiteContracts.filter((c) => c.status === 'active').map((c) => (
+              <div key={c.id} className="p-1 rounded border border-border bg-background text-[10px] font-mono">
+                <div className="flex items-center justify-between">
+                  <span className="text-neon-green">{c.def.label}</span>
+                  <span className="text-muted-foreground">{c.ticksRemaining}t left</span>
+                </div>
+                <div className="flex items-center gap-2 text-[9px]">
+                  <span className="text-neon-green">${c.def.revenuePerTick}/t</span>
+                  {c.def.sovereigntyRegime && c.def.sovereigntyRegime !== 'none' && (
+                    <Badge className="text-[8px] bg-blue-900/20 text-blue-400 border-blue-800">{SOVEREIGNTY_LABELS[c.def.sovereigntyRegime] ?? c.def.sovereigntyRegime}</Badge>
+                  )}
+                  {c.consecutiveViolations > 0 && (
+                    <span className="text-red-400">!! {c.consecutiveViolations} violations</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Region Detail */}
       {selectedRegionData && (
         <RegionDetail
@@ -823,6 +1019,8 @@ export function WorldMapPanel() {
           onInstallPrep={installDisasterPrep}
           onRemovePrep={removeDisasterPrep}
           money={money}
+          demandGrowth={demandGrowthMultipliers[selectedRegionData.id] ?? {}}
+          competitorPresence={competitorRegionalPresence.filter((cp) => cp.regionId === selectedRegionData.id)}
         />
       )}
     </div>

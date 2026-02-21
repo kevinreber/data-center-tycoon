@@ -255,6 +255,12 @@ export const ACHIEVEMENT_CATALOG: AchievementDef[] = [
   { id: 'disaster_prepped', label: 'Disaster Prepped', description: 'Install your first disaster preparedness investment.', icon: '🛡️' },
   { id: 'fully_hardened', label: 'Fully Hardened', description: 'Install all 4 disaster prep types across your sites.', icon: '🏰' },
   { id: 'regional_blocker', label: 'Disaster Deflected', description: 'Block 5 regional incidents with disaster preparedness.', icon: '⛑️' },
+  // Phase 6D — Global Strategy Layer achievements
+  { id: 'first_multisite_contract', label: 'Global Deal', description: 'Accept your first multi-site contract.', icon: '🤝' },
+  { id: 'sovereignty_compliant', label: 'Data Sovereign', description: 'Complete a contract with data sovereignty requirements.', icon: '🏛️' },
+  { id: 'staff_transferred', label: 'Staff Mobility', description: 'Complete your first staff transfer between sites.', icon: '🧳' },
+  { id: 'demand_surfer', label: 'Demand Surfer', description: 'Have a site in an emerging market with growing demand.', icon: '📈' },
+  { id: 'global_empire', label: 'Global Empire', description: 'Have active multi-site contracts generating $300+/tick total.', icon: '🏰' },
   // New Feature achievements
   { id: 'first_workload', label: 'Job Runner', description: 'Complete your first workload job.', icon: '🏋️' },
   { id: 'workload_master', label: 'Workload Master', description: 'Complete 10 workload jobs.', icon: '🎯' },
@@ -414,4 +420,9 @@ export const TUTORIAL_TIPS: TutorialTip[] = [
   // Phase 6C — Regional Incidents & Disaster Preparedness tips
   { id: 'regional_incident_hint', title: 'Regional Disasters', message: 'Expansion sites face region-specific disasters! Earthquakes in Bay Area/Tokyo, monsoons in Singapore/Mumbai, grid instability in Johannesburg. Check disaster risk before building.', category: 'incidents' },
   { id: 'disaster_prep_hint', title: 'Disaster Preparedness', message: 'Invest in disaster preparedness to mitigate regional risks. Seismic reinforcement, flood barriers, and hurricane hardening can significantly reduce damage.', category: 'incidents' },
+  // Phase 6D — Global Strategy Layer tips
+  { id: 'multisite_contracts_hint', title: 'Multi-Site Contracts', message: 'With sites in multiple regions, you can accept lucrative multi-site contracts! Check the Contracts panel for global deals requiring presence in specific regions.', category: 'contracts' },
+  { id: 'sovereignty_hint', title: 'Data Sovereignty', message: 'Some regions have data sovereignty laws (GDPR, LGPD). Contracts requiring local data residency pay premium rates but need a site in the right region.', category: 'contracts' },
+  { id: 'staff_transfer_hint', title: 'Staff Transfers', message: 'Transfer staff between sites to fill critical gaps. Cross-continent transfers take longer but let you leverage experienced engineers globally.', category: 'incidents' },
+  { id: 'demand_growth_hint', title: 'Market Dynamics', message: 'Regional demand changes over time! Emerging markets grow fast while saturated markets slow down. Expand early into high-growth regions for maximum returns.', category: 'market' },
 ]

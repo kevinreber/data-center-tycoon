@@ -32,6 +32,12 @@ import {
   INTER_SITE_LINK_CONFIG,
   DISASTER_PREP_CONFIG,
   REGIONAL_INCIDENT_CATALOG,
+  MULTI_SITE_CONTRACT_CATALOG,
+  MAX_MULTI_SITE_CONTRACTS,
+  DATA_SOVEREIGNTY_CONFIG,
+  STAFF_TRANSFER_CONFIG,
+  DEMAND_GROWTH_CONFIG,
+  COMPETITOR_REGIONAL_CONFIG,
   calcCabinetCooling,
   getChillerConnection,
   getAdjacentCabinets,
@@ -3240,6 +3246,247 @@ describe('Regional Incidents & Disaster Preparedness', () => {
       expect(getState().regionalIncidentCount).toBe(0)
       expect(getState().regionalIncidentsBlocked).toBe(0)
       expect(getState().disasterPrepMaintenanceCost).toBe(0)
+    })
+  })
+
+  // ── Phase 6D — Global Strategy Layer ────────────────────────────
+
+  describe('Multi-Site Contract Catalog validation', () => {
+    it('has at least 5 multi-site contract definitions', () => {
+      expect(MULTI_SITE_CONTRACT_CATALOG.length).toBeGreaterThanOrEqual(5)
+    })
+
+    it('all contracts have valid required regions', () => {
+      const regionIds = REGION_CATALOG.map((r) => r.id)
+      for (const def of MULTI_SITE_CONTRACT_CATALOG) {
+        for (const r of def.requiredRegions) {
+          expect(regionIds).toContain(r)
+        }
+      }
+    })
+
+    it('all contracts have positive revenue and duration', () => {
+      for (const def of MULTI_SITE_CONTRACT_CATALOG) {
+        expect(def.revenuePerTick).toBeGreaterThan(0)
+        expect(def.durationTicks).toBeGreaterThan(0)
+        expect(def.completionBonus).toBeGreaterThan(0)
+      }
+    })
+
+    it('sovereignty contracts reference valid sovereignty regimes', () => {
+      const validRegimes = DATA_SOVEREIGNTY_CONFIG.map((r) => r.regime)
+      for (const def of MULTI_SITE_CONTRACT_CATALOG) {
+        if (def.sovereigntyRegime && def.sovereigntyRegime !== 'none') {
+          expect(validRegimes).toContain(def.sovereigntyRegime)
+        }
+      }
+    })
+  })
+
+  describe('Data Sovereignty Config validation', () => {
+    it('has at least 3 sovereignty rules', () => {
+      expect(DATA_SOVEREIGNTY_CONFIG.length).toBeGreaterThanOrEqual(3)
+    })
+
+    it('all rules have valid regions', () => {
+      const regionIds = REGION_CATALOG.map((r) => r.id)
+      for (const rule of DATA_SOVEREIGNTY_CONFIG) {
+        for (const r of rule.regions) {
+          expect(regionIds).toContain(r)
+        }
+        expect(rule.revenueBonus).toBeGreaterThan(0)
+        expect(rule.nonCompliancePenalty).toBeGreaterThan(0)
+      }
+    })
+  })
+
+  describe('acceptMultiSiteContract action', () => {
+    it('accepts a contract when all required regions have operational sites', () => {
+      // The global_cdn contract requires ashburn, london, singapore
+      // ashburn is always HQ, so we need london and singapore
+      setupMultiSiteWithOperationalSite('london')
+      // Add another site in singapore
+      getState().researchRegion('singapore')
+      getState().purchaseSite('singapore', 'colocation', 'SG Colo')
+      setState({
+        sites: getState().sites.map((s) => ({
+          ...s,
+          operational: true,
+          constructionTicksRemaining: 0,
+          snapshot: {
+            cabinets: [], spineSwitches: [], pdus: [], cableTrays: [], cableRuns: [],
+            coolingUnits: [], chillerPlants: [], coolingPipes: [],
+            busways: [], crossConnects: [], inRowCoolers: [],
+            rowEndSlots: [], aisleContainments: [], aisleWidths: {},
+            raisedFloorTier: 'none', cableManagementType: 'none',
+            coolingType: 'air', suiteTier: 'starter',
+            totalPower: 0, avgHeat: 22, revenue: 0, expenses: 0,
+          },
+        })),
+      })
+      getState().acceptMultiSiteContract('global_cdn')
+      expect(getState().multiSiteContracts).toHaveLength(1)
+      expect(getState().multiSiteContracts[0].def.id).toBe('global_cdn')
+      expect(getState().multiSiteContracts[0].status).toBe('active')
+    })
+
+    it('rejects contract if required regions not met', () => {
+      setupMultiSiteWithOperationalSite('london')
+      // Missing singapore — should fail
+      getState().acceptMultiSiteContract('global_cdn')
+      expect(getState().multiSiteContracts).toHaveLength(0)
+    })
+
+    it('rejects duplicate active contracts', () => {
+      setupMultiSiteWithOperationalSite('london')
+      getState().researchRegion('singapore')
+      getState().purchaseSite('singapore', 'colocation', 'SG Colo')
+      setState({
+        sites: getState().sites.map((s) => ({
+          ...s,
+          operational: true,
+          constructionTicksRemaining: 0,
+          snapshot: {
+            cabinets: [], spineSwitches: [], pdus: [], cableTrays: [], cableRuns: [],
+            coolingUnits: [], chillerPlants: [], coolingPipes: [],
+            busways: [], crossConnects: [], inRowCoolers: [],
+            rowEndSlots: [], aisleContainments: [], aisleWidths: {},
+            raisedFloorTier: 'none', cableManagementType: 'none',
+            coolingType: 'air', suiteTier: 'starter',
+            totalPower: 0, avgHeat: 22, revenue: 0, expenses: 0,
+          },
+        })),
+      })
+      getState().acceptMultiSiteContract('global_cdn')
+      getState().acceptMultiSiteContract('global_cdn') // duplicate
+      expect(getState().multiSiteContracts).toHaveLength(1)
+    })
+
+    it('rejects contract if multi-site not unlocked', () => {
+      setState({ multiSiteUnlocked: false })
+      getState().acceptMultiSiteContract('global_cdn')
+      expect(getState().multiSiteContracts).toHaveLength(0)
+    })
+  })
+
+  describe('transferStaff action', () => {
+    it('transfers staff to a remote site', () => {
+      const siteId = setupMultiSiteWithOperationalSite('london')
+      // Hire staff
+      getState().hireStaff('network_engineer', 1)
+      expect(getState().staff).toHaveLength(1)
+      const staffId = getState().staff[0].id
+
+      getState().transferStaff(staffId, siteId)
+      expect(getState().staff).toHaveLength(0) // removed from current roster
+      expect(getState().staffTransfers).toHaveLength(1)
+      expect(getState().staffTransfers[0].staffId).toBe(staffId)
+      expect(getState().staffTransfers[0].toSiteId).toBe(siteId)
+    })
+
+    it('prevents transfer of staff already in transit', () => {
+      const siteId = setupMultiSiteWithOperationalSite('london')
+      getState().hireStaff('network_engineer', 1)
+      const staffId = getState().staff[0].id
+      getState().transferStaff(staffId, siteId)
+      // Try again — staff is already in transit
+      getState().transferStaff(staffId, siteId)
+      expect(getState().staffTransfers).toHaveLength(1)
+    })
+
+    it('deducts transfer cost', () => {
+      setupMultiSiteWithOperationalSite('london')
+      getState().hireStaff('network_engineer', 1)
+      setState({ sandboxMode: false, money: 50000 })
+      const moneyBefore = getState().money
+      const staffId = getState().staff[0].id
+      getState().transferStaff(staffId, getState().sites[0].id)
+      expect(getState().money).toBeLessThan(moneyBefore)
+    })
+
+    it('prevents transfer if not enough money', () => {
+      setupMultiSiteWithOperationalSite('london')
+      getState().hireStaff('network_engineer', 1)
+      setState({ sandboxMode: false, money: 1 })
+      const staffId = getState().staff[0].id
+      getState().transferStaff(staffId, getState().sites[0].id)
+      expect(getState().staffTransfers).toHaveLength(0)
+      expect(getState().staff).toHaveLength(1)
+    })
+  })
+
+  describe('cancelStaffTransfer action', () => {
+    it('cancels an in-transit transfer', () => {
+      const siteId = setupMultiSiteWithOperationalSite('london')
+      getState().hireStaff('network_engineer', 1)
+      const staffId = getState().staff[0].id
+      getState().transferStaff(staffId, siteId)
+      expect(getState().staffTransfers).toHaveLength(1)
+      const transferId = getState().staffTransfers[0].id
+      getState().cancelStaffTransfer(transferId)
+      expect(getState().staffTransfers).toHaveLength(0)
+    })
+  })
+
+  describe('Demand Growth Config validation', () => {
+    it('has valid growth parameters', () => {
+      expect(DEMAND_GROWTH_CONFIG.growthInterval).toBeGreaterThan(0)
+      expect(DEMAND_GROWTH_CONFIG.emergingGrowthRate).toBeGreaterThan(0)
+      expect(DEMAND_GROWTH_CONFIG.saturatedDecayRate).toBeLessThan(0)
+      expect(DEMAND_GROWTH_CONFIG.maxDemand).toBeGreaterThan(DEMAND_GROWTH_CONFIG.minDemand)
+      expect(DEMAND_GROWTH_CONFIG.saturatedThreshold).toBeGreaterThan(DEMAND_GROWTH_CONFIG.emergingThreshold)
+    })
+  })
+
+  describe('Staff Transfer Config validation', () => {
+    it('has valid transfer parameters', () => {
+      expect(STAFF_TRANSFER_CONFIG.baseCost).toBeGreaterThan(0)
+      expect(STAFF_TRANSFER_CONFIG.sameContinentTicks).toBeGreaterThan(0)
+      expect(STAFF_TRANSFER_CONFIG.crossContinentTicks).toBeGreaterThan(STAFF_TRANSFER_CONFIG.sameContinentTicks)
+    })
+  })
+
+  describe('Competitor Regional Config validation', () => {
+    it('has valid regional expansion parameters', () => {
+      expect(COMPETITOR_REGIONAL_CONFIG.expansionChance).toBeGreaterThan(0)
+      expect(COMPETITOR_REGIONAL_CONFIG.expansionChance).toBeLessThan(1)
+      expect(COMPETITOR_REGIONAL_CONFIG.maxRegionsPerCompetitor).toBeGreaterThan(0)
+      expect(COMPETITOR_REGIONAL_CONFIG.maxRegionalStrength).toBeGreaterThan(0)
+      expect(COMPETITOR_REGIONAL_CONFIG.maxRegionalStrength).toBeLessThanOrEqual(1)
+    })
+  })
+
+  describe('resetGame resets Phase 6D state', () => {
+    it('clears all Phase 6D state on reset', () => {
+      setupMultiSiteWithOperationalSite('london')
+      getState().researchRegion('singapore')
+      getState().purchaseSite('singapore', 'colocation', 'SG Colo')
+      setState({
+        sites: getState().sites.map((s) => ({
+          ...s,
+          operational: true,
+          constructionTicksRemaining: 0,
+          snapshot: {
+            cabinets: [], spineSwitches: [], pdus: [], cableTrays: [], cableRuns: [],
+            coolingUnits: [], chillerPlants: [], coolingPipes: [],
+            busways: [], crossConnects: [], inRowCoolers: [],
+            rowEndSlots: [], aisleContainments: [], aisleWidths: {},
+            raisedFloorTier: 'none', cableManagementType: 'none',
+            coolingType: 'air', suiteTier: 'starter',
+            totalPower: 0, avgHeat: 22, revenue: 0, expenses: 0,
+          },
+        })),
+      })
+      getState().acceptMultiSiteContract('global_cdn')
+      expect(getState().multiSiteContracts).toHaveLength(1)
+
+      getState().resetGame()
+      expect(getState().multiSiteContracts).toHaveLength(0)
+      expect(getState().multiSiteContractRevenue).toBe(0)
+      expect(getState().staffTransfers).toHaveLength(0)
+      expect(getState().staffTransfersCompleted).toBe(0)
+      expect(getState().competitorRegionalPresence).toHaveLength(0)
+      expect(getState().demandGrowthMultipliers).toEqual({})
     })
   })
 })
