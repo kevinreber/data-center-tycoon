@@ -14,6 +14,8 @@ export function GameCanvas() {
   // effects re-run against the now-ready scene (fixes demo-mode load
   // where state is populated before Phaser's async create() completes).
   const [sceneReady, setSceneReady] = useState(false)
+  // Track the active site so we can detect switches and do a full re-render
+  const prevSiteId = useRef<string | null>(null)
 
   const cabinets = useGameStore((s) => s.cabinets)
   const spineSwitches = useGameStore((s) => s.spineSwitches)
@@ -41,6 +43,36 @@ export function GameCanvas() {
   const viewMode = useGameStore((s) => s.viewMode)
   const rowEndSlots = useGameStore((s) => s.rowEndSlots)
   const audioSettings = useGameStore((s) => s.audioSettings)
+  const activeSiteId = useGameStore((s) => s.activeSiteId)
+
+  // ── Detect site switch and trigger full Phaser re-render ─────────
+  useEffect(() => {
+    if (!gameRef.current || !sceneReady) return
+    // Skip initial render — only trigger on actual switches
+    if (prevSiteId.current === activeSiteId) return
+    prevSiteId.current = activeSiteId
+
+    const scene = getScene(gameRef.current)
+    if (!scene) return
+
+    // Reset ref counters so all cabinets/spines are re-added from scratch
+    prevCabCount.current = 0
+    prevSpineCount.current = 0
+
+    // Clear all scene objects (will be rebuilt by subsequent sync effects)
+    scene.clearAllCabinets()
+    scene.clearAllSpines()
+    scene.clearInfrastructure()
+    scene.clearCoolingUnits()
+    scene.clearChillerPlants()
+    scene.clearCoolingPipes()
+
+    // Re-sync grid size for the current suite tier
+    const state = useGameStore.getState()
+    const limits = getSuiteLimits(state.suiteTier)
+    const layout = SUITE_TIERS[state.suiteTier].layout
+    scene.setGridSize(limits.cols, layout.totalGridRows, limits.maxSpines, layout)
+  }, [activeSiteId, sceneReady])
 
   // Tile click handler — called from Phaser when user clicks a grid tile
   const handleTileClick = useCallback((col: number, row: number) => {

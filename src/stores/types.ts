@@ -90,6 +90,34 @@ export interface SiteTypeConfig {
   description: string
 }
 
+// Per-site state snapshot — captures all site-specific arrays and fields
+// so that switching between sites preserves full state
+export interface SiteSnapshot {
+  cabinets: Cabinet[]
+  spineSwitches: SpineSwitch[]
+  pdus: PDU[]
+  cableTrays: CableTray[]
+  cableRuns: CableRun[]
+  coolingUnits: CoolingUnit[]
+  chillerPlants: ChillerPlant[]
+  coolingPipes: CoolingPipe[]
+  busways: Busway[]
+  crossConnects: CrossConnect[]
+  inRowCoolers: InRowCooling[]
+  rowEndSlots: RowEndSlot[]
+  aisleContainments: number[]
+  aisleWidths: Record<number, AisleWidth>
+  raisedFloorTier: RaisedFloorTier
+  cableManagementType: CableManagementType
+  coolingType: CoolingType
+  suiteTier: SuiteTier
+  // Computed fields (restored for quick display, recalculated on tick)
+  totalPower: number
+  avgHeat: number
+  revenue: number
+  expenses: number
+}
+
 export interface Site {
   id: string
   name: string
@@ -104,6 +132,7 @@ export interface Site {
   expenses: number
   heat: number
   suiteTier: SuiteTier
+  snapshot: SiteSnapshot | null  // full state when not active; null for HQ or not-yet-built
 }
 
 // ── Save Slot Types ────────────────────────────────────────────

@@ -57,7 +57,7 @@ import type {
   StaffMember, StaffTraining, HardwareOrder, InterconnectPort, PeeringAgreement,
   MaintenanceWindow, ActiveComplianceCert, Competitor, CompetitorBid,
   EventLogEntry, EventCategory, HistoryPoint, LifetimeStats, TutorialTip,
-  ScenarioDef, Site, Patent, RFPOffer, DrillResult, NetworkTopologyStats,
+  ScenarioDef, Site, SiteSnapshot, Patent, RFPOffer, DrillResult, NetworkTopologyStats,
   SaveSlotMeta,
   // New feature types
   ViewMode, RowEndSlotType, RowEndSlot, AisleWidth, RaisedFloorTier,
@@ -456,6 +456,7 @@ interface GameState {
   worldMapOpen: boolean
   sites: Site[]
   activeSiteId: string | null            // null = HQ (original site)
+  hqSnapshot: SiteSnapshot | null        // HQ state stored here when visiting a remote site
   researchedRegions: RegionId[]          // regions with revealed profiles
   totalSiteRevenue: number               // aggregate revenue from background sites per tick
   totalSiteExpenses: number              // aggregate expenses from background sites per tick
@@ -972,6 +973,7 @@ export const useGameStore = create<GameState>((set) => ({
   worldMapOpen: false,
   sites: [] as Site[],
   activeSiteId: null as string | null,
+  hqSnapshot: null as SiteSnapshot | null,
   researchedRegions: [] as RegionId[],
   totalSiteRevenue: 0,
   totalSiteExpenses: 0,
@@ -2255,6 +2257,7 @@ export const useGameStore = create<GameState>((set) => ({
         expenses: 0,
         heat: region.profile.coolingEfficiency + 22, // ambient based on region
         suiteTier: 'starter',
+        snapshot: null,
       }
       return {
         sites: [...state.sites, newSite],
@@ -2264,10 +2267,153 @@ export const useGameStore = create<GameState>((set) => ({
 
   switchSite: (siteId: string | null) =>
     set((state) => {
-      if (siteId === null) return { activeSiteId: null }  // switch to HQ
-      const site = state.sites.find((s) => s.id === siteId)
-      if (!site || !site.operational) return state
-      return { activeSiteId: siteId }
+      // Already on the requested site
+      if (siteId === state.activeSiteId) return state
+
+      // If switching to a remote site, validate it
+      if (siteId !== null) {
+        const target = state.sites.find((s) => s.id === siteId)
+        if (!target || !target.operational) return state
+      }
+
+      // ── Snapshot current site state ───────────────────────────
+      const currentSnapshot: SiteSnapshot = {
+        cabinets: state.cabinets,
+        spineSwitches: state.spineSwitches,
+        pdus: state.pdus,
+        cableTrays: state.cableTrays,
+        cableRuns: state.cableRuns,
+        coolingUnits: state.coolingUnits,
+        chillerPlants: state.chillerPlants,
+        coolingPipes: state.coolingPipes,
+        busways: state.busways,
+        crossConnects: state.crossConnects,
+        inRowCoolers: state.inRowCoolers,
+        rowEndSlots: state.rowEndSlots,
+        aisleContainments: state.aisleContainments,
+        aisleWidths: state.aisleWidths,
+        raisedFloorTier: state.raisedFloorTier,
+        cableManagementType: state.cableManagementType,
+        coolingType: state.coolingType,
+        suiteTier: state.suiteTier,
+        totalPower: state.totalPower,
+        avgHeat: state.avgHeat,
+        revenue: state.revenue,
+        expenses: state.expenses,
+      }
+
+      // Save snapshot into the current site's entry
+      let updatedSites = state.sites
+      if (state.activeSiteId === null) {
+        // Currently at HQ — store snapshot in a special 'hq' site field on the store
+        // We don't have an HQ site in the sites array, so we use hqSnapshot
+      } else {
+        // Currently at a remote site — update its snapshot
+        updatedSites = state.sites.map((s) =>
+          s.id === state.activeSiteId
+            ? {
+                ...s,
+                snapshot: currentSnapshot,
+                cabinets: state.cabinets.length,
+                servers: state.cabinets.reduce((sum, c) => sum + c.serverCount, 0),
+                suiteTier: state.suiteTier,
+              }
+            : s
+        )
+      }
+
+      // ── Restore target site state ─────────────────────────────
+      if (siteId === null) {
+        // Switching back to HQ — restore from hqSnapshot
+        const hq = state.hqSnapshot
+        if (!hq) return { activeSiteId: null, sites: updatedSites }
+        return {
+          activeSiteId: null,
+          sites: updatedSites,
+          cabinets: hq.cabinets,
+          spineSwitches: hq.spineSwitches,
+          pdus: hq.pdus,
+          cableTrays: hq.cableTrays,
+          cableRuns: hq.cableRuns,
+          coolingUnits: hq.coolingUnits,
+          chillerPlants: hq.chillerPlants,
+          coolingPipes: hq.coolingPipes,
+          busways: hq.busways,
+          crossConnects: hq.crossConnects,
+          inRowCoolers: hq.inRowCoolers,
+          rowEndSlots: hq.rowEndSlots,
+          aisleContainments: hq.aisleContainments,
+          aisleWidths: hq.aisleWidths,
+          raisedFloorTier: hq.raisedFloorTier,
+          cableManagementType: hq.cableManagementType,
+          coolingType: hq.coolingType,
+          suiteTier: hq.suiteTier,
+          hqSnapshot: null,
+          ...calcStats(hq.cabinets, hq.spineSwitches),
+          trafficStats: calcTraffic(hq.cabinets, hq.spineSwitches),
+        }
+      }
+
+      // Switching to a remote site — restore its snapshot
+      const target = updatedSites.find((s) => s.id === siteId)!
+      const snap = target.snapshot
+      // Save HQ snapshot if leaving HQ
+      const hqSnap = state.activeSiteId === null ? currentSnapshot : state.hqSnapshot
+
+      if (snap) {
+        return {
+          activeSiteId: siteId,
+          sites: updatedSites,
+          hqSnapshot: hqSnap,
+          cabinets: snap.cabinets,
+          spineSwitches: snap.spineSwitches,
+          pdus: snap.pdus,
+          cableTrays: snap.cableTrays,
+          cableRuns: snap.cableRuns,
+          coolingUnits: snap.coolingUnits,
+          chillerPlants: snap.chillerPlants,
+          coolingPipes: snap.coolingPipes,
+          busways: snap.busways,
+          crossConnects: snap.crossConnects,
+          inRowCoolers: snap.inRowCoolers,
+          rowEndSlots: snap.rowEndSlots,
+          aisleContainments: snap.aisleContainments,
+          aisleWidths: snap.aisleWidths,
+          raisedFloorTier: snap.raisedFloorTier,
+          cableManagementType: snap.cableManagementType,
+          coolingType: snap.coolingType,
+          suiteTier: snap.suiteTier,
+          ...calcStats(snap.cabinets, snap.spineSwitches),
+          trafficStats: calcTraffic(snap.cabinets, snap.spineSwitches),
+        }
+      }
+
+      // No snapshot yet (freshly built site) — start with empty state
+      return {
+        activeSiteId: siteId,
+        sites: updatedSites,
+        hqSnapshot: hqSnap,
+        cabinets: [],
+        spineSwitches: [],
+        pdus: [],
+        cableTrays: [],
+        cableRuns: [],
+        coolingUnits: [],
+        chillerPlants: [],
+        coolingPipes: [],
+        busways: [],
+        crossConnects: [],
+        inRowCoolers: [],
+        rowEndSlots: [],
+        aisleContainments: [],
+        aisleWidths: {},
+        raisedFloorTier: 'none' as RaisedFloorTier,
+        cableManagementType: 'none' as CableManagementType,
+        coolingType: 'air' as CoolingType,
+        suiteTier: target.suiteTier,
+        ...calcStats([], []),
+        trafficStats: calcTraffic([], []),
+      }
     }),
 
   // ── New Feature Actions ──────────────────────────────────────────
@@ -3390,6 +3536,7 @@ export const useGameStore = create<GameState>((set) => ({
       worldMapOpen: false,
       sites: [],
       activeSiteId: null,
+      hqSnapshot: null,
       researchedRegions: [],
       totalSiteRevenue: 0,
       totalSiteExpenses: 0,
@@ -3939,14 +4086,29 @@ export const useGameStore = create<GameState>((set) => ({
         }
 
         // Phase 6 — site construction still ticks even with no equipment
+        const earlyEventLog = [...state.eventLog]
         const earlyReturnSites = state.sites.map((site) => {
           if (!site.operational && site.constructionTicksRemaining > 0) {
             const remaining = site.constructionTicksRemaining - 1
-            if (remaining <= 0) return { ...site, constructionTicksRemaining: 0, operational: true }
+            if (remaining <= 0) {
+              const emptySnapshot: SiteSnapshot = {
+                cabinets: [], spineSwitches: [], pdus: [], cableTrays: [], cableRuns: [],
+                coolingUnits: [], chillerPlants: [], coolingPipes: [],
+                busways: [], crossConnects: [], inRowCoolers: [],
+                rowEndSlots: [], aisleContainments: [], aisleWidths: {},
+                raisedFloorTier: 'none', cableManagementType: 'none',
+                coolingType: 'air', suiteTier: 'starter' as SuiteTier,
+                totalPower: 0, avgHeat: SIM.ambientTemp, revenue: 0, expenses: 0,
+              }
+              earlyEventLog.push({ tick: newTickCount, gameHour: +(newHour.toFixed(1)), category: 'infrastructure' as EventCategory, message: `${site.name} construction complete — site is now operational!`, severity: 'success' as EventSeverity })
+              floatingTexts.push({ text: `${site.name} ONLINE`, color: '#00ff88', center: true })
+              return { ...site, constructionTicksRemaining: 0, operational: true, snapshot: emptySnapshot }
+            }
             return { ...site, constructionTicksRemaining: remaining }
           }
           return site
         })
+        if (earlyEventLog.length > 200) earlyEventLog.splice(0, earlyEventLog.length - 200)
         const earlyMultiSiteUnlocked = state.multiSiteUnlocked || (
           state.suiteTier === 'enterprise' &&
           state.money >= MULTI_SITE_GATE.minCash &&
@@ -3980,6 +4142,8 @@ export const useGameStore = create<GameState>((set) => ({
           // Phase 6
           sites: earlyReturnSites,
           multiSiteUnlocked: earlyMultiSiteUnlocked,
+          eventLog: earlyEventLog,
+          pendingFloatingTexts: floatingTexts,
         }
       }
 
@@ -4076,6 +4240,13 @@ export const useGameStore = create<GameState>((set) => ({
       const cableMgmtConfig = CABLE_MANAGEMENT_CONFIG.find((c) => c.type === state.cableManagementType)
       const facilityCableMessReduction = cableMgmtConfig?.cableMessReduction ?? 0
 
+      // Regional ambient modifier: remote sites have ambient temp shifted by region's coolingEfficiency
+      const activeSiteRegion = state.activeSiteId
+        ? REGION_CATALOG.find((r) => r.id === state.sites.find((s) => s.id === state.activeSiteId)?.regionId)
+        : null
+      const regionalAmbientOffset = activeSiteRegion ? activeSiteRegion.profile.coolingEfficiency : 0
+      const effectiveAmbientTemp = SIM.ambientTemp + regionalAmbientOffset
+
       // 1. Update heat per cabinet (with customer type, spacing, and tech modifiers)
       const newCabinets = state.cabinets.map((cab) => {
         let heat = cab.heatLevel
@@ -4152,8 +4323,8 @@ export const useGameStore = create<GameState>((set) => ({
         // Fire adds extra heat
         if (fireActive) heat += 5
 
-        // Clamp to ambient minimum and 100 max
-        heat = Math.max(SIM.ambientTemp, Math.min(100, heat))
+        // Clamp to ambient minimum (adjusted by regional cooling efficiency) and 100 max
+        heat = Math.max(effectiveAmbientTemp, Math.min(100, heat))
 
         // Age servers (depreciation)
         const newAge = cab.powerStatus ? cab.serverAge + 1 : cab.serverAge
@@ -4354,8 +4525,9 @@ export const useGameStore = create<GameState>((set) => ({
       const repTier = getReputationTier(state.reputationScore)
 
       // 4. Calculate expenses (with spot pricing, incident power surge, customer type power draw)
+      const regionalPowerMult = activeSiteRegion ? activeSiteRegion.profile.powerCostMultiplier : 1
       const effectivePower = Math.round(stats.totalPower * incidentPowerMult)
-      const spotPowerCost = SIM.powerCostPerKW * effectivePowerPrice
+      const spotPowerCost = SIM.powerCostPerKW * effectivePowerPrice * regionalPowerMult
       const powerCost = +(effectivePower / 1000 * spotPowerCost).toFixed(2)
       const coolingCost = +(adjustedCoolingPower / 1000 * spotPowerCost).toFixed(2)
       // Cooling unit power draw
@@ -5452,20 +5624,53 @@ export const useGameStore = create<GameState>((set) => ({
         if (!site.operational && site.constructionTicksRemaining > 0) {
           const remaining = site.constructionTicksRemaining - 1
           if (remaining <= 0) {
-            return { ...site, constructionTicksRemaining: 0, operational: true }
+            // Site construction complete — initialize with empty snapshot
+            const emptySnapshot: SiteSnapshot = {
+              cabinets: [], spineSwitches: [], pdus: [], cableTrays: [], cableRuns: [],
+              coolingUnits: [], chillerPlants: [], coolingPipes: [],
+              busways: [], crossConnects: [], inRowCoolers: [],
+              rowEndSlots: [], aisleContainments: [], aisleWidths: {},
+              raisedFloorTier: 'none', cableManagementType: 'none',
+              coolingType: 'air', suiteTier: 'starter' as SuiteTier,
+              totalPower: 0, avgHeat: SIM.ambientTemp, revenue: 0, expenses: 0,
+            }
+            eventLog.push({ tick: newTickCount, gameHour: +(newHour.toFixed(1)), category: 'infrastructure' as EventCategory, message: `${site.name} construction complete — site is now operational!`, severity: 'success' as EventSeverity })
+            floatingTexts.push({ text: `${site.name} ONLINE`, color: '#00ff88', center: true })
+            return { ...site, constructionTicksRemaining: 0, operational: true, snapshot: emptySnapshot }
           }
           return { ...site, constructionTicksRemaining: remaining }
         }
-        // Background site simplified revenue/expenses (only for operational non-active sites)
+        // Background site revenue/expenses (only for operational non-active sites with snapshots)
         if (site.operational && site.id !== state.activeSiteId) {
           const region = REGION_CATALOG.find((r) => r.id === site.regionId)
           const siteConfig = SITE_TYPE_CONFIG[site.type]
           const regionPowerMult = region ? region.profile.powerCostMultiplier : 1
-          const siteRev = site.servers * SIM.revenuePerServer * (region ? (region.demandProfile.general + 0.5) : 1)
-          const siteExp = site.servers * POWER_DRAW.server * 0.001 * POWER_MARKET.baseCost * regionPowerMult + siteConfig.maintenanceCostPerTick
+          // Use snapshot data for more accurate calculation if available
+          const srvCount = site.snapshot ? site.snapshot.cabinets.reduce((sum, c) => sum + c.serverCount, 0) : site.servers
+          const demandBonus = region ? Math.max(region.demandProfile.general, region.demandProfile.ai_training, region.demandProfile.streaming, region.demandProfile.enterprise, region.demandProfile.crypto) : 0.5
+          const siteRev = srvCount * SIM.revenuePerServer * (0.5 + demandBonus)
+          const siteExp = srvCount * POWER_DRAW.server * 0.001 * POWER_MARKET.baseCost * regionPowerMult + siteConfig.maintenanceCostPerTick
           totalSiteRevenue += siteRev
           totalSiteExpenses += siteExp
-          return { ...site, revenue: +siteRev.toFixed(2), expenses: +siteExp.toFixed(2) }
+          return {
+            ...site,
+            cabinets: site.snapshot ? site.snapshot.cabinets.length : site.cabinets,
+            servers: srvCount,
+            revenue: +siteRev.toFixed(2),
+            expenses: +siteExp.toFixed(2),
+          }
+        }
+        // Active remote site — sync live stats from current state
+        if (site.operational && site.id === state.activeSiteId) {
+          return {
+            ...site,
+            cabinets: newCabinets.length,
+            servers: newCabinets.reduce((sum, c) => sum + c.serverCount, 0),
+            suiteTier: state.suiteTier,
+            revenue: +revenue.toFixed(2),
+            expenses: +expenses.toFixed(2),
+            heat: Math.round(newCabinets.reduce((sum, c) => sum + c.heatLevel, 0) / Math.max(1, newCabinets.length)),
+          }
         }
         return site
       })

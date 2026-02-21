@@ -2882,6 +2882,28 @@ class DataCenterScene extends Phaser.Scene {
     this.pipeEntries.clear()
   }
 
+  /** Clear all cabinet graphics (used during site switching) */
+  clearAllCabinets() {
+    for (const g of this.cabinetGraphics.values()) g.destroy()
+    for (const labels of this.cabinetLabels.values()) labels.forEach(l => l.destroy())
+    this.cabinetGraphics.clear()
+    this.cabinetLabels.clear()
+    this.occupiedTiles.clear()
+    this.clearSelection()
+  }
+
+  /** Clear all spine switch graphics (used during site switching) */
+  clearAllSpines() {
+    for (const g of this.spineGraphics.values()) g.destroy()
+    for (const l of this.spineNodeLabels.values()) l.destroy()
+    this.spineGraphics.clear()
+    this.spineNodeLabels.clear()
+    this.spineEntries.clear()
+    this.spineCount = 0
+    // Clear traffic lines since they reference old spine IDs
+    this.trafficLinks = []
+  }
+
   /** Update aisle containment state and redraw aisle overlays */
   setAisleContainments(containedIds: number[]) {
     this.containedAisles = new Set(containedIds)
