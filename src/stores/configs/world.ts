@@ -12,6 +12,9 @@ import type {
   Region,
   InterSiteLinkType,
   InterSiteLinkConfig,
+  RegionalIncidentDef,
+  DisasterPrepType,
+  DisasterPrepConfig,
 } from '../types'
 
 // ── Carbon & Environmental Config ───────────────────────────────────
@@ -415,3 +418,171 @@ export const MAX_LINKS_PER_SITE = 4
 
 /** Bandwidth overage cost per Gbps over capacity per tick */
 export const BANDWIDTH_OVERAGE_COST = 2
+
+// ── Phase 6C — Regional Incidents ───────────────────────────────────
+
+export const REGIONAL_INCIDENT_CATALOG: RegionalIncidentDef[] = [
+  // Earthquake — Bay Area, Tokyo
+  {
+    type: 'earthquake', label: 'Earthquake', severity: 'critical',
+    description: 'Seismic event detected! Structural damage to cabinets and power outage.',
+    durationTicks: 50, resolveCost: 25000,
+    effect: 'cabinet_destruction', effectMagnitude: 0.2,
+    regions: ['bay_area', 'tokyo', 'mumbai'],
+    riskKey: 'earthquakeRisk', baseChance: 0.003,
+    mitigatedBy: 'seismic_reinforcement', mitigationFactor: 0.6,
+  },
+  // Wildfire smoke — Bay Area
+  {
+    type: 'wildfire_smoke', label: 'Wildfire Smoke', severity: 'minor',
+    description: 'Wildfire smoke infiltrating air intakes. Increased cooling load and filter costs.',
+    durationTicks: 30, resolveCost: 4000,
+    effect: 'heat_spike', effectMagnitude: 5,
+    regions: ['bay_area'],
+    riskKey: 'heatwaveRisk', baseChance: 0.004,
+    seasonalBoost: ['summer'],
+  },
+  // Tornado — Dallas
+  {
+    type: 'tornado', label: 'Tornado', severity: 'major',
+    description: 'Tornado warning! Outdoor equipment at risk of destruction.',
+    durationTicks: 20, resolveCost: 15000,
+    effect: 'power_surge', effectMagnitude: 1.5,
+    regions: ['dallas'],
+    riskKey: 'hurricaneRisk', baseChance: 0.003,
+    seasonalBoost: ['spring', 'summer'],
+    mitigatedBy: 'hurricane_hardening', mitigationFactor: 0.5,
+  },
+  // Grid collapse — Dallas, Johannesburg
+  {
+    type: 'grid_collapse', label: 'Grid Collapse', severity: 'critical',
+    description: 'Complete power grid failure! Generators are the only option.',
+    durationTicks: 40, resolveCost: 20000,
+    effect: 'power_surge', effectMagnitude: 2.0,
+    regions: ['dallas', 'johannesburg'],
+    riskKey: 'gridInstability', baseChance: 0.002,
+  },
+  // Hurricane — Ashburn, Dallas
+  {
+    type: 'hurricane', label: 'Hurricane', severity: 'critical',
+    description: 'Major hurricane approaching! Flooding, wind damage, and extended power loss.',
+    durationTicks: 60, resolveCost: 30000,
+    effect: 'cabinet_destruction', effectMagnitude: 0.15,
+    regions: ['ashburn', 'dallas'],
+    riskKey: 'hurricaneRisk', baseChance: 0.002,
+    seasonalBoost: ['summer', 'autumn'],
+    mitigatedBy: 'hurricane_hardening', mitigationFactor: 0.6,
+  },
+  // Volcanic eruption — Nordics
+  {
+    type: 'volcanic_eruption', label: 'Volcanic Eruption', severity: 'critical',
+    description: 'Volcanic activity detected! Ash clouds halt supply chain and threaten facility.',
+    durationTicks: 80, resolveCost: 35000,
+    effect: 'supply_chain_halt', effectMagnitude: 0,
+    regions: ['nordics'],
+    riskKey: 'earthquakeRisk', baseChance: 0.0005,
+  },
+  // Submarine cable cut — Nordics, London
+  {
+    type: 'submarine_cable_cut', label: 'Submarine Cable Cut', severity: 'major',
+    description: 'Undersea cable severed! Intercontinental connectivity lost.',
+    durationTicks: 60, resolveCost: 10000,
+    effect: 'traffic_drop', effectMagnitude: 0.4,
+    regions: ['nordics', 'london', 'singapore'],
+    riskKey: 'floodRisk', baseChance: 0.001,
+  },
+  // Monsoon flooding — Singapore, Mumbai
+  {
+    type: 'monsoon_flooding', label: 'Monsoon Flooding', severity: 'major',
+    description: 'Monsoon flooding! Ground-floor equipment damaged if not elevated.',
+    durationTicks: 25, resolveCost: 12000,
+    effect: 'cooling_failure', effectMagnitude: 0.3,
+    regions: ['singapore', 'mumbai'],
+    riskKey: 'floodRisk', baseChance: 0.004,
+    seasonalBoost: ['summer', 'autumn'],
+    mitigatedBy: 'flood_barriers', mitigationFactor: 0.7,
+  },
+  // Extreme heat — Dubai, Mumbai, Dallas, Singapore
+  {
+    type: 'extreme_heat', label: 'Extreme Heat Event', severity: 'major',
+    description: 'Record temperatures! Ambient heat overwhelming cooling systems.',
+    durationTicks: 25, resolveCost: 8000,
+    effect: 'heat_spike', effectMagnitude: 12,
+    regions: ['dubai', 'mumbai', 'dallas', 'singapore'],
+    riskKey: 'heatwaveRisk', baseChance: 0.005,
+    seasonalBoost: ['summer'],
+  },
+  // Grid load shedding — Johannesburg
+  {
+    type: 'grid_load_shedding', label: 'Grid Load Shedding', severity: 'major',
+    description: 'Scheduled rolling blackouts in effect. Power intermittent for extended period.',
+    durationTicks: 15, resolveCost: 5000,
+    effect: 'power_surge', effectMagnitude: 1.4,
+    regions: ['johannesburg'],
+    riskKey: 'gridInstability', baseChance: 0.008,
+  },
+  // Thames flooding — London
+  {
+    type: 'thames_flooding', label: 'Thames Flooding', severity: 'minor',
+    description: 'Thames burst banks. Basement water ingress risk affecting power systems.',
+    durationTicks: 15, resolveCost: 6000,
+    effect: 'cooling_failure', effectMagnitude: 0.4,
+    regions: ['london'],
+    riskKey: 'floodRisk', baseChance: 0.002,
+    mitigatedBy: 'flood_barriers', mitigationFactor: 0.8,
+  },
+  // Amsterdam flood — Amsterdam
+  {
+    type: 'amsterdam_flood', label: 'Below Sea Level Flood', severity: 'critical',
+    description: 'Polder defense failure! Catastrophic flooding threatens entire facility.',
+    durationTicks: 70, resolveCost: 40000,
+    effect: 'cabinet_destruction', effectMagnitude: 0.25,
+    regions: ['amsterdam'],
+    riskKey: 'floodRisk', baseChance: 0.0005,
+    mitigatedBy: 'flood_barriers', mitigationFactor: 0.7,
+  },
+]
+
+// ── Phase 6C — Disaster Preparedness ─────────────────────────────────
+
+export const DISASTER_PREP_CONFIG: Record<DisasterPrepType, DisasterPrepConfig> = {
+  seismic_reinforcement: {
+    type: 'seismic_reinforcement',
+    label: 'Seismic Reinforcement',
+    description: 'Reinforced rack mounts, flexible conduit, and structural bracing. Reduces earthquake damage by 60%.',
+    cost: 100000,
+    mitigates: 'earthquakeRisk',
+    damageReduction: 0.6,
+    maintenanceCostPerTick: 5,
+  },
+  flood_barriers: {
+    type: 'flood_barriers',
+    label: 'Flood Barriers',
+    description: 'Deployable flood walls, sump pumps, and waterproof seals. Prevents ground-floor flooding.',
+    cost: 50000,
+    mitigates: 'floodRisk',
+    damageReduction: 0.7,
+    maintenanceCostPerTick: 3,
+  },
+  hurricane_hardening: {
+    type: 'hurricane_hardening',
+    label: 'Hurricane Hardening',
+    description: 'Impact-rated windows, reinforced roof, wind-resistant enclosures. Reduces wind/water damage.',
+    cost: 75000,
+    mitigates: 'hurricaneRisk',
+    damageReduction: 0.6,
+    maintenanceCostPerTick: 4,
+  },
+  elevated_equipment: {
+    type: 'elevated_equipment',
+    label: 'Elevated Equipment',
+    description: 'Raised power and cooling equipment above flood level. Protects critical infrastructure from water.',
+    cost: 25000,
+    mitigates: 'floodRisk',
+    damageReduction: 0.5,
+    maintenanceCostPerTick: 1,
+  },
+}
+
+/** Max regional incidents active at once per site */
+export const MAX_REGIONAL_INCIDENTS = 2

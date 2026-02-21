@@ -250,6 +250,11 @@ export const ACHIEVEMENT_CATALOG: AchievementDef[] = [
   { id: 'dark_fiber', label: 'Dark Fiber', description: 'Install a dark fiber connection between sites.', icon: '🌑' },
   { id: 'submarine_cable', label: 'Submarine Cable', description: 'Lay a submarine cable across continents.', icon: '🌊' },
   { id: 'cdn_revenue', label: 'CDN Revenue', description: 'Earn CDN revenue from an Edge PoP with backhaul.', icon: '📡' },
+  // Phase 6C — Regional Incidents & Disaster Preparedness achievements
+  { id: 'disaster_survivor', label: 'Disaster Survivor', description: 'Survive a critical regional incident at an expansion site.', icon: '🌪️' },
+  { id: 'disaster_prepped', label: 'Disaster Prepped', description: 'Install your first disaster preparedness investment.', icon: '🛡️' },
+  { id: 'fully_hardened', label: 'Fully Hardened', description: 'Install all 4 disaster prep types across your sites.', icon: '🏰' },
+  { id: 'regional_blocker', label: 'Disaster Deflected', description: 'Block 5 regional incidents with disaster preparedness.', icon: '⛑️' },
   // New Feature achievements
   { id: 'first_workload', label: 'Job Runner', description: 'Complete your first workload job.', icon: '🏋️' },
   { id: 'workload_master', label: 'Workload Master', description: 'Complete 10 workload jobs.', icon: '🎯' },
@@ -406,4 +411,7 @@ export const TUTORIAL_TIPS: TutorialTip[] = [
   // Phase 6B — Inter-Site Networking tips
   { id: 'first_link_hint', title: 'Inter-Site Links', message: 'Connect your sites with network links! IP Transit is cheapest, Dark Fiber offers the best latency, and Submarine Cables cross continents.', category: 'network' },
   { id: 'edge_pop_backhaul', title: 'Edge PoP Backhaul', message: 'Edge PoPs need a backhaul link to earn CDN revenue. Connect them to HQ or another core site.', category: 'network' },
+  // Phase 6C — Regional Incidents & Disaster Preparedness tips
+  { id: 'regional_incident_hint', title: 'Regional Disasters', message: 'Expansion sites face region-specific disasters! Earthquakes in Bay Area/Tokyo, monsoons in Singapore/Mumbai, grid instability in Johannesburg. Check disaster risk before building.', category: 'incidents' },
+  { id: 'disaster_prep_hint', title: 'Disaster Preparedness', message: 'Invest in disaster preparedness to mitigate regional risks. Seismic reinforcement, flood barriers, and hurricane hardening can significantly reduce damage.', category: 'incidents' },
 ]

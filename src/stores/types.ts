@@ -135,6 +135,54 @@ export interface Site {
   snapshot: SiteSnapshot | null  // full state when not active; null for HQ or not-yet-built
 }
 
+// ── Regional Incidents & Disaster Preparedness (Phase 6C) ─────
+export type RegionalIncidentType =
+  | 'earthquake' | 'wildfire_smoke' | 'tornado' | 'grid_collapse'
+  | 'hurricane' | 'volcanic_eruption' | 'submarine_cable_cut'
+  | 'monsoon_flooding' | 'extreme_heat' | 'grid_load_shedding'
+  | 'thames_flooding' | 'amsterdam_flood'
+
+export type DisasterPrepType = 'seismic_reinforcement' | 'flood_barriers' | 'hurricane_hardening' | 'elevated_equipment'
+
+export interface RegionalIncidentDef {
+  type: RegionalIncidentType
+  label: string
+  severity: IncidentSeverity
+  description: string
+  durationTicks: number
+  resolveCost: number
+  effect: 'heat_spike' | 'revenue_penalty' | 'power_surge' | 'traffic_drop' | 'cooling_failure' | 'hardware_failure' | 'cabinet_destruction' | 'supply_chain_halt'
+  effectMagnitude: number
+  /** Which regions can spawn this incident */
+  regions: RegionId[]
+  /** Which disaster risk profile key determines spawn chance */
+  riskKey: keyof RegionDisasterProfile
+  /** Base chance per tick (multiplied by region risk) */
+  baseChance: number
+  /** Which season(s) increase chance, if any */
+  seasonalBoost?: Season[]
+  /** Which disaster prep type mitigates this */
+  mitigatedBy?: DisasterPrepType
+  /** Damage reduction factor when mitigated (0–1, where 1 = fully mitigated) */
+  mitigationFactor?: number
+}
+
+export interface DisasterPrepConfig {
+  type: DisasterPrepType
+  label: string
+  description: string
+  cost: number
+  mitigates: keyof RegionDisasterProfile
+  damageReduction: number   // 0–1 fraction of damage/severity prevented
+  maintenanceCostPerTick: number
+}
+
+export interface SiteDisasterPrep {
+  siteId: string
+  type: DisasterPrepType
+  installedAtTick: number
+}
+
 // ── Inter-Site Networking Types (Phase 6B) ────────────────────
 export type InterSiteLinkType = 'ip_transit' | 'leased_wavelength' | 'dark_fiber' | 'submarine_cable'
 

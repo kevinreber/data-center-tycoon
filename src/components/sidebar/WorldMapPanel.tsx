@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { useGameStore, REGION_CATALOG, SITE_TYPE_CONFIG, REGION_RESEARCH_COST, MAX_SITES, MULTI_SITE_GATE, INTER_SITE_LINK_CONFIG, MAX_LINKS_PER_SITE } from '@/stores/gameStore'
-import type { RegionId, SiteType, Region, InterSiteLinkType, InterSiteLink } from '@/stores/gameStore'
+import { useGameStore, REGION_CATALOG, SITE_TYPE_CONFIG, REGION_RESEARCH_COST, MAX_SITES, MULTI_SITE_GATE, INTER_SITE_LINK_CONFIG, MAX_LINKS_PER_SITE, DISASTER_PREP_CONFIG, REGIONAL_INCIDENT_CATALOG } from '@/stores/gameStore'
+import type { RegionId, SiteType, Region, InterSiteLinkType, InterSiteLink, DisasterPrepType, SiteDisasterPrep } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Globe, MapPin, Search, Building, Zap, Thermometer, Wifi, DollarSign, ArrowRight, Link2, Unlink, Radio } from 'lucide-react'
+import { Globe, MapPin, Search, Building, Zap, Thermometer, Wifi, DollarSign, ArrowRight, Link2, Unlink, Radio, Shield, AlertTriangle } from 'lucide-react'
 import {
   Tooltip,
   TooltipContent,
@@ -327,12 +327,107 @@ function LinkManagement({ sites, links, money, onInstall, onRemove }: {
   )
 }
 
-function RegionDetail({ region, researched, site, onResearch, onPurchase, money }: {
+function DisasterRiskBar({ label, risk }: { label: string; risk: number }) {
+  const color = risk >= 0.5 ? '#ff4444' : risk >= 0.2 ? '#ffaa00' : risk > 0 ? '#66cc66' : '#334455'
+  return (
+    <div className="flex items-center gap-1 text-[10px]">
+      <span className="text-muted-foreground w-16 truncate">{label}:</span>
+      <div className="flex-1 h-1.5 bg-background rounded-full overflow-hidden border border-border">
+        <div className="h-full rounded-full" style={{ width: `${Math.max(risk * 100, 2)}%`, backgroundColor: color }} />
+      </div>
+      <span className="text-[9px] w-6 text-right" style={{ color }}>{(risk * 100).toFixed(0)}%</span>
+    </div>
+  )
+}
+
+function DisasterPrepSection({ site, sitePreps, onInstall, onRemove, money, regionId }: {
+  site: { id: string }
+  sitePreps: SiteDisasterPrep[]
+  onInstall: (siteId: string, prepType: DisasterPrepType) => void
+  onRemove: (siteId: string, prepType: DisasterPrepType) => void
+  money: number
+  regionId: RegionId
+}) {
+  const prepTypes = Object.keys(DISASTER_PREP_CONFIG) as DisasterPrepType[]
+  // Filter to only show preps relevant to this region's risks
+  const relevantPreps = prepTypes.filter((pt) => {
+    const riskKey = DISASTER_PREP_CONFIG[pt].mitigates
+    const region = REGION_CATALOG.find((r) => r.id === regionId)
+    return region && region.disasterProfile[riskKey] > 0
+  })
+  if (relevantPreps.length === 0) return null
+
+  // What regional incidents can affect this region?
+  const regionIncidents = REGIONAL_INCIDENT_CATALOG.filter((ri) => ri.regions.includes(regionId))
+
+  return (
+    <div className="border border-border rounded p-2 bg-background mt-1">
+      <div className="flex items-center gap-2 mb-1.5">
+        <Shield className="size-3 text-neon-cyan" />
+        <span className="text-[10px] font-bold text-neon-cyan">DISASTER PREPAREDNESS</span>
+      </div>
+      {/* Regional threats */}
+      {regionIncidents.length > 0 && (
+        <div className="mb-1.5">
+          <span className="text-[9px] text-muted-foreground">Regional threats:</span>
+          <div className="flex flex-wrap gap-0.5 mt-0.5">
+            {regionIncidents.map((ri) => (
+              <span key={ri.type} className={`text-[8px] font-mono px-1 py-0.5 rounded border ${ri.severity === 'critical' ? 'border-red-800 text-red-400 bg-red-900/10' : ri.severity === 'major' ? 'border-orange-800 text-orange-400 bg-orange-900/10' : 'border-yellow-800 text-yellow-400 bg-yellow-900/10'}`}>
+                {ri.label}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+      {/* Prep options */}
+      <div className="flex flex-col gap-1">
+        {relevantPreps.map((pt) => {
+          const config = DISASTER_PREP_CONFIG[pt]
+          const installed = sitePreps.some((p) => p.type === pt)
+          return (
+            <div key={pt} className={`flex items-center gap-1.5 p-1 rounded border text-[10px] font-mono ${installed ? 'border-neon-green bg-green-900/10' : 'border-border bg-card'}`}>
+              <div className="flex-1">
+                <div className="flex items-center gap-1">
+                  {installed && <Shield className="size-2.5 text-neon-green" />}
+                  <span className={installed ? 'text-neon-green' : 'text-foreground'}>{config.label}</span>
+                </div>
+                <span className="text-[9px] text-muted-foreground">{config.description.split('.')[0]}.</span>
+              </div>
+              {installed ? (
+                <button
+                  className="text-[9px] text-red-400 hover:text-red-300 px-1 py-0.5 border border-red-800 rounded"
+                  onClick={() => onRemove(site.id, pt)}
+                >
+                  Remove
+                </button>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-[9px] h-5 px-1.5 font-mono"
+                  disabled={money < config.cost}
+                  onClick={() => onInstall(site.id, pt)}
+                >
+                  ${config.cost.toLocaleString()}
+                </Button>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function RegionDetail({ region, researched, site, sitePreps, onResearch, onPurchase, onInstallPrep, onRemovePrep, money }: {
   region: Region
   researched: boolean
   site: { id: string; type: SiteType; operational: boolean; constructionTicksRemaining: number; cabinets: number; servers: number; revenue: number; expenses: number } | null
+  sitePreps: SiteDisasterPrep[]
   onResearch: () => void
   onPurchase: (siteType: SiteType, name: string) => void
+  onInstallPrep: (siteId: string, prepType: DisasterPrepType) => void
+  onRemovePrep: (siteId: string, prepType: DisasterPrepType) => void
   money: number
 }) {
   const [selectedType, setSelectedType] = useState<SiteType>('edge_pop')
@@ -443,25 +538,55 @@ function RegionDetail({ region, researched, site, onResearch, onPurchase, money 
         </div>
       </div>
 
+      {/* Disaster Risk Profile */}
+      {(region.disasterProfile.earthquakeRisk > 0 || region.disasterProfile.floodRisk > 0 || region.disasterProfile.hurricaneRisk > 0 || region.disasterProfile.heatwaveRisk > 0 || region.disasterProfile.gridInstability > 0) && (
+        <div className="mb-2">
+          <div className="flex items-center gap-1 mb-0.5">
+            <AlertTriangle className="size-2.5 text-orange-400" />
+            <span className="text-[10px] text-orange-400 font-bold">DISASTER RISK</span>
+          </div>
+          <div className="flex flex-col gap-0.5">
+            {region.disasterProfile.earthquakeRisk > 0 && <DisasterRiskBar label="Seismic" risk={region.disasterProfile.earthquakeRisk} />}
+            {region.disasterProfile.floodRisk > 0 && <DisasterRiskBar label="Flood" risk={region.disasterProfile.floodRisk} />}
+            {region.disasterProfile.hurricaneRisk > 0 && <DisasterRiskBar label="Storm" risk={region.disasterProfile.hurricaneRisk} />}
+            {region.disasterProfile.heatwaveRisk > 0 && <DisasterRiskBar label="Heat" risk={region.disasterProfile.heatwaveRisk} />}
+            {region.disasterProfile.gridInstability > 0 && <DisasterRiskBar label="Grid" risk={region.disasterProfile.gridInstability} />}
+          </div>
+        </div>
+      )}
+
       {/* Existing site or purchase options */}
       {site ? (
-        <div className="border border-border rounded p-2 bg-background">
-          <div className="flex items-center gap-2 mb-1">
-            <Building className="size-3 text-neon-green" />
-            <span className="text-xs font-bold text-neon-green">{SITE_TYPE_CONFIG[site.type].label}</span>
-            <Badge className={`ml-auto text-[10px] font-mono ${site.operational ? 'bg-green-900/30 text-green-400 border-green-800' : 'bg-yellow-900/30 text-yellow-400 border-yellow-800'}`}>
-              {site.operational ? 'ONLINE' : `BUILDING (${site.constructionTicksRemaining}t)`}
-            </Badge>
-          </div>
-          {site.operational && (
-            <div className="grid grid-cols-2 gap-1 text-[10px]">
-              <span className="text-muted-foreground">Cabinets: {site.cabinets}</span>
-              <span className="text-muted-foreground">Servers: {site.servers}</span>
-              <span className="text-neon-green">Rev: ${site.revenue.toFixed(0)}/t</span>
-              <span className="text-red-400">Exp: ${site.expenses.toFixed(0)}/t</span>
+        <>
+          <div className="border border-border rounded p-2 bg-background">
+            <div className="flex items-center gap-2 mb-1">
+              <Building className="size-3 text-neon-green" />
+              <span className="text-xs font-bold text-neon-green">{SITE_TYPE_CONFIG[site.type].label}</span>
+              <Badge className={`ml-auto text-[10px] font-mono ${site.operational ? 'bg-green-900/30 text-green-400 border-green-800' : 'bg-yellow-900/30 text-yellow-400 border-yellow-800'}`}>
+                {site.operational ? 'ONLINE' : `BUILDING (${site.constructionTicksRemaining}t)`}
+              </Badge>
             </div>
+            {site.operational && (
+              <div className="grid grid-cols-2 gap-1 text-[10px]">
+                <span className="text-muted-foreground">Cabinets: {site.cabinets}</span>
+                <span className="text-muted-foreground">Servers: {site.servers}</span>
+                <span className="text-neon-green">Rev: ${site.revenue.toFixed(0)}/t</span>
+                <span className="text-red-400">Exp: ${site.expenses.toFixed(0)}/t</span>
+              </div>
+            )}
+          </div>
+          {/* Disaster Preparedness (only for operational sites) */}
+          {site.operational && (
+            <DisasterPrepSection
+              site={site}
+              sitePreps={sitePreps}
+              onInstall={onInstallPrep}
+              onRemove={onRemovePrep}
+              money={money}
+              regionId={region.id}
+            />
           )}
-        </div>
+        </>
       ) : (
         <div>
           <span className="text-[10px] text-muted-foreground block mb-1">Purchase site:</span>
@@ -509,6 +634,9 @@ export function WorldMapPanel() {
     totalSiteRevenue, totalSiteExpenses,
     interSiteLinks, interSiteLinkCost, edgePopCDNRevenue,
     installInterSiteLink, removeInterSiteLink,
+    siteDisasterPreps, disasterPrepMaintenanceCost,
+    regionalIncidentsBlocked,
+    installDisasterPrep, removeDisasterPrep,
   } = useGameStore()
   const [selectedRegion, setSelectedRegion] = useState<RegionId | null>(null)
 
@@ -580,6 +708,18 @@ export function WorldMapPanel() {
             <>
               <span className="text-muted-foreground">CDN Revenue:</span>
               <span className="text-neon-green">${edgePopCDNRevenue.toFixed(0)}/t</span>
+            </>
+          )}
+          {disasterPrepMaintenanceCost > 0 && (
+            <>
+              <span className="text-muted-foreground">Disaster Prep:</span>
+              <span className="text-red-400">${disasterPrepMaintenanceCost.toFixed(0)}/t</span>
+            </>
+          )}
+          {siteDisasterPreps.length > 0 && (
+            <>
+              <span className="text-muted-foreground">Incidents Blocked:</span>
+              <span className="text-neon-cyan">{regionalIncidentsBlocked}</span>
             </>
           )}
           <span className="text-muted-foreground">Regions Scouted:</span>
@@ -677,8 +817,11 @@ export function WorldMapPanel() {
           region={selectedRegionData}
           researched={researchedRegions.includes(selectedRegionData.id)}
           site={selectedSite}
+          sitePreps={selectedSite ? siteDisasterPreps.filter((p) => p.siteId === selectedSite.id) : []}
           onResearch={() => researchRegion(selectedRegionData.id)}
           onPurchase={(siteType, name) => purchaseSite(selectedRegionData.id, siteType, name)}
+          onInstallPrep={installDisasterPrep}
+          onRemovePrep={removeDisasterPrep}
           money={money}
         />
       )}

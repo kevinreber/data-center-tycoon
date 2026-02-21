@@ -30,6 +30,8 @@ import {
   REGION_RESEARCH_COST,
   MAX_SITES,
   INTER_SITE_LINK_CONFIG,
+  DISASTER_PREP_CONFIG,
+  REGIONAL_INCIDENT_CATALOG,
   calcCabinetCooling,
   getChillerConnection,
   getAdjacentCabinets,
@@ -3075,6 +3077,170 @@ describe('Reset Game includes new features', () => {
     expect(getState().advancedTier).toBeNull()
     expect(getState().activeWorkloads).toHaveLength(0)
     expect(getState().audioSettings.muted).toBe(false)
+  })
+})
+
+// ============================================================================
+// Phase 6C — Regional Incidents & Disaster Preparedness
+// ============================================================================
+
+describe('Regional Incidents & Disaster Preparedness', () => {
+  beforeEach(() => {
+    getState().resetGame()
+  })
+
+  function setupMultiSiteWithOperationalSite(regionId: RegionId = 'bay_area') {
+    setState({
+      sandboxMode: true,
+      money: 999999,
+      suiteTier: 'enterprise',
+      reputationScore: 80,
+      multiSiteUnlocked: true,
+    })
+    getState().researchRegion(regionId)
+    getState().purchaseSite(regionId, 'colocation', `${regionId} Colo`)
+    // Make operational
+    setState({
+      sites: getState().sites.map((s) => ({
+        ...s,
+        operational: true,
+        constructionTicksRemaining: 0,
+        snapshot: {
+          cabinets: [], spineSwitches: [], pdus: [], cableTrays: [], cableRuns: [],
+          coolingUnits: [], chillerPlants: [], coolingPipes: [],
+          busways: [], crossConnects: [], inRowCoolers: [],
+          rowEndSlots: [], aisleContainments: [], aisleWidths: {},
+          raisedFloorTier: 'none' as const, cableManagementType: 'none' as const,
+          coolingType: 'air' as const, suiteTier: 'starter' as const,
+          totalPower: 0, avgHeat: 22, revenue: 0, expenses: 0,
+        },
+      })),
+    })
+    return getState().sites[0].id
+  }
+
+  describe('REGIONAL_INCIDENT_CATALOG', () => {
+    it('has at least 10 regional incident types', () => {
+      expect(REGIONAL_INCIDENT_CATALOG.length).toBeGreaterThanOrEqual(10)
+    })
+
+    it('all incidents reference valid regions', () => {
+      const regionIds = REGION_CATALOG.map((r) => r.id)
+      for (const inc of REGIONAL_INCIDENT_CATALOG) {
+        for (const regionId of inc.regions) {
+          expect(regionIds).toContain(regionId)
+        }
+      }
+    })
+
+    it('all incidents have valid risk keys', () => {
+      const validKeys = ['earthquakeRisk', 'floodRisk', 'hurricaneRisk', 'heatwaveRisk', 'gridInstability']
+      for (const inc of REGIONAL_INCIDENT_CATALOG) {
+        expect(validKeys).toContain(inc.riskKey)
+      }
+    })
+
+    it('mitigatedBy references valid disaster prep types', () => {
+      const validPreps = Object.keys(DISASTER_PREP_CONFIG)
+      for (const inc of REGIONAL_INCIDENT_CATALOG) {
+        if (inc.mitigatedBy) {
+          expect(validPreps).toContain(inc.mitigatedBy)
+        }
+      }
+    })
+  })
+
+  describe('DISASTER_PREP_CONFIG', () => {
+    it('has 4 disaster prep types', () => {
+      expect(Object.keys(DISASTER_PREP_CONFIG)).toHaveLength(4)
+    })
+
+    it('all preps have positive cost and damage reduction', () => {
+      for (const config of Object.values(DISASTER_PREP_CONFIG)) {
+        expect(config.cost).toBeGreaterThan(0)
+        expect(config.damageReduction).toBeGreaterThan(0)
+        expect(config.damageReduction).toBeLessThanOrEqual(1)
+      }
+    })
+  })
+
+  describe('installDisasterPrep', () => {
+    it('installs disaster prep for a site', () => {
+      const siteId = setupMultiSiteWithOperationalSite('bay_area')
+      expect(getState().siteDisasterPreps).toHaveLength(0)
+
+      getState().installDisasterPrep(siteId, 'seismic_reinforcement')
+      expect(getState().siteDisasterPreps).toHaveLength(1)
+      expect(getState().siteDisasterPreps[0].siteId).toBe(siteId)
+      expect(getState().siteDisasterPreps[0].type).toBe('seismic_reinforcement')
+    })
+
+    it('prevents duplicate prep types for same site', () => {
+      const siteId = setupMultiSiteWithOperationalSite('bay_area')
+      getState().installDisasterPrep(siteId, 'seismic_reinforcement')
+      getState().installDisasterPrep(siteId, 'seismic_reinforcement')
+      expect(getState().siteDisasterPreps).toHaveLength(1)
+    })
+
+    it('allows different prep types for same site', () => {
+      const siteId = setupMultiSiteWithOperationalSite('bay_area')
+      getState().installDisasterPrep(siteId, 'seismic_reinforcement')
+      getState().installDisasterPrep(siteId, 'flood_barriers')
+      expect(getState().siteDisasterPreps).toHaveLength(2)
+    })
+
+    it('does not work if multi-site is not unlocked', () => {
+      const siteId = setupMultiSiteWithOperationalSite('bay_area')
+      setState({ multiSiteUnlocked: false })
+      getState().installDisasterPrep(siteId, 'seismic_reinforcement')
+      expect(getState().siteDisasterPreps).toHaveLength(0)
+    })
+
+    it('deducts cost in non-sandbox mode', () => {
+      const siteId = setupMultiSiteWithOperationalSite('bay_area')
+      setState({ sandboxMode: false, money: 200000 })
+      const moneyBefore = getState().money
+      getState().installDisasterPrep(siteId, 'seismic_reinforcement')
+      expect(getState().money).toBe(moneyBefore - DISASTER_PREP_CONFIG.seismic_reinforcement.cost)
+    })
+
+    it('does not install if insufficient funds in non-sandbox', () => {
+      const siteId = setupMultiSiteWithOperationalSite('bay_area')
+      setState({ sandboxMode: false, money: 10 })
+      getState().installDisasterPrep(siteId, 'seismic_reinforcement')
+      expect(getState().siteDisasterPreps).toHaveLength(0)
+    })
+  })
+
+  describe('removeDisasterPrep', () => {
+    it('removes an installed disaster prep', () => {
+      const siteId = setupMultiSiteWithOperationalSite('bay_area')
+      getState().installDisasterPrep(siteId, 'seismic_reinforcement')
+      expect(getState().siteDisasterPreps).toHaveLength(1)
+
+      getState().removeDisasterPrep(siteId, 'seismic_reinforcement')
+      expect(getState().siteDisasterPreps).toHaveLength(0)
+    })
+
+    it('does nothing if prep not installed', () => {
+      const siteId = setupMultiSiteWithOperationalSite('bay_area')
+      getState().removeDisasterPrep(siteId, 'seismic_reinforcement')
+      expect(getState().siteDisasterPreps).toHaveLength(0)
+    })
+  })
+
+  describe('resetGame resets Phase 6C state', () => {
+    it('clears all disaster prep state on reset', () => {
+      const siteId = setupMultiSiteWithOperationalSite('bay_area')
+      getState().installDisasterPrep(siteId, 'seismic_reinforcement')
+      expect(getState().siteDisasterPreps).toHaveLength(1)
+
+      getState().resetGame()
+      expect(getState().siteDisasterPreps).toHaveLength(0)
+      expect(getState().regionalIncidentCount).toBe(0)
+      expect(getState().regionalIncidentsBlocked).toBe(0)
+      expect(getState().disasterPrepMaintenanceCost).toBe(0)
+    })
   })
 })
 

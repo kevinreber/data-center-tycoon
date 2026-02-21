@@ -8,6 +8,7 @@ export type {
   CompetitorPersonality, OpsTier, SiteType, Continent, RegionId,
   RegionProfile, RegionDemandProfile, RegionDisasterProfile, Region, SiteTypeConfig, Site,
   InterSiteLinkType, InterSiteLink, InterSiteLinkConfig,
+  RegionalIncidentType, DisasterPrepType, RegionalIncidentDef, DisasterPrepConfig, SiteDisasterPrep,
   SaveSlotMeta, CustomerTypeConfig, GeneratorConfig, Generator, SuppressionConfig,
   TechDef, ActiveResearch, OpsTierConfig, CabinetFacing,
   PDU, PDUConfig, CableTray, CableTrayConfig, CableRun,
@@ -52,13 +53,14 @@ import type {
   ChillerTier, Cabinet, SpineSwitch, TrafficStats, LayerColors,
   LayerVisibility, LayerOpacity, LayerColorOverrides, NodeType,
   ContractDef, ActiveResearch,
-  Generator, Loan, ActiveIncident, ActiveContract, Achievement,
+  Generator, Loan, IncidentDef, ActiveIncident, ActiveContract, Achievement,
   PDU, CableTray, CableRun, Busway, CrossConnect, InRowCooling,
   CoolingUnit, ChillerPlant, CoolingPipe, Zone, DedicatedRowInfo,
   StaffMember, StaffTraining, HardwareOrder, InterconnectPort, PeeringAgreement,
   MaintenanceWindow, ActiveComplianceCert, Competitor, CompetitorBid,
   EventLogEntry, EventCategory, HistoryPoint, LifetimeStats, TutorialTip,
   ScenarioDef, Site, SiteSnapshot, Patent, RFPOffer, DrillResult, NetworkTopologyStats, InterSiteLink,
+  SiteDisasterPrep, DisasterPrepType,
   SaveSlotMeta,
   // New feature types
   ViewMode, RowEndSlotType, RowEndSlot, AisleWidth, RaisedFloorTier,
@@ -84,8 +86,8 @@ import { TECH_TREE, OPS_TIER_CONFIG, OPS_TIER_ORDER, CONTRACT_CATALOG, CONTRACT_
 export { LOAN_OPTIONS, POWER_MARKET, DEPRECIATION, INSURANCE_OPTIONS, DRILL_CONFIG, VALUATION_MILESTONES, PATENT_CONFIG, RFP_CONFIG, SPOT_COMPUTE_CONFIG, MAINTENANCE_CONFIG, PEERING_OPTIONS, INTERCONNECT_PORT_CONFIG, MEETME_ROOM_CONFIG, INTERCONNECT_TENANTS, SUPPLY_CHAIN_CONFIG, SEASON_CONFIG, WEATHER_CONDITION_CONFIG, STAFF_ROLE_CONFIG, STAFF_CERT_CONFIG, SHIFT_PATTERN_CONFIG, MAX_STAFF_BY_TIER, FIRST_NAMES, LAST_NAMES, generateStaffName } from './configs/economy'
 import { LOAN_OPTIONS, POWER_MARKET, DEPRECIATION, INSURANCE_OPTIONS, DRILL_CONFIG, VALUATION_MILESTONES, PATENT_CONFIG, RFP_CONFIG, SPOT_COMPUTE_CONFIG, MAINTENANCE_CONFIG, PEERING_OPTIONS, INTERCONNECT_PORT_CONFIG, MEETME_ROOM_CONFIG, INTERCONNECT_TENANTS, SUPPLY_CHAIN_CONFIG, SEASON_CONFIG, WEATHER_CONDITION_CONFIG, STAFF_ROLE_CONFIG, STAFF_CERT_CONFIG, SHIFT_PATTERN_CONFIG, MAX_STAFF_BY_TIER, generateStaffName } from './configs/economy'
 
-export { ENERGY_SOURCE_CONFIG, GREEN_CERT_CONFIG, CARBON_TAX_SCHEDULE, WATER_USAGE_CONFIG, EWASTE_CONFIG, SECURITY_FEATURE_CONFIG, SECURITY_TIER_CONFIG, COMPLIANCE_CERT_CONFIG, COMPETITOR_PERSONALITIES, COMPETITOR_NAMES, COMPETITOR_SCALE_CONFIG, MULTI_SITE_GATE, SITE_TYPE_CONFIG, REGION_CATALOG, REGION_RESEARCH_COST, MAX_SITES, INTER_SITE_LINK_CONFIG, DISTANCE_LATENCY_MODIFIER, EDGE_POP_CDN_REVENUE_PER_GBPS, MAX_LINKS_PER_SITE, BANDWIDTH_OVERAGE_COST } from './configs/world'
-import { ENERGY_SOURCE_CONFIG, GREEN_CERT_CONFIG, CARBON_TAX_SCHEDULE, WATER_USAGE_CONFIG, EWASTE_CONFIG, SECURITY_FEATURE_CONFIG, SECURITY_TIER_CONFIG, COMPLIANCE_CERT_CONFIG, COMPETITOR_PERSONALITIES, COMPETITOR_NAMES, COMPETITOR_SCALE_CONFIG, MULTI_SITE_GATE, SITE_TYPE_CONFIG, REGION_CATALOG, REGION_RESEARCH_COST, MAX_SITES, INTER_SITE_LINK_CONFIG, DISTANCE_LATENCY_MODIFIER, EDGE_POP_CDN_REVENUE_PER_GBPS, MAX_LINKS_PER_SITE } from './configs/world'
+export { ENERGY_SOURCE_CONFIG, GREEN_CERT_CONFIG, CARBON_TAX_SCHEDULE, WATER_USAGE_CONFIG, EWASTE_CONFIG, SECURITY_FEATURE_CONFIG, SECURITY_TIER_CONFIG, COMPLIANCE_CERT_CONFIG, COMPETITOR_PERSONALITIES, COMPETITOR_NAMES, COMPETITOR_SCALE_CONFIG, MULTI_SITE_GATE, SITE_TYPE_CONFIG, REGION_CATALOG, REGION_RESEARCH_COST, MAX_SITES, INTER_SITE_LINK_CONFIG, DISTANCE_LATENCY_MODIFIER, EDGE_POP_CDN_REVENUE_PER_GBPS, MAX_LINKS_PER_SITE, BANDWIDTH_OVERAGE_COST, REGIONAL_INCIDENT_CATALOG, DISASTER_PREP_CONFIG, MAX_REGIONAL_INCIDENTS } from './configs/world'
+import { ENERGY_SOURCE_CONFIG, GREEN_CERT_CONFIG, CARBON_TAX_SCHEDULE, WATER_USAGE_CONFIG, EWASTE_CONFIG, SECURITY_FEATURE_CONFIG, SECURITY_TIER_CONFIG, COMPLIANCE_CERT_CONFIG, COMPETITOR_PERSONALITIES, COMPETITOR_NAMES, COMPETITOR_SCALE_CONFIG, MULTI_SITE_GATE, SITE_TYPE_CONFIG, REGION_CATALOG, REGION_RESEARCH_COST, MAX_SITES, INTER_SITE_LINK_CONFIG, DISTANCE_LATENCY_MODIFIER, EDGE_POP_CDN_REVENUE_PER_GBPS, MAX_LINKS_PER_SITE, REGIONAL_INCIDENT_CATALOG, DISASTER_PREP_CONFIG, MAX_REGIONAL_INCIDENTS } from './configs/world'
 
 // ── Re-export calculations ─────────────────────────────────────
 export { coolingOverheadFactor, calcManagementBonus, calcTrafficWithCapacity, calcCabinetCooling, getCabinetsInPDURange, getPDULoad, isPDUOverloaded, calcCableLength, getFacingOffsets, calcAisleBonus, countAisleViolations, getAdjacentCabinets, hasMaintenanceAccess, calcSpacingHeatEffect, countMessyCables, calcZones, isZoneRequirementMet, calcMixedEnvPenalties, calcDedicatedRows, getSuiteLimits, getCabinetRowAtGrid, getValidCabinetGridRows, getRowFacing, getPlacementHints, formatGameTime, getReputationTier } from './calculations'
@@ -467,6 +469,12 @@ interface GameState {
   interSiteLinkCost: number              // total link costs per tick
   edgePopCDNRevenue: number              // CDN revenue from edge PoPs with backhaul
 
+  // Phase 6C — Regional Incidents & Disaster Preparedness
+  siteDisasterPreps: SiteDisasterPrep[]   // disaster prep investments per site
+  regionalIncidentCount: number           // lifetime regional incidents spawned
+  disasterPrepMaintenanceCost: number     // total maintenance cost per tick for all disaster preps
+  regionalIncidentsBlocked: number        // lifetime regional incidents fully mitigated
+
   // ── New Features ─────────────────────────────────────────────
 
   // View Mode (sub-floor view)
@@ -619,6 +627,9 @@ interface GameState {
   // Phase 6B — Inter-Site Networking actions
   installInterSiteLink: (siteAId: string | null, siteBId: string, linkType: InterSiteLinkType) => void
   removeInterSiteLink: (linkId: string) => void
+  // Phase 6C — Disaster Preparedness actions
+  installDisasterPrep: (siteId: string, prepType: DisasterPrepType) => void
+  removeDisasterPrep: (siteId: string, prepType: DisasterPrepType) => void
   // New Feature Actions
   setViewMode: (mode: ViewMode) => void
   placeRowEndSlot: (rowId: number, side: 'left' | 'right', type: RowEndSlotType) => void
@@ -992,6 +1003,12 @@ export const useGameStore = create<GameState>((set) => ({
   interSiteLinks: [] as InterSiteLink[],
   interSiteLinkCost: 0,
   edgePopCDNRevenue: 0,
+
+  // Phase 6C — Regional Incidents & Disaster Preparedness
+  siteDisasterPreps: [] as SiteDisasterPrep[],
+  regionalIncidentCount: 0,
+  disasterPrepMaintenanceCost: 0,
+  regionalIncidentsBlocked: 0,
 
   // ── New Features ────────────────────────────────────────────
 
@@ -2513,6 +2530,31 @@ export const useGameStore = create<GameState>((set) => ({
       }
     }),
 
+  // ── Phase 6C — Disaster Preparedness Actions ─────────────────────
+
+  installDisasterPrep: (siteId: string, prepType: DisasterPrepType) =>
+    set((state) => {
+      if (!state.multiSiteUnlocked) return state
+      // Check site exists
+      const site = state.sites.find((s) => s.id === siteId)
+      if (!site) return state
+      // Check not already installed for this site
+      if (state.siteDisasterPreps.some((p) => p.siteId === siteId && p.type === prepType)) return state
+      const config = DISASTER_PREP_CONFIG[prepType]
+      if (!state.sandboxMode && state.money < config.cost) return state
+      return {
+        siteDisasterPreps: [...state.siteDisasterPreps, { siteId, type: prepType, installedAtTick: state.tickCount }],
+        money: state.sandboxMode ? state.money : state.money - config.cost,
+      }
+    }),
+
+  removeDisasterPrep: (siteId: string, prepType: DisasterPrepType) =>
+    set((state) => {
+      return {
+        siteDisasterPreps: state.siteDisasterPreps.filter((p) => !(p.siteId === siteId && p.type === prepType)),
+      }
+    }),
+
   // ── New Feature Actions ──────────────────────────────────────────
 
   setViewMode: (mode: ViewMode) =>
@@ -3642,6 +3684,11 @@ export const useGameStore = create<GameState>((set) => ({
       interSiteLinks: [],
       interSiteLinkCost: 0,
       edgePopCDNRevenue: 0,
+      // Phase 6C — Regional Incidents & Disaster Preparedness
+      siteDisasterPreps: [],
+      regionalIncidentCount: 0,
+      disasterPrepMaintenanceCost: 0,
+      regionalIncidentsBlocked: 0,
       // New Features
       viewMode: 'cabinet' as ViewMode,
       rowEndSlots: [],
@@ -3835,6 +3882,86 @@ export const useGameStore = create<GameState>((set) => ({
         } else if (opsSpawnReduction > 0 && Math.random() < baseSpawnChance) {
           // Incident was prevented by ops tier
           opsPreventedCount++
+        }
+      }
+
+      // ── Phase 6C — Regional Incident Spawning ────────────────────
+      // For each operational site, check region-specific disaster risk and spawn regional incidents
+      let regionalIncidentCount = state.regionalIncidentCount
+      let regionalIncidentsBlocked = state.regionalIncidentsBlocked
+      let disasterPrepMaintenanceCost = 0
+      if (state.multiSiteUnlocked && state.sites.length > 0) {
+        // Calculate disaster prep maintenance cost
+        for (const prep of state.siteDisasterPreps) {
+          const prepConfig = DISASTER_PREP_CONFIG[prep.type]
+          disasterPrepMaintenanceCost += prepConfig.maintenanceCostPerTick
+        }
+        // Check each operational site for regional incidents
+        for (const site of state.sites) {
+          if (!site.operational) continue
+          const region = REGION_CATALOG.find((r) => r.id === site.regionId)
+          if (!region) continue
+          // Count regional incidents already active for this site
+          const siteRegionalIncidents = activeIncidents.filter((i) =>
+            !i.resolved && i.def.type.startsWith('regional_') && i.affectedHardwareId === site.id
+          ).length
+          if (siteRegionalIncidents >= MAX_REGIONAL_INCIDENTS) continue
+          // Check each regional incident type that can spawn in this region
+          for (const riDef of REGIONAL_INCIDENT_CATALOG) {
+            if (!riDef.regions.includes(site.regionId)) continue
+            const riskLevel = region.disasterProfile[riDef.riskKey]
+            if (riskLevel <= 0) continue
+            let spawnChance = riDef.baseChance * riskLevel
+            // Seasonal boost
+            if (riDef.seasonalBoost && riDef.seasonalBoost.includes(state.currentSeason)) {
+              spawnChance *= 2
+            }
+            if (Math.random() >= spawnChance) continue
+            // Check if disaster prep mitigates this
+            const sitePreps = state.siteDisasterPreps.filter((p) => p.siteId === site.id)
+            const hasMitigation = riDef.mitigatedBy && sitePreps.some((p) => p.type === riDef.mitigatedBy)
+            const mitigationFactor = hasMitigation ? (riDef.mitigationFactor ?? 0.5) : 0
+            // If fully mitigated (mitigationFactor >= 0.9), block the incident entirely
+            if (mitigationFactor >= 0.9) {
+              regionalIncidentsBlocked++
+              incidentLog = [`[${site.name}] ${riDef.label} — blocked by ${DISASTER_PREP_CONFIG[riDef.mitigatedBy!].label}`, ...incidentLog].slice(0, 10)
+              floatingTexts.push({ text: `${riDef.label} BLOCKED`, color: '#00ff88', center: true })
+              continue
+            }
+            // Create the incident — use affectedHardwareId to track which site it targets
+            const adjustedMagnitude = riDef.effectMagnitude * (1 - mitigationFactor)
+            const adjustedDuration = Math.round(riDef.durationTicks * (1 - mitigationFactor * 0.3))
+            const adjustedCost = Math.round(riDef.resolveCost * (1 - mitigationFactor * 0.4))
+            const incidentDef: IncidentDef = {
+              type: `regional_${riDef.type}`,
+              label: `[${site.name}] ${riDef.label}`,
+              severity: riDef.severity,
+              description: riDef.description,
+              durationTicks: adjustedDuration,
+              resolveCost: adjustedCost,
+              effect: riDef.effect === 'cabinet_destruction' ? 'revenue_penalty'
+                : riDef.effect === 'supply_chain_halt' ? 'revenue_penalty'
+                : riDef.effect,
+              effectMagnitude: riDef.effect === 'cabinet_destruction' ? (1 - adjustedMagnitude)
+                : riDef.effect === 'supply_chain_halt' ? 0.5
+                : adjustedMagnitude,
+            }
+            const incident: ActiveIncident = {
+              id: `rinc-${nextIncidentId++}`,
+              def: incidentDef,
+              ticksRemaining: incidentDef.durationTicks,
+              resolved: false,
+              affectedHardwareId: site.id,
+            }
+            activeIncidents.push(incident)
+            regionalIncidentCount++
+            incidentLog = [`[${site.name}] New: ${riDef.label} — ${riDef.description}${hasMitigation ? ' (damage reduced by ' + DISASTER_PREP_CONFIG[riDef.mitigatedBy!].label + ')' : ''}`, ...incidentLog].slice(0, 10)
+            const sevColor = riDef.severity === 'critical' ? '#ff4444' : riDef.severity === 'major' ? '#ff8844' : '#ffcc00'
+            floatingTexts.push({ text: `⚠ ${riDef.label} [${site.name}]`, color: sevColor, center: true, fontSize: '13px' })
+            if (riDef.severity === 'critical') cameraEffects.push({ type: 'shake_heavy' })
+            else if (riDef.severity === 'major') cameraEffects.push({ type: 'shake_medium' })
+            break // Max one regional incident per site per tick
+          }
         }
       }
 
@@ -5652,6 +5779,9 @@ export const useGameStore = create<GameState>((set) => ({
           // Phase 6B — Inter-Site Networking tips
           if (tip.id === 'first_link_hint' && state.sites.filter((s) => s.operational).length >= 1 && state.interSiteLinks.length === 0) trigger = true
           if (tip.id === 'edge_pop_backhaul' && state.sites.some((s) => s.type === 'edge_pop' && s.operational) && !state.interSiteLinks.some((l) => l.operational && state.sites.some((ep) => ep.type === 'edge_pop' && (l.siteAId === ep.id || l.siteBId === ep.id)))) trigger = true
+          // Phase 6C — Regional Incidents & Disaster Preparedness tips
+          if (tip.id === 'regional_incident_hint' && state.sites.filter((s) => s.operational).length >= 1 && state.regionalIncidentCount === 0) trigger = true
+          if (tip.id === 'disaster_prep_hint' && regionalIncidentCount > 0 && state.siteDisasterPreps.length === 0) trigger = true
           if (trigger) { activeTip = tip; break }
         }
       }
@@ -5883,6 +6013,17 @@ export const useGameStore = create<GameState>((set) => ({
       if (updatedLinks.some((l) => l.type === 'submarine_cable')) unlock('submarine_cable')
       if (edgePopCDNRevenue > 0) unlock('cdn_revenue')
 
+      // Phase 6C achievements
+      if (regionalIncidentCount > 0) {
+        // Check if any critical regional incident was survived (resolved or expired)
+        const hadCriticalRegional = activeIncidents.some((i) => i.def.type.startsWith('regional_') && i.def.severity === 'critical')
+        if (hadCriticalRegional || state.regionalIncidentCount > 0) unlock('disaster_survivor')
+      }
+      if (state.siteDisasterPreps.length >= 1) unlock('disaster_prepped')
+      const prepTypes = new Set(state.siteDisasterPreps.map((p) => p.type))
+      if (prepTypes.size >= 4) unlock('fully_hardened')
+      if (regionalIncidentsBlocked >= 5) unlock('regional_blocker')
+
       // Apply Phase 4 bonuses to contract revenue
       const adjustedContractRevenue = +(contractRevenue * (1 + complianceRevenueBonus + greenCertRevenueBonus) * priceWarPenalty).toFixed(2)
 
@@ -5891,7 +6032,7 @@ export const useGameStore = create<GameState>((set) => ({
       const phase5Expenses = peeringCostPerTick + powerRedundancyCost + meetMeMaintenanceCost + (noiseComplaints > state.noiseComplaints && noiseComplaints % NOISE_CONFIG.fineThreshold === 0 ? NOISE_CONFIG.fineAmount : 0)
       const phase4Expenses = carbonTaxPerTick + waterCostPerTick + securityMaintenanceCost
       const phase6Income = totalSiteRevenue + edgePopCDNRevenue
-      const phase6Expenses = totalSiteExpenses + interSiteLinkCost
+      const phase6Expenses = totalSiteExpenses + interSiteLinkCost + disasterPrepMaintenanceCost
       const newFeatureIncome = workloadRevenue
       const finalNewMoney = state.sandboxMode
         ? 999999999
@@ -6058,6 +6199,10 @@ export const useGameStore = create<GameState>((set) => ({
         interSiteLinks: updatedLinks,
         interSiteLinkCost: +interSiteLinkCost.toFixed(2),
         edgePopCDNRevenue: +edgePopCDNRevenue.toFixed(2),
+        // Phase 6C — Regional Incidents & Disaster Preparedness
+        regionalIncidentCount,
+        regionalIncidentsBlocked,
+        disasterPrepMaintenanceCost: +disasterPrepMaintenanceCost.toFixed(2),
         // New Features
         activeWorkloads,
         completedWorkloads,
