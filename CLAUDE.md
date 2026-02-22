@@ -4,7 +4,7 @@
 
 **Fabric Tycoon: Data Center Simulator** is a web-based isometric tycoon game where players build and manage a data center. Players place cabinets, install servers and network switches, design a Clos (spine-leaf) network fabric, and balance power, heat, and revenue to scale from a single rack to a global operation.
 
-**Current version:** v0.5.0
+**Current version:** v0.5.2
 
 ## Tech Stack
 
@@ -59,24 +59,24 @@ src/
 │       ├── OperationsPanel.tsx # Power, cooling, generators, maintenance
 │       ├── InfrastructurePanel.tsx # PDUs, cable trays, busways, cross-connects
 │       ├── ResearchPanel.tsx   # Tech tree, patents
-│       ├── ContractsPanel.tsx  # Contracts, RFP bidding
+│       ├── ContractsPanel.tsx  # Contracts, RFP bidding, multi-site global contracts
 │       ├── IncidentsPanel.tsx  # Active incidents, DR drills, insurance
 │       ├── FacilityPanel.tsx   # Suite upgrades, noise, sound barriers, power redundancy
 │       ├── CarbonPanel.tsx     # Energy source, carbon tracker, green certs, e-waste
 │       ├── SecurityPanel.tsx   # Security tier, features, compliance certs
-│       ├── MarketPanel.tsx     # Competitors, market share, bids, events
+│       ├── MarketPanel.tsx     # Competitors, market share, bids, events, regional presence
 │       ├── CapacityPanel.tsx   # Capacity planning dashboard, trends, projections, alerts
 │       ├── ProgressPanel.tsx   # Achievements, reputation, lifetime stats
 │       ├── SettingsPanel.tsx   # Save/load, sandbox mode, reset, demo
-│       ├── GuidePanel.tsx      # How to play / tutorial (with Phase 4 system guides)
+│       ├── GuidePanel.tsx      # How to play / tutorial (with Phase 4-6 system guides)
 │       ├── BuildLogsPanel.tsx  # What's New changelog (version history, player-facing)
 │       └── ScenarioPanel.tsx    # Scenario select screen with cards, star ratings, locked progression
 ├── game/
 │   ├── PhaserGame.ts           # Phaser scene: isometric rendering, traffic visualization, placement mode
 │   └── CLAUDE.md               # Phaser-specific coding rules (see Sub-module Rules below)
 ├── stores/
-│   ├── gameStore.ts            # Single Zustand store (~5600 lines): game state, actions, tick loop
-│   ├── types.ts                # All TypeScript type definitions (~975 lines)
+│   ├── gameStore.ts            # Single Zustand store (~6500 lines): game state, actions, tick loop
+│   ├── types.ts                # All TypeScript type definitions (~1325 lines)
 │   ├── constants.ts            # Simulation constants (SIM, POWER_DRAW, TRAFFIC, etc.)
 │   ├── calculations.ts         # Pure calculation functions (calcStats, calcCabinetCooling, etc.)
 │   ├── chiller.ts              # Chiller plant connection algorithm (BFS through pipes)
@@ -85,11 +85,11 @@ src/
 │   │   ├── equipment.ts        # Cooling, server config, PDU, cable tray, aisle configs
 │   │   ├── features.ts         # Row-end slots, aisle widths, raised floor, cable mgmt, workloads, advanced tiers, rack equipment, audio
 │   │   ├── infrastructure.ts   # Busway, cross-connect, in-row cooling, spacing, zone configs
-│   │   ├── progression.ts      # Tech tree, achievements (89), incidents (17), contracts, scenarios, tutorial tips (34)
-│   │   └── world.ts            # Staff, supply chain, weather, interconnection, peering, competitors, regions
+│   │   ├── progression.ts      # Tech tree, achievements (103), incidents (17), contracts, scenarios, tutorial tips (42)
+│   │   └── world.ts            # Staff, supply chain, weather, interconnection, peering, competitors, regions, sites, sovereignty, demand
 │   ├── gameStore.test.ts       # Vitest tests for cabinet placement and placement hints
 │   ├── __tests__/
-│   │   └── gameStore.test.ts   # Vitest tests for Phase 5+ systems (250 tests)
+│   │   └── gameStore.test.ts   # Vitest tests for Phase 5+ systems (310 tests)
 │   └── CLAUDE.md               # Store-specific coding rules (see Sub-module Rules below)
 └── lib/
     └── utils.ts                # cn() utility for Tailwind class merging
@@ -113,12 +113,14 @@ src/
 
 ### Claude Code configuration
 
-- `.claude/settings.json` — Hooks: ESLint runs after Edit/Write on `.ts/.tsx` files; lint + type-check on session start
+- `.claude/settings.json` — Hooks: ESLint runs after Edit/Write on `.ts/.tsx` files; lint + type-check on session start; post-commit doc staleness check
+- `.claude/hooks/post-commit-doc-check.sh` — Detects commits touching core game files and prints reminders about which docs may need updating
 - `.claude/skills/add-feature/SKILL.md` — 9-step feature addition checklist (invoked with `/add-feature`)
 - `.claude/skills/add-incident/SKILL.md` — Guided incident type creation (invoked with `/add-incident`)
 - `.claude/skills/add-achievement/SKILL.md` — Guided achievement creation (invoked with `/add-achievement`)
 - `.claude/skills/add-scenario/SKILL.md` — Guided scenario challenge creation (invoked with `/add-scenario`)
 - `.claude/skills/update-build-logs/SKILL.md` — Changelog update checklist (invoked with `/update-build-logs`)
+- `.claude/skills/update-docs/SKILL.md` — Combined post-change documentation refresh (invoked with `/update-docs`)
 - `.claude/skills/validate-pr-docs/SKILL.md` — Pre-PR documentation validation (invoked with `/validate-pr-docs`)
 
 ## Sub-module Rules
@@ -172,9 +174,19 @@ All game state lives in a **single Zustand store** (`useGameStore`). The store (
 - **Advanced tier configs** (`ADVANCED_TIER_CONFIG`): Nuclear and Fusion late-game tiers
 - **Rack equipment configs** (`RACK_EQUIPMENT_CONFIG`): 8 equipment types for 42U rack model
 - **Chiller plant configs** (`CHILLER_PLANT_CONFIG`): 2 tiers (basic/advanced) with range and efficiency
+- **Region catalog** (`REGION_CATALOG`): 15 global regions with profiles (power cost, labor, climate, demand, disasters)
+- **Site type configs** (`SITE_TYPE_CONFIG`): 6 site types (HQ, edge_pop, colocation, hyperscale, network_hub, disaster_recovery)
+- **Inter-site link configs** (`INTER_SITE_LINK_CONFIG`): 4 link types with bandwidth, latency, cost, reliability
+- **Disaster prep configs** (`DISASTER_PREP_CONFIG`): 4 disaster preparedness types with mitigation factors
+- **Regional incident catalog** (`REGIONAL_INCIDENT_CATALOG`): 13 regional incident types with affected regions and risks
+- **Data sovereignty configs** (`DATA_SOVEREIGNTY_CONFIG`): 3 sovereignty regimes (GDPR, LGPD, PDPA) with revenue bonuses
+- **Multi-site contract catalog** (`MULTI_SITE_CONTRACT_CATALOG`): 6 global contracts requiring multi-region presence
+- **Staff transfer configs** (`STAFF_TRANSFER_CONFIG`): Cross-site/cross-continent transfer mechanics
+- **Demand growth configs** (`DEMAND_GROWTH_CONFIG`): Emerging/stable/saturated market dynamics
+- **Competitor regional configs** (`COMPETITOR_REGIONAL_CONFIG`): Competitor expansion into regions
 - **Traffic constants** (`TRAFFIC`): bandwidth per server, link capacity
 - **Pure calculation functions**: `calcStats()`, `calcTraffic()`, `calcTrafficWithCapacity()`, `coolingOverheadFactor()`, `calcManagementBonus()`, `calcAisleBonus()`, `calcCabinetCooling()`, `getPlacementHints()`, and more
-- **Store actions**: build, power, visual, simulation, finance, infrastructure, incidents, contracts, research, staff, supply chain, interconnection, peering, maintenance, operations progression, save/load, and more
+- **Store actions**: build, power, visual, simulation, finance, infrastructure, incidents, contracts, research, staff, supply chain, interconnection, peering, maintenance, operations progression, multi-site expansion, save/load, and more
 
 **Pattern for accessing state in components:**
 ```typescript
@@ -255,6 +267,29 @@ Operations Progression types:
 - `OpsTier` = `'manual' | 'monitoring' | 'automation' | 'orchestration'`
 - `OpsTierConfig` interface: unlock requirements (minStaff, requiredTechs, minReputation, minSuiteTier), benefits (incidentSpawnReduction, autoResolveSpeedBonus, revenuePenaltyReduction, staffEffectivenessBonus, resolveCostReduction), upgradeCost
 - `Competitor`, `CompetitorBid` interfaces
+
+Multi-site expansion types:
+- `RegionId` = 15 region IDs (ashburn, bay_area, dallas, chicago, portland, sao_paulo, london, amsterdam, frankfurt, nordics, singapore, tokyo, mumbai, dubai, johannesburg)
+- `Continent` = `'north_america' | 'south_america' | 'europe' | 'asia_pacific' | 'middle_east_africa'`
+- `SiteType` = `'headquarters' | 'edge_pop' | 'colocation' | 'hyperscale' | 'network_hub' | 'disaster_recovery'`
+- `Region` — id, name, continent, coordinates, profile (power/labor/cooling/connectivity), demandProfile, disasterProfile
+- `Site` — id, name, type, regionId, constructionTicksRemaining, operational, cabinets/servers/revenue/expenses, suiteTier, snapshot
+- `SiteSnapshot` — full per-site state preservation (cabinets, spines, PDUs, cooling, infrastructure)
+- `InterSiteLinkType` = `'ip_transit' | 'leased_wavelength' | 'dark_fiber' | 'submarine_cable'`
+- `InterSiteLink` — network link between sites with bandwidth, latency, cost, utilization, reliability
+- `DisasterPrepType` = `'seismic_reinforcement' | 'flood_barriers' | 'hurricane_hardening' | 'elevated_equipment'`
+- `RegionalIncidentType` — 12 regional incident types (earthquake, wildfire, hurricane, etc.)
+- `RegionalIncidentDef`, `SiteDisasterPrep` interfaces
+
+Global strategy types:
+- `DemandTrend` = `'emerging' | 'stable' | 'saturated'`
+- `SovereigntyRegime` = `'gdpr' | 'lgpd' | 'pdpa' | 'none'`
+- `DataSovereigntyRule` — sovereignty regime with applicable regions, revenue bonus, non-compliance penalty
+- `MultiSiteContractDef` — global contracts requiring multi-region presence with sovereignty requirements
+- `ActiveMultiSiteContract` — active contract tracking with violations, earnings, status
+- `StaffTransfer` — staff relocation between sites with travel time and cost
+- `StaffTransferConfig` — base cost, travel times, skill level cost multiplier
+- `CompetitorRegionalPresence` — competitor presence in regions with strength tracking
 
 Power & insurance types:
 - `PowerRedundancy` = `'N' | 'N+1' | '2N'`
@@ -344,6 +379,8 @@ Key interfaces (core):
 | Security/Compliance | `upgradeSecurityTier`, `startComplianceAudit` |
 | Operations | `upgradeOpsTier` |
 | Competitor AI | `counterPoachOffer` |
+| Multi-Site Expansion | `toggleWorldMap`, `researchRegion`, `purchaseSite`, `switchSite`, `installInterSiteLink`, `installDisasterPrep` |
+| Global Strategy | `acceptMultiSiteContract`, `transferStaff`, `cancelStaffTransfer` |
 | Tutorial | `dismissTip`, `toggleTutorial` |
 | Save/Load | `saveGame`, `loadGame`, `deleteGame`, `resetGame`, `refreshSaveSlots` |
 | Workloads | `launchWorkload`, `migrateWorkload` |
@@ -506,6 +543,8 @@ A `setInterval` in `App.tsx` calls `tick()` at the rate determined by `gameSpeed
 26. **Carbon/Environment**: Calculates emissions, carbon tax, water usage, e-waste penalties, green cert eligibility
 27. **Security/Compliance**: Processes audits, expires certifications, blocks intrusion incidents, calculates security maintenance
 28. **Competitor AI**: Spawns/grows competitors, processes bids, price wars, staff poaching, market share calculation
+29. **Multi-site expansion**: Ticks site construction, inter-site link reliability, regional incidents, edge PoP CDN revenue, disaster prep maintenance
+30. **Global strategy**: Demand growth per region (emerging/stable/saturated), multi-site contract compliance and revenue, staff transfers, competitor regional expansion
 
 ## Game Systems
 
@@ -515,7 +554,7 @@ A `setInterval` in `App.tsx` calls `tick()` at the rate determined by `gameSpeed
 
 **Economy:**
 - **Revenue** from servers, modified by customer type, environment, throttling, depreciation, and tech bonuses
-- **Additional revenue**: meet-me room interconnects, patent royalties, spot compute market, RFP contract wins
+- **Additional revenue**: meet-me room interconnects, patent royalties, spot compute market, RFP contract wins, multi-site contract income, edge PoP CDN revenue
 - **Expenses** from power (dynamic market pricing), cooling, loan repayments, staff salaries, peering costs, insurance premiums, maintenance, power redundancy overhead, noise fines
 - **Loans** available in 3 tiers with different amounts/interest/terms
 - **Contracts** (bronze/silver/gold) provide bonus revenue with SLA requirements
@@ -625,6 +664,25 @@ A `setInterval` in `App.tsx` calls `tick()` at the rate determined by `gameSpeed
 - **Events**: Price wars (15% revenue reduction), staff poaching (counter-offer or lose), competitor outages
 - **Market share**: Tracked as player vs competitor strength ratio
 
+**Multi-Site Expansion:**
+- **15 regions** across 5 continents (North America, South America, Europe, Asia-Pacific, Middle East/Africa) with distinct economic/environmental profiles
+- **6 site types**: headquarters (free, starting), edge_pop ($25K, CDN revenue), colocation ($150K), hyperscale ($500K), network_hub ($200K), disaster_recovery ($300K)
+- **Site state preservation**: Full `SiteSnapshot` saves/restores all per-site infrastructure when switching between sites
+- **Region profiles**: Each region has unique power costs, labor rates, cooling efficiency, network connectivity, regulatory burden, carbon tax, and demand profiles
+- **Inter-site networking**: 4 link types (IP transit, leased wavelength, dark fiber, submarine cable) with geographic constraints
+- **Edge PoP CDN revenue**: Edge sites earn passive $0.50/Gbps/tick when connected via backhaul links
+- **Regional incidents**: 13 region-specific disasters (earthquake, hurricane, wildfire, grid collapse, submarine cable cut, etc.) with seasonal boosts
+- **Disaster preparedness**: 4 prep types (seismic reinforcement, flood barriers, hurricane hardening, elevated equipment) with damage mitigation
+- **Multi-site gate**: Requires enterprise tier, $500K cash, and 75+ reputation to unlock
+
+**Global Strategy Layer:**
+- **Demand growth**: Regions have emerging/stable/saturated market trends that shift over time, affecting revenue potential
+- **Data sovereignty**: GDPR (EU regions), LGPD (Brazil), PDPA (Singapore) with revenue bonuses for compliant contracts and penalties for violations
+- **Multi-site contracts**: 6 global contracts requiring operational sites in specific regions (e.g., StreamVault Global needs Ashburn+London+Singapore)
+- **Staff transfers**: Relocate staff between sites with same-continent (8 ticks) or cross-continent (15 ticks) travel time and skill-based cost multipliers
+- **Competitor regional presence**: Competitors expand into regions with demand-weighted selection, up to 4 regions each
+- **19 Phase 6 achievements** and **10 Phase 6 tutorial tips** for global expansion guidance
+
 **Workload Simulation:**
 - 5 workload types: ai_training, batch_processing, live_migration, rendering, database_migration
 - Per-cabinet workload assignment with progress tracking and overheat failure
@@ -651,7 +709,7 @@ A `setInterval` in `App.tsx` calls `tick()` at the rate determined by `gameSpeed
 - **RFP Bidding**: Compete for contract wins/losses
 - **Scenario Challenges**: 5 predefined challenges with special rules and objectives
 - **Scenario Presentation**: Dedicated scenario select screen with scenario cards showing objectives and special rules; 1-3 star rating system based on completion speed; locked progression (later scenarios require completing earlier ones); victory/defeat results screen with stats and star display; best completion times tracked per scenario
-- **Tutorial System**: 34 contextual tips triggered during gameplay (including carbon, security, market, operations, cooling, and infrastructure tips)
+- **Tutorial System**: 42 contextual tips triggered during gameplay (including carbon, security, market, operations, cooling, infrastructure, and multi-site tips)
 - **Event Logging**: Filterable log of significant events (capped at 200)
 - **Capacity History**: Per-tick snapshot of key metrics (capped at 100)
 - **Lifetime Statistics**: Revenue, expenses, peak temp, uptime streaks, fires survived, etc.
@@ -741,6 +799,14 @@ A `setInterval` in `App.tsx` calls `tick()` at the rate determined by `gameSpeed
 | Spot Compute | On-demand compute capacity sold at dynamic market prices. |
 | Season | Time cycle (spring/summer/autumn/winter) affecting ambient temperature. |
 | Ops Tier | Operations maturity level (manual → monitoring → automation → orchestration). Reduces incidents and improves staff effectiveness. |
+| Region | Geographic location for data center sites. 15 regions across 5 continents with unique profiles. |
+| Site | A data center facility in a region. 6 types from edge PoP to hyperscale. Players can own up to 8 sites. |
+| Inter-Site Link | Network connection between two sites. 4 types with geographic constraints (same/cross-continent). |
+| Edge PoP | Small edge site that generates CDN revenue per Gbps of backhaul bandwidth when connected to other sites. |
+| Data Sovereignty | Regional data laws (GDPR, LGPD, PDPA) that grant revenue bonuses for compliant contracts. |
+| Multi-Site Contract | Global contract requiring operational sites in multiple specific regions with SLA compliance. |
+| Demand Trend | Regional market state (emerging/stable/saturated) that shifts over time, affecting revenue potential. |
+| Staff Transfer | Relocating staff between sites with travel time based on distance (same vs cross-continent). |
 
 ## Simulation Parameters (quick reference)
 

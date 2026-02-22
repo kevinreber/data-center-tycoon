@@ -46,6 +46,17 @@ A web-based, 2D isometric Tycoon game (think Roller Coaster Tycoon) where the pl
 - **Meet-Me Room** — Install an interconnection facility to earn passive revenue from network tenants. Add ports to increase capacity.
 - **Network Peering** — Establish peering agreements (Free Peering, Paid Peering, Transit, IX Port) to reduce latency and improve reputation.
 
+### Global Expansion
+- **Multi-Site Empire** — Expand beyond a single facility to build data centers across 15 global regions from Ashburn to Tokyo. 6 site types: Headquarters, Edge PoP, Colocation, Hyperscale, Network Hub, and Disaster Recovery.
+- **Inter-Site Networking** — Connect your sites with IP Transit, Leased Wavelength, Dark Fiber, or Submarine Cable links. Geographic constraints apply (dark fiber same-continent only, submarine cable cross-continent only).
+- **Regional Profiles** — Each region has unique power costs, labor rates, climate, cooling efficiency, demand patterns, and disaster risks.
+- **Regional Incidents** — 13 region-specific disasters (earthquakes, hurricanes, floods, grid collapse) based on each region's risk profile. Install disaster preparedness to mitigate damage.
+- **Demand Dynamics** — Regional markets evolve through emerging, stable, and saturated phases. Get into emerging markets early for maximum growth.
+- **Data Sovereignty** — GDPR (EU), LGPD (Brazil), and PDPA (Singapore) rules grant revenue bonuses for compliant global contracts.
+- **Global Contracts** — Land lucrative contracts requiring operational sites in multiple specific regions, with completion bonuses up to $100K.
+- **Staff Transfers** — Relocate staff between sites to fill skill gaps. Same-continent transfers take 8 ticks; cross-continent take 15.
+- **Competitor Expansion** — AI competitors expand into regions, competing for global market share.
+
 ### Weather & Supply Chain
 - **Seasons** — Spring, Summer, Fall, Winter rotate automatically, each affecting ambient temperature and cooling load.
 - **Weather Events** — Clear skies, clouds, rain, storms, heatwaves, and cold snaps create temporary temperature shifts.
@@ -67,7 +78,7 @@ A web-based, 2D isometric Tycoon game (think Roller Coaster Tycoon) where the pl
 - **Suite Tiers** — Scale from Starter (4x2 grid) to Enterprise (10x5 grid), then unlock Nuclear and Fusion advanced tiers.
 - **Tech Tree** — Research 9 technologies across Efficiency, Performance, and Resilience branches.
 - **Reputation** — Build reputation from Unknown to Legendary through uptime, SLA compliance, and incident management.
-- **Achievements** — Unlock 89 achievements for milestones across all game systems.
+- **Achievements** — Unlock 103 achievements for milestones across all game systems.
 - **Scenarios** — Play themed challenges with specific goals and constraints.
 - **Leaderboards** — Track your best revenue, uptime, and cabinet count across sessions.
 
@@ -81,7 +92,7 @@ A web-based, 2D isometric Tycoon game (think Roller Coaster Tycoon) where the pl
 - **Event Log** — Chronological record of all data center events with severity-based color coding.
 - **Capacity Planning** — Track space, power, heat, and financial runway. Monitor revenue trends over time.
 - **Lifetime Statistics** — Cumulative stats including total revenue, expenses, peak temperature, uptime streaks, and more.
-- **Tutorial System** — 34 contextual tips that appear as you encounter new game mechanics for the first time.
+- **Tutorial System** — 42 contextual tips that appear as you encounter new game mechanics for the first time.
 
 ### Views & Audio
 - **Cabinet View** — Standard isometric view of your data center floor.

@@ -7,6 +7,10 @@ export type {
   ShiftPattern, EnergySource, GreenCert, SecurityTier, SecurityFeatureId, ComplianceCertId,
   CompetitorPersonality, OpsTier, SiteType, Continent, RegionId,
   RegionProfile, RegionDemandProfile, RegionDisasterProfile, Region, SiteTypeConfig, Site,
+  InterSiteLinkType, InterSiteLink, InterSiteLinkConfig,
+  RegionalIncidentType, DisasterPrepType, RegionalIncidentDef, DisasterPrepConfig, SiteDisasterPrep,
+  DemandTrend, SovereigntyRegime, DataSovereigntyRule, MultiSiteContractDef, ActiveMultiSiteContract,
+  StaffTransfer, StaffTransferConfig, CompetitorRegionalPresence,
   SaveSlotMeta, CustomerTypeConfig, GeneratorConfig, Generator, SuppressionConfig,
   TechDef, ActiveResearch, OpsTierConfig, CabinetFacing,
   PDU, PDUConfig, CableTray, CableTrayConfig, CableRun,
@@ -45,19 +49,21 @@ import type {
   GameSpeed, CabinetEnvironment, CoolingType, CoolingUnitType, CustomerType,
   GeneratorStatus, SuppressionType, SuiteTier, StaffRole, StaffSkillLevel, ShiftPattern,
   EnergySource, GreenCert, SecurityTier, SecurityFeatureId, ComplianceCertId, OpsTier,
-  CompetitorPersonality, SiteType, RegionId, CabinetFacing, ServerConfig,
+  CompetitorPersonality, SiteType, RegionId, CabinetFacing, ServerConfig, InterSiteLinkType,
   InterconnectPortType, MaintenanceTargetType, MaintenanceStatus, PowerRedundancy, InsurancePolicyType,
   OrderStatus, Season, WeatherCondition, EventSeverity,
   ChillerTier, Cabinet, SpineSwitch, TrafficStats, LayerColors,
   LayerVisibility, LayerOpacity, LayerColorOverrides, NodeType,
   ContractDef, ActiveResearch,
-  Generator, Loan, ActiveIncident, ActiveContract, Achievement,
+  Generator, Loan, IncidentDef, ActiveIncident, ActiveContract, Achievement,
   PDU, CableTray, CableRun, Busway, CrossConnect, InRowCooling,
   CoolingUnit, ChillerPlant, CoolingPipe, Zone, DedicatedRowInfo,
   StaffMember, StaffTraining, HardwareOrder, InterconnectPort, PeeringAgreement,
   MaintenanceWindow, ActiveComplianceCert, Competitor, CompetitorBid,
   EventLogEntry, EventCategory, HistoryPoint, LifetimeStats, TutorialTip,
-  ScenarioDef, Site, Patent, RFPOffer, DrillResult, NetworkTopologyStats,
+  ScenarioDef, Site, SiteSnapshot, Patent, RFPOffer, DrillResult, NetworkTopologyStats, InterSiteLink,
+  SiteDisasterPrep, DisasterPrepType,
+  ActiveMultiSiteContract, StaffTransfer, CompetitorRegionalPresence,
   SaveSlotMeta,
   // New feature types
   ViewMode, RowEndSlotType, RowEndSlot, AisleWidth, RaisedFloorTier,
@@ -83,8 +89,8 @@ import { TECH_TREE, OPS_TIER_CONFIG, OPS_TIER_ORDER, CONTRACT_CATALOG, CONTRACT_
 export { LOAN_OPTIONS, POWER_MARKET, DEPRECIATION, INSURANCE_OPTIONS, DRILL_CONFIG, VALUATION_MILESTONES, PATENT_CONFIG, RFP_CONFIG, SPOT_COMPUTE_CONFIG, MAINTENANCE_CONFIG, PEERING_OPTIONS, INTERCONNECT_PORT_CONFIG, MEETME_ROOM_CONFIG, INTERCONNECT_TENANTS, SUPPLY_CHAIN_CONFIG, SEASON_CONFIG, WEATHER_CONDITION_CONFIG, STAFF_ROLE_CONFIG, STAFF_CERT_CONFIG, SHIFT_PATTERN_CONFIG, MAX_STAFF_BY_TIER, FIRST_NAMES, LAST_NAMES, generateStaffName } from './configs/economy'
 import { LOAN_OPTIONS, POWER_MARKET, DEPRECIATION, INSURANCE_OPTIONS, DRILL_CONFIG, VALUATION_MILESTONES, PATENT_CONFIG, RFP_CONFIG, SPOT_COMPUTE_CONFIG, MAINTENANCE_CONFIG, PEERING_OPTIONS, INTERCONNECT_PORT_CONFIG, MEETME_ROOM_CONFIG, INTERCONNECT_TENANTS, SUPPLY_CHAIN_CONFIG, SEASON_CONFIG, WEATHER_CONDITION_CONFIG, STAFF_ROLE_CONFIG, STAFF_CERT_CONFIG, SHIFT_PATTERN_CONFIG, MAX_STAFF_BY_TIER, generateStaffName } from './configs/economy'
 
-export { ENERGY_SOURCE_CONFIG, GREEN_CERT_CONFIG, CARBON_TAX_SCHEDULE, WATER_USAGE_CONFIG, EWASTE_CONFIG, SECURITY_FEATURE_CONFIG, SECURITY_TIER_CONFIG, COMPLIANCE_CERT_CONFIG, COMPETITOR_PERSONALITIES, COMPETITOR_NAMES, COMPETITOR_SCALE_CONFIG, MULTI_SITE_GATE, SITE_TYPE_CONFIG, REGION_CATALOG, REGION_RESEARCH_COST, MAX_SITES } from './configs/world'
-import { ENERGY_SOURCE_CONFIG, GREEN_CERT_CONFIG, CARBON_TAX_SCHEDULE, WATER_USAGE_CONFIG, EWASTE_CONFIG, SECURITY_FEATURE_CONFIG, SECURITY_TIER_CONFIG, COMPLIANCE_CERT_CONFIG, COMPETITOR_PERSONALITIES, COMPETITOR_NAMES, COMPETITOR_SCALE_CONFIG, MULTI_SITE_GATE, SITE_TYPE_CONFIG, REGION_CATALOG, REGION_RESEARCH_COST, MAX_SITES } from './configs/world'
+export { ENERGY_SOURCE_CONFIG, GREEN_CERT_CONFIG, CARBON_TAX_SCHEDULE, WATER_USAGE_CONFIG, EWASTE_CONFIG, SECURITY_FEATURE_CONFIG, SECURITY_TIER_CONFIG, COMPLIANCE_CERT_CONFIG, COMPETITOR_PERSONALITIES, COMPETITOR_NAMES, COMPETITOR_SCALE_CONFIG, MULTI_SITE_GATE, SITE_TYPE_CONFIG, REGION_CATALOG, REGION_RESEARCH_COST, MAX_SITES, INTER_SITE_LINK_CONFIG, DISTANCE_LATENCY_MODIFIER, EDGE_POP_CDN_REVENUE_PER_GBPS, MAX_LINKS_PER_SITE, BANDWIDTH_OVERAGE_COST, REGIONAL_INCIDENT_CATALOG, DISASTER_PREP_CONFIG, MAX_REGIONAL_INCIDENTS, DATA_SOVEREIGNTY_CONFIG, MULTI_SITE_CONTRACT_CATALOG, MAX_MULTI_SITE_CONTRACTS, STAFF_TRANSFER_CONFIG, MAX_STAFF_TRANSFERS, DEMAND_GROWTH_CONFIG, COMPETITOR_REGIONAL_CONFIG, getRegionSovereignty } from './configs/world'
+import { ENERGY_SOURCE_CONFIG, GREEN_CERT_CONFIG, CARBON_TAX_SCHEDULE, WATER_USAGE_CONFIG, EWASTE_CONFIG, SECURITY_FEATURE_CONFIG, SECURITY_TIER_CONFIG, COMPLIANCE_CERT_CONFIG, COMPETITOR_PERSONALITIES, COMPETITOR_NAMES, COMPETITOR_SCALE_CONFIG, MULTI_SITE_GATE, SITE_TYPE_CONFIG, REGION_CATALOG, REGION_RESEARCH_COST, MAX_SITES, INTER_SITE_LINK_CONFIG, DISTANCE_LATENCY_MODIFIER, EDGE_POP_CDN_REVENUE_PER_GBPS, MAX_LINKS_PER_SITE, REGIONAL_INCIDENT_CATALOG, DISASTER_PREP_CONFIG, MAX_REGIONAL_INCIDENTS, DATA_SOVEREIGNTY_CONFIG, MULTI_SITE_CONTRACT_CATALOG, MAX_MULTI_SITE_CONTRACTS, STAFF_TRANSFER_CONFIG, MAX_STAFF_TRANSFERS, DEMAND_GROWTH_CONFIG, COMPETITOR_REGIONAL_CONFIG } from './configs/world'
 
 // ── Re-export calculations ─────────────────────────────────────
 export { coolingOverheadFactor, calcManagementBonus, calcTrafficWithCapacity, calcCabinetCooling, getCabinetsInPDURange, getPDULoad, isPDUOverloaded, calcCableLength, getFacingOffsets, calcAisleBonus, countAisleViolations, getAdjacentCabinets, hasMaintenanceAccess, calcSpacingHeatEffect, countMessyCables, calcZones, isZoneRequirementMet, calcMixedEnvPenalties, calcDedicatedRows, getSuiteLimits, getCabinetRowAtGrid, getValidCabinetGridRows, getRowFacing, getPlacementHints, formatGameTime, getReputationTier } from './calculations'
@@ -456,9 +462,29 @@ interface GameState {
   worldMapOpen: boolean
   sites: Site[]
   activeSiteId: string | null            // null = HQ (original site)
+  hqSnapshot: SiteSnapshot | null        // HQ state stored here when visiting a remote site
   researchedRegions: RegionId[]          // regions with revealed profiles
   totalSiteRevenue: number               // aggregate revenue from background sites per tick
   totalSiteExpenses: number              // aggregate expenses from background sites per tick
+
+  // Phase 6B — Inter-Site Networking
+  interSiteLinks: InterSiteLink[]        // connections between sites
+  interSiteLinkCost: number              // total link costs per tick
+  edgePopCDNRevenue: number              // CDN revenue from edge PoPs with backhaul
+
+  // Phase 6C — Regional Incidents & Disaster Preparedness
+  siteDisasterPreps: SiteDisasterPrep[]   // disaster prep investments per site
+  regionalIncidentCount: number           // lifetime regional incidents spawned
+  disasterPrepMaintenanceCost: number     // total maintenance cost per tick for all disaster preps
+  regionalIncidentsBlocked: number        // lifetime regional incidents fully mitigated
+
+  // Phase 6D — Global Strategy Layer
+  demandGrowthMultipliers: Record<string, Record<string, number>>  // regionId → customerType → growth multiplier
+  multiSiteContracts: ActiveMultiSiteContract[]
+  multiSiteContractRevenue: number        // aggregate per-tick revenue from multi-site contracts
+  staffTransfers: StaffTransfer[]          // staff currently in transit between sites
+  staffTransfersCompleted: number          // lifetime completed transfers
+  competitorRegionalPresence: CompetitorRegionalPresence[]  // competitors in regions
 
   // ── New Features ─────────────────────────────────────────────
 
@@ -609,6 +635,16 @@ interface GameState {
   researchRegion: (regionId: RegionId) => void
   purchaseSite: (regionId: RegionId, siteType: SiteType, name: string) => void
   switchSite: (siteId: string | null) => void
+  // Phase 6B — Inter-Site Networking actions
+  installInterSiteLink: (siteAId: string | null, siteBId: string, linkType: InterSiteLinkType) => void
+  removeInterSiteLink: (linkId: string) => void
+  // Phase 6C — Disaster Preparedness actions
+  installDisasterPrep: (siteId: string, prepType: DisasterPrepType) => void
+  removeDisasterPrep: (siteId: string, prepType: DisasterPrepType) => void
+  // Phase 6D — Global Strategy Layer actions
+  acceptMultiSiteContract: (contractId: string) => void
+  transferStaff: (staffId: string, toSiteId: string | null) => void
+  cancelStaffTransfer: (transferId: string) => void
   // New Feature Actions
   setViewMode: (mode: ViewMode) => void
   placeRowEndSlot: (rowId: number, side: 'left' | 'right', type: RowEndSlotType) => void
@@ -649,6 +685,7 @@ let nextGeneratorId = 1
 let nextStaffId = 1
 let nextCompetitorId = 1
 let nextSiteId = 1
+let nextLinkId = 1
 
 function maxIdNum(items: { id: string }[], prefix: string): number {
   let max = 0
@@ -972,9 +1009,29 @@ export const useGameStore = create<GameState>((set) => ({
   worldMapOpen: false,
   sites: [] as Site[],
   activeSiteId: null as string | null,
+  hqSnapshot: null as SiteSnapshot | null,
   researchedRegions: [] as RegionId[],
   totalSiteRevenue: 0,
   totalSiteExpenses: 0,
+
+  // Phase 6B — Inter-Site Networking
+  interSiteLinks: [] as InterSiteLink[],
+  interSiteLinkCost: 0,
+  edgePopCDNRevenue: 0,
+
+  // Phase 6C — Regional Incidents & Disaster Preparedness
+  siteDisasterPreps: [] as SiteDisasterPrep[],
+  regionalIncidentCount: 0,
+  disasterPrepMaintenanceCost: 0,
+  regionalIncidentsBlocked: 0,
+
+  // Phase 6D — Global Strategy Layer
+  demandGrowthMultipliers: {} as Record<string, Record<string, number>>,
+  multiSiteContracts: [] as ActiveMultiSiteContract[],
+  multiSiteContractRevenue: 0,
+  staffTransfers: [] as StaffTransfer[],
+  staffTransfersCompleted: 0,
+  competitorRegionalPresence: [] as CompetitorRegionalPresence[],
 
   // ── New Features ────────────────────────────────────────────
 
@@ -2255,6 +2312,7 @@ export const useGameStore = create<GameState>((set) => ({
         expenses: 0,
         heat: region.profile.coolingEfficiency + 22, // ambient based on region
         suiteTier: 'starter',
+        snapshot: null,
       }
       return {
         sites: [...state.sites, newSite],
@@ -2264,10 +2322,349 @@ export const useGameStore = create<GameState>((set) => ({
 
   switchSite: (siteId: string | null) =>
     set((state) => {
-      if (siteId === null) return { activeSiteId: null }  // switch to HQ
+      // Already on the requested site
+      if (siteId === state.activeSiteId) return state
+
+      // If switching to a remote site, validate it
+      if (siteId !== null) {
+        const target = state.sites.find((s) => s.id === siteId)
+        if (!target || !target.operational) return state
+      }
+
+      // ── Snapshot current site state ───────────────────────────
+      const currentSnapshot: SiteSnapshot = {
+        cabinets: state.cabinets,
+        spineSwitches: state.spineSwitches,
+        pdus: state.pdus,
+        cableTrays: state.cableTrays,
+        cableRuns: state.cableRuns,
+        coolingUnits: state.coolingUnits,
+        chillerPlants: state.chillerPlants,
+        coolingPipes: state.coolingPipes,
+        busways: state.busways,
+        crossConnects: state.crossConnects,
+        inRowCoolers: state.inRowCoolers,
+        rowEndSlots: state.rowEndSlots,
+        aisleContainments: state.aisleContainments,
+        aisleWidths: state.aisleWidths,
+        raisedFloorTier: state.raisedFloorTier,
+        cableManagementType: state.cableManagementType,
+        coolingType: state.coolingType,
+        suiteTier: state.suiteTier,
+        totalPower: state.totalPower,
+        avgHeat: state.avgHeat,
+        revenue: state.revenue,
+        expenses: state.expenses,
+      }
+
+      // Save snapshot into the current site's entry
+      let updatedSites = state.sites
+      if (state.activeSiteId === null) {
+        // Currently at HQ — store snapshot in a special 'hq' site field on the store
+        // We don't have an HQ site in the sites array, so we use hqSnapshot
+      } else {
+        // Currently at a remote site — update its snapshot
+        updatedSites = state.sites.map((s) =>
+          s.id === state.activeSiteId
+            ? {
+                ...s,
+                snapshot: currentSnapshot,
+                cabinets: state.cabinets.length,
+                servers: state.cabinets.reduce((sum, c) => sum + c.serverCount, 0),
+                suiteTier: state.suiteTier,
+              }
+            : s
+        )
+      }
+
+      // ── Restore target site state ─────────────────────────────
+      if (siteId === null) {
+        // Switching back to HQ — restore from hqSnapshot
+        const hq = state.hqSnapshot
+        if (!hq) return { activeSiteId: null, sites: updatedSites }
+        return {
+          activeSiteId: null,
+          sites: updatedSites,
+          cabinets: hq.cabinets,
+          spineSwitches: hq.spineSwitches,
+          pdus: hq.pdus,
+          cableTrays: hq.cableTrays,
+          cableRuns: hq.cableRuns,
+          coolingUnits: hq.coolingUnits,
+          chillerPlants: hq.chillerPlants,
+          coolingPipes: hq.coolingPipes,
+          busways: hq.busways,
+          crossConnects: hq.crossConnects,
+          inRowCoolers: hq.inRowCoolers,
+          rowEndSlots: hq.rowEndSlots,
+          aisleContainments: hq.aisleContainments,
+          aisleWidths: hq.aisleWidths,
+          raisedFloorTier: hq.raisedFloorTier,
+          cableManagementType: hq.cableManagementType,
+          coolingType: hq.coolingType,
+          suiteTier: hq.suiteTier,
+          hqSnapshot: null,
+          ...calcStats(hq.cabinets, hq.spineSwitches),
+          trafficStats: calcTraffic(hq.cabinets, hq.spineSwitches),
+        }
+      }
+
+      // Switching to a remote site — restore its snapshot
+      const target = updatedSites.find((s) => s.id === siteId)!
+      const snap = target.snapshot
+      // Save HQ snapshot if leaving HQ
+      const hqSnap = state.activeSiteId === null ? currentSnapshot : state.hqSnapshot
+
+      if (snap) {
+        return {
+          activeSiteId: siteId,
+          sites: updatedSites,
+          hqSnapshot: hqSnap,
+          cabinets: snap.cabinets,
+          spineSwitches: snap.spineSwitches,
+          pdus: snap.pdus,
+          cableTrays: snap.cableTrays,
+          cableRuns: snap.cableRuns,
+          coolingUnits: snap.coolingUnits,
+          chillerPlants: snap.chillerPlants,
+          coolingPipes: snap.coolingPipes,
+          busways: snap.busways,
+          crossConnects: snap.crossConnects,
+          inRowCoolers: snap.inRowCoolers,
+          rowEndSlots: snap.rowEndSlots,
+          aisleContainments: snap.aisleContainments,
+          aisleWidths: snap.aisleWidths,
+          raisedFloorTier: snap.raisedFloorTier,
+          cableManagementType: snap.cableManagementType,
+          coolingType: snap.coolingType,
+          suiteTier: snap.suiteTier,
+          ...calcStats(snap.cabinets, snap.spineSwitches),
+          trafficStats: calcTraffic(snap.cabinets, snap.spineSwitches),
+        }
+      }
+
+      // No snapshot yet (freshly built site) — start with empty state
+      return {
+        activeSiteId: siteId,
+        sites: updatedSites,
+        hqSnapshot: hqSnap,
+        cabinets: [],
+        spineSwitches: [],
+        pdus: [],
+        cableTrays: [],
+        cableRuns: [],
+        coolingUnits: [],
+        chillerPlants: [],
+        coolingPipes: [],
+        busways: [],
+        crossConnects: [],
+        inRowCoolers: [],
+        rowEndSlots: [],
+        aisleContainments: [],
+        aisleWidths: {},
+        raisedFloorTier: 'none' as RaisedFloorTier,
+        cableManagementType: 'none' as CableManagementType,
+        coolingType: 'air' as CoolingType,
+        suiteTier: target.suiteTier,
+        ...calcStats([], []),
+        trafficStats: calcTraffic([], []),
+      }
+    }),
+
+  // ── Phase 6B — Inter-Site Networking Actions ─────────────────────
+
+  installInterSiteLink: (siteAId: string | null, siteBId: string, linkType: InterSiteLinkType) =>
+    set((state) => {
+      if (!state.multiSiteUnlocked) return state
+      // Validate sites exist and are operational
+      if (siteAId !== null) {
+        const siteA = state.sites.find((s) => s.id === siteAId)
+        if (!siteA || !siteA.operational) return state
+      }
+      const siteB = state.sites.find((s) => s.id === siteBId)
+      if (!siteB || !siteB.operational) return state
+
+      // Can't link a site to itself
+      if (siteAId === siteBId) return state
+
+      // Check max links per site
+      const linksForA = state.interSiteLinks.filter((l) => l.siteAId === siteAId || l.siteBId === siteAId || (siteAId === null && (l.siteAId === null)))
+      const linksForB = state.interSiteLinks.filter((l) => l.siteAId === siteBId || l.siteBId === siteBId)
+      if (linksForA.length >= MAX_LINKS_PER_SITE || linksForB.length >= MAX_LINKS_PER_SITE) return state
+
+      // Check if link already exists between these two sites
+      if (state.interSiteLinks.some((l) =>
+        (l.siteAId === siteAId && l.siteBId === siteBId) ||
+        (l.siteAId === siteBId && l.siteBId === siteAId) ||
+        (siteAId === null && l.siteAId === null && l.siteBId === siteBId) ||
+        (siteAId === null && l.siteBId === siteAId && l.siteAId === siteBId)
+      )) return state
+
+      const config = INTER_SITE_LINK_CONFIG[linkType]
+      if (state.money < config.installCost && !state.sandboxMode) return state
+
+      // Determine continents of both sites
+      const regionA = siteAId === null ? null : REGION_CATALOG.find((r) => r.id === state.sites.find((s) => s.id === siteAId)?.regionId)
+      const regionB = REGION_CATALOG.find((r) => r.id === siteB.regionId)
+      // For HQ, use the first site's region or default to 'ashburn' (HQ is the original data center)
+      const continentA = siteAId === null ? 'north_america' : regionA?.continent
+      const continentB = regionB?.continent
+      const sameCont = continentA === continentB
+
+      // Validate continent constraints
+      if (config.crossContinentOnly && sameCont) return state
+      if (config.sameContinentOnly && !sameCont) return state
+
+      // Calculate latency based on distance
+      let distLatency = DISTANCE_LATENCY_MODIFIER.same_continent
+      if (sameCont) {
+        // Check if same region (metro)
+        const regionIdA = siteAId === null ? 'ashburn' : state.sites.find((s) => s.id === siteAId)?.regionId
+        const regionIdB = siteB.regionId
+        distLatency = regionIdA === regionIdB ? DISTANCE_LATENCY_MODIFIER.same_metro : DISTANCE_LATENCY_MODIFIER.same_continent
+      } else {
+        distLatency = DISTANCE_LATENCY_MODIFIER.cross_continent
+      }
+
+      const newLink: InterSiteLink = {
+        id: `link-${nextLinkId++}`,
+        type: linkType,
+        siteAId,
+        siteBId,
+        bandwidthGbps: config.bandwidthGbps,
+        latencyMs: config.baseLatencyMs + distLatency,
+        costPerTick: config.costPerTick,
+        installedAtTick: state.tickCount,
+        utilization: 0,
+        operational: true,
+      }
+      return {
+        interSiteLinks: [...state.interSiteLinks, newLink],
+        money: state.sandboxMode ? state.money : state.money - config.installCost,
+      }
+    }),
+
+  removeInterSiteLink: (linkId: string) =>
+    set((state) => {
+      const link = state.interSiteLinks.find((l) => l.id === linkId)
+      if (!link) return state
+      return {
+        interSiteLinks: state.interSiteLinks.filter((l) => l.id !== linkId),
+      }
+    }),
+
+  // ── Phase 6C — Disaster Preparedness Actions ─────────────────────
+
+  installDisasterPrep: (siteId: string, prepType: DisasterPrepType) =>
+    set((state) => {
+      if (!state.multiSiteUnlocked) return state
+      // Check site exists
       const site = state.sites.find((s) => s.id === siteId)
-      if (!site || !site.operational) return state
-      return { activeSiteId: siteId }
+      if (!site) return state
+      // Check not already installed for this site
+      if (state.siteDisasterPreps.some((p) => p.siteId === siteId && p.type === prepType)) return state
+      const config = DISASTER_PREP_CONFIG[prepType]
+      if (!state.sandboxMode && state.money < config.cost) return state
+      return {
+        siteDisasterPreps: [...state.siteDisasterPreps, { siteId, type: prepType, installedAtTick: state.tickCount }],
+        money: state.sandboxMode ? state.money : state.money - config.cost,
+      }
+    }),
+
+  removeDisasterPrep: (siteId: string, prepType: DisasterPrepType) =>
+    set((state) => {
+      return {
+        siteDisasterPreps: state.siteDisasterPreps.filter((p) => !(p.siteId === siteId && p.type === prepType)),
+      }
+    }),
+
+  // ── Phase 6D — Global Strategy Layer Actions ───────────────────────
+
+  acceptMultiSiteContract: (contractId: string) =>
+    set((state) => {
+      if (!state.multiSiteUnlocked) return state
+      // Check max active
+      const activeContracts = state.multiSiteContracts.filter((c) => c.status === 'active')
+      if (activeContracts.length >= MAX_MULTI_SITE_CONTRACTS) return state
+      // Find contract def
+      const def = MULTI_SITE_CONTRACT_CATALOG.find((c) => c.id === contractId)
+      if (!def) return state
+      // Check not already active
+      if (state.multiSiteContracts.some((c) => c.def.id === contractId && c.status === 'active')) return state
+      // Check all required regions have operational sites
+      const operationalSiteRegions = state.sites.filter((s) => s.operational).map((s) => s.regionId)
+      // HQ is always in ashburn
+      const allRegions = ['ashburn' as const, ...operationalSiteRegions]
+      if (!def.requiredRegions.every((r) => allRegions.includes(r))) return state
+      // Check required site types if specified
+      if (def.requiredSiteTypes && def.requiredSiteTypes.length > 0) {
+        const operationalSiteTypes = state.sites.filter((s) => s.operational).map((s) => s.type)
+        operationalSiteTypes.push('headquarters')
+        if (!def.requiredSiteTypes.some((t) => operationalSiteTypes.includes(t))) return state
+      }
+      const newContract: ActiveMultiSiteContract = {
+        id: `msc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        def,
+        acceptedAtTick: state.tickCount,
+        ticksRemaining: def.durationTicks,
+        totalEarned: 0,
+        totalPenalties: 0,
+        consecutiveViolations: 0,
+        status: 'active',
+      }
+      return {
+        multiSiteContracts: [...state.multiSiteContracts, newContract],
+      }
+    }),
+
+  transferStaff: (staffId: string, toSiteId: string | null) =>
+    set((state) => {
+      if (!state.multiSiteUnlocked) return state
+      // Check max transfers
+      if (state.staffTransfers.length >= MAX_STAFF_TRANSFERS) return state
+      // Staff must exist
+      const staff = state.staff.find((s) => s.id === staffId)
+      if (!staff) return state
+      // Staff can't already be in transit
+      if (state.staffTransfers.some((t) => t.staffId === staffId)) return state
+      // Determine destination region and from site
+      const fromSiteId = state.activeSiteId
+      if (fromSiteId === toSiteId) return state
+      // Calculate cost and duration
+      const cost = STAFF_TRANSFER_CONFIG.baseCost * (1 + STAFF_TRANSFER_CONFIG.costMultiplierPerLevel * (staff.skillLevel - 1))
+      if (!state.sandboxMode && state.money < cost) return state
+      // Determine if same/cross continent
+      const fromRegion = fromSiteId ? state.sites.find((s) => s.id === fromSiteId)?.regionId : 'ashburn'
+      const toRegion = toSiteId ? state.sites.find((s) => s.id === toSiteId)?.regionId : 'ashburn'
+      const fromContinent = REGION_CATALOG.find((r) => r.id === fromRegion)?.continent
+      const toContinent = REGION_CATALOG.find((r) => r.id === toRegion)?.continent
+      const ticks = fromContinent === toContinent ? STAFF_TRANSFER_CONFIG.sameContinentTicks : STAFF_TRANSFER_CONFIG.crossContinentTicks
+      const transfer: StaffTransfer = {
+        id: `xfr-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        staffId,
+        staffName: staff.name,
+        staffRole: staff.role,
+        fromSiteId,
+        toSiteId,
+        cost,
+        ticksRemaining: ticks,
+        startedAtTick: state.tickCount,
+      }
+      return {
+        staffTransfers: [...state.staffTransfers, transfer],
+        staff: state.staff.filter((s) => s.id !== staffId),  // remove from current site roster
+        money: state.sandboxMode ? state.money : state.money - cost,
+      }
+    }),
+
+  cancelStaffTransfer: (transferId: string) =>
+    set((state) => {
+      const transfer = state.staffTransfers.find((t) => t.id === transferId)
+      if (!transfer) return state
+      // Return staff to origin if cancelling (no refund)
+      return {
+        staffTransfers: state.staffTransfers.filter((t) => t.id !== transferId),
+      }
     }),
 
   // ── New Feature Actions ──────────────────────────────────────────
@@ -3231,6 +3628,7 @@ export const useGameStore = create<GameState>((set) => ({
     nextGeneratorId = 1
     nextCompetitorId = 1
     nextSiteId = 1
+    nextLinkId = 1
     set({
       cabinets: [],
       spineSwitches: [],
@@ -3390,9 +3788,26 @@ export const useGameStore = create<GameState>((set) => ({
       worldMapOpen: false,
       sites: [],
       activeSiteId: null,
+      hqSnapshot: null,
       researchedRegions: [],
       totalSiteRevenue: 0,
       totalSiteExpenses: 0,
+      // Phase 6B — Inter-Site Networking
+      interSiteLinks: [],
+      interSiteLinkCost: 0,
+      edgePopCDNRevenue: 0,
+      // Phase 6C — Regional Incidents & Disaster Preparedness
+      siteDisasterPreps: [],
+      regionalIncidentCount: 0,
+      disasterPrepMaintenanceCost: 0,
+      regionalIncidentsBlocked: 0,
+      // Phase 6D — Global Strategy Layer
+      demandGrowthMultipliers: {},
+      multiSiteContracts: [],
+      multiSiteContractRevenue: 0,
+      staffTransfers: [],
+      staffTransfersCompleted: 0,
+      competitorRegionalPresence: [],
       // New Features
       viewMode: 'cabinet' as ViewMode,
       rowEndSlots: [],
@@ -3586,6 +4001,86 @@ export const useGameStore = create<GameState>((set) => ({
         } else if (opsSpawnReduction > 0 && Math.random() < baseSpawnChance) {
           // Incident was prevented by ops tier
           opsPreventedCount++
+        }
+      }
+
+      // ── Phase 6C — Regional Incident Spawning ────────────────────
+      // For each operational site, check region-specific disaster risk and spawn regional incidents
+      let regionalIncidentCount = state.regionalIncidentCount
+      let regionalIncidentsBlocked = state.regionalIncidentsBlocked
+      let disasterPrepMaintenanceCost = 0
+      if (state.multiSiteUnlocked && state.sites.length > 0) {
+        // Calculate disaster prep maintenance cost
+        for (const prep of state.siteDisasterPreps) {
+          const prepConfig = DISASTER_PREP_CONFIG[prep.type]
+          disasterPrepMaintenanceCost += prepConfig.maintenanceCostPerTick
+        }
+        // Check each operational site for regional incidents
+        for (const site of state.sites) {
+          if (!site.operational) continue
+          const region = REGION_CATALOG.find((r) => r.id === site.regionId)
+          if (!region) continue
+          // Count regional incidents already active for this site
+          const siteRegionalIncidents = activeIncidents.filter((i) =>
+            !i.resolved && i.def.type.startsWith('regional_') && i.affectedHardwareId === site.id
+          ).length
+          if (siteRegionalIncidents >= MAX_REGIONAL_INCIDENTS) continue
+          // Check each regional incident type that can spawn in this region
+          for (const riDef of REGIONAL_INCIDENT_CATALOG) {
+            if (!riDef.regions.includes(site.regionId)) continue
+            const riskLevel = region.disasterProfile[riDef.riskKey]
+            if (riskLevel <= 0) continue
+            let spawnChance = riDef.baseChance * riskLevel
+            // Seasonal boost
+            if (riDef.seasonalBoost && riDef.seasonalBoost.includes(state.currentSeason)) {
+              spawnChance *= 2
+            }
+            if (Math.random() >= spawnChance) continue
+            // Check if disaster prep mitigates this
+            const sitePreps = state.siteDisasterPreps.filter((p) => p.siteId === site.id)
+            const hasMitigation = riDef.mitigatedBy && sitePreps.some((p) => p.type === riDef.mitigatedBy)
+            const mitigationFactor = hasMitigation ? (riDef.mitigationFactor ?? 0.5) : 0
+            // If fully mitigated (mitigationFactor >= 0.9), block the incident entirely
+            if (mitigationFactor >= 0.9) {
+              regionalIncidentsBlocked++
+              incidentLog = [`[${site.name}] ${riDef.label} — blocked by ${DISASTER_PREP_CONFIG[riDef.mitigatedBy!].label}`, ...incidentLog].slice(0, 10)
+              floatingTexts.push({ text: `${riDef.label} BLOCKED`, color: '#00ff88', center: true })
+              continue
+            }
+            // Create the incident — use affectedHardwareId to track which site it targets
+            const adjustedMagnitude = riDef.effectMagnitude * (1 - mitigationFactor)
+            const adjustedDuration = Math.round(riDef.durationTicks * (1 - mitigationFactor * 0.3))
+            const adjustedCost = Math.round(riDef.resolveCost * (1 - mitigationFactor * 0.4))
+            const incidentDef: IncidentDef = {
+              type: `regional_${riDef.type}`,
+              label: `[${site.name}] ${riDef.label}`,
+              severity: riDef.severity,
+              description: riDef.description,
+              durationTicks: adjustedDuration,
+              resolveCost: adjustedCost,
+              effect: riDef.effect === 'cabinet_destruction' ? 'revenue_penalty'
+                : riDef.effect === 'supply_chain_halt' ? 'revenue_penalty'
+                : riDef.effect,
+              effectMagnitude: riDef.effect === 'cabinet_destruction' ? (1 - adjustedMagnitude)
+                : riDef.effect === 'supply_chain_halt' ? 0.5
+                : adjustedMagnitude,
+            }
+            const incident: ActiveIncident = {
+              id: `rinc-${nextIncidentId++}`,
+              def: incidentDef,
+              ticksRemaining: incidentDef.durationTicks,
+              resolved: false,
+              affectedHardwareId: site.id,
+            }
+            activeIncidents.push(incident)
+            regionalIncidentCount++
+            incidentLog = [`[${site.name}] New: ${riDef.label} — ${riDef.description}${hasMitigation ? ' (damage reduced by ' + DISASTER_PREP_CONFIG[riDef.mitigatedBy!].label + ')' : ''}`, ...incidentLog].slice(0, 10)
+            const sevColor = riDef.severity === 'critical' ? '#ff4444' : riDef.severity === 'major' ? '#ff8844' : '#ffcc00'
+            floatingTexts.push({ text: `⚠ ${riDef.label} [${site.name}]`, color: sevColor, center: true, fontSize: '13px' })
+            if (riDef.severity === 'critical') cameraEffects.push({ type: 'shake_heavy' })
+            else if (riDef.severity === 'major') cameraEffects.push({ type: 'shake_medium' })
+            break // Max one regional incident per site per tick
+          }
         }
       }
 
@@ -3939,19 +4434,64 @@ export const useGameStore = create<GameState>((set) => ({
         }
 
         // Phase 6 — site construction still ticks even with no equipment
+        const earlyEventLog = [...state.eventLog]
         const earlyReturnSites = state.sites.map((site) => {
           if (!site.operational && site.constructionTicksRemaining > 0) {
             const remaining = site.constructionTicksRemaining - 1
-            if (remaining <= 0) return { ...site, constructionTicksRemaining: 0, operational: true }
+            if (remaining <= 0) {
+              const emptySnapshot: SiteSnapshot = {
+                cabinets: [], spineSwitches: [], pdus: [], cableTrays: [], cableRuns: [],
+                coolingUnits: [], chillerPlants: [], coolingPipes: [],
+                busways: [], crossConnects: [], inRowCoolers: [],
+                rowEndSlots: [], aisleContainments: [], aisleWidths: {},
+                raisedFloorTier: 'none', cableManagementType: 'none',
+                coolingType: 'air', suiteTier: 'starter' as SuiteTier,
+                totalPower: 0, avgHeat: SIM.ambientTemp, revenue: 0, expenses: 0,
+              }
+              earlyEventLog.push({ tick: newTickCount, gameHour: +(newHour.toFixed(1)), category: 'infrastructure' as EventCategory, message: `${site.name} construction complete — site is now operational!`, severity: 'success' as EventSeverity })
+              floatingTexts.push({ text: `${site.name} ONLINE`, color: '#00ff88', center: true })
+              return { ...site, constructionTicksRemaining: 0, operational: true, snapshot: emptySnapshot }
+            }
             return { ...site, constructionTicksRemaining: remaining }
           }
           return site
         })
+        if (earlyEventLog.length > 200) earlyEventLog.splice(0, earlyEventLog.length - 200)
         const earlyMultiSiteUnlocked = state.multiSiteUnlocked || (
           state.suiteTier === 'enterprise' &&
           state.money >= MULTI_SITE_GATE.minCash &&
           state.reputationScore >= MULTI_SITE_GATE.minReputation
         )
+
+        // Phase 6B — tick inter-site links (even with no equipment)
+        let earlyLinkCost = 0
+        let earlyEdgePopCDNRevenue = 0
+        const earlyUpdatedLinks = state.interSiteLinks.map((link) => {
+          const linkConfig = INTER_SITE_LINK_CONFIG[link.type]
+          let operational = link.operational
+          if (operational && Math.random() > linkConfig.reliability) {
+            operational = false
+          } else if (!operational && Math.random() < 0.2) {
+            operational = true
+          }
+          if (operational) earlyLinkCost += link.costPerTick
+          return { ...link, operational, utilization: 0 }
+        })
+
+        // Edge PoP CDN revenue in early return path
+        for (const ep of earlyReturnSites.filter((s) => s.type === 'edge_pop' && s.operational)) {
+          const hasBackhaul = earlyUpdatedLinks.some((l) => l.operational && (l.siteAId === ep.id || l.siteBId === ep.id))
+          if (hasBackhaul) {
+            const bestLink = earlyUpdatedLinks
+              .filter((l) => l.operational && (l.siteAId === ep.id || l.siteBId === ep.id))
+              .sort((a, b) => b.bandwidthGbps - a.bandwidthGbps)[0]
+            if (bestLink) {
+              const region = REGION_CATALOG.find((r) => r.id === ep.regionId)
+              const demandBonus = region ? Math.max(region.demandProfile.streaming, region.demandProfile.general) : 0.5
+              earlyEdgePopCDNRevenue += bestLink.bandwidthGbps * EDGE_POP_CDN_REVENUE_PER_GBPS * demandBonus
+            }
+          }
+        }
 
         return {
           tickCount: newTickCount,
@@ -3962,7 +4502,7 @@ export const useGameStore = create<GameState>((set) => ({
           spikeMagnitude,
           loans: updatedLoans,
           loanPayments: +loanPayments.toFixed(2),
-          money: state.sandboxMode ? 999999999 : Math.round((state.money - loanPayments) * 100) / 100,
+          money: state.sandboxMode ? 999999999 : Math.round((state.money - loanPayments - earlyLinkCost + earlyEdgePopCDNRevenue) * 100) / 100,
           activeIncidents,
           incidentLog,
           resolvedCount,
@@ -3980,6 +4520,12 @@ export const useGameStore = create<GameState>((set) => ({
           // Phase 6
           sites: earlyReturnSites,
           multiSiteUnlocked: earlyMultiSiteUnlocked,
+          eventLog: earlyEventLog,
+          pendingFloatingTexts: floatingTexts,
+          // Phase 6B
+          interSiteLinks: earlyUpdatedLinks,
+          interSiteLinkCost: +earlyLinkCost.toFixed(2),
+          edgePopCDNRevenue: +earlyEdgePopCDNRevenue.toFixed(2),
         }
       }
 
@@ -4076,6 +4622,13 @@ export const useGameStore = create<GameState>((set) => ({
       const cableMgmtConfig = CABLE_MANAGEMENT_CONFIG.find((c) => c.type === state.cableManagementType)
       const facilityCableMessReduction = cableMgmtConfig?.cableMessReduction ?? 0
 
+      // Regional ambient modifier: remote sites have ambient temp shifted by region's coolingEfficiency
+      const activeSiteRegion = state.activeSiteId
+        ? REGION_CATALOG.find((r) => r.id === state.sites.find((s) => s.id === state.activeSiteId)?.regionId)
+        : null
+      const regionalAmbientOffset = activeSiteRegion ? activeSiteRegion.profile.coolingEfficiency : 0
+      const effectiveAmbientTemp = SIM.ambientTemp + regionalAmbientOffset
+
       // 1. Update heat per cabinet (with customer type, spacing, and tech modifiers)
       const newCabinets = state.cabinets.map((cab) => {
         let heat = cab.heatLevel
@@ -4152,8 +4705,8 @@ export const useGameStore = create<GameState>((set) => ({
         // Fire adds extra heat
         if (fireActive) heat += 5
 
-        // Clamp to ambient minimum and 100 max
-        heat = Math.max(SIM.ambientTemp, Math.min(100, heat))
+        // Clamp to ambient minimum (adjusted by regional cooling efficiency) and 100 max
+        heat = Math.max(effectiveAmbientTemp, Math.min(100, heat))
 
         // Age servers (depreciation)
         const newAge = cab.powerStatus ? cab.serverAge + 1 : cab.serverAge
@@ -4354,8 +4907,9 @@ export const useGameStore = create<GameState>((set) => ({
       const repTier = getReputationTier(state.reputationScore)
 
       // 4. Calculate expenses (with spot pricing, incident power surge, customer type power draw)
+      const regionalPowerMult = activeSiteRegion ? activeSiteRegion.profile.powerCostMultiplier : 1
       const effectivePower = Math.round(stats.totalPower * incidentPowerMult)
-      const spotPowerCost = SIM.powerCostPerKW * effectivePowerPrice
+      const spotPowerCost = SIM.powerCostPerKW * effectivePowerPrice * regionalPowerMult
       const powerCost = +(effectivePower / 1000 * spotPowerCost).toFixed(2)
       const coolingCost = +(adjustedCoolingPower / 1000 * spotPowerCost).toFixed(2)
       // Cooling unit power draw
@@ -5341,6 +5895,17 @@ export const useGameStore = create<GameState>((set) => ({
           // Phase 6 — Multi-Site tips
           if (tip.id === 'multi_site_unlocked' && !state.multiSiteUnlocked && state.suiteTier === 'enterprise' && state.money >= MULTI_SITE_GATE.minCash && reputationScore >= MULTI_SITE_GATE.minReputation) trigger = true
           if (tip.id === 'site_under_construction' && state.sites.some((s) => !s.operational && s.constructionTicksRemaining > 0)) trigger = true
+          // Phase 6B — Inter-Site Networking tips
+          if (tip.id === 'first_link_hint' && state.sites.filter((s) => s.operational).length >= 1 && state.interSiteLinks.length === 0) trigger = true
+          if (tip.id === 'edge_pop_backhaul' && state.sites.some((s) => s.type === 'edge_pop' && s.operational) && !state.interSiteLinks.some((l) => l.operational && state.sites.some((ep) => ep.type === 'edge_pop' && (l.siteAId === ep.id || l.siteBId === ep.id)))) trigger = true
+          // Phase 6C — Regional Incidents & Disaster Preparedness tips
+          if (tip.id === 'regional_incident_hint' && state.sites.filter((s) => s.operational).length >= 1 && state.regionalIncidentCount === 0) trigger = true
+          if (tip.id === 'disaster_prep_hint' && regionalIncidentCount > 0 && state.siteDisasterPreps.length === 0) trigger = true
+          // Phase 6D — Global Strategy Layer tips
+          if (tip.id === 'multisite_contracts_hint' && state.sites.filter((s) => s.operational).length >= 2 && state.multiSiteContracts.length === 0) trigger = true
+          if (tip.id === 'sovereignty_hint' && state.sites.some((s) => s.operational && ['london', 'amsterdam', 'frankfurt', 'nordics', 'sao_paulo', 'singapore'].includes(s.regionId)) && !state.multiSiteContracts.some((c) => c.def.sovereigntyRegime)) trigger = true
+          if (tip.id === 'staff_transfer_hint' && state.sites.filter((s) => s.operational).length >= 2 && state.staffTransfersCompleted === 0) trigger = true
+          if (tip.id === 'demand_growth_hint' && Object.keys(state.demandGrowthMultipliers).length > 0 && state.multiSiteContracts.length === 0) trigger = true
           if (trigger) { activeTip = tip; break }
         }
       }
@@ -5452,20 +6017,53 @@ export const useGameStore = create<GameState>((set) => ({
         if (!site.operational && site.constructionTicksRemaining > 0) {
           const remaining = site.constructionTicksRemaining - 1
           if (remaining <= 0) {
-            return { ...site, constructionTicksRemaining: 0, operational: true }
+            // Site construction complete — initialize with empty snapshot
+            const emptySnapshot: SiteSnapshot = {
+              cabinets: [], spineSwitches: [], pdus: [], cableTrays: [], cableRuns: [],
+              coolingUnits: [], chillerPlants: [], coolingPipes: [],
+              busways: [], crossConnects: [], inRowCoolers: [],
+              rowEndSlots: [], aisleContainments: [], aisleWidths: {},
+              raisedFloorTier: 'none', cableManagementType: 'none',
+              coolingType: 'air', suiteTier: 'starter' as SuiteTier,
+              totalPower: 0, avgHeat: SIM.ambientTemp, revenue: 0, expenses: 0,
+            }
+            eventLog.push({ tick: newTickCount, gameHour: +(newHour.toFixed(1)), category: 'infrastructure' as EventCategory, message: `${site.name} construction complete — site is now operational!`, severity: 'success' as EventSeverity })
+            floatingTexts.push({ text: `${site.name} ONLINE`, color: '#00ff88', center: true })
+            return { ...site, constructionTicksRemaining: 0, operational: true, snapshot: emptySnapshot }
           }
           return { ...site, constructionTicksRemaining: remaining }
         }
-        // Background site simplified revenue/expenses (only for operational non-active sites)
+        // Background site revenue/expenses (only for operational non-active sites with snapshots)
         if (site.operational && site.id !== state.activeSiteId) {
           const region = REGION_CATALOG.find((r) => r.id === site.regionId)
           const siteConfig = SITE_TYPE_CONFIG[site.type]
           const regionPowerMult = region ? region.profile.powerCostMultiplier : 1
-          const siteRev = site.servers * SIM.revenuePerServer * (region ? (region.demandProfile.general + 0.5) : 1)
-          const siteExp = site.servers * POWER_DRAW.server * 0.001 * POWER_MARKET.baseCost * regionPowerMult + siteConfig.maintenanceCostPerTick
+          // Use snapshot data for more accurate calculation if available
+          const srvCount = site.snapshot ? site.snapshot.cabinets.reduce((sum, c) => sum + c.serverCount, 0) : site.servers
+          const demandBonus = region ? Math.max(region.demandProfile.general, region.demandProfile.ai_training, region.demandProfile.streaming, region.demandProfile.enterprise, region.demandProfile.crypto) : 0.5
+          const siteRev = srvCount * SIM.revenuePerServer * (0.5 + demandBonus)
+          const siteExp = srvCount * POWER_DRAW.server * 0.001 * POWER_MARKET.baseCost * regionPowerMult + siteConfig.maintenanceCostPerTick
           totalSiteRevenue += siteRev
           totalSiteExpenses += siteExp
-          return { ...site, revenue: +siteRev.toFixed(2), expenses: +siteExp.toFixed(2) }
+          return {
+            ...site,
+            cabinets: site.snapshot ? site.snapshot.cabinets.length : site.cabinets,
+            servers: srvCount,
+            revenue: +siteRev.toFixed(2),
+            expenses: +siteExp.toFixed(2),
+          }
+        }
+        // Active remote site — sync live stats from current state
+        if (site.operational && site.id === state.activeSiteId) {
+          return {
+            ...site,
+            cabinets: newCabinets.length,
+            servers: newCabinets.reduce((sum, c) => sum + c.serverCount, 0),
+            suiteTier: state.suiteTier,
+            revenue: +revenue.toFixed(2),
+            expenses: +expenses.toFixed(2),
+            heat: Math.round(newCabinets.reduce((sum, c) => sum + c.heatLevel, 0) / Math.max(1, newCabinets.length)),
+          }
         }
         return site
       })
@@ -5478,19 +6076,266 @@ export const useGameStore = create<GameState>((set) => ({
       const continentsWithSites = new Set(updatedSites.filter((s) => s.operational).map((s) => REGION_CATALOG.find((r) => r.id === s.regionId)?.continent).filter(Boolean))
       if (continentsWithSites.size >= 3) unlock('three_continents')
 
+      // ── Phase 6B — Inter-Site Networking Tick ──────────────────────
+      let interSiteLinkCost = 0
+      let edgePopCDNRevenue = 0
+      const updatedLinks = state.interSiteLinks.map((link) => {
+        // Link reliability check — occasionally take links offline
+        const linkConfig = INTER_SITE_LINK_CONFIG[link.type]
+        let operational = link.operational
+        if (operational && Math.random() > linkConfig.reliability) {
+          operational = false
+          eventLog.push({ tick: newTickCount, gameHour: +(newHour.toFixed(1)), category: 'infrastructure' as EventCategory, message: `Inter-site link ${linkConfig.label} went offline!`, severity: 'warning' as EventSeverity })
+        } else if (!operational && Math.random() < 0.2) {
+          // 20% chance per tick to come back online
+          operational = true
+          eventLog.push({ tick: newTickCount, gameHour: +(newHour.toFixed(1)), category: 'infrastructure' as EventCategory, message: `Inter-site link ${linkConfig.label} restored.`, severity: 'success' as EventSeverity })
+        }
+
+        // Calculate utilization based on connected site server counts
+        let util = 0
+        if (operational) {
+          const siteAServers = link.siteAId === null
+            ? newCabinets.reduce((sum, c) => sum + c.serverCount, 0)
+            : (() => { const s = updatedSites.find((st) => st.id === link.siteAId); return s ? s.servers : 0 })()
+          const siteBServers = (() => { const s = updatedSites.find((st) => st.id === link.siteBId); return s ? s.servers : 0 })()
+          const totalTraffic = (siteAServers + siteBServers) * TRAFFIC.gbpsPerServer * 0.1 // 10% of local traffic goes inter-site
+          util = Math.min(1, totalTraffic / link.bandwidthGbps)
+        }
+
+        // Link cost
+        if (operational) interSiteLinkCost += link.costPerTick
+
+        return { ...link, operational, utilization: +util.toFixed(3) }
+      })
+
+      // Edge PoP CDN revenue — edge PoPs with a backhaul link to HQ or a core site earn CDN revenue
+      const operationalEdgePops = updatedSites.filter((s) => s.type === 'edge_pop' && s.operational)
+      for (const ep of operationalEdgePops) {
+        // Check if this edge PoP has a backhaul link to any other operational site
+        const hasBackhaul = updatedLinks.some((l) =>
+          l.operational &&
+          ((l.siteAId === ep.id || l.siteBId === ep.id))
+        )
+        if (hasBackhaul) {
+          // CDN revenue based on the bandwidth of the best link to this edge PoP
+          const bestLink = updatedLinks
+            .filter((l) => l.operational && (l.siteAId === ep.id || l.siteBId === ep.id))
+            .sort((a, b) => b.bandwidthGbps - a.bandwidthGbps)[0]
+          if (bestLink) {
+            const region = REGION_CATALOG.find((r) => r.id === ep.regionId)
+            const demandBonus = region ? Math.max(region.demandProfile.streaming, region.demandProfile.general) : 0.5
+            edgePopCDNRevenue += bestLink.bandwidthGbps * EDGE_POP_CDN_REVENUE_PER_GBPS * demandBonus
+          }
+        }
+      }
+
+      // Phase 6B achievements
+      if (updatedLinks.length >= 1) unlock('first_link')
+      if (updatedLinks.filter((l) => l.operational).length >= 3) unlock('network_architect')
+      if (updatedLinks.some((l) => l.type === 'dark_fiber')) unlock('dark_fiber')
+      if (updatedLinks.some((l) => l.type === 'submarine_cable')) unlock('submarine_cable')
+      if (edgePopCDNRevenue > 0) unlock('cdn_revenue')
+
+      // Phase 6C achievements
+      if (regionalIncidentCount > 0) {
+        // Check if any critical regional incident was survived (resolved or expired)
+        const hadCriticalRegional = activeIncidents.some((i) => i.def.type.startsWith('regional_') && i.def.severity === 'critical')
+        if (hadCriticalRegional || state.regionalIncidentCount > 0) unlock('disaster_survivor')
+      }
+      if (state.siteDisasterPreps.length >= 1) unlock('disaster_prepped')
+      const prepTypes = new Set(state.siteDisasterPreps.map((p) => p.type))
+      if (prepTypes.size >= 4) unlock('fully_hardened')
+      if (regionalIncidentsBlocked >= 5) unlock('regional_blocker')
+
+      // ── Phase 6D — Global Strategy Layer Tick ──────────────────────
+      // Demand growth — update regional demand multipliers periodically
+      const demandGrowthMultipliers = { ...state.demandGrowthMultipliers }
+      if (multiSiteUnlocked && newTickCount % DEMAND_GROWTH_CONFIG.growthInterval === 0) {
+        const customerTypes = ['general', 'ai_training', 'streaming', 'crypto', 'enterprise'] as const
+        for (const region of REGION_CATALOG) {
+          if (!demandGrowthMultipliers[region.id]) {
+            demandGrowthMultipliers[region.id] = {}
+            for (const ct of customerTypes) demandGrowthMultipliers[region.id][ct] = 0
+          }
+          for (const ct of customerTypes) {
+            const baseDemand = region.demandProfile[ct]
+            const currentGrowth = demandGrowthMultipliers[region.id][ct] || 0
+            const effectiveDemand = baseDemand + currentGrowth
+            let delta = 0
+            if (effectiveDemand < DEMAND_GROWTH_CONFIG.emergingThreshold) {
+              delta = DEMAND_GROWTH_CONFIG.emergingGrowthRate
+            } else if (effectiveDemand > DEMAND_GROWTH_CONFIG.saturatedThreshold) {
+              delta = DEMAND_GROWTH_CONFIG.saturatedDecayRate
+            } else {
+              delta = DEMAND_GROWTH_CONFIG.stableGrowthRate
+            }
+            // Random variation ±50%
+            delta *= (0.5 + Math.random())
+            const newGrowth = Math.max(
+              DEMAND_GROWTH_CONFIG.minDemand - baseDemand,
+              Math.min(DEMAND_GROWTH_CONFIG.maxDemand - baseDemand, currentGrowth + delta)
+            )
+            demandGrowthMultipliers[region.id][ct] = +newGrowth.toFixed(4)
+          }
+        }
+      }
+
+      // Multi-site contracts — tick active contracts, check compliance
+      let multiSiteContractRevenue = 0
+      let multiSiteContractPenalties = 0
+      const operationalSiteRegions = updatedSites.filter((s) => s.operational).map((s) => s.regionId)
+      const allPlayerRegions = ['ashburn' as const, ...operationalSiteRegions]
+      const operationalSiteTypes = updatedSites.filter((s) => s.operational).map((s) => s.type)
+      operationalSiteTypes.push('headquarters')
+      const updatedMultiSiteContracts = state.multiSiteContracts.map((contract) => {
+        if (contract.status !== 'active') return contract
+        const def = contract.def
+        // Check region compliance
+        const regionsMet = def.requiredRegions.every((r) => allPlayerRegions.includes(r))
+        const siteTypesMet = !def.requiredSiteTypes || def.requiredSiteTypes.length === 0 || def.requiredSiteTypes.some((t) => operationalSiteTypes.includes(t))
+        const compliant = regionsMet && siteTypesMet
+        const ticks = contract.ticksRemaining - 1
+        if (compliant) {
+          // Apply sovereignty bonus
+          let sovereigntyBonus = 1
+          if (def.sovereigntyRegime && def.sovereigntyRegime !== 'none') {
+            const rule = DATA_SOVEREIGNTY_CONFIG.find((r) => r.regime === def.sovereigntyRegime)
+            if (rule) sovereigntyBonus = 1 + rule.revenueBonus
+          }
+          const rev = def.revenuePerTick * sovereigntyBonus
+          multiSiteContractRevenue += rev
+          if (ticks <= 0) {
+            multiSiteContractRevenue += 0 // completion bonus added to money directly
+            eventLog.push({ tick: newTickCount, gameHour: +(newHour.toFixed(1)), category: 'contract' as EventCategory, message: `Multi-site contract "${def.label}" completed! Bonus: $${def.completionBonus.toLocaleString()}`, severity: 'success' as EventSeverity })
+            floatingTexts.push({ text: `CONTRACT COMPLETE: ${def.label}`, color: '#00ff88', center: true })
+            return { ...contract, ticksRemaining: 0, totalEarned: contract.totalEarned + rev + def.completionBonus, status: 'completed' as const, consecutiveViolations: 0 }
+          }
+          return { ...contract, ticksRemaining: ticks, totalEarned: contract.totalEarned + rev, consecutiveViolations: 0 }
+        } else {
+          // Non-compliant — apply penalty
+          multiSiteContractPenalties += def.penaltyPerTick
+          const violations = contract.consecutiveViolations + 1
+          // Terminate after 20 consecutive violations
+          if (violations >= 20) {
+            eventLog.push({ tick: newTickCount, gameHour: +(newHour.toFixed(1)), category: 'contract' as EventCategory, message: `Multi-site contract "${def.label}" terminated due to non-compliance!`, severity: 'error' as EventSeverity })
+            floatingTexts.push({ text: `CONTRACT TERMINATED: ${def.label}`, color: '#ff4444', center: true })
+            return { ...contract, ticksRemaining: ticks, totalPenalties: contract.totalPenalties + def.penaltyPerTick, consecutiveViolations: violations, status: 'terminated' as const }
+          }
+          return { ...contract, ticksRemaining: ticks, totalPenalties: contract.totalPenalties + def.penaltyPerTick, consecutiveViolations: violations }
+        }
+      })
+      // Add completion bonuses to money
+      const completionBonuses = updatedMultiSiteContracts.filter((c) => c.status === 'completed' && state.multiSiteContracts.find((sc) => sc.id === c.id)?.status === 'active').reduce((sum, c) => sum + c.def.completionBonus, 0)
+
+      // Staff transfers — tick in-transit staff, deliver arrived staff
+      let staffTransfersCompleted = state.staffTransfersCompleted
+      const pendingTransfers: StaffTransfer[] = []
+      const arrivedStaff: StaffTransfer[] = []
+      for (const transfer of state.staffTransfers) {
+        const remaining = transfer.ticksRemaining - 1
+        if (remaining <= 0) {
+          arrivedStaff.push(transfer)
+          staffTransfersCompleted++
+        } else {
+          pendingTransfers.push({ ...transfer, ticksRemaining: remaining })
+        }
+      }
+      // Note: arrived staff will be added to the target site's roster when player switches to that site
+      // For now, log the arrival
+      for (const arrived of arrivedStaff) {
+        const destName = arrived.toSiteId ? updatedSites.find((s) => s.id === arrived.toSiteId)?.name ?? 'site' : 'HQ'
+        eventLog.push({ tick: newTickCount, gameHour: +(newHour.toFixed(1)), category: 'staff' as EventCategory, message: `${arrived.staffName} (${arrived.staffRole}) arrived at ${destName}.`, severity: 'success' as EventSeverity })
+        floatingTexts.push({ text: `STAFF ARRIVED: ${arrived.staffName}`, color: '#00aaff', center: true })
+        // If arriving at HQ (activeSiteId === null) or current active site, add to staff
+        if (arrived.toSiteId === state.activeSiteId) {
+          // Will be handled below via updatedStaffWithArrivals
+        }
+      }
+      const staffArrivingHere = arrivedStaff.filter((a) => a.toSiteId === state.activeSiteId)
+      // Recreate arrived staff members (basic reconstruction)
+      const arrivedStaffMembers: StaffMember[] = staffArrivingHere.map((a) => ({
+        id: a.staffId,
+        name: a.staffName,
+        role: a.staffRole,
+        skillLevel: 1 as StaffSkillLevel,
+        salaryPerTick: STAFF_ROLE_CONFIG.find((r) => r.role === a.staffRole)?.baseSalary ?? 5,
+        hiredAtTick: a.startedAtTick,
+        onShift: true,
+        certifications: [],
+        incidentsResolved: 0,
+        fatigueLevel: 0,
+      }))
+
+      // Competitor regional presence — competitors expand into regions
+      let competitorRegionalPresence = [...state.competitorRegionalPresence]
+      if (multiSiteUnlocked) {
+        for (const comp of competitors) {
+          const compPresence = competitorRegionalPresence.filter((p) => p.competitorId === comp.id)
+          // Grow existing presence
+          competitorRegionalPresence = competitorRegionalPresence.map((p) => {
+            if (p.competitorId !== comp.id) return p
+            const newStrength = Math.min(COMPETITOR_REGIONAL_CONFIG.maxRegionalStrength, p.strength + COMPETITOR_REGIONAL_CONFIG.regionalStrengthGrowth)
+            return { ...p, strength: +newStrength.toFixed(3) }
+          })
+          // Chance to expand to new region
+          if (compPresence.length < COMPETITOR_REGIONAL_CONFIG.maxRegionsPerCompetitor && Math.random() < COMPETITOR_REGIONAL_CONFIG.expansionChance) {
+            // Pick a region the competitor isn't in yet, weighted by demand matching their specialization
+            const existingRegions = new Set(compPresence.map((p) => p.regionId))
+            const candidates = REGION_CATALOG.filter((r) => !existingRegions.has(r.id))
+            if (candidates.length > 0) {
+              const specKey = comp.specialization as keyof typeof candidates[0]['demandProfile']
+              const sorted = candidates.sort((a, b) => (b.demandProfile[specKey] || 0) - (a.demandProfile[specKey] || 0))
+              const chosen = sorted[0]
+              competitorRegionalPresence = [...competitorRegionalPresence, {
+                competitorId: comp.id,
+                regionId: chosen.id,
+                strength: 0.1,
+                establishedAtTick: newTickCount,
+              }]
+              eventLog.push({ tick: newTickCount, gameHour: +(newHour.toFixed(1)), category: 'system' as EventCategory, message: `Competitor ${comp.name} expanded to ${chosen.name}!`, severity: 'warning' as EventSeverity })
+            }
+          }
+        }
+      }
+
+      // Phase 6D achievements
+      if (updatedMultiSiteContracts.some((c) => c.status === 'active' || c.status === 'completed')) unlock('first_multisite_contract')
+      if (updatedMultiSiteContracts.some((c) => (c.status === 'completed') && c.def.sovereigntyRegime && c.def.sovereigntyRegime !== 'none')) unlock('sovereignty_compliant')
+      if (staffTransfersCompleted >= 1) unlock('staff_transferred')
+      // Demand surfer — site in emerging market
+      for (const site of updatedSites.filter((s) => s.operational)) {
+        const growth = demandGrowthMultipliers[site.regionId]
+        if (growth) {
+          const hasEmerging = Object.values(growth).some((g) => g > 0.01)
+          if (hasEmerging) { unlock('demand_surfer'); break }
+        }
+      }
+      const totalMSCRevenue = updatedMultiSiteContracts.filter((c) => c.status === 'active').reduce((sum, c) => {
+        let bonus = 1
+        if (c.def.sovereigntyRegime && c.def.sovereigntyRegime !== 'none') {
+          const rule = DATA_SOVEREIGNTY_CONFIG.find((r) => r.regime === c.def.sovereigntyRegime)
+          if (rule) bonus = 1 + rule.revenueBonus
+        }
+        return sum + c.def.revenuePerTick * bonus
+      }, 0)
+      if (totalMSCRevenue >= 300) unlock('global_empire')
+
       // Apply Phase 4 bonuses to contract revenue
       const adjustedContractRevenue = +(contractRevenue * (1 + complianceRevenueBonus + greenCertRevenueBonus) * priceWarPenalty).toFixed(2)
 
-      // Recalculate final money with all income/expenses (Phase 4 + 5 + 6 + workloads + ops included)
+      // Recalculate final money with all income/expenses (Phase 4 + 5 + 6 + 6B + 6D + workloads + ops included)
       const phase5Income = spotRevenue + meetMeRevenue
       const phase5Expenses = peeringCostPerTick + powerRedundancyCost + meetMeMaintenanceCost + (noiseComplaints > state.noiseComplaints && noiseComplaints % NOISE_CONFIG.fineThreshold === 0 ? NOISE_CONFIG.fineAmount : 0)
       const phase4Expenses = carbonTaxPerTick + waterCostPerTick + securityMaintenanceCost
-      const phase6Income = totalSiteRevenue
-      const phase6Expenses = totalSiteExpenses
+      const phase6Income = totalSiteRevenue + edgePopCDNRevenue
+      const phase6Expenses = totalSiteExpenses + interSiteLinkCost + disasterPrepMaintenanceCost
+      const phase6DIncome = multiSiteContractRevenue + completionBonuses
+      const phase6DExpenses = multiSiteContractPenalties
       const newFeatureIncome = workloadRevenue
       const finalNewMoney = state.sandboxMode
         ? 999999999
-        : Math.round((state.money + revenue + adjustedContractRevenue + patentIncome + milestoneMoney + phase5Income + phase6Income + newFeatureIncome + (insurancePayouts - state.insurancePayouts) - expenses - loanPayments - contractPenalties - insuranceCost - staffCostPerTick - phase5Expenses - phase4Expenses - phase6Expenses) * 100) / 100
+        : Math.round((state.money + revenue + adjustedContractRevenue + patentIncome + milestoneMoney + phase5Income + phase6Income + phase6DIncome + newFeatureIncome + (insurancePayouts - state.insurancePayouts) - expenses - loanPayments - contractPenalties - insuranceCost - staffCostPerTick - phase5Expenses - phase4Expenses - phase6Expenses - phase6DExpenses) * 100) / 100
 
       return {
         cabinets: newCabinets,
@@ -5561,8 +6406,8 @@ export const useGameStore = create<GameState>((set) => ({
         scenarioProgress,
         scenariosCompleted,
         scenarioBestTicks,
-        // Staff & HR
-        staff: updatedStaff,
+        // Staff & HR (include arrived transfers)
+        staff: [...updatedStaff, ...arrivedStaffMembers],
         trainingQueue,
         staffCostPerTick: +staffCostPerTick.toFixed(2),
         staffIncidentsResolved,
@@ -5649,6 +6494,21 @@ export const useGameStore = create<GameState>((set) => ({
         sites: updatedSites,
         totalSiteRevenue: +totalSiteRevenue.toFixed(2),
         totalSiteExpenses: +totalSiteExpenses.toFixed(2),
+        // Phase 6B — Inter-Site Networking
+        interSiteLinks: updatedLinks,
+        interSiteLinkCost: +interSiteLinkCost.toFixed(2),
+        edgePopCDNRevenue: +edgePopCDNRevenue.toFixed(2),
+        // Phase 6C — Regional Incidents & Disaster Preparedness
+        regionalIncidentCount,
+        regionalIncidentsBlocked,
+        disasterPrepMaintenanceCost: +disasterPrepMaintenanceCost.toFixed(2),
+        // Phase 6D — Global Strategy Layer
+        demandGrowthMultipliers,
+        multiSiteContracts: updatedMultiSiteContracts,
+        multiSiteContractRevenue: +multiSiteContractRevenue.toFixed(2),
+        staffTransfers: pendingTransfers,
+        staffTransfersCompleted,
+        competitorRegionalPresence,
         // New Features
         activeWorkloads,
         completedWorkloads,

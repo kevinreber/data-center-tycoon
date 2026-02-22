@@ -90,6 +90,34 @@ export interface SiteTypeConfig {
   description: string
 }
 
+// Per-site state snapshot — captures all site-specific arrays and fields
+// so that switching between sites preserves full state
+export interface SiteSnapshot {
+  cabinets: Cabinet[]
+  spineSwitches: SpineSwitch[]
+  pdus: PDU[]
+  cableTrays: CableTray[]
+  cableRuns: CableRun[]
+  coolingUnits: CoolingUnit[]
+  chillerPlants: ChillerPlant[]
+  coolingPipes: CoolingPipe[]
+  busways: Busway[]
+  crossConnects: CrossConnect[]
+  inRowCoolers: InRowCooling[]
+  rowEndSlots: RowEndSlot[]
+  aisleContainments: number[]
+  aisleWidths: Record<number, AisleWidth>
+  raisedFloorTier: RaisedFloorTier
+  cableManagementType: CableManagementType
+  coolingType: CoolingType
+  suiteTier: SuiteTier
+  // Computed fields (restored for quick display, recalculated on tick)
+  totalPower: number
+  avgHeat: number
+  revenue: number
+  expenses: number
+}
+
 export interface Site {
   id: string
   name: string
@@ -104,6 +132,148 @@ export interface Site {
   expenses: number
   heat: number
   suiteTier: SuiteTier
+  snapshot: SiteSnapshot | null  // full state when not active; null for HQ or not-yet-built
+}
+
+// ── Regional Incidents & Disaster Preparedness (Phase 6C) ─────
+export type RegionalIncidentType =
+  | 'earthquake' | 'wildfire_smoke' | 'tornado' | 'grid_collapse'
+  | 'hurricane' | 'volcanic_eruption' | 'submarine_cable_cut'
+  | 'monsoon_flooding' | 'extreme_heat' | 'grid_load_shedding'
+  | 'thames_flooding' | 'amsterdam_flood'
+
+export type DisasterPrepType = 'seismic_reinforcement' | 'flood_barriers' | 'hurricane_hardening' | 'elevated_equipment'
+
+export interface RegionalIncidentDef {
+  type: RegionalIncidentType
+  label: string
+  severity: IncidentSeverity
+  description: string
+  durationTicks: number
+  resolveCost: number
+  effect: 'heat_spike' | 'revenue_penalty' | 'power_surge' | 'traffic_drop' | 'cooling_failure' | 'hardware_failure' | 'cabinet_destruction' | 'supply_chain_halt'
+  effectMagnitude: number
+  /** Which regions can spawn this incident */
+  regions: RegionId[]
+  /** Which disaster risk profile key determines spawn chance */
+  riskKey: keyof RegionDisasterProfile
+  /** Base chance per tick (multiplied by region risk) */
+  baseChance: number
+  /** Which season(s) increase chance, if any */
+  seasonalBoost?: Season[]
+  /** Which disaster prep type mitigates this */
+  mitigatedBy?: DisasterPrepType
+  /** Damage reduction factor when mitigated (0–1, where 1 = fully mitigated) */
+  mitigationFactor?: number
+}
+
+export interface DisasterPrepConfig {
+  type: DisasterPrepType
+  label: string
+  description: string
+  cost: number
+  mitigates: keyof RegionDisasterProfile
+  damageReduction: number   // 0–1 fraction of damage/severity prevented
+  maintenanceCostPerTick: number
+}
+
+export interface SiteDisasterPrep {
+  siteId: string
+  type: DisasterPrepType
+  installedAtTick: number
+}
+
+// ── Global Strategy Layer (Phase 6D) ──────────────────────────
+export type DemandTrend = 'emerging' | 'stable' | 'saturated'
+export type SovereigntyRegime = 'gdpr' | 'lgpd' | 'pdpa' | 'none'
+
+export interface DataSovereigntyRule {
+  regime: SovereigntyRegime
+  label: string
+  description: string
+  regions: RegionId[]
+  revenueBonus: number          // bonus for contracts that require local presence
+  nonCompliancePenalty: number   // revenue penalty if data leaves jurisdiction
+}
+
+export interface MultiSiteContractDef {
+  id: string
+  company: string
+  label: string
+  description: string
+  requiredRegions: RegionId[]           // must have operational sites in ALL these regions
+  requiredSiteTypes?: SiteType[]        // optional: specific site types needed
+  sovereigntyRegime?: SovereigntyRegime // optional: data sovereignty compliance
+  revenuePerTick: number
+  durationTicks: number
+  completionBonus: number
+  penaltyPerTick: number                // penalty if requirements stop being met
+}
+
+export interface ActiveMultiSiteContract {
+  id: string
+  def: MultiSiteContractDef
+  acceptedAtTick: number
+  ticksRemaining: number
+  totalEarned: number
+  totalPenalties: number
+  consecutiveViolations: number
+  status: 'active' | 'completed' | 'terminated'
+}
+
+export interface StaffTransfer {
+  id: string
+  staffId: string
+  staffName: string
+  staffRole: StaffRole
+  fromSiteId: string | null     // null = HQ
+  toSiteId: string | null       // null = HQ
+  cost: number
+  ticksRemaining: number
+  startedAtTick: number
+}
+
+export interface StaffTransferConfig {
+  baseCost: number              // base transfer cost
+  sameContinentTicks: number    // travel time same continent
+  crossContinentTicks: number   // travel time cross continent
+  costMultiplierPerLevel: number // skill level multiplier on transfer cost
+}
+
+export interface CompetitorRegionalPresence {
+  competitorId: string
+  regionId: RegionId
+  strength: number              // 0–1 local market strength
+  establishedAtTick: number
+}
+
+// ── Inter-Site Networking Types (Phase 6B) ────────────────────
+export type InterSiteLinkType = 'ip_transit' | 'leased_wavelength' | 'dark_fiber' | 'submarine_cable'
+
+export interface InterSiteLink {
+  id: string
+  type: InterSiteLinkType
+  siteAId: string | null    // null = HQ
+  siteBId: string
+  bandwidthGbps: number
+  latencyMs: number
+  costPerTick: number
+  installedAtTick: number
+  utilization: number       // 0–1, current bandwidth usage
+  operational: boolean
+}
+
+export interface InterSiteLinkConfig {
+  type: InterSiteLinkType
+  label: string
+  description: string
+  bandwidthGbps: number
+  baseLatencyMs: number
+  installCost: number
+  costPerTick: number
+  crossContinentOnly: boolean   // submarine_cable requires cross-continent
+  sameContinentOnly: boolean    // leased_wavelength / dark_fiber require same continent
+  reliability: number           // 0–1, probability of staying operational each tick
 }
 
 // ── Save Slot Types ────────────────────────────────────────────

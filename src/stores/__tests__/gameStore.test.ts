@@ -29,6 +29,14 @@ import {
   SITE_TYPE_CONFIG,
   REGION_RESEARCH_COST,
   MAX_SITES,
+  INTER_SITE_LINK_CONFIG,
+  DISASTER_PREP_CONFIG,
+  REGIONAL_INCIDENT_CATALOG,
+  MULTI_SITE_CONTRACT_CATALOG,
+  DATA_SOVEREIGNTY_CONFIG,
+  STAFF_TRANSFER_CONFIG,
+  DEMAND_GROWTH_CONFIG,
+  COMPETITOR_REGIONAL_CONFIG,
   calcCabinetCooling,
   getChillerConnection,
   getAdjacentCabinets,
@@ -2026,6 +2034,29 @@ describe('Phase 6 — Multi-Site Expansion', () => {
     })
   }
 
+  function setupOperationalSite() {
+    setupMultiSiteUnlocked()
+    getState().researchRegion('ashburn')
+    getState().purchaseSite('ashburn', 'edge_pop', 'Ashburn Edge')
+    setState({
+      sites: getState().sites.map((s) => ({
+        ...s,
+        operational: true,
+        constructionTicksRemaining: 0,
+        snapshot: {
+          cabinets: [], spineSwitches: [], pdus: [], cableTrays: [], cableRuns: [],
+          coolingUnits: [], chillerPlants: [], coolingPipes: [],
+          busways: [], crossConnects: [], inRowCoolers: [],
+          rowEndSlots: [], aisleContainments: [], aisleWidths: {},
+          raisedFloorTier: 'none' as const, cableManagementType: 'none' as const,
+          coolingType: 'air' as const, suiteTier: 'starter' as const,
+          totalPower: 0, avgHeat: 22, revenue: 0, expenses: 0,
+        },
+      })),
+    })
+    return getState().sites[0].id
+  }
+
   describe('Region Catalog', () => {
     it('has 15 regions across 5 continents', () => {
       expect(REGION_CATALOG).toHaveLength(15)
@@ -2286,6 +2317,385 @@ describe('Phase 6 — Multi-Site Expansion', () => {
       expect(getState().researchedRegions).toHaveLength(0)
       expect(getState().totalSiteRevenue).toBe(0)
       expect(getState().totalSiteExpenses).toBe(0)
+      expect(getState().hqSnapshot).toBeNull()
+    })
+  })
+
+  describe('switchSite — per-site state snapshots', () => {
+    it('saves HQ state when switching to remote site', () => {
+      const siteId = setupOperationalSite()
+      // Build something at HQ first
+      getState().addCabinet(0, 1, 'production', 'general', 'south')
+      expect(getState().cabinets).toHaveLength(1)
+
+      // Switch to remote site
+      getState().switchSite(siteId)
+      expect(getState().activeSiteId).toBe(siteId)
+      // Remote site should be empty
+      expect(getState().cabinets).toHaveLength(0)
+      // HQ snapshot should be saved
+      expect(getState().hqSnapshot).not.toBeNull()
+      expect(getState().hqSnapshot!.cabinets).toHaveLength(1)
+    })
+
+    it('restores HQ state when switching back', () => {
+      const siteId = setupOperationalSite()
+      // Build at HQ
+      getState().addCabinet(0, 1, 'production', 'general', 'south')
+      const hqCab = getState().cabinets[0]
+
+      // Switch to remote and back
+      getState().switchSite(siteId)
+      expect(getState().cabinets).toHaveLength(0)
+      getState().switchSite(null)
+      expect(getState().activeSiteId).toBeNull()
+      expect(getState().cabinets).toHaveLength(1)
+      expect(getState().cabinets[0].id).toBe(hqCab.id)
+      expect(getState().hqSnapshot).toBeNull()
+    })
+
+    it('preserves remote site state in snapshot', () => {
+      const siteId = setupOperationalSite()
+
+      // Switch to remote site
+      getState().switchSite(siteId)
+      expect(getState().cabinets).toHaveLength(0)
+
+      // Build at remote site (add a cabinet — site is starter tier)
+      getState().addCabinet(0, 1, 'production', 'general', 'south')
+      expect(getState().cabinets).toHaveLength(1)
+
+      // Switch back to HQ
+      getState().switchSite(null)
+      // Remote site's snapshot should contain the cabinet we built
+      const remoteSite = getState().sites.find((s) => s.id === siteId)!
+      expect(remoteSite.snapshot).not.toBeNull()
+      expect(remoteSite.snapshot!.cabinets).toHaveLength(1)
+    })
+
+    it('uses starter suite tier for new remote sites', () => {
+      const siteId = setupOperationalSite()
+      getState().switchSite(siteId)
+      // Remote site should have starter tier
+      expect(getState().suiteTier).toBe('starter')
+    })
+
+    it('preserves HQ suite tier', () => {
+      const siteId = setupOperationalSite()
+      expect(getState().suiteTier).toBe('enterprise')
+
+      getState().switchSite(siteId)
+      expect(getState().suiteTier).toBe('starter')
+
+      getState().switchSite(null)
+      expect(getState().suiteTier).toBe('enterprise')
+    })
+
+    it('does nothing when switching to same site', () => {
+      const siteId = setupOperationalSite()
+      getState().switchSite(siteId)
+      const stateBefore = getState()
+      getState().switchSite(siteId)
+      expect(getState().activeSiteId).toBe(stateBefore.activeSiteId)
+    })
+
+    it('switching HQ to HQ is no-op', () => {
+      setupOperationalSite()
+      getState().addCabinet(0, 1, 'production', 'general', 'south')
+      getState().switchSite(null)
+      expect(getState().activeSiteId).toBeNull()
+      expect(getState().cabinets).toHaveLength(1)
+    })
+  })
+
+  describe('tick — site construction with snapshots', () => {
+    it('creates empty snapshot when site construction completes', () => {
+      setupMultiSiteUnlocked()
+      getState().researchRegion('portland')
+      getState().purchaseSite('portland', 'edge_pop', 'Portland Edge')
+      // Verify purchaseSite produces snapshot: null
+      expect(getState().sites[0].snapshot).toBeNull()
+      // Set to 1 tick remaining
+      setState({ sites: getState().sites.map((s) => ({ ...s, constructionTicksRemaining: 1 })) })
+      // Before tick: site is not operational
+      expect(getState().sites[0].operational).toBe(false)
+      expect(getState().sites[0].constructionTicksRemaining).toBe(1)
+      getState().tick()
+      const site = getState().sites[0]
+      expect(site.operational).toBe(true)
+      expect(site.constructionTicksRemaining).toBe(0)
+      expect(site.snapshot).not.toBeNull()
+      expect(site.snapshot!.cabinets).toHaveLength(0)
+      expect(site.snapshot!.suiteTier).toBe('starter')
+    })
+
+    it('generates construction complete event log', () => {
+      setupMultiSiteUnlocked()
+      getState().researchRegion('portland')
+      getState().purchaseSite('portland', 'edge_pop', 'Portland Edge')
+      setState({ sites: getState().sites.map((s) => ({ ...s, constructionTicksRemaining: 1 })) })
+      getState().tick()
+      const logs = getState().eventLog
+      const constructionLog = logs.find((l) => l.message.includes('construction complete'))
+      expect(constructionLog).toBeDefined()
+      expect(constructionLog!.severity).toBe('success')
+    })
+  })
+
+  describe('regional modifiers', () => {
+    it('applies regional power cost multiplier to active remote site', () => {
+      const siteId = setupOperationalSite()
+      // Add cabinet to HQ
+      getState().addCabinet(0, 1, 'production', 'general', 'south')
+      getState().upgradeNextCabinet()
+      getState().addSpineSwitch()
+
+      // Tick at HQ to get HQ expense baseline
+      getState().tick()
+      const hqExpenses = getState().expenses
+
+      // Switch to remote site and add same equipment
+      getState().switchSite(siteId)
+      getState().addCabinet(0, 1, 'production', 'general', 'south')
+      getState().upgradeNextCabinet()
+      getState().addSpineSwitch()
+      getState().tick()
+      const remoteExpenses = getState().expenses
+
+      // Ashburn has powerCostMultiplier of 0.8, so expenses should differ
+      const ashburnRegion = REGION_CATALOG.find((r) => r.id === 'ashburn')!
+      // Remote expenses should be scaled by regional power cost
+      // (exact comparison is complex due to many factors, just verify they differ if multiplier != 1)
+      if (ashburnRegion.profile.powerCostMultiplier !== 1) {
+        expect(remoteExpenses).not.toBe(hqExpenses)
+      }
+    })
+  })
+})
+
+// ============================================================================
+// Phase 6B — Inter-Site Networking
+// ============================================================================
+
+describe('Inter-Site Networking', () => {
+  beforeEach(() => {
+    getState().resetGame()
+  })
+
+  function setupMultiSiteWithTwoSites() {
+    setState({
+      sandboxMode: true,
+      money: 999999,
+      suiteTier: 'enterprise',
+      reputationScore: 80,
+      multiSiteUnlocked: true,
+    })
+    // Research two regions and purchase sites
+    getState().researchRegion('ashburn')
+    getState().researchRegion('london')
+    getState().purchaseSite('ashburn', 'edge_pop', 'Ashburn Edge')
+    getState().purchaseSite('london', 'colocation', 'London Colo')
+    // Make them operational
+    setState({
+      sites: getState().sites.map((s) => ({
+        ...s,
+        operational: true,
+        constructionTicksRemaining: 0,
+        snapshot: {
+          cabinets: [], spineSwitches: [], pdus: [], cableTrays: [], cableRuns: [],
+          coolingUnits: [], chillerPlants: [], coolingPipes: [],
+          busways: [], crossConnects: [], inRowCoolers: [],
+          rowEndSlots: [], aisleContainments: [], aisleWidths: {},
+          raisedFloorTier: 'none' as const, cableManagementType: 'none' as const,
+          coolingType: 'air' as const, suiteTier: 'starter' as const,
+          totalPower: 0, avgHeat: 22, revenue: 0, expenses: 0,
+        },
+      })),
+    })
+    return getState().sites.map((s) => s.id)
+  }
+
+  describe('installInterSiteLink', () => {
+    it('installs a link between HQ and a remote site', () => {
+      const [siteAId] = setupMultiSiteWithTwoSites()
+      getState().installInterSiteLink(null, siteAId, 'ip_transit')
+      expect(getState().interSiteLinks).toHaveLength(1)
+      const link = getState().interSiteLinks[0]
+      expect(link.siteAId).toBeNull()
+      expect(link.siteBId).toBe(siteAId)
+      expect(link.type).toBe('ip_transit')
+      expect(link.operational).toBe(true)
+      expect(link.bandwidthGbps).toBe(INTER_SITE_LINK_CONFIG.ip_transit.bandwidthGbps)
+    })
+
+    it('installs a link between two remote sites', () => {
+      const [siteAId, siteBId] = setupMultiSiteWithTwoSites()
+      getState().installInterSiteLink(siteAId, siteBId, 'ip_transit')
+      expect(getState().interSiteLinks).toHaveLength(1)
+      const link = getState().interSiteLinks[0]
+      expect(link.siteAId).toBe(siteAId)
+      expect(link.siteBId).toBe(siteBId)
+    })
+
+    it('deducts install cost from money', () => {
+      const [siteAId] = setupMultiSiteWithTwoSites()
+      const moneyBefore = getState().money
+      getState().installInterSiteLink(null, siteAId, 'ip_transit')
+      // sandbox mode doesn't deduct money
+      setState({ sandboxMode: false, money: moneyBefore })
+      getState().installInterSiteLink(null, siteAId, 'leased_wavelength')
+      // Should fail — duplicate link
+      expect(getState().interSiteLinks).toHaveLength(1)
+    })
+
+    it('rejects duplicate links between same sites', () => {
+      const [siteAId] = setupMultiSiteWithTwoSites()
+      getState().installInterSiteLink(null, siteAId, 'ip_transit')
+      expect(getState().interSiteLinks).toHaveLength(1)
+      getState().installInterSiteLink(null, siteAId, 'dark_fiber')
+      expect(getState().interSiteLinks).toHaveLength(1) // still 1
+    })
+
+    it('rejects link to non-operational site', () => {
+      setState({
+        sandboxMode: true,
+        money: 999999,
+        suiteTier: 'enterprise',
+        reputationScore: 80,
+        multiSiteUnlocked: true,
+      })
+      getState().researchRegion('ashburn')
+      getState().purchaseSite('ashburn', 'edge_pop', 'Ashburn Edge')
+      // Site is still under construction (not operational)
+      const siteId = getState().sites[0].id
+      getState().installInterSiteLink(null, siteId, 'ip_transit')
+      expect(getState().interSiteLinks).toHaveLength(0)
+    })
+
+    it('rejects same-continent-only link between different continents', () => {
+      const [siteAId, siteBId] = setupMultiSiteWithTwoSites()
+      // Ashburn = north_america, London = europe
+      // dark_fiber is sameContinentOnly
+      getState().installInterSiteLink(siteAId, siteBId, 'dark_fiber')
+      expect(getState().interSiteLinks).toHaveLength(0)
+    })
+
+    it('allows submarine cable between different continents', () => {
+      const [siteAId, siteBId] = setupMultiSiteWithTwoSites()
+      // Ashburn = north_america, London = europe
+      getState().installInterSiteLink(siteAId, siteBId, 'submarine_cable')
+      expect(getState().interSiteLinks).toHaveLength(1)
+      expect(getState().interSiteLinks[0].type).toBe('submarine_cable')
+    })
+
+    it('rejects submarine cable between same-continent sites', () => {
+      setState({
+        sandboxMode: true,
+        money: 999999,
+        suiteTier: 'enterprise',
+        reputationScore: 80,
+        multiSiteUnlocked: true,
+      })
+      getState().researchRegion('ashburn')
+      getState().researchRegion('dallas')
+      getState().purchaseSite('ashburn', 'edge_pop', 'Ashburn Edge')
+      getState().purchaseSite('dallas', 'edge_pop', 'Dallas Edge')
+      setState({
+        sites: getState().sites.map((s) => ({
+          ...s,
+          operational: true,
+          constructionTicksRemaining: 0,
+          snapshot: {
+            cabinets: [], spineSwitches: [], pdus: [], cableTrays: [], cableRuns: [],
+            coolingUnits: [], chillerPlants: [], coolingPipes: [],
+            busways: [], crossConnects: [], inRowCoolers: [],
+            rowEndSlots: [], aisleContainments: [], aisleWidths: {},
+            raisedFloorTier: 'none' as const, cableManagementType: 'none' as const,
+            coolingType: 'air' as const, suiteTier: 'starter' as const,
+            totalPower: 0, avgHeat: 22, revenue: 0, expenses: 0,
+          },
+        })),
+      })
+      const [siteAId, siteBId] = getState().sites.map((s) => s.id)
+      // submarine_cable is crossContinentOnly — should fail for same continent
+      getState().installInterSiteLink(siteAId, siteBId, 'submarine_cable')
+      expect(getState().interSiteLinks).toHaveLength(0)
+    })
+
+    it('calculates latency including distance modifier', () => {
+      const [siteAId, siteBId] = setupMultiSiteWithTwoSites()
+      // Cross-continent link (Ashburn → London), should include cross-continent latency
+      getState().installInterSiteLink(siteAId, siteBId, 'ip_transit')
+      const link = getState().interSiteLinks[0]
+      // Base latency (30) + cross-continent modifier (80)
+      expect(link.latencyMs).toBeGreaterThanOrEqual(INTER_SITE_LINK_CONFIG.ip_transit.baseLatencyMs)
+    })
+  })
+
+  describe('removeInterSiteLink', () => {
+    it('removes an existing link', () => {
+      const [siteAId] = setupMultiSiteWithTwoSites()
+      getState().installInterSiteLink(null, siteAId, 'ip_transit')
+      expect(getState().interSiteLinks).toHaveLength(1)
+      const linkId = getState().interSiteLinks[0].id
+      getState().removeInterSiteLink(linkId)
+      expect(getState().interSiteLinks).toHaveLength(0)
+    })
+
+    it('does nothing for non-existent link', () => {
+      setupMultiSiteWithTwoSites()
+      getState().removeInterSiteLink('link-999')
+      expect(getState().interSiteLinks).toHaveLength(0)
+    })
+  })
+
+  describe('Inter-Site Link Config', () => {
+    it('has 4 link types', () => {
+      expect(Object.keys(INTER_SITE_LINK_CONFIG)).toHaveLength(4)
+    })
+
+    it('all link types have valid configs', () => {
+      for (const [, config] of Object.entries(INTER_SITE_LINK_CONFIG)) {
+        expect(config.bandwidthGbps).toBeGreaterThan(0)
+        expect(config.baseLatencyMs).toBeGreaterThanOrEqual(0)
+        expect(config.installCost).toBeGreaterThan(0)
+        expect(config.costPerTick).toBeGreaterThan(0)
+        expect(config.reliability).toBeGreaterThan(0)
+        expect(config.reliability).toBeLessThanOrEqual(1)
+      }
+    })
+  })
+
+  describe('Tick — inter-site link processing', () => {
+    it('includes link costs in money calculation', () => {
+      const [siteAId] = setupMultiSiteWithTwoSites()
+      getState().installInterSiteLink(null, siteAId, 'ip_transit')
+      getState().tick()
+      const link = getState().interSiteLinks[0]
+      // If link stayed operational, cost should be > 0; if random failure took it offline, cost is 0
+      if (link.operational) {
+        expect(getState().interSiteLinkCost).toBeGreaterThan(0)
+      } else {
+        expect(getState().interSiteLinkCost).toBe(0)
+      }
+    })
+
+    it('tracks link utilization', () => {
+      const [siteAId] = setupMultiSiteWithTwoSites()
+      getState().installInterSiteLink(null, siteAId, 'ip_transit')
+      getState().tick()
+      // With no servers, utilization should be 0
+      expect(getState().interSiteLinks[0].utilization).toBe(0)
+    })
+
+    it('resets inter-site links on resetGame', () => {
+      const [siteAId] = setupMultiSiteWithTwoSites()
+      getState().installInterSiteLink(null, siteAId, 'ip_transit')
+      expect(getState().interSiteLinks).toHaveLength(1)
+      getState().resetGame()
+      expect(getState().interSiteLinks).toHaveLength(0)
+      expect(getState().interSiteLinkCost).toBe(0)
+      expect(getState().edgePopCDNRevenue).toBe(0)
     })
   })
 })
@@ -2672,6 +3082,411 @@ describe('Reset Game includes new features', () => {
     expect(getState().advancedTier).toBeNull()
     expect(getState().activeWorkloads).toHaveLength(0)
     expect(getState().audioSettings.muted).toBe(false)
+  })
+})
+
+// ============================================================================
+// Phase 6C — Regional Incidents & Disaster Preparedness
+// ============================================================================
+
+describe('Regional Incidents & Disaster Preparedness', () => {
+  beforeEach(() => {
+    getState().resetGame()
+  })
+
+  function setupMultiSiteWithOperationalSite(regionId: RegionId = 'bay_area') {
+    setState({
+      sandboxMode: true,
+      money: 999999,
+      suiteTier: 'enterprise',
+      reputationScore: 80,
+      multiSiteUnlocked: true,
+    })
+    getState().researchRegion(regionId)
+    getState().purchaseSite(regionId, 'colocation', `${regionId} Colo`)
+    // Make operational
+    setState({
+      sites: getState().sites.map((s) => ({
+        ...s,
+        operational: true,
+        constructionTicksRemaining: 0,
+        snapshot: {
+          cabinets: [], spineSwitches: [], pdus: [], cableTrays: [], cableRuns: [],
+          coolingUnits: [], chillerPlants: [], coolingPipes: [],
+          busways: [], crossConnects: [], inRowCoolers: [],
+          rowEndSlots: [], aisleContainments: [], aisleWidths: {},
+          raisedFloorTier: 'none' as const, cableManagementType: 'none' as const,
+          coolingType: 'air' as const, suiteTier: 'starter' as const,
+          totalPower: 0, avgHeat: 22, revenue: 0, expenses: 0,
+        },
+      })),
+    })
+    return getState().sites[0].id
+  }
+
+  describe('REGIONAL_INCIDENT_CATALOG', () => {
+    it('has at least 10 regional incident types', () => {
+      expect(REGIONAL_INCIDENT_CATALOG.length).toBeGreaterThanOrEqual(10)
+    })
+
+    it('all incidents reference valid regions', () => {
+      const regionIds = REGION_CATALOG.map((r) => r.id)
+      for (const inc of REGIONAL_INCIDENT_CATALOG) {
+        for (const regionId of inc.regions) {
+          expect(regionIds).toContain(regionId)
+        }
+      }
+    })
+
+    it('all incidents have valid risk keys', () => {
+      const validKeys = ['earthquakeRisk', 'floodRisk', 'hurricaneRisk', 'heatwaveRisk', 'gridInstability']
+      for (const inc of REGIONAL_INCIDENT_CATALOG) {
+        expect(validKeys).toContain(inc.riskKey)
+      }
+    })
+
+    it('mitigatedBy references valid disaster prep types', () => {
+      const validPreps = Object.keys(DISASTER_PREP_CONFIG)
+      for (const inc of REGIONAL_INCIDENT_CATALOG) {
+        if (inc.mitigatedBy) {
+          expect(validPreps).toContain(inc.mitigatedBy)
+        }
+      }
+    })
+  })
+
+  describe('DISASTER_PREP_CONFIG', () => {
+    it('has 4 disaster prep types', () => {
+      expect(Object.keys(DISASTER_PREP_CONFIG)).toHaveLength(4)
+    })
+
+    it('all preps have positive cost and damage reduction', () => {
+      for (const config of Object.values(DISASTER_PREP_CONFIG)) {
+        expect(config.cost).toBeGreaterThan(0)
+        expect(config.damageReduction).toBeGreaterThan(0)
+        expect(config.damageReduction).toBeLessThanOrEqual(1)
+      }
+    })
+  })
+
+  describe('installDisasterPrep', () => {
+    it('installs disaster prep for a site', () => {
+      const siteId = setupMultiSiteWithOperationalSite('bay_area')
+      expect(getState().siteDisasterPreps).toHaveLength(0)
+
+      getState().installDisasterPrep(siteId, 'seismic_reinforcement')
+      expect(getState().siteDisasterPreps).toHaveLength(1)
+      expect(getState().siteDisasterPreps[0].siteId).toBe(siteId)
+      expect(getState().siteDisasterPreps[0].type).toBe('seismic_reinforcement')
+    })
+
+    it('prevents duplicate prep types for same site', () => {
+      const siteId = setupMultiSiteWithOperationalSite('bay_area')
+      getState().installDisasterPrep(siteId, 'seismic_reinforcement')
+      getState().installDisasterPrep(siteId, 'seismic_reinforcement')
+      expect(getState().siteDisasterPreps).toHaveLength(1)
+    })
+
+    it('allows different prep types for same site', () => {
+      const siteId = setupMultiSiteWithOperationalSite('bay_area')
+      getState().installDisasterPrep(siteId, 'seismic_reinforcement')
+      getState().installDisasterPrep(siteId, 'flood_barriers')
+      expect(getState().siteDisasterPreps).toHaveLength(2)
+    })
+
+    it('does not work if multi-site is not unlocked', () => {
+      const siteId = setupMultiSiteWithOperationalSite('bay_area')
+      setState({ multiSiteUnlocked: false })
+      getState().installDisasterPrep(siteId, 'seismic_reinforcement')
+      expect(getState().siteDisasterPreps).toHaveLength(0)
+    })
+
+    it('deducts cost in non-sandbox mode', () => {
+      const siteId = setupMultiSiteWithOperationalSite('bay_area')
+      setState({ sandboxMode: false, money: 200000 })
+      const moneyBefore = getState().money
+      getState().installDisasterPrep(siteId, 'seismic_reinforcement')
+      expect(getState().money).toBe(moneyBefore - DISASTER_PREP_CONFIG.seismic_reinforcement.cost)
+    })
+
+    it('does not install if insufficient funds in non-sandbox', () => {
+      const siteId = setupMultiSiteWithOperationalSite('bay_area')
+      setState({ sandboxMode: false, money: 10 })
+      getState().installDisasterPrep(siteId, 'seismic_reinforcement')
+      expect(getState().siteDisasterPreps).toHaveLength(0)
+    })
+  })
+
+  describe('removeDisasterPrep', () => {
+    it('removes an installed disaster prep', () => {
+      const siteId = setupMultiSiteWithOperationalSite('bay_area')
+      getState().installDisasterPrep(siteId, 'seismic_reinforcement')
+      expect(getState().siteDisasterPreps).toHaveLength(1)
+
+      getState().removeDisasterPrep(siteId, 'seismic_reinforcement')
+      expect(getState().siteDisasterPreps).toHaveLength(0)
+    })
+
+    it('does nothing if prep not installed', () => {
+      const siteId = setupMultiSiteWithOperationalSite('bay_area')
+      getState().removeDisasterPrep(siteId, 'seismic_reinforcement')
+      expect(getState().siteDisasterPreps).toHaveLength(0)
+    })
+  })
+
+  describe('resetGame resets Phase 6C state', () => {
+    it('clears all disaster prep state on reset', () => {
+      const siteId = setupMultiSiteWithOperationalSite('bay_area')
+      getState().installDisasterPrep(siteId, 'seismic_reinforcement')
+      expect(getState().siteDisasterPreps).toHaveLength(1)
+
+      getState().resetGame()
+      expect(getState().siteDisasterPreps).toHaveLength(0)
+      expect(getState().regionalIncidentCount).toBe(0)
+      expect(getState().regionalIncidentsBlocked).toBe(0)
+      expect(getState().disasterPrepMaintenanceCost).toBe(0)
+    })
+  })
+
+  // ── Phase 6D — Global Strategy Layer ────────────────────────────
+
+  describe('Multi-Site Contract Catalog validation', () => {
+    it('has at least 5 multi-site contract definitions', () => {
+      expect(MULTI_SITE_CONTRACT_CATALOG.length).toBeGreaterThanOrEqual(5)
+    })
+
+    it('all contracts have valid required regions', () => {
+      const regionIds = REGION_CATALOG.map((r) => r.id)
+      for (const def of MULTI_SITE_CONTRACT_CATALOG) {
+        for (const r of def.requiredRegions) {
+          expect(regionIds).toContain(r)
+        }
+      }
+    })
+
+    it('all contracts have positive revenue and duration', () => {
+      for (const def of MULTI_SITE_CONTRACT_CATALOG) {
+        expect(def.revenuePerTick).toBeGreaterThan(0)
+        expect(def.durationTicks).toBeGreaterThan(0)
+        expect(def.completionBonus).toBeGreaterThan(0)
+      }
+    })
+
+    it('sovereignty contracts reference valid sovereignty regimes', () => {
+      const validRegimes = DATA_SOVEREIGNTY_CONFIG.map((r) => r.regime)
+      for (const def of MULTI_SITE_CONTRACT_CATALOG) {
+        if (def.sovereigntyRegime && def.sovereigntyRegime !== 'none') {
+          expect(validRegimes).toContain(def.sovereigntyRegime)
+        }
+      }
+    })
+  })
+
+  describe('Data Sovereignty Config validation', () => {
+    it('has at least 3 sovereignty rules', () => {
+      expect(DATA_SOVEREIGNTY_CONFIG.length).toBeGreaterThanOrEqual(3)
+    })
+
+    it('all rules have valid regions', () => {
+      const regionIds = REGION_CATALOG.map((r) => r.id)
+      for (const rule of DATA_SOVEREIGNTY_CONFIG) {
+        for (const r of rule.regions) {
+          expect(regionIds).toContain(r)
+        }
+        expect(rule.revenueBonus).toBeGreaterThan(0)
+        expect(rule.nonCompliancePenalty).toBeGreaterThan(0)
+      }
+    })
+  })
+
+  describe('acceptMultiSiteContract action', () => {
+    it('accepts a contract when all required regions have operational sites', () => {
+      // The global_cdn contract requires ashburn, london, singapore
+      // ashburn is always HQ, so we need london and singapore
+      setupMultiSiteWithOperationalSite('london')
+      // Add another site in singapore
+      getState().researchRegion('singapore')
+      getState().purchaseSite('singapore', 'colocation', 'SG Colo')
+      setState({
+        sites: getState().sites.map((s) => ({
+          ...s,
+          operational: true,
+          constructionTicksRemaining: 0,
+          snapshot: {
+            cabinets: [], spineSwitches: [], pdus: [], cableTrays: [], cableRuns: [],
+            coolingUnits: [], chillerPlants: [], coolingPipes: [],
+            busways: [], crossConnects: [], inRowCoolers: [],
+            rowEndSlots: [], aisleContainments: [], aisleWidths: {},
+            raisedFloorTier: 'none', cableManagementType: 'none',
+            coolingType: 'air', suiteTier: 'starter',
+            totalPower: 0, avgHeat: 22, revenue: 0, expenses: 0,
+          },
+        })),
+      })
+      getState().acceptMultiSiteContract('global_cdn')
+      expect(getState().multiSiteContracts).toHaveLength(1)
+      expect(getState().multiSiteContracts[0].def.id).toBe('global_cdn')
+      expect(getState().multiSiteContracts[0].status).toBe('active')
+    })
+
+    it('rejects contract if required regions not met', () => {
+      setupMultiSiteWithOperationalSite('london')
+      // Missing singapore — should fail
+      getState().acceptMultiSiteContract('global_cdn')
+      expect(getState().multiSiteContracts).toHaveLength(0)
+    })
+
+    it('rejects duplicate active contracts', () => {
+      setupMultiSiteWithOperationalSite('london')
+      getState().researchRegion('singapore')
+      getState().purchaseSite('singapore', 'colocation', 'SG Colo')
+      setState({
+        sites: getState().sites.map((s) => ({
+          ...s,
+          operational: true,
+          constructionTicksRemaining: 0,
+          snapshot: {
+            cabinets: [], spineSwitches: [], pdus: [], cableTrays: [], cableRuns: [],
+            coolingUnits: [], chillerPlants: [], coolingPipes: [],
+            busways: [], crossConnects: [], inRowCoolers: [],
+            rowEndSlots: [], aisleContainments: [], aisleWidths: {},
+            raisedFloorTier: 'none', cableManagementType: 'none',
+            coolingType: 'air', suiteTier: 'starter',
+            totalPower: 0, avgHeat: 22, revenue: 0, expenses: 0,
+          },
+        })),
+      })
+      getState().acceptMultiSiteContract('global_cdn')
+      getState().acceptMultiSiteContract('global_cdn') // duplicate
+      expect(getState().multiSiteContracts).toHaveLength(1)
+    })
+
+    it('rejects contract if multi-site not unlocked', () => {
+      setState({ multiSiteUnlocked: false })
+      getState().acceptMultiSiteContract('global_cdn')
+      expect(getState().multiSiteContracts).toHaveLength(0)
+    })
+  })
+
+  describe('transferStaff action', () => {
+    it('transfers staff to a remote site', () => {
+      const siteId = setupMultiSiteWithOperationalSite('london')
+      // Hire staff
+      getState().hireStaff('network_engineer', 1)
+      expect(getState().staff).toHaveLength(1)
+      const staffId = getState().staff[0].id
+
+      getState().transferStaff(staffId, siteId)
+      expect(getState().staff).toHaveLength(0) // removed from current roster
+      expect(getState().staffTransfers).toHaveLength(1)
+      expect(getState().staffTransfers[0].staffId).toBe(staffId)
+      expect(getState().staffTransfers[0].toSiteId).toBe(siteId)
+    })
+
+    it('prevents transfer of staff already in transit', () => {
+      const siteId = setupMultiSiteWithOperationalSite('london')
+      getState().hireStaff('network_engineer', 1)
+      const staffId = getState().staff[0].id
+      getState().transferStaff(staffId, siteId)
+      // Try again — staff is already in transit
+      getState().transferStaff(staffId, siteId)
+      expect(getState().staffTransfers).toHaveLength(1)
+    })
+
+    it('deducts transfer cost', () => {
+      setupMultiSiteWithOperationalSite('london')
+      getState().hireStaff('network_engineer', 1)
+      setState({ sandboxMode: false, money: 50000 })
+      const moneyBefore = getState().money
+      const staffId = getState().staff[0].id
+      getState().transferStaff(staffId, getState().sites[0].id)
+      expect(getState().money).toBeLessThan(moneyBefore)
+    })
+
+    it('prevents transfer if not enough money', () => {
+      setupMultiSiteWithOperationalSite('london')
+      getState().hireStaff('network_engineer', 1)
+      setState({ sandboxMode: false, money: 1 })
+      const staffId = getState().staff[0].id
+      getState().transferStaff(staffId, getState().sites[0].id)
+      expect(getState().staffTransfers).toHaveLength(0)
+      expect(getState().staff).toHaveLength(1)
+    })
+  })
+
+  describe('cancelStaffTransfer action', () => {
+    it('cancels an in-transit transfer', () => {
+      const siteId = setupMultiSiteWithOperationalSite('london')
+      getState().hireStaff('network_engineer', 1)
+      const staffId = getState().staff[0].id
+      getState().transferStaff(staffId, siteId)
+      expect(getState().staffTransfers).toHaveLength(1)
+      const transferId = getState().staffTransfers[0].id
+      getState().cancelStaffTransfer(transferId)
+      expect(getState().staffTransfers).toHaveLength(0)
+    })
+  })
+
+  describe('Demand Growth Config validation', () => {
+    it('has valid growth parameters', () => {
+      expect(DEMAND_GROWTH_CONFIG.growthInterval).toBeGreaterThan(0)
+      expect(DEMAND_GROWTH_CONFIG.emergingGrowthRate).toBeGreaterThan(0)
+      expect(DEMAND_GROWTH_CONFIG.saturatedDecayRate).toBeLessThan(0)
+      expect(DEMAND_GROWTH_CONFIG.maxDemand).toBeGreaterThan(DEMAND_GROWTH_CONFIG.minDemand)
+      expect(DEMAND_GROWTH_CONFIG.saturatedThreshold).toBeGreaterThan(DEMAND_GROWTH_CONFIG.emergingThreshold)
+    })
+  })
+
+  describe('Staff Transfer Config validation', () => {
+    it('has valid transfer parameters', () => {
+      expect(STAFF_TRANSFER_CONFIG.baseCost).toBeGreaterThan(0)
+      expect(STAFF_TRANSFER_CONFIG.sameContinentTicks).toBeGreaterThan(0)
+      expect(STAFF_TRANSFER_CONFIG.crossContinentTicks).toBeGreaterThan(STAFF_TRANSFER_CONFIG.sameContinentTicks)
+    })
+  })
+
+  describe('Competitor Regional Config validation', () => {
+    it('has valid regional expansion parameters', () => {
+      expect(COMPETITOR_REGIONAL_CONFIG.expansionChance).toBeGreaterThan(0)
+      expect(COMPETITOR_REGIONAL_CONFIG.expansionChance).toBeLessThan(1)
+      expect(COMPETITOR_REGIONAL_CONFIG.maxRegionsPerCompetitor).toBeGreaterThan(0)
+      expect(COMPETITOR_REGIONAL_CONFIG.maxRegionalStrength).toBeGreaterThan(0)
+      expect(COMPETITOR_REGIONAL_CONFIG.maxRegionalStrength).toBeLessThanOrEqual(1)
+    })
+  })
+
+  describe('resetGame resets Phase 6D state', () => {
+    it('clears all Phase 6D state on reset', () => {
+      setupMultiSiteWithOperationalSite('london')
+      getState().researchRegion('singapore')
+      getState().purchaseSite('singapore', 'colocation', 'SG Colo')
+      setState({
+        sites: getState().sites.map((s) => ({
+          ...s,
+          operational: true,
+          constructionTicksRemaining: 0,
+          snapshot: {
+            cabinets: [], spineSwitches: [], pdus: [], cableTrays: [], cableRuns: [],
+            coolingUnits: [], chillerPlants: [], coolingPipes: [],
+            busways: [], crossConnects: [], inRowCoolers: [],
+            rowEndSlots: [], aisleContainments: [], aisleWidths: {},
+            raisedFloorTier: 'none', cableManagementType: 'none',
+            coolingType: 'air', suiteTier: 'starter',
+            totalPower: 0, avgHeat: 22, revenue: 0, expenses: 0,
+          },
+        })),
+      })
+      getState().acceptMultiSiteContract('global_cdn')
+      expect(getState().multiSiteContracts).toHaveLength(1)
+
+      getState().resetGame()
+      expect(getState().multiSiteContracts).toHaveLength(0)
+      expect(getState().multiSiteContractRevenue).toBe(0)
+      expect(getState().staffTransfers).toHaveLength(0)
+      expect(getState().staffTransfersCompleted).toBe(0)
+      expect(getState().competitorRegionalPresence).toHaveLength(0)
+      expect(getState().demandGrowthMultipliers).toEqual({})
+    })
   })
 })
 

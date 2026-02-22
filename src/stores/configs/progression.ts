@@ -244,6 +244,23 @@ export const ACHIEVEMENT_CATALOG: AchievementDef[] = [
   { id: 'global_network', label: 'Global Network', description: 'Have 3 or more operational sites.', icon: '🗺️' },
   { id: 'three_continents', label: 'Three Continents', description: 'Operate sites on 3 different continents.', icon: '✈️' },
   { id: 'world_domination', label: 'World Domination', description: 'Fill all available site slots.', icon: '👑' },
+  // Phase 6B — Inter-Site Networking achievements
+  { id: 'first_link', label: 'Connected', description: 'Install your first inter-site network link.', icon: '🔗' },
+  { id: 'network_architect', label: 'Network Architect', description: 'Have 3 operational inter-site links simultaneously.', icon: '🕸️' },
+  { id: 'dark_fiber', label: 'Dark Fiber', description: 'Install a dark fiber connection between sites.', icon: '🌑' },
+  { id: 'submarine_cable', label: 'Submarine Cable', description: 'Lay a submarine cable across continents.', icon: '🌊' },
+  { id: 'cdn_revenue', label: 'CDN Revenue', description: 'Earn CDN revenue from an Edge PoP with backhaul.', icon: '📡' },
+  // Phase 6C — Regional Incidents & Disaster Preparedness achievements
+  { id: 'disaster_survivor', label: 'Disaster Survivor', description: 'Survive a critical regional incident at an expansion site.', icon: '🌪️' },
+  { id: 'disaster_prepped', label: 'Disaster Prepped', description: 'Install your first disaster preparedness investment.', icon: '🛡️' },
+  { id: 'fully_hardened', label: 'Fully Hardened', description: 'Install all 4 disaster prep types across your sites.', icon: '🏰' },
+  { id: 'regional_blocker', label: 'Disaster Deflected', description: 'Block 5 regional incidents with disaster preparedness.', icon: '⛑️' },
+  // Phase 6D — Global Strategy Layer achievements
+  { id: 'first_multisite_contract', label: 'Global Deal', description: 'Accept your first multi-site contract.', icon: '🤝' },
+  { id: 'sovereignty_compliant', label: 'Data Sovereign', description: 'Complete a contract with data sovereignty requirements.', icon: '🏛️' },
+  { id: 'staff_transferred', label: 'Staff Mobility', description: 'Complete your first staff transfer between sites.', icon: '🧳' },
+  { id: 'demand_surfer', label: 'Demand Surfer', description: 'Have a site in an emerging market with growing demand.', icon: '📈' },
+  { id: 'global_empire', label: 'Global Empire', description: 'Have active multi-site contracts generating $300+/tick total.', icon: '🏰' },
   // New Feature achievements
   { id: 'first_workload', label: 'Job Runner', description: 'Complete your first workload job.', icon: '🏋️' },
   { id: 'workload_master', label: 'Workload Master', description: 'Complete 10 workload jobs.', icon: '🎯' },
@@ -397,4 +414,15 @@ export const TUTORIAL_TIPS: TutorialTip[] = [
   // Phase 6 — Multi-Site Expansion tips
   { id: 'multi_site_unlocked', title: 'Global Expansion', message: 'You\'ve unlocked multi-site expansion! Open the Global Expansion panel to research regions and purchase your first expansion site.', category: 'build' },
   { id: 'site_under_construction', title: 'Site Building', message: 'Your new site is under construction. It will become operational after the build timer completes.', category: 'build' },
+  // Phase 6B — Inter-Site Networking tips
+  { id: 'first_link_hint', title: 'Inter-Site Links', message: 'Connect your sites with network links! IP Transit is cheapest, Dark Fiber offers the best latency, and Submarine Cables cross continents.', category: 'network' },
+  { id: 'edge_pop_backhaul', title: 'Edge PoP Backhaul', message: 'Edge PoPs need a backhaul link to earn CDN revenue. Connect them to HQ or another core site.', category: 'network' },
+  // Phase 6C — Regional Incidents & Disaster Preparedness tips
+  { id: 'regional_incident_hint', title: 'Regional Disasters', message: 'Expansion sites face region-specific disasters! Earthquakes in Bay Area/Tokyo, monsoons in Singapore/Mumbai, grid instability in Johannesburg. Check disaster risk before building.', category: 'incidents' },
+  { id: 'disaster_prep_hint', title: 'Disaster Preparedness', message: 'Invest in disaster preparedness to mitigate regional risks. Seismic reinforcement, flood barriers, and hurricane hardening can significantly reduce damage.', category: 'incidents' },
+  // Phase 6D — Global Strategy Layer tips
+  { id: 'multisite_contracts_hint', title: 'Multi-Site Contracts', message: 'With sites in multiple regions, you can accept lucrative multi-site contracts! Check the Contracts panel for global deals requiring presence in specific regions.', category: 'contracts' },
+  { id: 'sovereignty_hint', title: 'Data Sovereignty', message: 'Some regions have data sovereignty laws (GDPR, LGPD). Contracts requiring local data residency pay premium rates but need a site in the right region.', category: 'contracts' },
+  { id: 'staff_transfer_hint', title: 'Staff Transfers', message: 'Transfer staff between sites to fill critical gaps. Cross-continent transfers take longer but let you leverage experienced engineers globally.', category: 'incidents' },
+  { id: 'demand_growth_hint', title: 'Market Dynamics', message: 'Regional demand changes over time! Emerging markets grow fast while saturated markets slow down. Expand early into high-growth regions for maximum returns.', category: 'market' },
 ]
