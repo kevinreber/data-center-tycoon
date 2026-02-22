@@ -113,7 +113,8 @@ src/
 
 ### Claude Code configuration
 
-- `.claude/settings.json` — Hooks: ESLint runs after Edit/Write on `.ts/.tsx` files; lint + type-check on session start; post-commit doc staleness check
+- `.claude/settings.json` — Hooks: pre-commit code review on `git commit`; ESLint runs after Edit/Write on `.ts/.tsx` files; lint + type-check on session start; post-commit doc staleness check
+- `.claude/hooks/pre-commit-review.sh` — Pre-commit code review: analyzes staged changes for security issues (secrets, credentials), convention violations (enum/namespace, debugger, console.log, any types), store-specific checks (immutability, calcStats), and code quality (large changes, TODOs). Blocks commit on critical issues.
 - `.claude/hooks/post-commit-doc-check.sh` — Detects commits touching core game files and prints reminders about which docs may need updating
 - `.claude/skills/add-feature/SKILL.md` — 9-step feature addition checklist (invoked with `/add-feature`)
 - `.claude/skills/add-incident/SKILL.md` — Guided incident type creation (invoked with `/add-incident`)
