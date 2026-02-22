@@ -1,5 +1,11 @@
 {
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "command": "cd /home/user/data-center-tycoon && CMD=$(echo $TOOL_INPUT | jq -r '.command // empty') && if echo \"$CMD\" | grep -qE 'git commit'; then bash .claude/hooks/pre-commit-review.sh 2>&1; fi"
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Edit|Write",
