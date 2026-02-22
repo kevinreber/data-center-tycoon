@@ -4,6 +4,10 @@
       {
         "matcher": "Edit|Write",
         "command": "cd /home/user/data-center-tycoon && FILE=$(echo $TOOL_INPUT | jq -r '.file_path // empty') && if [ -n \"$FILE\" ] && echo \"$FILE\" | grep -qE '\\.(ts|tsx)$'; then npx eslint --no-warn-ignored \"$FILE\" 2>&1 | tail -20; fi"
+      },
+      {
+        "matcher": "Bash",
+        "command": "cd /home/user/data-center-tycoon && CMD=$(echo $TOOL_INPUT | jq -r '.command // empty') && if echo \"$CMD\" | grep -qE 'git commit'; then bash .claude/hooks/post-commit-doc-check.sh 2>&1; fi"
       }
     ],
     "SessionStart": [
