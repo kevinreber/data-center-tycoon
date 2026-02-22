@@ -423,6 +423,7 @@ export interface Aisle {
   gridRow: number
   type: AisleType
   betweenRows: [number, number]
+  width: number  // how many grid rows this aisle spans (1 = standard, 2+ = wide)
 }
 
 export interface DataCenterLayout {

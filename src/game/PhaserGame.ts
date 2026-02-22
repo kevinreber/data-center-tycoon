@@ -200,6 +200,7 @@ class DataCenterScene extends Phaser.Scene {
   // Placement mode
   private placementActive = false
   private placementFacing: CabinetFacing = 'north'
+  private rowPlacementActive = false
   private placementHighlight: Phaser.GameObjects.Graphics | null = null
   private placementZoneGraphics: Phaser.GameObjects.Graphics | null = null
   private placementZoneLabels: Phaser.GameObjects.Text[] = []
@@ -576,6 +577,45 @@ class DataCenterScene extends Phaser.Scene {
     }
     this.clearZoneOverlays()
 
+    // ── Row Placement Mode ──────────────────────────────────────
+    if (this.rowPlacementActive) {
+      const isCorridor = row === 0 || (this.layout && row === this.layout.corridorBottom)
+      const isExistingRow = this.isCabinetRow(row)
+      const isValid = !isCorridor && !isExistingRow && row > 0 && row < this.cabRows - 1
+
+      // Check min gap constraint (must be > 1 row from nearest cabinet row)
+      let tooClose = false
+      if (isValid && this.layout) {
+        for (const cr of this.layout.cabinetRows) {
+          if (Math.abs(cr.gridRow - row) < 2) { tooClose = true; break }
+        }
+      }
+
+      const color = isValid && !tooClose ? 0x00ff88 : isCorridor ? 0x556677 : isExistingRow ? 0xffaa00 : 0xff4444
+      const alpha = isValid && !tooClose ? 0.25 : 0.15
+
+      // Highlight the entire row
+      for (let c = 0; c < this.cabCols; c++) {
+        this.drawIsoTile(this.placementHighlight, c, row, color, alpha, color, 0.4)
+      }
+
+      // Add label
+      const center = this.isoToScreen(Math.floor(this.cabCols / 2), row)
+      let label = 'PLACE ROW HERE'
+      if (isCorridor) label = 'CORRIDOR — CANNOT PLACE'
+      else if (isExistingRow) label = 'ROW ALREADY HERE'
+      else if (tooClose) label = 'TOO CLOSE — MIN 1 ROW GAP'
+
+      this.placementZoneLabels.push(
+        this.add.text(center.x, center.y + TILE_H / 2, label, {
+          fontFamily: 'monospace',
+          fontSize: '8px',
+          color: isValid && !tooClose ? '#00ff88' : '#ff6644',
+        }).setOrigin(0.5).setAlpha(0.8).setDepth(4)
+      )
+      return
+    }
+
     const { x, y } = this.isoToScreen(col, row)
     const isValidRow = this.isCabinetRow(row)
     const occupied = this.occupiedTiles.has(`${col},${row}`)
@@ -794,7 +834,10 @@ class DataCenterScene extends Phaser.Scene {
 
     if (this.layout) {
       for (const row of this.layout.cabinetRows) cabinetGridRows.add(row.gridRow)
-      for (const aisle of this.layout.aisles) aisleGridRows.set(aisle.gridRow, aisle.type)
+      for (const aisle of this.layout.aisles) {
+        const w = aisle.width ?? 1
+        for (let i = 0; i < w; i++) aisleGridRows.set(aisle.gridRow + i, aisle.type)
+      }
       corridorGridRows.add(this.layout.corridorTop)
       corridorGridRows.add(this.layout.corridorBottom)
     }
@@ -863,14 +906,16 @@ class DataCenterScene extends Phaser.Scene {
 
     for (const aisle of this.layout.aisles) {
       const r = aisle.gridRow
+      const w = aisle.width ?? 1
       const color = aisle.type === 'cold' ? 0x00aaff : aisle.type === 'hot' ? 0xff6644 : 0x888888
-      const typeLabel = aisle.type === 'cold' ? 'COLD AISLE' : aisle.type === 'hot' ? 'HOT AISLE' : 'AISLE'
+      const widthLabel = w > 1 ? ` (${w}-WIDE)` : ''
+      const typeLabel = (aisle.type === 'cold' ? 'COLD AISLE' : aisle.type === 'hot' ? 'HOT AISLE' : 'AISLE') + widthLabel
 
-      // Draw aisle border lines (top and bottom edges of the aisle row)
+      // Draw aisle border lines (top and bottom edges of the full aisle span)
       const leftTop = this.isoToScreen(0, r)
       const rightTop = this.isoToScreen(this.cabCols, r)
-      const leftBot = this.isoToScreen(0, r + 1)
-      const rightBot = this.isoToScreen(this.cabCols, r + 1)
+      const leftBot = this.isoToScreen(0, r + w)
+      const rightBot = this.isoToScreen(this.cabCols, r + w)
 
       // Top edge
       this.aisleGraphics.lineStyle(1, color, 0.25)
@@ -910,20 +955,20 @@ class DataCenterScene extends Phaser.Scene {
 
       // Containment panels if installed
       if (this.containedAisles.has(aisle.id)) {
-        this.drawContainmentPanels(aisle.gridRow, color)
+        this.drawContainmentPanels(aisle.gridRow, color, w)
       }
     }
   }
 
   /** Draw containment panel indicators on a contained aisle */
-  private drawContainmentPanels(aisleGridRow: number, aisleColor: number) {
+  private drawContainmentPanels(aisleGridRow: number, aisleColor: number, aisleWidth = 1) {
     if (!this.containmentGraphics) return
 
     // Draw small barrier marks at each end of the aisle
     const leftTop = this.isoToScreen(0, aisleGridRow)
     const rightTop = this.isoToScreen(this.cabCols, aisleGridRow)
-    const leftBot = this.isoToScreen(0, aisleGridRow + 1)
-    const rightBot = this.isoToScreen(this.cabCols, aisleGridRow + 1)
+    const leftBot = this.isoToScreen(0, aisleGridRow + aisleWidth)
+    const rightBot = this.isoToScreen(this.cabCols, aisleGridRow + aisleWidth)
 
     // Solid barrier lines (thicker, brighter) on top and bottom edges
     this.containmentGraphics.lineStyle(2.5, aisleColor, 0.5)
@@ -2487,6 +2532,11 @@ class DataCenterScene extends Phaser.Scene {
     if (this.placementActive && this.hoveredTile) {
       this.drawPlacementHighlight(this.hoveredTile.col, this.hoveredTile.row)
     }
+  }
+
+  /** Toggle row placement mode (for custom row layout) */
+  setRowPlacementMode(active: boolean) {
+    this.rowPlacementActive = active
   }
 
   /** Register callback for tile clicks during placement mode */
