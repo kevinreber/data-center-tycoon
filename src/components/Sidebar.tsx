@@ -1,9 +1,10 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import {
   Cpu, Server, DollarSign, Radio, Zap, Plug,
   FlaskConical, FileText, Siren, Building, Trophy,
   Save, X, HelpCircle, Leaf, Shield, TrendingUp, Newspaper, BarChart3, Globe, Target,
+  Menu,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -116,14 +117,30 @@ function PanelContent({ panelId }: { panelId: PanelId }) {
   }
 }
 
+/** Hook to detect mobile viewport (< 768px) */
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
+  )
+  useEffect(() => {
+    const mql = window.matchMedia('(max-width: 767px)')
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
+    mql.addEventListener('change', handler)
+    return () => mql.removeEventListener('change', handler)
+  }, [])
+  return isMobile
+}
+
 export function Sidebar() {
   const [activePanel, setActivePanel] = useState<PanelId | null>(null)
   // Track the panel being rendered (persists during close animation)
   const [renderedPanel, setRenderedPanel] = useState<PanelId | null>(null)
   const [isOpen, setIsOpen] = useState(false)
+  const [mobileRailOpen, setMobileRailOpen] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
   const incidentCount = useGameStore((s) => s.activeIncidents.filter((i) => !i.resolved).length)
   const trackPanelOpen = useGameStore((s) => s.trackPanelOpen)
+  const isMobile = useIsMobile()
 
   const togglePanel = (id: PanelId) => {
     const newPanel = activePanel === id ? null : id
@@ -136,6 +153,12 @@ export function Sidebar() {
     } else {
       setIsOpen(false)
     }
+  }
+
+  const closePanel = () => {
+    setActivePanel(null)
+    setIsOpen(false)
+    if (isMobile) setMobileRailOpen(false)
   }
 
   // Unmount panel content after slide-out transition ends
@@ -151,6 +174,121 @@ export function Sidebar() {
 
   const renderedItem = SIDEBAR_ITEMS.find(i => i.id === renderedPanel)
 
+  // ── Mobile layout: hamburger button + full-screen overlay ──
+  if (isMobile) {
+    return (
+      <TooltipProvider>
+        {/* Hamburger toggle button (fixed) */}
+        <button
+          onClick={() => setMobileRailOpen(!mobileRailOpen)}
+          className="fixed top-2 left-2 z-50 w-10 h-10 rounded-lg bg-card border border-border flex items-center justify-center text-neon-green active:bg-neon-green/20 md:hidden"
+          aria-label="Open menu"
+        >
+          {mobileRailOpen ? <X className="size-5" /> : <Menu className="size-5" />}
+        </button>
+
+        {/* Backdrop overlay */}
+        {mobileRailOpen && (
+          <div
+            className="fixed inset-0 z-40 bg-black/60 md:hidden"
+            onClick={closePanel}
+          />
+        )}
+
+        {/* Slide-in drawer */}
+        <div
+          className="fixed top-0 left-0 z-40 h-full flex md:hidden"
+          style={{
+            transform: mobileRailOpen ? 'translateX(0)' : 'translateX(-100%)',
+            transition: 'transform 200ms ease-out',
+          }}
+        >
+          {/* Icon rail */}
+          <div className="w-12 bg-card border-r border-border flex flex-col items-center py-2 shrink-0 overflow-y-auto">
+            <div className="h-10 mb-1" /> {/* Space for hamburger button */}
+            <div className="flex flex-col items-center gap-1">
+              {topItems.map(item => (
+                <SidebarIcon
+                  key={item.id}
+                  item={item}
+                  isActive={activePanel === item.id}
+                  onClick={() => togglePanel(item.id)}
+                  mobile
+                />
+              ))}
+            </div>
+            <div className="w-6 h-px bg-border my-2" />
+            <div className="flex flex-col items-center gap-1 flex-1">
+              {middleItems.map(item => (
+                <SidebarIcon
+                  key={item.id}
+                  item={item}
+                  isActive={activePanel === item.id}
+                  onClick={() => togglePanel(item.id)}
+                  badgeCount={item.id === 'incidents' ? incidentCount : undefined}
+                  mobile
+                />
+              ))}
+            </div>
+            <div className="w-6 h-px bg-border my-2" />
+            <div className="flex flex-col items-center gap-1">
+              {bottomItems.map(item => (
+                <SidebarIcon
+                  key={item.id}
+                  item={item}
+                  isActive={activePanel === item.id}
+                  onClick={() => togglePanel(item.id)}
+                  mobile
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Panel content (fills remaining width) */}
+          <div
+            ref={panelRef}
+            className="bg-card/95 border-r border-border flex flex-col overflow-hidden"
+            style={{
+              width: isOpen ? 'calc(100vw - 3rem)' : '0px',
+              maxWidth: '20rem',
+              opacity: isOpen ? 1 : 0,
+              transition: 'width 200ms ease-out, opacity 150ms ease-out',
+            }}
+            onTransitionEnd={handleTransitionEnd}
+          >
+            {renderedPanel && renderedItem && (
+              <>
+                <div className="flex items-center justify-between px-3 py-2 border-b border-border shrink-0 min-w-0">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <renderedItem.icon className="size-3.5 shrink-0" style={{ color: renderedItem.color }} />
+                    <span
+                      className="text-xs font-bold tracking-widest truncate"
+                      style={{ color: renderedItem.color }}
+                    >
+                      {PANEL_TITLES[renderedPanel]}
+                    </span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    onClick={closePanel}
+                    className="text-muted-foreground hover:text-foreground p-1 h-auto"
+                  >
+                    <X className="size-4" />
+                  </Button>
+                </div>
+                <div className="flex-1 overflow-y-auto p-3 min-w-0">
+                  <PanelContent panelId={renderedPanel} />
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </TooltipProvider>
+    )
+  }
+
+  // ── Desktop layout: icon rail + slide-out panel ──
   return (
     <TooltipProvider>
       <div className="flex h-full">
@@ -251,18 +389,23 @@ function SidebarIcon({
   isActive,
   onClick,
   badgeCount,
+  mobile,
 }: {
   item: SidebarItem
   isActive: boolean
   onClick: () => void
   badgeCount?: number
+  mobile?: boolean
 }) {
+  const size = mobile ? 'w-10 h-10' : 'w-8 h-8'
+  const iconSize = mobile ? 'size-5' : 'size-4'
+
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <button
           onClick={onClick}
-          className={`relative w-8 h-8 rounded-md flex items-center justify-center transition-all ${
+          className={`relative ${size} rounded-md flex items-center justify-center transition-all ${
             isActive
               ? 'bg-opacity-20'
               : 'text-muted-foreground hover:text-foreground'
@@ -277,7 +420,7 @@ function SidebarIcon({
               : undefined
           }
         >
-          <item.icon className="size-4" />
+          <item.icon className={iconSize} />
           {badgeCount != null && badgeCount > 0 && (
             <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-neon-red text-[9px] font-bold text-black flex items-center justify-center leading-none animate-pulse">
               {badgeCount}

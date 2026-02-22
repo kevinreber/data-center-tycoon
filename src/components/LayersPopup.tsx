@@ -48,7 +48,7 @@ export function LayersPopup() {
 
   return (
     <TooltipProvider>
-      <div className="absolute top-3 right-3 z-10">
+      <div className="absolute top-2 right-2 md:top-3 md:right-3 z-10">
         {/* Toggle button */}
         <Tooltip>
           <TooltipTrigger asChild>
@@ -71,7 +71,7 @@ export function LayersPopup() {
 
         {/* Popup panel */}
         {open && (
-          <div className="absolute top-9 right-0 w-80 rounded-lg border border-border bg-card/95 backdrop-blur-sm p-3 glow-green shadow-lg">
+          <div className="absolute top-9 right-0 w-[calc(100vw-1rem)] md:w-80 max-w-80 rounded-lg border border-border bg-card/95 backdrop-blur-sm p-3 glow-green shadow-lg">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <SlidersHorizontal className="size-3.5 text-neon-purple" />
