@@ -37,6 +37,8 @@ import {
   STAFF_TRANSFER_CONFIG,
   DEMAND_GROWTH_CONFIG,
   COMPETITOR_REGIONAL_CONFIG,
+  FLOOR_PLAN_CONFIG,
+  buildLayoutFromRows,
   calcCabinetCooling,
   getChillerConnection,
   getAdjacentCabinets,
@@ -3486,6 +3488,216 @@ describe('Regional Incidents & Disaster Preparedness', () => {
       expect(getState().staffTransfersCompleted).toBe(0)
       expect(getState().competitorRegionalPresence).toHaveLength(0)
       expect(getState().demandGrowthMultipliers).toEqual({})
+    })
+  })
+
+  // ══════════════════════════════════════════════════════════════
+  // Player-Built Rows (Custom Row Layout)
+  // ══════════════════════════════════════════════════════════════
+
+  describe('Player-Built Rows', () => {
+    it('toggleCustomRowMode initializes custom layout from default', () => {
+      setState({ sandboxMode: true, suiteTier: 'starter' })
+      expect(getState().customRowMode).toBe(false)
+      expect(getState().customLayout).toBeNull()
+
+      getState().toggleCustomRowMode()
+      expect(getState().customRowMode).toBe(true)
+      expect(getState().customLayout).not.toBeNull()
+      const layout = getState().customLayout!
+      // Starter tier should have 2 cabinet rows in custom mode
+      expect(layout.cabinetRows).toHaveLength(2)
+      // Floor plan should match expanded size
+      expect(layout.totalGridRows).toBe(FLOOR_PLAN_CONFIG.starter.totalGridRows)
+    })
+
+    it('toggleCustomRowMode OFF reverts to default layout', () => {
+      setState({ sandboxMode: true, suiteTier: 'starter' })
+      getState().toggleCustomRowMode() // ON
+      expect(getState().customLayout).not.toBeNull()
+
+      getState().toggleCustomRowMode() // OFF
+      expect(getState().customRowMode).toBe(false)
+      expect(getState().customLayout).toBeNull()
+    })
+
+    it('placeCustomRow adds a row at specified grid position', () => {
+      setState({ sandboxMode: true, suiteTier: 'standard' })
+      getState().toggleCustomRowMode()
+      const initialRowCount = getState().customLayout!.cabinetRows.length
+
+      // Remove all rows first so we can place fresh ones
+      for (const row of [...getState().customLayout!.cabinetRows]) {
+        getState().removeCustomRow(row.gridRow)
+      }
+      expect(getState().customLayout!.cabinetRows).toHaveLength(0)
+
+      // Place a row at grid row 2
+      getState().placeCustomRow(2, 'south')
+      expect(getState().customLayout!.cabinetRows).toHaveLength(1)
+      expect(getState().customLayout!.cabinetRows[0].gridRow).toBe(2)
+      expect(getState().customLayout!.cabinetRows[0].facing).toBe('south')
+    })
+
+    it('placeCustomRow enforces minimum gap constraint', () => {
+      setState({ sandboxMode: true, suiteTier: 'standard' })
+      getState().toggleCustomRowMode()
+
+      // Clear and place one row
+      for (const row of [...getState().customLayout!.cabinetRows]) {
+        getState().removeCustomRow(row.gridRow)
+      }
+      getState().placeCustomRow(3, 'south')
+      expect(getState().customLayout!.cabinetRows).toHaveLength(1)
+
+      // Try placing adjacent (gap of 0) — should fail (min gap is 1)
+      getState().placeCustomRow(4, 'north')
+      expect(getState().customLayout!.cabinetRows).toHaveLength(1) // still 1
+
+      // Place with proper gap of 2
+      getState().placeCustomRow(5, 'north')
+      expect(getState().customLayout!.cabinetRows).toHaveLength(2)
+    })
+
+    it('placeCustomRow rejects corridor positions', () => {
+      setState({ sandboxMode: true, suiteTier: 'starter' })
+      getState().toggleCustomRowMode()
+      for (const row of [...getState().customLayout!.cabinetRows]) {
+        getState().removeCustomRow(row.gridRow)
+      }
+
+      // Corridor top (gridRow 0) and bottom should be rejected
+      getState().placeCustomRow(0, 'south')
+      expect(getState().customLayout!.cabinetRows).toHaveLength(0)
+
+      const floorPlan = FLOOR_PLAN_CONFIG.starter
+      getState().placeCustomRow(floorPlan.totalGridRows - 1, 'south')
+      expect(getState().customLayout!.cabinetRows).toHaveLength(0)
+    })
+
+    it('placeCustomRow respects max row limit', () => {
+      setState({ sandboxMode: true, suiteTier: 'starter' })
+      getState().toggleCustomRowMode()
+
+      // Starter tier max is 2 rows — it should already have 2 from toggle init
+      expect(getState().customLayout!.cabinetRows.length).toBe(FLOOR_PLAN_CONFIG.starter.maxCabinetRows)
+
+      // Try placing another — should fail
+      getState().placeCustomRow(7, 'south')
+      expect(getState().customLayout!.cabinetRows.length).toBe(FLOOR_PLAN_CONFIG.starter.maxCabinetRows)
+    })
+
+    it('removeCustomRow removes an empty row', () => {
+      setState({ sandboxMode: true, suiteTier: 'standard' })
+      getState().toggleCustomRowMode()
+      const layout = getState().customLayout!
+      const rowToRemove = layout.cabinetRows[0]
+
+      getState().removeCustomRow(rowToRemove.gridRow)
+      expect(getState().customLayout!.cabinetRows.length).toBe(layout.cabinetRows.length - 1)
+    })
+
+    it('removeCustomRow rejects removal of row with cabinets', () => {
+      setState({ sandboxMode: true, money: 999999, suiteTier: 'standard' })
+      getState().toggleCustomRowMode()
+      const layout = getState().customLayout!
+      const rowGridRow = layout.cabinetRows[0].gridRow
+
+      // Place a cabinet on this row
+      getState().addCabinet(0, rowGridRow, 'production')
+      expect(getState().cabinets).toHaveLength(1)
+
+      // Try to remove the row — should fail
+      const rowCountBefore = getState().customLayout!.cabinetRows.length
+      getState().removeCustomRow(rowGridRow)
+      expect(getState().customLayout!.cabinetRows.length).toBe(rowCountBefore)
+    })
+
+    it('addCabinet works on custom layout rows', () => {
+      setState({ sandboxMode: true, money: 999999, suiteTier: 'standard' })
+      getState().toggleCustomRowMode()
+      const layout = getState().customLayout!
+      const row = layout.cabinetRows[0]
+
+      getState().addCabinet(0, row.gridRow, 'production')
+      expect(getState().cabinets).toHaveLength(1)
+      expect(getState().cabinets[0].row).toBe(row.gridRow)
+      expect(getState().cabinets[0].facing).toBe(row.facing)
+    })
+
+    it('addCabinet rejects placement on non-cabinet rows in custom layout', () => {
+      setState({ sandboxMode: true, money: 999999, suiteTier: 'standard' })
+      getState().toggleCustomRowMode()
+
+      // Try to place on corridor (row 0)
+      getState().addCabinet(0, 0, 'production')
+      expect(getState().cabinets).toHaveLength(0)
+    })
+
+    it('autoLayoutRows generates evenly-spaced rows', () => {
+      setState({ sandboxMode: true, suiteTier: 'standard' })
+      getState().toggleCustomRowMode()
+
+      // Clear existing rows
+      for (const row of [...getState().customLayout!.cabinetRows]) {
+        getState().removeCustomRow(row.gridRow)
+      }
+      expect(getState().customLayout!.cabinetRows).toHaveLength(0)
+
+      getState().autoLayoutRows()
+      const rows = getState().customLayout!.cabinetRows
+      expect(rows.length).toBe(FLOOR_PLAN_CONFIG.standard.maxCabinetRows)
+
+      // Rows should alternate facing
+      expect(rows[0].facing).toBe('south')
+      expect(rows[1].facing).toBe('north')
+      expect(rows[2].facing).toBe('south')
+    })
+
+    it('buildLayoutFromRows detects cold aisles between opposing rows', () => {
+      const rows = [
+        { id: 0, gridRow: 2, facing: 'south' as const, slots: 5 },
+        { id: 1, gridRow: 5, facing: 'north' as const, slots: 5 },
+      ]
+      const layout = buildLayoutFromRows(rows, 9)
+      expect(layout.aisles).toHaveLength(1)
+      expect(layout.aisles[0].type).toBe('cold')
+      expect(layout.aisles[0].width).toBe(2) // gap of 2 rows between gridRow 2 and 5
+    })
+
+    it('buildLayoutFromRows detects hot aisles between same-direction rows', () => {
+      const rows = [
+        { id: 0, gridRow: 2, facing: 'north' as const, slots: 5 },
+        { id: 1, gridRow: 5, facing: 'south' as const, slots: 5 },
+      ]
+      const layout = buildLayoutFromRows(rows, 9)
+      expect(layout.aisles).toHaveLength(1)
+      expect(layout.aisles[0].type).toBe('hot')
+    })
+
+    it('wider aisles provide extra cooling bonus', () => {
+      setState({ sandboxMode: true, money: 999999, suiteTier: 'standard' })
+      getState().toggleCustomRowMode()
+
+      // Get the aisles from the custom layout
+      const layout = getState().customLayout!
+      const aisles = layout.aisles
+      // Check that wide aisles have width > 1
+      const hasWideAisle = aisles.some(a => (a.width ?? 1) > 1)
+      // In standard tier with expanded floor plan and 3 rows, there should be wide aisles
+      expect(hasWideAisle).toBe(true)
+    })
+
+    it('resetGame clears custom layout state', () => {
+      setState({ sandboxMode: true })
+      getState().toggleCustomRowMode()
+      expect(getState().customRowMode).toBe(true)
+      expect(getState().customLayout).not.toBeNull()
+
+      getState().resetGame()
+      expect(getState().customRowMode).toBe(false)
+      expect(getState().customLayout).toBeNull()
+      expect(getState().rowPlacementMode).toBe(false)
     })
   })
 })

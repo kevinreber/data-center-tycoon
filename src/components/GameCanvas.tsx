@@ -44,6 +44,8 @@ export function GameCanvas() {
   const rowEndSlots = useGameStore((s) => s.rowEndSlots)
   const audioSettings = useGameStore((s) => s.audioSettings)
   const activeSiteId = useGameStore((s) => s.activeSiteId)
+  const customLayout = useGameStore((s) => s.customLayout)
+  const rowPlacementMode = useGameStore((s) => s.rowPlacementMode)
 
   // ── Detect site switch and trigger full Phaser re-render ─────────
   useEffect(() => {
@@ -67,16 +69,21 @@ export function GameCanvas() {
     scene.clearChillerPlants()
     scene.clearCoolingPipes()
 
-    // Re-sync grid size for the current suite tier
+    // Re-sync grid size for the current suite tier (respecting custom layout)
     const state = useGameStore.getState()
     const limits = getSuiteLimits(state.suiteTier)
-    const layout = SUITE_TIERS[state.suiteTier].layout
-    scene.setGridSize(limits.cols, layout.totalGridRows, limits.maxSpines, layout)
+    const activeLayout = state.customLayout ?? SUITE_TIERS[state.suiteTier].layout
+    scene.setGridSize(limits.cols, activeLayout.totalGridRows, limits.maxSpines, activeLayout)
   }, [activeSiteId, sceneReady])
 
   // Tile click handler — called from Phaser when user clicks a grid tile
   const handleTileClick = useCallback((col: number, row: number) => {
     const state = useGameStore.getState()
+    // Row placement mode: place a cabinet row on the clicked grid row
+    if (state.rowPlacementMode) {
+      state.placeCustomRow(row, state.rowPlacementFacing)
+      return
+    }
     if (!state.placementMode) return
     state.addCabinet(col, row, state.placementEnvironment, state.placementCustomerType, state.placementFacing)
   }, [])
@@ -84,7 +91,8 @@ export function GameCanvas() {
   // Tile hover handler — returns placement hints for the hovered tile
   const handleTileHover = useCallback((col: number, row: number) => {
     const state = useGameStore.getState()
-    return getPlacementHints(col, row, state.cabinets, state.suiteTier, state.placementEnvironment, state.placementCustomerType)
+    const activeLayout = state.customLayout ?? undefined
+    return getPlacementHints(col, row, state.cabinets, state.suiteTier, state.placementEnvironment, state.placementCustomerType, activeLayout)
   }, [])
 
   // Cabinet selection handler — called from Phaser when user clicks a cabinet
@@ -134,6 +142,20 @@ export function GameCanvas() {
     }
   }, [placementMode, handleTileClick, handleTileHover, handleCabinetSelect, sceneReady])
 
+  // Sync row placement mode to Phaser
+  useEffect(() => {
+    if (!gameRef.current) return
+    const scene = getScene(gameRef.current)
+    if (!scene) return
+    scene.setRowPlacementMode(rowPlacementMode)
+    // Row placement mode uses the same tile click/hover callbacks
+    if (rowPlacementMode) {
+      scene.setPlacementMode(true) // enable tile interaction
+      scene.clearSelection()
+      useGameStore.getState().selectCabinet(null)
+    }
+  }, [rowPlacementMode, sceneReady])
+
   // Sync placement facing to Phaser (updates zone overlays when user changes direction)
   useEffect(() => {
     if (!gameRef.current) return
@@ -161,10 +183,10 @@ export function GameCanvas() {
     const scene = getScene(gameRef.current)
     if (!scene) return
     const limits = getSuiteLimits(suiteTier)
-    const layout = SUITE_TIERS[suiteTier].layout
+    const activeLayout = customLayout ?? SUITE_TIERS[suiteTier].layout
     // Use totalGridRows as the visual row count (includes aisles + corridors)
-    scene.setGridSize(limits.cols, layout.totalGridRows, limits.maxSpines, layout)
-  }, [suiteTier, sceneReady])
+    scene.setGridSize(limits.cols, activeLayout.totalGridRows, limits.maxSpines, activeLayout)
+  }, [suiteTier, customLayout, sceneReady])
 
   // Sync cabinets to Phaser (including visual state for state differentiation)
   useEffect(() => {

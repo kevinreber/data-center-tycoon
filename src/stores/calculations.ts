@@ -23,7 +23,7 @@ import type {
 
 import { SIM, POWER_DRAW, TRAFFIC } from './constants'
 import { CUSTOMER_TYPE_CONFIG, COOLING_UNIT_CONFIG, ENVIRONMENT_CONFIG, BASE_AMBIENT_DISSIPATION, UNCONNECTED_CRAH_PENALTY } from './configs/equipment'
-import { SUITE_TIERS, SPACING_CONFIG, ZONE_BONUS_CONFIG, AISLE_CONTAINMENT_CONFIG } from './configs/infrastructure'
+import { SUITE_TIERS, SPACING_CONFIG, ZONE_BONUS_CONFIG, AISLE_CONTAINMENT_CONFIG, WIDE_AISLE_COOLING_BONUS } from './configs/infrastructure'
 import { REPUTATION_TIERS, getReputationTier } from './configs/progression'
 import { getChillerConnection } from './chiller'
 
@@ -296,10 +296,10 @@ export function getFacingOffsets(facing: CabinetFacing, col: number, row: number
 }
 
 /** Calculate hot/cold aisle cooling bonus based on cabinet layout and containment. */
-export function calcAisleBonus(cabinets: Cabinet[], suiteTier: SuiteTier = 'starter', aisleContainments: number[] = []): number {
+export function calcAisleBonus(cabinets: Cabinet[], suiteTier: SuiteTier = 'starter', aisleContainments: number[] = [], layoutOverride?: DataCenterLayout): number {
   if (cabinets.length < 2) return 0
 
-  const layout = SUITE_TIERS[suiteTier].layout
+  const layout = layoutOverride ?? SUITE_TIERS[suiteTier].layout
   let bonus = 0
 
   for (const aisle of layout.aisles) {
@@ -312,6 +312,12 @@ export function calcAisleBonus(cabinets: Cabinet[], suiteTier: SuiteTier = 'star
 
     if (hasAboveCabs && hasBelowCabs) {
       bonus += SPACING_CONFIG.properAisleBonusPerPair
+
+      // Wider aisles provide extra cooling bonus
+      const extraWidth = (aisle.width ?? 1) - 1
+      if (extraWidth > 0) {
+        bonus += extraWidth * WIDE_AISLE_COOLING_BONUS
+      }
 
       if (aisleContainments.includes(aisle.id)) {
         bonus += AISLE_CONTAINMENT_CONFIG.coolingBonusPerAisle
@@ -532,6 +538,11 @@ export function getCabinetRowAtGrid(gridRow: number, layout: DataCenterLayout): 
   return layout.cabinetRows.find(r => r.gridRow === gridRow)
 }
 
+/** Get the effective layout, respecting custom layout if active */
+export function getActiveLayout(tier: SuiteTier, customLayout: DataCenterLayout | null): DataCenterLayout {
+  return customLayout ?? SUITE_TIERS[tier].layout
+}
+
 /** Get the valid grid rows where cabinets can be placed for a suite tier */
 export function getValidCabinetGridRows(tier: SuiteTier): number[] {
   return SUITE_TIERS[tier].layout.cabinetRows.map(r => r.gridRow)
@@ -553,13 +564,14 @@ export function getPlacementHints(
   suiteTier: SuiteTier,
   placementEnv?: CabinetEnvironment,
   placementCust?: CustomerType,
+  layoutOverride?: DataCenterLayout,
 ): PlacementHint[] {
   const hints: PlacementHint[] = []
-  const layout = SUITE_TIERS[suiteTier].layout
+  const layout = layoutOverride ?? SUITE_TIERS[suiteTier].layout
 
   const cabinetRow = getCabinetRowAtGrid(row, layout)
   if (!cabinetRow) {
-    const aisle = layout.aisles.find(a => a.gridRow === row)
+    const aisle = layout.aisles.find(a => row >= a.gridRow && row < a.gridRow + (a.width ?? 1))
     if (aisle) {
       const typeLabel = aisle.type === 'cold' ? 'Cold' : aisle.type === 'hot' ? 'Hot' : 'Neutral'
       hints.push({ message: `${typeLabel} aisle — technician walkway, no cabinet placement`, type: 'info' })

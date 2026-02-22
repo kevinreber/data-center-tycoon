@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { useGameStore, RACK_COST, MAX_SERVERS_PER_CABINET, ENVIRONMENT_CONFIG, CUSTOMER_TYPE_CONFIG, SUITE_TIERS, getSuiteLimits, DEDICATED_ROW_BONUS_CONFIG, MIXED_ENV_PENALTY_CONFIG } from '@/stores/gameStore'
+import { useGameStore, RACK_COST, MAX_SERVERS_PER_CABINET, ENVIRONMENT_CONFIG, CUSTOMER_TYPE_CONFIG, SUITE_TIERS, getSuiteLimits, DEDICATED_ROW_BONUS_CONFIG, MIXED_ENV_PENALTY_CONFIG, FLOOR_PLAN_CONFIG } from '@/stores/gameStore'
 import type { CabinetEnvironment, CustomerType } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
-import { Server, Network, Plus, MousePointer, Rows3 } from 'lucide-react'
+import { Server, Network, Plus, MousePointer, Rows3, LayoutGrid, Trash2, Wand2 } from 'lucide-react'
 import {
   Tooltip,
   TooltipContent,
@@ -16,6 +16,10 @@ export function BuildPanel() {
     suiteTier,
     placementMode, enterPlacementMode,
     mixedEnvPenaltyCount, dedicatedRows, zones,
+    customRowMode, customLayout, rowPlacementMode,
+    toggleCustomRowMode, removeCustomRow, autoLayoutRows,
+    enterRowPlacementMode, exitRowPlacementMode, toggleRowPlacementFacing,
+    rowPlacementFacing,
   } = useGameStore()
 
   const [selectedEnv, setSelectedEnv] = useState<CabinetEnvironment>('production')
@@ -28,40 +32,136 @@ export function BuildPanel() {
   const envEntries = Object.entries(ENVIRONMENT_CONFIG) as [CabinetEnvironment, typeof ENVIRONMENT_CONFIG['production']][]
 
   // Row layout info for display
-  const layout = SUITE_TIERS[suiteTier].layout
+  const layout = customLayout ?? SUITE_TIERS[suiteTier].layout
+  const floorPlan = FLOOR_PLAN_CONFIG[suiteTier]
 
   return (
     <div className="flex flex-col gap-3">
       {/* Row layout info */}
       <div className="flex flex-col gap-1 rounded border border-border/30 bg-card/30 px-2 py-1.5">
-        <div className="flex items-center gap-1.5">
-          <Rows3 className="size-3 text-neon-cyan/70" />
-          <span className="text-xs font-mono text-muted-foreground">
-            {layout.cabinetRows.length} rows · {layout.aisles.length} aisles
-          </span>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <Rows3 className="size-3 text-neon-cyan/70" />
+            <span className="text-xs font-mono text-muted-foreground">
+              {layout.cabinetRows.length}{customRowMode ? `/${floorPlan.maxCabinetRows}` : ''} rows · {layout.aisles.length} aisles
+            </span>
+          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="xs"
+                onClick={toggleCustomRowMode}
+                className={`text-[9px] font-mono h-4 px-1.5 ${customRowMode ? 'text-neon-cyan border-neon-cyan/40' : 'text-muted-foreground'}`}
+              >
+                <LayoutGrid className="size-2.5 mr-0.5" />
+                {customRowMode ? 'Custom' : 'Auto'}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right" className="max-w-52">
+              <p className="font-bold">{customRowMode ? 'Custom Row Layout' : 'Auto Row Layout'}</p>
+              <p className="text-xs mt-1">{customRowMode ? 'Design your own row layout. Place and remove rows on the expanded floor plan.' : 'Switch to custom mode to place rows manually for strategic spacing.'}</p>
+            </TooltipContent>
+          </Tooltip>
         </div>
         <div className="flex gap-1 flex-wrap">
           {layout.cabinetRows.map((row) => {
             const rowCabs = cabinets.filter(c => c.row === row.gridRow)
             const fill = rowCabs.length
+            const canRemove = customRowMode && fill === 0
             return (
               <Tooltip key={row.id}>
                 <TooltipTrigger asChild>
-                  <span className={`text-xs font-mono px-1 rounded border ${
+                  <span className={`text-xs font-mono px-1 rounded border flex items-center gap-0.5 ${
                     fill > 0 ? 'border-neon-green/30 text-neon-green/80' : 'border-border/30 text-muted-foreground/50'
                   }`}>
                     R{row.id + 1} {row.facing === 'north' ? '▲' : '▼'} {fill}/{row.slots}
+                    {canRemove && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); removeCustomRow(row.gridRow) }}
+                        className="text-neon-red/60 hover:text-neon-red ml-0.5"
+                      >
+                        <Trash2 className="size-2.5" />
+                      </button>
+                    )}
                   </span>
                 </TooltipTrigger>
                 <TooltipContent side="right" className="max-w-48">
-                  <p className="font-bold">Row {row.id + 1}</p>
+                  <p className="font-bold">Row {row.id + 1} (grid row {row.gridRow})</p>
                   <p className="text-xs mt-1">Facing {row.facing} — {fill}/{row.slots} slots filled</p>
-                  <p className="text-xs text-muted-foreground">Facing is set by the facility layout</p>
+                  {customRowMode && fill === 0 && <p className="text-xs text-neon-red/80 mt-1">Click x to remove this empty row</p>}
+                  {customRowMode && fill > 0 && <p className="text-xs text-muted-foreground mt-1">Remove all cabinets first to delete row</p>}
                 </TooltipContent>
               </Tooltip>
             )
           })}
         </div>
+
+        {/* Custom row mode controls */}
+        {customRowMode && (
+          <div className="flex gap-1 mt-1 pt-1 border-t border-border/20">
+            {rowPlacementMode ? (
+              <div className="flex-1 flex items-center gap-1">
+                <span className="text-[10px] font-mono text-neon-cyan animate-pulse">Click row to place</span>
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  onClick={toggleRowPlacementFacing}
+                  className="text-[9px] font-mono h-4 px-1 text-neon-cyan"
+                >
+                  {rowPlacementFacing === 'south' ? '▼ S' : '▲ N'}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  onClick={exitRowPlacementMode}
+                  className="text-[9px] font-mono h-4 px-1 text-neon-red/60"
+                >
+                  Cancel
+                </Button>
+              </div>
+            ) : (
+              <>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="xs"
+                      disabled={layout.cabinetRows.length >= floorPlan.maxCabinetRows}
+                      onClick={() => enterRowPlacementMode('south')}
+                      className="text-[9px] font-mono h-5 flex-1 border-neon-cyan/30 hover:border-neon-cyan/60 hover:text-neon-cyan"
+                    >
+                      <Plus className="size-2.5 mr-0.5" />
+                      Add Row
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    <p>Click on the floor plan to place a new cabinet row</p>
+                    <p className="text-xs text-muted-foreground mt-1">Min 1-row gap between rows (fire code)</p>
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="xs"
+                      disabled={cabinets.length > 0}
+                      onClick={autoLayoutRows}
+                      className="text-[9px] font-mono h-5 border-border/30 hover:border-neon-green/40 hover:text-neon-green"
+                    >
+                      <Wand2 className="size-2.5 mr-0.5" />
+                      Auto
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    <p>Auto-arrange rows with optimal spacing</p>
+                    {cabinets.length > 0 && <p className="text-xs text-neon-red/80 mt-1">Remove all cabinets first</p>}
+                  </TooltipContent>
+                </Tooltip>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Environment selector */}

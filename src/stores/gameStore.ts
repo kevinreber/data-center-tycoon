@@ -70,6 +70,7 @@ import type {
   CableManagementType, WorkloadType, Workload, AdvancedTier,
   RackDetail, LeaderboardEntry, LeaderboardCategory, AudioSettings,
   FloatingTextEvent, CameraEffect,
+  DataCenterLayout, DataCenterRow,
 } from './types'
 
 // ── Re-export constants ────────────────────────────────────────
@@ -80,8 +81,8 @@ import { SIM, POWER_DRAW, COSTS, TRAFFIC, MAX_SERVERS_PER_CABINET, MINUTES_PER_T
 export { CUSTOMER_TYPE_CONFIG, GENERATOR_OPTIONS, SUPPRESSION_CONFIG, COOLING_CONFIG, COOLING_UNIT_CONFIG, CHILLER_PLANT_CONFIG, COOLING_PIPE_CONFIG, ENVIRONMENT_CONFIG, SERVER_CONFIG_OPTIONS, BASE_AMBIENT_DISSIPATION, UNCONNECTED_CRAH_PENALTY, MAX_CHILLER_PLANTS } from './configs/equipment'
 import { CUSTOMER_TYPE_CONFIG, GENERATOR_OPTIONS, SUPPRESSION_CONFIG, COOLING_CONFIG, COOLING_UNIT_CONFIG, CHILLER_PLANT_CONFIG, COOLING_PIPE_CONFIG, ENVIRONMENT_CONFIG, MAX_CHILLER_PLANTS } from './configs/equipment'
 
-export { PDU_OPTIONS, CABLE_TRAY_OPTIONS, AISLE_CONFIG, AISLE_CONTAINMENT_CONFIG, SPACING_CONFIG, generateLayout, SUITE_TIERS, SUITE_TIER_ORDER, BUSWAY_OPTIONS, CROSSCONNECT_OPTIONS, INROW_COOLING_OPTIONS, NOISE_CONFIG, POWER_REDUNDANCY_CONFIG, ZONE_BONUS_CONFIG, MIXED_ENV_PENALTY_CONFIG, DEDICATED_ROW_BONUS_CONFIG } from './configs/infrastructure'
-import { PDU_OPTIONS, CABLE_TRAY_OPTIONS, AISLE_CONFIG, AISLE_CONTAINMENT_CONFIG, SPACING_CONFIG, SUITE_TIERS, SUITE_TIER_ORDER, BUSWAY_OPTIONS, CROSSCONNECT_OPTIONS, INROW_COOLING_OPTIONS, NOISE_CONFIG, POWER_REDUNDANCY_CONFIG, ZONE_BONUS_CONFIG, MIXED_ENV_PENALTY_CONFIG, DEDICATED_ROW_BONUS_CONFIG } from './configs/infrastructure'
+export { PDU_OPTIONS, CABLE_TRAY_OPTIONS, AISLE_CONFIG, AISLE_CONTAINMENT_CONFIG, SPACING_CONFIG, generateLayout, SUITE_TIERS, SUITE_TIER_ORDER, BUSWAY_OPTIONS, CROSSCONNECT_OPTIONS, INROW_COOLING_OPTIONS, NOISE_CONFIG, POWER_REDUNDANCY_CONFIG, ZONE_BONUS_CONFIG, MIXED_ENV_PENALTY_CONFIG, DEDICATED_ROW_BONUS_CONFIG, FLOOR_PLAN_CONFIG, WIDE_AISLE_COOLING_BONUS, MIN_ROW_GAP, buildLayoutFromRows } from './configs/infrastructure'
+import { PDU_OPTIONS, CABLE_TRAY_OPTIONS, AISLE_CONFIG, AISLE_CONTAINMENT_CONFIG, SPACING_CONFIG, SUITE_TIERS, SUITE_TIER_ORDER, BUSWAY_OPTIONS, CROSSCONNECT_OPTIONS, INROW_COOLING_OPTIONS, NOISE_CONFIG, POWER_REDUNDANCY_CONFIG, ZONE_BONUS_CONFIG, MIXED_ENV_PENALTY_CONFIG, DEDICATED_ROW_BONUS_CONFIG, FLOOR_PLAN_CONFIG, MIN_ROW_GAP, buildLayoutFromRows } from './configs/infrastructure'
 
 export { TECH_TREE, TECH_BRANCH_COLORS, OPS_TIER_CONFIG, OPS_TIER_ORDER, REPUTATION_TIERS, CONTRACT_CATALOG, CONTRACT_TIER_COLORS, CONTRACT_OFFER_INTERVAL, MAX_ACTIVE_CONTRACTS, CONTRACT_OFFER_COUNT, COMPLIANCE_CONTRACT_CATALOG, COMPLIANCE_CONTRACT_REQUIREMENTS, ZONE_CONTRACT_CATALOG, ZONE_CONTRACT_REQUIREMENTS, ACHIEVEMENT_CATALOG, INCIDENT_CATALOG, INCIDENT_CHANCE, MAX_ACTIVE_INCIDENTS, SCENARIO_CATALOG, TUTORIAL_TIPS } from './configs/progression'
 import { TECH_TREE, OPS_TIER_CONFIG, OPS_TIER_ORDER, CONTRACT_CATALOG, CONTRACT_OFFER_INTERVAL, MAX_ACTIVE_CONTRACTS, CONTRACT_OFFER_COUNT, COMPLIANCE_CONTRACT_REQUIREMENTS, ZONE_CONTRACT_CATALOG, ZONE_CONTRACT_REQUIREMENTS, ACHIEVEMENT_CATALOG, INCIDENT_CATALOG, INCIDENT_CHANCE, MAX_ACTIVE_INCIDENTS, SCENARIO_CATALOG, TUTORIAL_TIPS } from './configs/progression'
@@ -93,7 +94,7 @@ export { ENERGY_SOURCE_CONFIG, GREEN_CERT_CONFIG, CARBON_TAX_SCHEDULE, WATER_USA
 import { ENERGY_SOURCE_CONFIG, GREEN_CERT_CONFIG, CARBON_TAX_SCHEDULE, WATER_USAGE_CONFIG, EWASTE_CONFIG, SECURITY_FEATURE_CONFIG, SECURITY_TIER_CONFIG, COMPLIANCE_CERT_CONFIG, COMPETITOR_PERSONALITIES, COMPETITOR_NAMES, COMPETITOR_SCALE_CONFIG, MULTI_SITE_GATE, SITE_TYPE_CONFIG, REGION_CATALOG, REGION_RESEARCH_COST, MAX_SITES, INTER_SITE_LINK_CONFIG, DISTANCE_LATENCY_MODIFIER, EDGE_POP_CDN_REVENUE_PER_GBPS, MAX_LINKS_PER_SITE, REGIONAL_INCIDENT_CATALOG, DISASTER_PREP_CONFIG, MAX_REGIONAL_INCIDENTS, DATA_SOVEREIGNTY_CONFIG, MULTI_SITE_CONTRACT_CATALOG, MAX_MULTI_SITE_CONTRACTS, STAFF_TRANSFER_CONFIG, MAX_STAFF_TRANSFERS, DEMAND_GROWTH_CONFIG, COMPETITOR_REGIONAL_CONFIG } from './configs/world'
 
 // ── Re-export calculations ─────────────────────────────────────
-export { coolingOverheadFactor, calcManagementBonus, calcTrafficWithCapacity, calcCabinetCooling, getCabinetsInPDURange, getPDULoad, isPDUOverloaded, calcCableLength, getFacingOffsets, calcAisleBonus, countAisleViolations, getAdjacentCabinets, hasMaintenanceAccess, calcSpacingHeatEffect, countMessyCables, calcZones, isZoneRequirementMet, calcMixedEnvPenalties, calcDedicatedRows, getSuiteLimits, getCabinetRowAtGrid, getValidCabinetGridRows, getRowFacing, getPlacementHints, formatGameTime, getReputationTier } from './calculations'
+export { coolingOverheadFactor, calcManagementBonus, calcTrafficWithCapacity, calcCabinetCooling, getCabinetsInPDURange, getPDULoad, isPDUOverloaded, calcCableLength, getFacingOffsets, calcAisleBonus, countAisleViolations, getAdjacentCabinets, hasMaintenanceAccess, calcSpacingHeatEffect, countMessyCables, calcZones, isZoneRequirementMet, calcMixedEnvPenalties, calcDedicatedRows, getSuiteLimits, getCabinetRowAtGrid, getValidCabinetGridRows, getRowFacing, getPlacementHints, getActiveLayout, formatGameTime, getReputationTier } from './calculations'
 import { calcStats, calcTraffic, calcTrafficWithCapacity, calcCabinetCooling, isPDUOverloaded, calcCableLength, calcAisleBonus, countAisleViolations, calcSpacingHeatEffect, countMessyCables, calcZones, isZoneRequirementMet, calcMixedEnvPenalties, calcDedicatedRows, getSuiteLimits, getCabinetRowAtGrid, getReputationTier, getAdjacentCabinets, hasMaintenanceAccess, manhattanDist } from './calculations'
 
 export { getChillerConnection } from './chiller'
@@ -512,6 +513,9 @@ interface GameState {
 
   // Player-Built Rows (custom row mode)
   customRowMode: boolean
+  customLayout: DataCenterLayout | null
+  rowPlacementMode: boolean
+  rowPlacementFacing: CabinetFacing
 
   // 42U Rack Model
   rackDetails: Record<string, RackDetail>   // cabinet ID → rack detail
@@ -657,6 +661,12 @@ interface GameState {
   cancelWorkload: (workloadId: string) => void
   unlockAdvancedTier: (tier: AdvancedTier) => void
   toggleCustomRowMode: () => void
+  placeCustomRow: (gridRow: number, facing: CabinetFacing) => void
+  removeCustomRow: (gridRow: number) => void
+  autoLayoutRows: () => void
+  enterRowPlacementMode: (facing: CabinetFacing) => void
+  exitRowPlacementMode: () => void
+  toggleRowPlacementFacing: () => void
   installRackEquipment: (cabinetId: string, position: number, equipmentType: string) => void
   removeRackEquipment: (cabinetId: string, position: number) => void
   submitLeaderboardEntry: (playerName: string, category: LeaderboardCategory) => void
@@ -1059,6 +1069,9 @@ export const useGameStore = create<GameState>((set) => ({
 
   // Player-Built Rows
   customRowMode: false,
+  customLayout: null as DataCenterLayout | null,
+  rowPlacementMode: false,
+  rowPlacementFacing: 'south' as CabinetFacing,
 
   // 42U Rack Model
   rackDetails: {} as Record<string, RackDetail>,
@@ -1097,7 +1110,7 @@ export const useGameStore = create<GameState>((set) => ({
       if (state.cabinets.length >= suiteLimits.maxCabinets) return state
 
       // Row-based validation: check that the grid row is a valid cabinet row
-      const layout = suiteLimits.layout
+      const layout = state.customLayout ?? suiteLimits.layout
       const cabinetRow = getCabinetRowAtGrid(row, layout)
       if (!cabinetRow) return state // Not a cabinet row (aisle or corridor)
 
@@ -1124,7 +1137,8 @@ export const useGameStore = create<GameState>((set) => ({
         facing: enforcedFacing,
       }
       const newCabinets = [...state.cabinets, cab]
-      const newAisleBonus = calcAisleBonus(newCabinets, state.suiteTier, state.aisleContainments)
+      const activeLayout = state.customLayout ?? suiteLimits.layout
+      const newAisleBonus = calcAisleBonus(newCabinets, state.suiteTier, state.aisleContainments, activeLayout)
       const newAisleViolations = countAisleViolations()
       const newZones = calcZones(newCabinets)
       return {
@@ -1442,9 +1456,37 @@ export const useGameStore = create<GameState>((set) => ({
       if (targetIdx <= currentIdx) return state
       const config = SUITE_TIERS[tier]
       if (state.money < config.upgradeCost) return state
+
+      // If custom row mode is active, rebuild layout for the new tier's floor plan
+      let customLayout: DataCenterLayout | null = null
+      if (state.customRowMode && state.customLayout) {
+        const newFloorPlan = FLOOR_PLAN_CONFIG[tier]
+        const newCols = config.cols
+        // Remap existing custom rows to new floor plan, preserving relative positions
+        const oldFloorPlan = FLOOR_PLAN_CONFIG[state.suiteTier]
+        const scale = (newFloorPlan.totalGridRows - 2) / (oldFloorPlan.totalGridRows - 2)
+        const remappedRows: DataCenterRow[] = state.customLayout.cabinetRows.map(r => ({
+          ...r,
+          gridRow: Math.min(
+            Math.max(1, Math.round(1 + (r.gridRow - 1) * scale)),
+            newFloorPlan.totalGridRows - 2
+          ),
+          slots: newCols,
+        }))
+        // Deduplicate any rows that mapped to same gridRow
+        const seen = new Set<number>()
+        const deduped = remappedRows.filter(r => {
+          if (seen.has(r.gridRow)) return false
+          seen.add(r.gridRow)
+          return true
+        })
+        customLayout = buildLayoutFromRows(deduped, newFloorPlan.totalGridRows)
+      }
+
       return {
         suiteTier: tier,
         money: state.money - config.upgradeCost,
+        ...(customLayout ? { customLayout } : {}),
         pendingCameraEffects: [...state.pendingCameraEffects, { type: 'zoom_reveal' as const }],
       }
     }),
@@ -1553,7 +1595,7 @@ export const useGameStore = create<GameState>((set) => ({
       )
       return {
         cabinets: newCabinets,
-        aisleBonus: calcAisleBonus(newCabinets, state.suiteTier, state.aisleContainments),
+        aisleBonus: calcAisleBonus(newCabinets, state.suiteTier, state.aisleContainments, state.customLayout ?? undefined),
         aisleViolations: countAisleViolations(),
       }
     }),
@@ -2110,7 +2152,7 @@ export const useGameStore = create<GameState>((set) => ({
       if (!state.sandboxMode && state.money < AISLE_CONTAINMENT_CONFIG.cost) return state
 
       const newContainments = [...state.aisleContainments, aisleId]
-      const newAisleBonus = calcAisleBonus(state.cabinets, state.suiteTier, newContainments)
+      const newAisleBonus = calcAisleBonus(state.cabinets, state.suiteTier, newContainments, state.customLayout ?? undefined)
       return {
         aisleContainments: newContainments,
         aisleBonus: newAisleBonus,
@@ -2800,7 +2842,146 @@ export const useGameStore = create<GameState>((set) => ({
     }),
 
   toggleCustomRowMode: () =>
-    set((state) => ({ customRowMode: !state.customRowMode })),
+    set((state) => {
+      const enabling = !state.customRowMode
+      if (enabling && !state.customLayout) {
+        // Initialize custom layout from current default layout
+        const defaultLayout = SUITE_TIERS[state.suiteTier].layout
+        const floorPlan = FLOOR_PLAN_CONFIG[state.suiteTier]
+        // Rebuild rows repositioned into the expanded floor plan using auto-layout
+        const cols = SUITE_TIERS[state.suiteTier].cols
+        const maxRows = floorPlan.maxCabinetRows
+        const interiorRows = floorPlan.totalGridRows - 2 // exclude corridors
+        const spacing = Math.max(2, Math.floor(interiorRows / maxRows))
+        const placedRows: DataCenterRow[] = []
+        for (let i = 0; i < maxRows; i++) {
+          const gridRow = 1 + Math.min(i * spacing, interiorRows - 1)
+          const facing: CabinetFacing = i % 2 === 0 ? 'south' : 'north'
+          placedRows.push({ id: i, gridRow, facing, slots: cols })
+        }
+        const layout = buildLayoutFromRows(placedRows, floorPlan.totalGridRows)
+        // Remap existing cabinets from old gridRows to new gridRows
+        const oldRows = defaultLayout.cabinetRows
+        const cabinets = state.cabinets.map(cab => {
+          const oldRow = oldRows.find(r => r.gridRow === cab.row)
+          if (!oldRow) return cab
+          const newRow = placedRows.find(r => r.id === oldRow.id)
+          if (!newRow || newRow.gridRow === cab.row) return cab
+          return { ...cab, row: newRow.gridRow, facing: newRow.facing }
+        })
+        return {
+          customRowMode: true,
+          customLayout: layout,
+          cabinets,
+          ...calcStats(cabinets, state.spineSwitches),
+        }
+      } else if (!enabling) {
+        // Switching back to default layout — remap cabinets back
+        const defaultLayout = SUITE_TIERS[state.suiteTier].layout
+        const customRows = state.customLayout?.cabinetRows ?? []
+        const cabinets = state.cabinets.map(cab => {
+          const customRow = customRows.find(r => r.gridRow === cab.row)
+          if (!customRow) return cab
+          const defaultRow = defaultLayout.cabinetRows.find(r => r.id === customRow.id)
+          if (!defaultRow || defaultRow.gridRow === cab.row) return cab
+          return { ...cab, row: defaultRow.gridRow, facing: defaultRow.facing }
+        })
+        return {
+          customRowMode: false,
+          customLayout: null,
+          rowPlacementMode: false,
+          cabinets,
+          ...calcStats(cabinets, state.spineSwitches),
+        }
+      }
+      return { customRowMode: enabling }
+    }),
+
+  placeCustomRow: (gridRow: number, facing: CabinetFacing) =>
+    set((state) => {
+      if (!state.customRowMode) return state
+      const floorPlan = FLOOR_PLAN_CONFIG[state.suiteTier]
+      const cols = SUITE_TIERS[state.suiteTier].cols
+      const existingRows = state.customLayout?.cabinetRows ?? []
+
+      // Validate: not in corridor
+      if (gridRow <= 0 || gridRow >= floorPlan.totalGridRows - 1) return state
+      // Validate: max rows not exceeded
+      if (existingRows.length >= floorPlan.maxCabinetRows) return state
+      // Validate: not already a cabinet row
+      if (existingRows.some(r => r.gridRow === gridRow)) return state
+      // Validate: minimum gap from other rows (fire code)
+      const tooClose = existingRows.some(r => Math.abs(r.gridRow - gridRow) < MIN_ROW_GAP + 1)
+      if (tooClose) return state
+
+      const newId = existingRows.length > 0 ? Math.max(...existingRows.map(r => r.id)) + 1 : 0
+      const newRow: DataCenterRow = { id: newId, gridRow, facing, slots: cols }
+      const allRows = [...existingRows, newRow]
+      const layout = buildLayoutFromRows(allRows, floorPlan.totalGridRows)
+
+      return {
+        customLayout: layout,
+        rowPlacementMode: false,
+        aisleBonus: calcAisleBonus(state.cabinets, state.suiteTier, state.aisleContainments, layout),
+      }
+    }),
+
+  removeCustomRow: (gridRow: number) =>
+    set((state) => {
+      if (!state.customRowMode || !state.customLayout) return state
+      const existingRows = state.customLayout.cabinetRows
+      const rowToRemove = existingRows.find(r => r.gridRow === gridRow)
+      if (!rowToRemove) return state
+
+      // Cannot remove a row that has cabinets on it
+      if (state.cabinets.some(c => c.row === gridRow)) return state
+
+      const remaining = existingRows.filter(r => r.gridRow !== gridRow)
+      // Re-assign sequential IDs
+      const reindexed = remaining
+        .sort((a, b) => a.gridRow - b.gridRow)
+        .map((r, i) => ({ ...r, id: i }))
+      const floorPlan = FLOOR_PLAN_CONFIG[state.suiteTier]
+      const layout = buildLayoutFromRows(reindexed, floorPlan.totalGridRows)
+
+      return {
+        customLayout: layout,
+        aisleBonus: calcAisleBonus(state.cabinets, state.suiteTier, state.aisleContainments, layout),
+      }
+    }),
+
+  autoLayoutRows: () =>
+    set((state) => {
+      if (!state.customRowMode) return state
+      // Only auto-layout if no cabinets placed (otherwise it's too disruptive)
+      if (state.cabinets.length > 0) return state
+
+      const floorPlan = FLOOR_PLAN_CONFIG[state.suiteTier]
+      const cols = SUITE_TIERS[state.suiteTier].cols
+      const maxRows = floorPlan.maxCabinetRows
+      const interiorRows = floorPlan.totalGridRows - 2
+      const spacing = Math.max(2, Math.floor(interiorRows / maxRows))
+      const placedRows: DataCenterRow[] = []
+      for (let i = 0; i < maxRows; i++) {
+        const gridRow = 1 + Math.min(i * spacing, interiorRows - 1)
+        const facing: CabinetFacing = i % 2 === 0 ? 'south' : 'north'
+        placedRows.push({ id: i, gridRow, facing, slots: cols })
+      }
+      const layout = buildLayoutFromRows(placedRows, floorPlan.totalGridRows)
+
+      return { customLayout: layout }
+    }),
+
+  enterRowPlacementMode: (facing: CabinetFacing) =>
+    set({ rowPlacementMode: true, rowPlacementFacing: facing, placementMode: false }),
+
+  exitRowPlacementMode: () =>
+    set({ rowPlacementMode: false }),
+
+  toggleRowPlacementFacing: () =>
+    set((state) => ({
+      rowPlacementFacing: state.rowPlacementFacing === 'south' ? 'north' : 'south',
+    })),
 
   installRackEquipment: (cabinetId: string, position: number, equipmentType: string) =>
     set((state) => {
@@ -3501,6 +3682,8 @@ export const useGameStore = create<GameState>((set) => ({
         coolingPipes: state.coolingPipes,
         sandboxMode: state.sandboxMode,
         aisleContainments: state.aisleContainments,
+        customRowMode: state.customRowMode,
+        customLayout: state.customLayout,
         stockPrice: state.stockPrice,
         stockHistory: state.stockHistory,
         valuationMilestonesReached: state.valuationMilestonesReached,
@@ -3586,6 +3769,8 @@ export const useGameStore = create<GameState>((set) => ({
         coolingPipes: data.coolingPipes ?? state.coolingPipes,
         sandboxMode: data.sandboxMode ?? state.sandboxMode,
         aisleContainments: data.aisleContainments ?? state.aisleContainments,
+        customRowMode: data.customRowMode ?? false,
+        customLayout: data.customLayout ?? null,
         stockPrice: data.stockPrice ?? state.stockPrice,
         stockHistory: data.stockHistory ?? state.stockHistory,
         valuationMilestonesReached: data.valuationMilestonesReached ?? state.valuationMilestonesReached,
@@ -3820,6 +4005,9 @@ export const useGameStore = create<GameState>((set) => ({
       workloadRevenue: 0,
       advancedTier: null,
       customRowMode: false,
+      customLayout: null,
+      rowPlacementMode: false,
+      rowPlacementFacing: 'south' as CabinetFacing,
       rackDetails: {},
       audioSettings: { ...DEFAULT_AUDIO_SETTINGS },
       pendingFloatingTexts: [],
@@ -4535,7 +4723,7 @@ export const useGameStore = create<GameState>((set) => ({
       }
 
       // ── Infrastructure layout effects ──────────────────────
-      const currentAisleBonus = calcAisleBonus(state.cabinets, state.suiteTier, state.aisleContainments)
+      const currentAisleBonus = calcAisleBonus(state.cabinets, state.suiteTier, state.aisleContainments, state.customLayout ?? undefined)
       const currentAisleViolations = countAisleViolations()
       const currentZones = calcZones(state.cabinets)
 

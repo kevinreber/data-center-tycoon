@@ -76,7 +76,7 @@ export function generateLayout(numRows: number, cols: number): DataCenterLayout 
         // Both backs face the aisle
         aisleType = 'hot'
       }
-      aisles.push({ id: i, gridRow, type: aisleType, betweenRows: [i, i + 1] })
+      aisles.push({ id: i, gridRow, type: aisleType, betweenRows: [i, i + 1], width: 1 })
       gridRow++
     }
   }
@@ -85,6 +85,64 @@ export function generateLayout(numRows: number, cols: number): DataCenterLayout 
   const totalGridRows = gridRow + 1
 
   return { cabinetRows, aisles, totalGridRows, corridorTop, corridorBottom }
+}
+
+// ── Floor Plan Config (Custom Row Mode) ─────────────────────────
+
+/** Floor plan dimensions for custom row mode — larger grids give players room to space rows */
+export const FLOOR_PLAN_CONFIG: Record<SuiteTier, { totalGridRows: number; maxCabinetRows: number }> = {
+  starter:      { totalGridRows: 9,  maxCabinetRows: 2 },
+  standard:     { totalGridRows: 11, maxCabinetRows: 3 },
+  professional: { totalGridRows: 13, maxCabinetRows: 4 },
+  enterprise:   { totalGridRows: 15, maxCabinetRows: 5 },
+}
+
+/** Wider aisles give extra cooling bonus per additional row of width beyond 1 */
+export const WIDE_AISLE_COOLING_BONUS = 0.03
+
+/** Minimum gap (in grid rows) between any two cabinet rows — fire code */
+export const MIN_ROW_GAP = 1
+
+/** Build a complete DataCenterLayout from player-placed cabinet rows */
+export function buildLayoutFromRows(
+  placedRows: DataCenterRow[],
+  floorPlanTotalRows: number,
+): DataCenterLayout {
+  const sorted = [...placedRows].sort((a, b) => a.gridRow - b.gridRow)
+  const aisles: Aisle[] = []
+
+  // Detect aisles between adjacent cabinet row pairs
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const current = sorted[i]
+    const next = sorted[i + 1]
+    const gapStart = current.gridRow + 1
+    const gapWidth = next.gridRow - current.gridRow - 1
+
+    if (gapWidth > 0) {
+      // Determine aisle type from facing of adjacent rows
+      let aisleType: AisleType = 'neutral'
+      if (current.facing === 'south' && next.facing === 'north') {
+        aisleType = 'cold'
+      } else if (current.facing === 'north' && next.facing === 'south') {
+        aisleType = 'hot'
+      }
+      aisles.push({
+        id: i,
+        gridRow: gapStart,
+        type: aisleType,
+        betweenRows: [current.id, next.id],
+        width: gapWidth,
+      })
+    }
+  }
+
+  return {
+    cabinetRows: sorted,
+    aisles,
+    totalGridRows: floorPlanTotalRows,
+    corridorTop: 0,
+    corridorBottom: floorPlanTotalRows - 1,
+  }
 }
 
 // ── Aisle Containment Config ────────────────────────────────────
