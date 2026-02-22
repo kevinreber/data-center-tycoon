@@ -3558,28 +3558,50 @@ describe('Guided Tutorial System', () => {
       expect(getState().tutorialCompleted).toBe(false)
       expect(getState().tutorialEnabled).toBe(true)
       expect(getState().seenTips).toEqual([])
+      expect(getState().tutorialPanelsOpened).toEqual([])
+    })
+  })
+
+  describe('trackPanelOpen', () => {
+    it('tracks unique panel opens', () => {
+      getState().trackPanelOpen('finance')
+      getState().trackPanelOpen('operations')
+      getState().trackPanelOpen('finance') // duplicate
+      expect(getState().tutorialPanelsOpened).toEqual(['finance', 'operations'])
     })
   })
 
   describe('step completion in tick', () => {
-    it('advances has_cabinet step when cabinet is placed', () => {
+    it('auto-advances "always" orientation step on first tick', () => {
       setState({ sandboxMode: true, suiteTier: 'standard' })
       getState().startTutorial()
       expect(getState().tutorialStepIndex).toBe(0)
-      expect(TUTORIAL_STEPS[0].completionCheck).toBe('has_cabinet')
+      expect(TUTORIAL_STEPS[0].completionCheck).toBe('always')
+
+      getState().tick()
+      // "always" step should auto-advance
+      expect(getState().tutorialStepIndex).toBeGreaterThan(0)
+    })
+
+    it('advances has_cabinet step when cabinet is placed', () => {
+      setState({ sandboxMode: true, suiteTier: 'standard' })
+      getState().startTutorial()
+      // Advance past the "always" orientation step
+      getState().tick()
+      const stepBeforeCabinet = getState().tutorialStepIndex
+      expect(TUTORIAL_STEPS[stepBeforeCabinet].completionCheck).toBe('has_cabinet')
 
       // Place a cabinet
       getState().addCabinet(0, STD_ROW_0, 'production', 'general', 'north')
-      // Run a tick to trigger step advancement
       getState().tick()
-      expect(getState().tutorialStepIndex).toBeGreaterThan(0)
+      expect(getState().tutorialStepIndex).toBeGreaterThan(stepBeforeCabinet)
     })
 
     it('advances through multiple steps when conditions are met', () => {
       setState({ sandboxMode: true, suiteTier: 'standard' })
       getState().startTutorial()
 
-      // Set up cabinet + server + leaf + spine (satisfies steps 0-3)
+      // Set up cabinet + server + leaf + spine (satisfies early build steps)
       getState().addCabinet(0, STD_ROW_0, 'production', 'general', 'north')
       getState().upgradeNextCabinet()
       getState().addLeafToNextCabinet()
@@ -3587,8 +3609,44 @@ describe('Guided Tutorial System', () => {
 
       // Multiple ticks should advance through completed steps
       for (let i = 0; i < 5; i++) getState().tick()
-      // Should be past the first 4 steps at minimum
-      expect(getState().tutorialStepIndex).toBeGreaterThanOrEqual(4)
+      // Should be past orientation + build + server + leaf + spine + unpause = at least step 6
+      expect(getState().tutorialStepIndex).toBeGreaterThanOrEqual(5)
+    })
+
+    it('advances panel-based steps when panels are opened', () => {
+      setState({ sandboxMode: true, suiteTier: 'standard' })
+      getState().startTutorial()
+
+      // Build a full setup to get past build/network steps
+      getState().addCabinet(0, STD_ROW_0, 'production', 'general', 'north')
+      getState().upgradeNextCabinet()
+      getState().addLeafToNextCabinet()
+      getState().addSpineSwitch()
+      // Add a second equipped cabinet for the scale-up step
+      getState().addCabinet(1, STD_ROW_0, 'production', 'general', 'north')
+      getState().upgradeNextCabinet()
+
+      // Run ticks to advance through build/network/unpause/heat steps
+      // (game is running since speed defaults to 1 after startTutorial via gameSpeed)
+      setState({ gameSpeed: 1, money: 60000 })
+      for (let i = 0; i < 10; i++) getState().tick()
+
+      // Now track panel opens for panel-based steps
+      getState().trackPanelOpen('finance')
+      getState().tick()
+      getState().trackPanelOpen('operations')
+      getState().tick()
+      getState().trackPanelOpen('contracts')
+      getState().tick()
+
+      // Track 3 exploration panels
+      getState().trackPanelOpen('research')
+      getState().trackPanelOpen('infrastructure')
+      getState().trackPanelOpen('facility')
+      getState().tick()
+
+      // Should have progressed significantly
+      expect(getState().tutorialStepIndex).toBeGreaterThanOrEqual(10)
     })
   })
 

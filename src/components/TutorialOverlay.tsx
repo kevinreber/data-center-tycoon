@@ -1,6 +1,6 @@
 import { useGameStore, TUTORIAL_STEPS } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
-import { X, ChevronRight, BookOpen, Lightbulb } from 'lucide-react'
+import { X, ChevronRight, BookOpen, Lightbulb, Monitor } from 'lucide-react'
 
 export function TutorialOverlay() {
   const tutorialEnabled = useGameStore((s) => s.tutorialEnabled)
@@ -20,11 +20,10 @@ export function TutorialOverlay() {
     const currentStep = TUTORIAL_STEPS[tutorialStepIndex]
     if (!currentStep) return null
 
-    // Auto-advance the final "always" step after rendering it briefly
     const isFinalStep = currentStep.completionCheck === 'always'
 
     return (
-      <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-40 w-full max-w-md px-4">
+      <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-40 w-full max-w-lg px-4">
         <div className="rounded-lg border border-neon-green/30 bg-card/95 backdrop-blur-sm p-4 shadow-lg glow-green">
           {/* Header */}
           <div className="flex items-center justify-between mb-2">
@@ -45,8 +44,8 @@ export function TutorialOverlay() {
             </Button>
           </div>
 
-          {/* Progress dots */}
-          <div className="flex gap-1 mb-3">
+          {/* Progress bar */}
+          <div className="flex gap-0.5 mb-3">
             {TUTORIAL_STEPS.map((_, i) => (
               <div
                 key={i}
@@ -61,22 +60,37 @@ export function TutorialOverlay() {
             ))}
           </div>
 
+          {/* Title */}
+          <p className="text-[10px] font-mono font-bold text-neon-cyan tracking-wider mb-1">
+            {currentStep.title}
+          </p>
+
           {/* Objective */}
           <p className="text-sm font-mono font-bold text-foreground mb-1">
             {currentStep.objective}
           </p>
 
           {/* Description */}
-          <p className="text-xs font-mono text-muted-foreground mb-3">
+          <p className="text-xs font-mono text-muted-foreground mb-2">
             {currentStep.description}
           </p>
 
-          {/* Hint panel reference */}
+          {/* UI hint */}
+          {currentStep.uiHint && (
+            <div className="flex items-start gap-1.5 rounded border border-neon-yellow/15 bg-neon-yellow/5 p-2 mb-2">
+              <Monitor className="size-3 text-neon-yellow shrink-0 mt-0.5" />
+              <p className="text-[10px] font-mono text-neon-yellow/80">
+                {currentStep.uiHint}
+              </p>
+            </div>
+          )}
+
+          {/* Panel hint */}
           {currentStep.highlightPanel && (
             <div className="flex items-center gap-1.5 text-[10px] font-mono text-neon-cyan">
               <ChevronRight className="size-3" />
               <span>
-                Open the <strong className="uppercase">{currentStep.highlightPanel}</strong> panel in the sidebar
+                Open the <strong className="uppercase">{currentStep.highlightPanel}</strong> panel in the left sidebar
               </span>
             </div>
           )}

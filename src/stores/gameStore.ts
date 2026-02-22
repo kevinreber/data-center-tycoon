@@ -421,6 +421,7 @@ interface GameState {
   showWelcomeModal: boolean
   tutorialStepIndex: number
   tutorialCompleted: boolean
+  tutorialPanelsOpened: string[]
 
   // Phase 4B — Carbon & Environmental
   energySource: EnergySource
@@ -671,6 +672,7 @@ interface GameState {
   skipTutorial: () => void
   advanceTutorialStep: () => void
   restartTutorial: () => void
+  trackPanelOpen: (panelId: string) => void
   // Demo
   loadDemoState: () => void
   exitDemo: () => void
@@ -975,6 +977,7 @@ export const useGameStore = create<GameState>((set) => ({
   showWelcomeModal: true,
   tutorialStepIndex: -1,
   tutorialCompleted: false,
+  tutorialPanelsOpened: [],
 
   // Phase 4B — Carbon & Environmental
   energySource: 'grid_mixed' as EnergySource,
@@ -2905,7 +2908,13 @@ export const useGameStore = create<GameState>((set) => ({
     }),
 
   restartTutorial: () =>
-    set({ showWelcomeModal: true, tutorialEnabled: true, tutorialStepIndex: -1, tutorialCompleted: false, seenTips: [], activeTip: null }),
+    set({ showWelcomeModal: true, tutorialEnabled: true, tutorialStepIndex: -1, tutorialCompleted: false, seenTips: [], activeTip: null, tutorialPanelsOpened: [] }),
+
+  trackPanelOpen: (panelId: string) =>
+    set((state) => {
+      if (state.tutorialPanelsOpened.includes(panelId)) return state
+      return { tutorialPanelsOpened: [...state.tutorialPanelsOpened, panelId] }
+    }),
 
   // ── Demo Mode ─────────────────────────────────────────────────
 
@@ -3283,6 +3292,7 @@ export const useGameStore = create<GameState>((set) => ({
       showWelcomeModal: false,
       tutorialStepIndex: -1,
       tutorialCompleted: true,
+      tutorialPanelsOpened: [],
       // Misc
       sandboxMode: false,
       fireActive: false,
@@ -3823,6 +3833,7 @@ export const useGameStore = create<GameState>((set) => ({
       showWelcomeModal: true,
       tutorialStepIndex: -1,
       tutorialCompleted: false,
+      tutorialPanelsOpened: [],
       activeSlotId: null,
       // Operations Progression
       opsTier: 'manual' as OpsTier,
@@ -4538,6 +4549,26 @@ export const useGameStore = create<GameState>((set) => ({
           }
         }
 
+        // Tutorial step advancement (also needed in early return path)
+        let earlyTutorialStepIndex = state.tutorialStepIndex
+        let earlyTutorialCompleted = state.tutorialCompleted
+        if (state.tutorialEnabled && earlyTutorialStepIndex >= 0 && !earlyTutorialCompleted) {
+          const currentStep = TUTORIAL_STEPS[earlyTutorialStepIndex]
+          if (currentStep) {
+            let stepDone = false
+            switch (currentStep.completionCheck) {
+              case 'game_unpaused': stepDone = state.gameSpeed > 0; break
+              case 'always': stepDone = true; break
+            }
+            if (stepDone) {
+              earlyTutorialStepIndex = earlyTutorialStepIndex + 1
+              if (earlyTutorialStepIndex >= TUTORIAL_STEPS.length) {
+                earlyTutorialCompleted = true
+              }
+            }
+          }
+        }
+
         return {
           tickCount: newTickCount,
           gameHour: newHour,
@@ -4571,6 +4602,9 @@ export const useGameStore = create<GameState>((set) => ({
           interSiteLinks: earlyUpdatedLinks,
           interSiteLinkCost: +earlyLinkCost.toFixed(2),
           edgePopCDNRevenue: +earlyEdgePopCDNRevenue.toFixed(2),
+          // Tutorial
+          tutorialStepIndex: earlyTutorialStepIndex,
+          tutorialCompleted: earlyTutorialCompleted,
         }
       }
 
@@ -5962,14 +5996,25 @@ export const useGameStore = create<GameState>((set) => ({
         const currentStep = TUTORIAL_STEPS[tutorialStepIndex]
         if (currentStep) {
           let stepDone = false
+          const panelsOpened = state.tutorialPanelsOpened
           switch (currentStep.completionCheck) {
             case 'has_cabinet': stepDone = newCabinets.length > 0; break
             case 'has_server': stepDone = newCabinets.some((c) => c.serverCount > 0); break
             case 'has_leaf': stepDone = newCabinets.some((c) => c.hasLeafSwitch); break
             case 'has_spine': stepDone = spineSwitches.length > 0; break
             case 'game_unpaused': stepDone = state.gameSpeed > 0; break
+            case 'earned_revenue': stepDone = state.money > 50000; break
             case 'heat_rising': stepDone = stats.avgHeat > SIM.ambientTemp + 2; break
             case 'has_two_equipped_cabinets': stepDone = newCabinets.filter((c) => c.serverCount > 0).length >= 2; break
+            case 'opened_finance': stepDone = panelsOpened.includes('finance'); break
+            case 'opened_operations': stepDone = panelsOpened.includes('operations'); break
+            case 'opened_contracts': stepDone = panelsOpened.includes('contracts'); break
+            case 'explored_panels': {
+              // Exclude panels already required by earlier steps and the core build/equipment
+              const explorationPanels = panelsOpened.filter((p) => !['build', 'equipment', 'finance', 'operations', 'contracts'].includes(p))
+              stepDone = explorationPanels.length >= 3
+              break
+            }
             case 'always': stepDone = true; break
           }
           if (stepDone) {

@@ -799,6 +799,7 @@ export interface TutorialStep {
   description: string
   highlightPanel?: string
   completionCheck: string
+  uiHint?: string
 }
 
 // ── Cooling Unit & Chiller Types ───────────────────────────────
