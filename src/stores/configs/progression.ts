@@ -1,4 +1,4 @@
-import type { TechBranch, TechDef, OpsTierConfig, OpsTier, ReputationTier, ContractDef, ContractTier, ComplianceCertId, AchievementDef, IncidentDef, ScenarioDef, TutorialTip, ZoneRequirement } from '../types'
+import type { TechBranch, TechDef, OpsTierConfig, OpsTier, ReputationTier, ContractDef, ContractTier, ComplianceCertId, AchievementDef, IncidentDef, ScenarioDef, TutorialTip, TutorialStep, ZoneRequirement } from '../types'
 
 // ── Tech Tree ──────────────────────────────────────────────────
 
@@ -425,4 +425,71 @@ export const TUTORIAL_TIPS: TutorialTip[] = [
   { id: 'sovereignty_hint', title: 'Data Sovereignty', message: 'Some regions have data sovereignty laws (GDPR, LGPD). Contracts requiring local data residency pay premium rates but need a site in the right region.', category: 'contracts' },
   { id: 'staff_transfer_hint', title: 'Staff Transfers', message: 'Transfer staff between sites to fill critical gaps. Cross-continent transfers take longer but let you leverage experienced engineers globally.', category: 'incidents' },
   { id: 'demand_growth_hint', title: 'Market Dynamics', message: 'Regional demand changes over time! Emerging markets grow fast while saturated markets slow down. Expand early into high-growth regions for maximum returns.', category: 'market' },
+]
+
+// ── Guided Tutorial Steps ───────────────────────────────────────
+
+export const TUTORIAL_STEPS: TutorialStep[] = [
+  {
+    id: 'build_cabinet',
+    title: 'Build Your First Cabinet',
+    objective: 'Place a cabinet on the data center floor',
+    description: 'Cabinets (racks) are the foundation of your data center. Open the Build panel on the left sidebar, then click a tile on the grid to place your first cabinet.',
+    highlightPanel: 'build',
+    completionCheck: 'has_cabinet',
+  },
+  {
+    id: 'add_server',
+    title: 'Install a Server',
+    objective: 'Add a server to your cabinet',
+    description: 'Servers generate revenue by running compute workloads. Open the Equipment panel and click "Add Server" to install one in your cabinet. Each cabinet holds up to 4 servers.',
+    highlightPanel: 'equipment',
+    completionCheck: 'has_server',
+  },
+  {
+    id: 'add_leaf',
+    title: 'Connect to the Network',
+    objective: 'Install a leaf switch in your cabinet',
+    description: 'A leaf switch (top-of-rack switch) connects your servers to the network fabric. Without one, your cabinet is offline! Add a leaf switch from the Equipment panel.',
+    highlightPanel: 'equipment',
+    completionCheck: 'has_leaf',
+  },
+  {
+    id: 'add_spine',
+    title: 'Build the Backbone',
+    objective: 'Add a spine switch to complete the network',
+    description: 'Spine switches form the backbone of your network. Every leaf switch connects to every spine — this is called a Clos (spine-leaf) fabric. Add one from the Equipment panel.',
+    highlightPanel: 'equipment',
+    completionCheck: 'has_spine',
+  },
+  {
+    id: 'unpause',
+    title: 'Watch the Money Flow',
+    objective: 'Unpause the game to start earning revenue',
+    description: 'Your data center is ready to go! Hit the play button in the top bar to unpause the simulation. Watch your servers earn $12/tick in revenue.',
+    completionCheck: 'game_unpaused',
+  },
+  {
+    id: 'monitor_heat',
+    title: 'Keep Your Cool',
+    objective: 'Let the simulation run and observe temperatures',
+    description: 'Servers generate heat. If a cabinet exceeds 80\u00B0C, servers throttle to 50% revenue. Above 95\u00B0C, fires can break out! Keep an eye on the temperature in the top status bar.',
+    completionCheck: 'heat_rising',
+  },
+  {
+    id: 'second_cabinet',
+    title: 'Scale Up',
+    objective: 'Build a second cabinet with at least one server',
+    description: 'Time to grow! Place another cabinet and add servers to increase your revenue. Try placing it in the same row or adjacent to form an aisle pair for a cooling bonus.',
+    highlightPanel: 'build',
+    completionCheck: 'has_two_equipped_cabinets',
+  },
+  {
+    id: 'tutorial_complete',
+    title: 'You\'re Ready!',
+    objective: 'Tutorial complete — explore on your own!',
+    description: 'You\'ve learned the basics: cabinets, servers, networking, and cooling. From here you can upgrade your facility, take contracts, hire staff, research tech, and much more. Check the Guide panel for advanced tips!',
+    highlightPanel: 'guide',
+    completionCheck: 'always',
+  },
 ]

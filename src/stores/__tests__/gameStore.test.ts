@@ -20,6 +20,7 @@ import {
   SERVER_CONFIG_OPTIONS,
   SPOT_COMPUTE_CONFIG,
   TUTORIAL_TIPS,
+  TUTORIAL_STEPS,
   INCIDENT_CATALOG,
   SUITE_TIERS,
   OPS_TIER_CONFIG,
@@ -3486,6 +3487,120 @@ describe('Regional Incidents & Disaster Preparedness', () => {
       expect(getState().staffTransfersCompleted).toBe(0)
       expect(getState().competitorRegionalPresence).toHaveLength(0)
       expect(getState().demandGrowthMultipliers).toEqual({})
+    })
+  })
+})
+
+// ============================================================================
+// Guided Tutorial System
+// ============================================================================
+
+describe('Guided Tutorial System', () => {
+  describe('Welcome modal', () => {
+    it('shows welcome modal on fresh game', () => {
+      expect(getState().showWelcomeModal).toBe(true)
+      expect(getState().tutorialStepIndex).toBe(-1)
+      expect(getState().tutorialCompleted).toBe(false)
+    })
+
+    it('hides welcome modal after resetGame', () => {
+      getState().skipTutorial()
+      expect(getState().showWelcomeModal).toBe(false)
+      getState().resetGame()
+      expect(getState().showWelcomeModal).toBe(true)
+    })
+  })
+
+  describe('startTutorial', () => {
+    it('starts the guided tutorial from step 0', () => {
+      getState().startTutorial()
+      expect(getState().showWelcomeModal).toBe(false)
+      expect(getState().tutorialEnabled).toBe(true)
+      expect(getState().tutorialStepIndex).toBe(0)
+      expect(getState().tutorialCompleted).toBe(false)
+    })
+  })
+
+  describe('skipTutorial', () => {
+    it('hides modal and disables tutorial', () => {
+      getState().skipTutorial()
+      expect(getState().showWelcomeModal).toBe(false)
+      expect(getState().tutorialEnabled).toBe(false)
+      expect(getState().tutorialStepIndex).toBe(-1)
+    })
+  })
+
+  describe('advanceTutorialStep', () => {
+    it('advances to the next step', () => {
+      getState().startTutorial()
+      expect(getState().tutorialStepIndex).toBe(0)
+      getState().advanceTutorialStep()
+      expect(getState().tutorialStepIndex).toBe(1)
+      expect(getState().tutorialCompleted).toBe(false)
+    })
+
+    it('marks tutorial completed at the end', () => {
+      getState().startTutorial()
+      for (let i = 0; i < TUTORIAL_STEPS.length; i++) {
+        getState().advanceTutorialStep()
+      }
+      expect(getState().tutorialCompleted).toBe(true)
+    })
+  })
+
+  describe('restartTutorial', () => {
+    it('resets to welcome modal state', () => {
+      getState().startTutorial()
+      getState().advanceTutorialStep()
+      getState().restartTutorial()
+      expect(getState().showWelcomeModal).toBe(true)
+      expect(getState().tutorialStepIndex).toBe(-1)
+      expect(getState().tutorialCompleted).toBe(false)
+      expect(getState().tutorialEnabled).toBe(true)
+      expect(getState().seenTips).toEqual([])
+    })
+  })
+
+  describe('step completion in tick', () => {
+    it('advances has_cabinet step when cabinet is placed', () => {
+      setState({ sandboxMode: true, suiteTier: 'standard' })
+      getState().startTutorial()
+      expect(getState().tutorialStepIndex).toBe(0)
+      expect(TUTORIAL_STEPS[0].completionCheck).toBe('has_cabinet')
+
+      // Place a cabinet
+      getState().addCabinet(0, STD_ROW_0, 'production', 'general', 'north')
+      // Run a tick to trigger step advancement
+      getState().tick()
+      expect(getState().tutorialStepIndex).toBeGreaterThan(0)
+    })
+
+    it('advances through multiple steps when conditions are met', () => {
+      setState({ sandboxMode: true, suiteTier: 'standard' })
+      getState().startTutorial()
+
+      // Set up cabinet + server + leaf + spine (satisfies steps 0-3)
+      getState().addCabinet(0, STD_ROW_0, 'production', 'general', 'north')
+      getState().upgradeNextCabinet()
+      getState().addLeafToNextCabinet()
+      getState().addSpineSwitch()
+
+      // Multiple ticks should advance through completed steps
+      for (let i = 0; i < 5; i++) getState().tick()
+      // Should be past the first 4 steps at minimum
+      expect(getState().tutorialStepIndex).toBeGreaterThanOrEqual(4)
+    })
+  })
+
+  describe('save/load preserves tutorial state', () => {
+    it('loadGame suppresses welcome modal', () => {
+      setState({ sandboxMode: true, suiteTier: 'standard' })
+      getState().startTutorial()
+      getState().saveGame(1, 'Test Save')
+      getState().resetGame()
+      expect(getState().showWelcomeModal).toBe(true)
+      getState().loadGame(1)
+      expect(getState().showWelcomeModal).toBe(false)
     })
   })
 })

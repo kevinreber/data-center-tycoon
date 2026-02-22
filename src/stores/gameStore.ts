@@ -83,8 +83,8 @@ import { CUSTOMER_TYPE_CONFIG, GENERATOR_OPTIONS, SUPPRESSION_CONFIG, COOLING_CO
 export { PDU_OPTIONS, CABLE_TRAY_OPTIONS, AISLE_CONFIG, AISLE_CONTAINMENT_CONFIG, SPACING_CONFIG, generateLayout, SUITE_TIERS, SUITE_TIER_ORDER, BUSWAY_OPTIONS, CROSSCONNECT_OPTIONS, INROW_COOLING_OPTIONS, NOISE_CONFIG, POWER_REDUNDANCY_CONFIG, ZONE_BONUS_CONFIG, MIXED_ENV_PENALTY_CONFIG, DEDICATED_ROW_BONUS_CONFIG } from './configs/infrastructure'
 import { PDU_OPTIONS, CABLE_TRAY_OPTIONS, AISLE_CONFIG, AISLE_CONTAINMENT_CONFIG, SPACING_CONFIG, SUITE_TIERS, SUITE_TIER_ORDER, BUSWAY_OPTIONS, CROSSCONNECT_OPTIONS, INROW_COOLING_OPTIONS, NOISE_CONFIG, POWER_REDUNDANCY_CONFIG, ZONE_BONUS_CONFIG, MIXED_ENV_PENALTY_CONFIG, DEDICATED_ROW_BONUS_CONFIG } from './configs/infrastructure'
 
-export { TECH_TREE, TECH_BRANCH_COLORS, OPS_TIER_CONFIG, OPS_TIER_ORDER, REPUTATION_TIERS, CONTRACT_CATALOG, CONTRACT_TIER_COLORS, CONTRACT_OFFER_INTERVAL, MAX_ACTIVE_CONTRACTS, CONTRACT_OFFER_COUNT, COMPLIANCE_CONTRACT_CATALOG, COMPLIANCE_CONTRACT_REQUIREMENTS, ZONE_CONTRACT_CATALOG, ZONE_CONTRACT_REQUIREMENTS, ACHIEVEMENT_CATALOG, INCIDENT_CATALOG, INCIDENT_CHANCE, MAX_ACTIVE_INCIDENTS, SCENARIO_CATALOG, TUTORIAL_TIPS } from './configs/progression'
-import { TECH_TREE, OPS_TIER_CONFIG, OPS_TIER_ORDER, CONTRACT_CATALOG, CONTRACT_OFFER_INTERVAL, MAX_ACTIVE_CONTRACTS, CONTRACT_OFFER_COUNT, COMPLIANCE_CONTRACT_REQUIREMENTS, ZONE_CONTRACT_CATALOG, ZONE_CONTRACT_REQUIREMENTS, ACHIEVEMENT_CATALOG, INCIDENT_CATALOG, INCIDENT_CHANCE, MAX_ACTIVE_INCIDENTS, SCENARIO_CATALOG, TUTORIAL_TIPS } from './configs/progression'
+export { TECH_TREE, TECH_BRANCH_COLORS, OPS_TIER_CONFIG, OPS_TIER_ORDER, REPUTATION_TIERS, CONTRACT_CATALOG, CONTRACT_TIER_COLORS, CONTRACT_OFFER_INTERVAL, MAX_ACTIVE_CONTRACTS, CONTRACT_OFFER_COUNT, COMPLIANCE_CONTRACT_CATALOG, COMPLIANCE_CONTRACT_REQUIREMENTS, ZONE_CONTRACT_CATALOG, ZONE_CONTRACT_REQUIREMENTS, ACHIEVEMENT_CATALOG, INCIDENT_CATALOG, INCIDENT_CHANCE, MAX_ACTIVE_INCIDENTS, SCENARIO_CATALOG, TUTORIAL_TIPS, TUTORIAL_STEPS } from './configs/progression'
+import { TECH_TREE, OPS_TIER_CONFIG, OPS_TIER_ORDER, CONTRACT_CATALOG, CONTRACT_OFFER_INTERVAL, MAX_ACTIVE_CONTRACTS, CONTRACT_OFFER_COUNT, COMPLIANCE_CONTRACT_REQUIREMENTS, ZONE_CONTRACT_CATALOG, ZONE_CONTRACT_REQUIREMENTS, ACHIEVEMENT_CATALOG, INCIDENT_CATALOG, INCIDENT_CHANCE, MAX_ACTIVE_INCIDENTS, SCENARIO_CATALOG, TUTORIAL_TIPS, TUTORIAL_STEPS } from './configs/progression'
 
 export { LOAN_OPTIONS, POWER_MARKET, DEPRECIATION, INSURANCE_OPTIONS, DRILL_CONFIG, VALUATION_MILESTONES, PATENT_CONFIG, RFP_CONFIG, SPOT_COMPUTE_CONFIG, MAINTENANCE_CONFIG, PEERING_OPTIONS, INTERCONNECT_PORT_CONFIG, MEETME_ROOM_CONFIG, INTERCONNECT_TENANTS, SUPPLY_CHAIN_CONFIG, SEASON_CONFIG, WEATHER_CONDITION_CONFIG, STAFF_ROLE_CONFIG, STAFF_CERT_CONFIG, SHIFT_PATTERN_CONFIG, MAX_STAFF_BY_TIER, FIRST_NAMES, LAST_NAMES, generateStaffName } from './configs/economy'
 import { LOAN_OPTIONS, POWER_MARKET, DEPRECIATION, INSURANCE_OPTIONS, DRILL_CONFIG, VALUATION_MILESTONES, PATENT_CONFIG, RFP_CONFIG, SPOT_COMPUTE_CONFIG, MAINTENANCE_CONFIG, PEERING_OPTIONS, INTERCONNECT_PORT_CONFIG, MEETME_ROOM_CONFIG, INTERCONNECT_TENANTS, SUPPLY_CHAIN_CONFIG, SEASON_CONFIG, WEATHER_CONDITION_CONFIG, STAFF_ROLE_CONFIG, STAFF_CERT_CONFIG, SHIFT_PATTERN_CONFIG, MAX_STAFF_BY_TIER, generateStaffName } from './configs/economy'
@@ -418,6 +418,9 @@ interface GameState {
   seenTips: string[]
   activeTip: TutorialTip | null
   tutorialEnabled: boolean
+  showWelcomeModal: boolean
+  tutorialStepIndex: number
+  tutorialCompleted: boolean
 
   // Phase 4B — Carbon & Environmental
   energySource: EnergySource
@@ -664,6 +667,10 @@ interface GameState {
   // Tutorial actions
   dismissTip: (tipId: string) => void
   toggleTutorial: () => void
+  startTutorial: () => void
+  skipTutorial: () => void
+  advanceTutorialStep: () => void
+  restartTutorial: () => void
   // Demo
   loadDemoState: () => void
   exitDemo: () => void
@@ -965,6 +972,9 @@ export const useGameStore = create<GameState>((set) => ({
   seenTips: [],
   activeTip: null,
   tutorialEnabled: true,
+  showWelcomeModal: true,
+  tutorialStepIndex: -1,
+  tutorialCompleted: false,
 
   // Phase 4B — Carbon & Environmental
   energySource: 'grid_mixed' as EnergySource,
@@ -2879,6 +2889,24 @@ export const useGameStore = create<GameState>((set) => ({
   toggleTutorial: () =>
     set((state) => ({ tutorialEnabled: !state.tutorialEnabled, activeTip: null })),
 
+  startTutorial: () =>
+    set({ showWelcomeModal: false, tutorialEnabled: true, tutorialStepIndex: 0, tutorialCompleted: false }),
+
+  skipTutorial: () =>
+    set({ showWelcomeModal: false, tutorialEnabled: false, tutorialStepIndex: -1, tutorialCompleted: false }),
+
+  advanceTutorialStep: () =>
+    set((state) => {
+      const nextIndex = state.tutorialStepIndex + 1
+      if (nextIndex >= TUTORIAL_STEPS.length) {
+        return { tutorialStepIndex: nextIndex, tutorialCompleted: true }
+      }
+      return { tutorialStepIndex: nextIndex }
+    }),
+
+  restartTutorial: () =>
+    set({ showWelcomeModal: true, tutorialEnabled: true, tutorialStepIndex: -1, tutorialCompleted: false, seenTips: [], activeTip: null }),
+
   // ── Demo Mode ─────────────────────────────────────────────────
 
   loadDemoState: () => {
@@ -3252,6 +3280,9 @@ export const useGameStore = create<GameState>((set) => ({
       seenTips: ['tip_first_cabinet', 'tip_first_server', 'tip_leaf_switch', 'tip_spine', 'tip_cooling', 'tip_heat', 'tip_contracts', 'tip_staff'],
       activeTip: null,
       tutorialEnabled: true,
+      showWelcomeModal: false,
+      tutorialStepIndex: -1,
+      tutorialCompleted: true,
       // Misc
       sandboxMode: false,
       fireActive: false,
@@ -3514,6 +3545,11 @@ export const useGameStore = create<GameState>((set) => ({
         trainingQueue: state.trainingQueue,
         staffIncidentsResolved: state.staffIncidentsResolved,
         staffBurnouts: state.staffBurnouts,
+        // Tutorial
+        tutorialEnabled: state.tutorialEnabled,
+        tutorialStepIndex: state.tutorialStepIndex,
+        tutorialCompleted: state.tutorialCompleted,
+        seenTips: state.seenTips,
       }
       try {
         localStorage.setItem(SAVE_SLOT_PREFIX + slotId, JSON.stringify(saveData))
@@ -3599,6 +3635,12 @@ export const useGameStore = create<GameState>((set) => ({
         trainingQueue: data.trainingQueue ?? state.trainingQueue,
         staffIncidentsResolved: data.staffIncidentsResolved ?? state.staffIncidentsResolved,
         staffBurnouts: data.staffBurnouts ?? state.staffBurnouts,
+        // Tutorial
+        tutorialEnabled: data.tutorialEnabled ?? state.tutorialEnabled,
+        seenTips: data.seenTips ?? state.seenTips,
+        tutorialStepIndex: data.tutorialStepIndex ?? -1,
+        tutorialCompleted: data.tutorialCompleted ?? true,
+        showWelcomeModal: false,
         activeSlotId: slotId,
         hasSaved: true,
         ...calcStats(data.cabinets ?? state.cabinets, data.spineSwitches ?? state.spineSwitches),
@@ -3778,6 +3820,9 @@ export const useGameStore = create<GameState>((set) => ({
       seenTips: [],
       activeTip: null,
       tutorialEnabled: true,
+      showWelcomeModal: true,
+      tutorialStepIndex: -1,
+      tutorialCompleted: false,
       activeSlotId: null,
       // Operations Progression
       opsTier: 'manual' as OpsTier,
@@ -5910,6 +5955,32 @@ export const useGameStore = create<GameState>((set) => ({
         }
       }
 
+      // ── Guided tutorial step advancement ────────────────────────
+      let tutorialStepIndex = state.tutorialStepIndex
+      let tutorialCompleted = state.tutorialCompleted
+      if (state.tutorialEnabled && tutorialStepIndex >= 0 && !tutorialCompleted) {
+        const currentStep = TUTORIAL_STEPS[tutorialStepIndex]
+        if (currentStep) {
+          let stepDone = false
+          switch (currentStep.completionCheck) {
+            case 'has_cabinet': stepDone = newCabinets.length > 0; break
+            case 'has_server': stepDone = newCabinets.some((c) => c.serverCount > 0); break
+            case 'has_leaf': stepDone = newCabinets.some((c) => c.hasLeafSwitch); break
+            case 'has_spine': stepDone = spineSwitches.length > 0; break
+            case 'game_unpaused': stepDone = state.gameSpeed > 0; break
+            case 'heat_rising': stepDone = stats.avgHeat > SIM.ambientTemp + 2; break
+            case 'has_two_equipped_cabinets': stepDone = newCabinets.filter((c) => c.serverCount > 0).length >= 2; break
+            case 'always': stepDone = true; break
+          }
+          if (stepDone) {
+            tutorialStepIndex = tutorialStepIndex + 1
+            if (tutorialStepIndex >= TUTORIAL_STEPS.length) {
+              tutorialCompleted = true
+            }
+          }
+        }
+      }
+
       // ── Sandbox mode money ────────────────────────────────────
       const sandboxMoneyAdjust = state.sandboxMode ? 999999999 : 0
 
@@ -6456,6 +6527,8 @@ export const useGameStore = create<GameState>((set) => ({
         lifetimeStats,
         // Phase 5 — Tutorial
         activeTip,
+        tutorialStepIndex,
+        tutorialCompleted,
         // Phase 4B — Carbon & Environmental
         carbonEmissionsPerTick,
         lifetimeCarbonEmissions,

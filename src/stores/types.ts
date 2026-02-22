@@ -792,6 +792,15 @@ export interface TutorialTip {
   category: 'build' | 'cooling' | 'finance' | 'network' | 'incidents' | 'contracts' | 'carbon' | 'security' | 'market'
 }
 
+export interface TutorialStep {
+  id: string
+  title: string
+  objective: string
+  description: string
+  highlightPanel?: string
+  completionCheck: string
+}
+
 // ── Cooling Unit & Chiller Types ───────────────────────────────
 export interface CoolingUnit {
   id: string
