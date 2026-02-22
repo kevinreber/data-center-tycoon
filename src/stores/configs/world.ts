@@ -12,6 +12,14 @@ import type {
   Region,
   InterSiteLinkType,
   InterSiteLinkConfig,
+  RegionalIncidentDef,
+  DisasterPrepType,
+  DisasterPrepConfig,
+  DataSovereigntyRule,
+  MultiSiteContractDef,
+  StaffTransferConfig,
+  SovereigntyRegime,
+  RegionId,
 } from '../types'
 
 // ── Carbon & Environmental Config ───────────────────────────────────
@@ -415,3 +423,278 @@ export const MAX_LINKS_PER_SITE = 4
 
 /** Bandwidth overage cost per Gbps over capacity per tick */
 export const BANDWIDTH_OVERAGE_COST = 2
+
+// ── Phase 6C — Regional Incidents ───────────────────────────────────
+
+export const REGIONAL_INCIDENT_CATALOG: RegionalIncidentDef[] = [
+  // Earthquake — Bay Area, Tokyo
+  {
+    type: 'earthquake', label: 'Earthquake', severity: 'critical',
+    description: 'Seismic event detected! Structural damage to cabinets and power outage.',
+    durationTicks: 50, resolveCost: 25000,
+    effect: 'cabinet_destruction', effectMagnitude: 0.2,
+    regions: ['bay_area', 'tokyo', 'mumbai'],
+    riskKey: 'earthquakeRisk', baseChance: 0.003,
+    mitigatedBy: 'seismic_reinforcement', mitigationFactor: 0.6,
+  },
+  // Wildfire smoke — Bay Area
+  {
+    type: 'wildfire_smoke', label: 'Wildfire Smoke', severity: 'minor',
+    description: 'Wildfire smoke infiltrating air intakes. Increased cooling load and filter costs.',
+    durationTicks: 30, resolveCost: 4000,
+    effect: 'heat_spike', effectMagnitude: 5,
+    regions: ['bay_area'],
+    riskKey: 'heatwaveRisk', baseChance: 0.004,
+    seasonalBoost: ['summer'],
+  },
+  // Tornado — Dallas
+  {
+    type: 'tornado', label: 'Tornado', severity: 'major',
+    description: 'Tornado warning! Outdoor equipment at risk of destruction.',
+    durationTicks: 20, resolveCost: 15000,
+    effect: 'power_surge', effectMagnitude: 1.5,
+    regions: ['dallas'],
+    riskKey: 'hurricaneRisk', baseChance: 0.003,
+    seasonalBoost: ['spring', 'summer'],
+    mitigatedBy: 'hurricane_hardening', mitigationFactor: 0.5,
+  },
+  // Grid collapse — Dallas, Johannesburg
+  {
+    type: 'grid_collapse', label: 'Grid Collapse', severity: 'critical',
+    description: 'Complete power grid failure! Generators are the only option.',
+    durationTicks: 40, resolveCost: 20000,
+    effect: 'power_surge', effectMagnitude: 2.0,
+    regions: ['dallas', 'johannesburg'],
+    riskKey: 'gridInstability', baseChance: 0.002,
+  },
+  // Hurricane — Ashburn, Dallas
+  {
+    type: 'hurricane', label: 'Hurricane', severity: 'critical',
+    description: 'Major hurricane approaching! Flooding, wind damage, and extended power loss.',
+    durationTicks: 60, resolveCost: 30000,
+    effect: 'cabinet_destruction', effectMagnitude: 0.15,
+    regions: ['ashburn', 'dallas'],
+    riskKey: 'hurricaneRisk', baseChance: 0.002,
+    seasonalBoost: ['summer', 'autumn'],
+    mitigatedBy: 'hurricane_hardening', mitigationFactor: 0.6,
+  },
+  // Volcanic eruption — Nordics
+  {
+    type: 'volcanic_eruption', label: 'Volcanic Eruption', severity: 'critical',
+    description: 'Volcanic activity detected! Ash clouds halt supply chain and threaten facility.',
+    durationTicks: 80, resolveCost: 35000,
+    effect: 'supply_chain_halt', effectMagnitude: 0,
+    regions: ['nordics'],
+    riskKey: 'earthquakeRisk', baseChance: 0.0005,
+  },
+  // Submarine cable cut — Nordics, London
+  {
+    type: 'submarine_cable_cut', label: 'Submarine Cable Cut', severity: 'major',
+    description: 'Undersea cable severed! Intercontinental connectivity lost.',
+    durationTicks: 60, resolveCost: 10000,
+    effect: 'traffic_drop', effectMagnitude: 0.4,
+    regions: ['nordics', 'london', 'singapore'],
+    riskKey: 'floodRisk', baseChance: 0.001,
+  },
+  // Monsoon flooding — Singapore, Mumbai
+  {
+    type: 'monsoon_flooding', label: 'Monsoon Flooding', severity: 'major',
+    description: 'Monsoon flooding! Ground-floor equipment damaged if not elevated.',
+    durationTicks: 25, resolveCost: 12000,
+    effect: 'cooling_failure', effectMagnitude: 0.3,
+    regions: ['singapore', 'mumbai'],
+    riskKey: 'floodRisk', baseChance: 0.004,
+    seasonalBoost: ['summer', 'autumn'],
+    mitigatedBy: 'flood_barriers', mitigationFactor: 0.7,
+  },
+  // Extreme heat — Dubai, Mumbai, Dallas, Singapore
+  {
+    type: 'extreme_heat', label: 'Extreme Heat Event', severity: 'major',
+    description: 'Record temperatures! Ambient heat overwhelming cooling systems.',
+    durationTicks: 25, resolveCost: 8000,
+    effect: 'heat_spike', effectMagnitude: 12,
+    regions: ['dubai', 'mumbai', 'dallas', 'singapore'],
+    riskKey: 'heatwaveRisk', baseChance: 0.005,
+    seasonalBoost: ['summer'],
+  },
+  // Grid load shedding — Johannesburg
+  {
+    type: 'grid_load_shedding', label: 'Grid Load Shedding', severity: 'major',
+    description: 'Scheduled rolling blackouts in effect. Power intermittent for extended period.',
+    durationTicks: 15, resolveCost: 5000,
+    effect: 'power_surge', effectMagnitude: 1.4,
+    regions: ['johannesburg'],
+    riskKey: 'gridInstability', baseChance: 0.008,
+  },
+  // Thames flooding — London
+  {
+    type: 'thames_flooding', label: 'Thames Flooding', severity: 'minor',
+    description: 'Thames burst banks. Basement water ingress risk affecting power systems.',
+    durationTicks: 15, resolveCost: 6000,
+    effect: 'cooling_failure', effectMagnitude: 0.4,
+    regions: ['london'],
+    riskKey: 'floodRisk', baseChance: 0.002,
+    mitigatedBy: 'flood_barriers', mitigationFactor: 0.8,
+  },
+  // Amsterdam flood — Amsterdam
+  {
+    type: 'amsterdam_flood', label: 'Below Sea Level Flood', severity: 'critical',
+    description: 'Polder defense failure! Catastrophic flooding threatens entire facility.',
+    durationTicks: 70, resolveCost: 40000,
+    effect: 'cabinet_destruction', effectMagnitude: 0.25,
+    regions: ['amsterdam'],
+    riskKey: 'floodRisk', baseChance: 0.0005,
+    mitigatedBy: 'flood_barriers', mitigationFactor: 0.7,
+  },
+]
+
+// ── Phase 6C — Disaster Preparedness ─────────────────────────────────
+
+export const DISASTER_PREP_CONFIG: Record<DisasterPrepType, DisasterPrepConfig> = {
+  seismic_reinforcement: {
+    type: 'seismic_reinforcement',
+    label: 'Seismic Reinforcement',
+    description: 'Reinforced rack mounts, flexible conduit, and structural bracing. Reduces earthquake damage by 60%.',
+    cost: 100000,
+    mitigates: 'earthquakeRisk',
+    damageReduction: 0.6,
+    maintenanceCostPerTick: 5,
+  },
+  flood_barriers: {
+    type: 'flood_barriers',
+    label: 'Flood Barriers',
+    description: 'Deployable flood walls, sump pumps, and waterproof seals. Prevents ground-floor flooding.',
+    cost: 50000,
+    mitigates: 'floodRisk',
+    damageReduction: 0.7,
+    maintenanceCostPerTick: 3,
+  },
+  hurricane_hardening: {
+    type: 'hurricane_hardening',
+    label: 'Hurricane Hardening',
+    description: 'Impact-rated windows, reinforced roof, wind-resistant enclosures. Reduces wind/water damage.',
+    cost: 75000,
+    mitigates: 'hurricaneRisk',
+    damageReduction: 0.6,
+    maintenanceCostPerTick: 4,
+  },
+  elevated_equipment: {
+    type: 'elevated_equipment',
+    label: 'Elevated Equipment',
+    description: 'Raised power and cooling equipment above flood level. Protects critical infrastructure from water.',
+    cost: 25000,
+    mitigates: 'floodRisk',
+    damageReduction: 0.5,
+    maintenanceCostPerTick: 1,
+  },
+}
+
+/** Max regional incidents active at once per site */
+export const MAX_REGIONAL_INCIDENTS = 2
+
+// ── Phase 6D — Global Strategy Layer ─────────────────────────────────
+
+/** Data sovereignty rules — certain regions require data to stay local */
+export const DATA_SOVEREIGNTY_CONFIG: DataSovereigntyRule[] = [
+  {
+    regime: 'gdpr', label: 'GDPR (EU)', description: 'EU General Data Protection Regulation. Customer data must be stored and processed within EU regions.',
+    regions: ['london', 'amsterdam', 'frankfurt', 'nordics'],
+    revenueBonus: 0.15, nonCompliancePenalty: 0.10,
+  },
+  {
+    regime: 'lgpd', label: 'LGPD (Brazil)', description: 'Lei Geral de Proteção de Dados. Brazilian customer data must remain in-country.',
+    regions: ['sao_paulo'],
+    revenueBonus: 0.20, nonCompliancePenalty: 0.15,
+  },
+  {
+    regime: 'pdpa', label: 'PDPA (Singapore)', description: 'Personal Data Protection Act. Southeast Asian data sovereignty requirements.',
+    regions: ['singapore'],
+    revenueBonus: 0.10, nonCompliancePenalty: 0.08,
+  },
+]
+
+/** Get the sovereignty regime for a region, if any */
+export function getRegionSovereignty(regionId: RegionId): SovereigntyRegime {
+  for (const rule of DATA_SOVEREIGNTY_CONFIG) {
+    if (rule.regions.includes(regionId)) return rule.regime
+  }
+  return 'none'
+}
+
+/** Multi-site contracts requiring presence in multiple regions */
+export const MULTI_SITE_CONTRACT_CATALOG: MultiSiteContractDef[] = [
+  {
+    id: 'global_cdn', company: 'StreamVault Global', label: 'Global CDN Distribution',
+    description: 'Worldwide content delivery network requiring edge presence across 3 continents.',
+    requiredRegions: ['ashburn', 'london', 'singapore'],
+    revenuePerTick: 120, durationTicks: 500, completionBonus: 80000, penaltyPerTick: 30,
+  },
+  {
+    id: 'eu_enterprise_saas', company: 'EuroCloud AG', label: 'EU Enterprise SaaS',
+    description: 'GDPR-compliant enterprise SaaS hosting. Data must stay within EU regions.',
+    requiredRegions: ['frankfurt', 'amsterdam'],
+    sovereigntyRegime: 'gdpr',
+    revenuePerTick: 85, durationTicks: 400, completionBonus: 50000, penaltyPerTick: 25,
+  },
+  {
+    id: 'latam_streaming', company: 'VivaStream', label: 'LatAm Streaming Platform',
+    description: 'Streaming service expansion into Latin America. LGPD compliance required for São Paulo.',
+    requiredRegions: ['ashburn', 'sao_paulo'],
+    sovereigntyRegime: 'lgpd',
+    revenuePerTick: 70, durationTicks: 350, completionBonus: 35000, penaltyPerTick: 20,
+  },
+  {
+    id: 'apac_ai_cluster', company: 'DeepMind Asia', label: 'Asia-Pacific AI Training',
+    description: 'Distributed AI training across Asia-Pacific with low-latency interconnects.',
+    requiredRegions: ['tokyo', 'singapore'],
+    requiredSiteTypes: ['hyperscale', 'colocation'],
+    revenuePerTick: 150, durationTicks: 300, completionBonus: 60000, penaltyPerTick: 40,
+  },
+  {
+    id: 'global_dr', company: 'Resilience Corp', label: 'Global Disaster Recovery',
+    description: 'Worldwide DR service with cross-continent failover capability.',
+    requiredRegions: ['ashburn', 'london', 'tokyo'],
+    requiredSiteTypes: ['disaster_recovery'],
+    revenuePerTick: 100, durationTicks: 600, completionBonus: 100000, penaltyPerTick: 35,
+  },
+  {
+    id: 'transcontinental_finance', company: 'TradeFast Global', label: 'Transcontinental Finance',
+    description: 'High-frequency trading infrastructure spanning North America and Europe.',
+    requiredRegions: ['chicago', 'london', 'frankfurt'],
+    revenuePerTick: 130, durationTicks: 450, completionBonus: 70000, penaltyPerTick: 35,
+  },
+]
+
+/** Max active multi-site contracts at once */
+export const MAX_MULTI_SITE_CONTRACTS = 3
+
+/** Staff transfer configuration */
+export const STAFF_TRANSFER_CONFIG: StaffTransferConfig = {
+  baseCost: 2000,
+  sameContinentTicks: 8,
+  crossContinentTicks: 15,
+  costMultiplierPerLevel: 0.5,  // L1: 1x, L2: 1.5x, L3: 2x
+}
+
+/** Max simultaneous staff transfers */
+export const MAX_STAFF_TRANSFERS = 3
+
+/** Demand growth parameters */
+export const DEMAND_GROWTH_CONFIG = {
+  growthInterval: 50,         // ticks between demand growth updates
+  emergingGrowthRate: 0.02,   // +2% per interval for emerging markets
+  stableGrowthRate: 0.005,    // +0.5% per interval for stable markets
+  saturatedDecayRate: -0.01,  // -1% per interval for saturated markets
+  emergingThreshold: 0.4,     // demand < 0.4 = emerging
+  saturatedThreshold: 0.85,   // demand > 0.85 = saturated
+  maxDemand: 1.0,
+  minDemand: 0.1,
+}
+
+/** Competitor regional expansion config */
+export const COMPETITOR_REGIONAL_CONFIG = {
+  expansionChance: 0.005,       // chance per tick a competitor expands to a new region
+  maxRegionsPerCompetitor: 4,   // max regions a competitor can be in
+  regionalStrengthGrowth: 0.01, // strength growth per tick in a region
+  maxRegionalStrength: 0.8,     // max regional strength
+}

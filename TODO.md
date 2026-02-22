@@ -318,34 +318,34 @@ Deeper workload mechanics beyond the current traffic/server model.
 
 Expand from a single data center to a global data center empire with a world map view, location-based strategy, and inter-site networking. Full detailed design in BRAINSTORM.md Phase 6.
 
-#### Phase 6A — World Map UI + Site Selection
-- [ ] World map view (React + SVG) with neon/terminal aesthetic
-- [ ] 12-15 metro regions with distinct profiles (power cost, climate, labor, demand, disaster risk)
-- [ ] Region info panel with research mechanic (pay to reveal full profile)
-- [ ] Purchase and build first expansion site (edge PoP)
-- [ ] Site switcher to toggle floor view between sites
-- [ ] Per-site game state instances (separate cabinets, infrastructure, staff)
+#### Phase 6A — World Map UI + Site Selection ✅
+- [x] World map view (React + SVG) with neon/terminal aesthetic
+- [x] 12-15 metro regions with distinct profiles (power cost, climate, labor, demand, disaster risk)
+- [x] Region info panel with research mechanic (pay to reveal full profile)
+- [x] Purchase and build first expansion site (edge PoP)
+- [x] Site switcher to toggle floor view between sites
+- [x] Per-site game state instances (separate cabinets, infrastructure, staff)
 
-#### Phase 6B — Inter-Site Networking + Edge PoPs
-- [ ] Link types: IP transit, leased wavelength, dark fiber, submarine cable
-- [ ] Edge PoP site type with simplified management (1-4 cabinets)
-- [ ] Backhaul requirement (edge PoP → core site link)
-- [ ] Latency modeling between sites based on distance
-- [ ] CDN/content delivery revenue model for edge PoPs
+#### Phase 6B — Inter-Site Networking + Edge PoPs ✅
+- [x] Link types: IP transit, leased wavelength, dark fiber, submarine cable
+- [x] Edge PoP site type with simplified management (1-4 cabinets)
+- [x] Backhaul requirement (edge PoP → core site link)
+- [x] Latency modeling between sites based on distance
+- [x] CDN/content delivery revenue model for edge PoPs
 
-#### Phase 6C — Full Site Types + Regional Incidents
-- [ ] 5 site types: edge_pop, colocation, hyperscale, network_hub, disaster_recovery
-- [ ] Location-specific incidents (earthquakes, hurricanes, grid collapse, monsoons, volcanic eruptions)
-- [ ] Disaster preparedness investments (seismic reinforcement, flood barriers, hurricane hardening)
-- [ ] Construction time for new sites
+#### Phase 6C — Full Site Types + Regional Incidents ✅
+- [x] 5 site types: edge_pop, colocation, hyperscale, network_hub, disaster_recovery
+- [x] Location-specific incidents (earthquakes, hurricanes, grid collapse, monsoons, volcanic eruptions)
+- [x] Disaster preparedness investments (seismic reinforcement, flood barriers, hurricane hardening)
+- [x] Construction time for new sites
 
-#### Phase 6D — Global Strategy Layer
-- [ ] Customer demand heat maps on world map (by customer type)
-- [ ] Demand growth over time (emerging vs. saturated markets)
-- [ ] Multi-site contracts requiring presence in multiple regions
-- [ ] Data sovereignty mechanics (GDPR, LGPD — certain contracts require local presence)
-- [ ] Staff transfers between sites (cost + relocation time)
-- [ ] Regional competitor presence and market share per region
+#### Phase 6D — Global Strategy Layer ✅
+- [x] Customer demand heat maps on world map (by customer type) ✅
+- [x] Demand growth over time (emerging vs. saturated markets) ✅
+- [x] Multi-site contracts requiring presence in multiple regions ✅
+- [x] Data sovereignty mechanics (GDPR, LGPD — certain contracts require local presence) ✅
+- [x] Staff transfers between sites (cost + relocation time) ✅
+- [x] Regional competitor presence and market share per region ✅
 
 **Effort:** Very High | **Impact:** High — Transforms the game from facility management into global infrastructure strategy. Phased delivery: each sub-phase delivers standalone value. Gate: Enterprise tier + $500K+ cash + excellent reputation.
 

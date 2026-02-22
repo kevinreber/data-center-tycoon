@@ -1,7 +1,7 @@
-import { useGameStore, COMPETITOR_PERSONALITIES } from '@/stores/gameStore'
+import { useGameStore, COMPETITOR_PERSONALITIES, REGION_CATALOG } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { TrendingUp, Users, Swords, ShieldAlert, DollarSign } from 'lucide-react'
+import { TrendingUp, Users, Swords, ShieldAlert, DollarSign, Globe } from 'lucide-react'
 import {
   Tooltip,
   TooltipContent,
@@ -16,6 +16,7 @@ export function MarketPanel() {
     priceWarActive, priceWarTicksRemaining,
     poachTarget, counterPoachOffer, money,
     staff, reputationScore,
+    competitorRegionalPresence, multiSiteUnlocked,
   } = useGameStore()
 
   const poachStaff = staff.find((s) => s.id === poachTarget)
@@ -188,6 +189,46 @@ export function MarketPanel() {
           </div>
         )}
       </div>
+
+      {/* Regional Competitor Presence */}
+      {multiSiteUnlocked && competitorRegionalPresence.length > 0 && (
+        <div className="border-t border-border pt-3">
+          <div className="flex items-center gap-2 mb-2">
+            <Globe className="size-3 text-neon-orange" />
+            <span className="text-xs font-bold text-neon-orange">REGIONAL PRESENCE</span>
+          </div>
+          <div className="flex flex-col gap-1">
+            {competitors.map((comp) => {
+              const presence = competitorRegionalPresence.filter((p) => p.competitorId === comp.id)
+              if (presence.length === 0) return null
+              const personality = COMPETITOR_PERSONALITIES[comp.personality]
+              return (
+                <div key={comp.id} className="text-[10px] font-mono">
+                  <span className="font-bold" style={{ color: personality.color }}>{comp.name}:</span>
+                  <div className="flex flex-wrap gap-0.5 mt-0.5 ml-2">
+                    {presence.map((p) => {
+                      const regionName = REGION_CATALOG.find((r) => r.id === p.regionId)?.name.split('(')[0].trim() ?? p.regionId
+                      return (
+                        <span
+                          key={p.regionId}
+                          className="px-1 py-0 rounded border text-[8px]"
+                          style={{
+                            borderColor: `${personality.color}40`,
+                            color: personality.color,
+                            backgroundColor: `${personality.color}10`,
+                          }}
+                        >
+                          {regionName} ({(p.strength * 100).toFixed(0)}%)
+                        </span>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Active Bids */}
       {competitorBids.length > 0 && (

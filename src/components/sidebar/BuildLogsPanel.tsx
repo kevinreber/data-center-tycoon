@@ -16,6 +16,27 @@ interface VersionEntry {
 
 const CHANGELOG: VersionEntry[] = [
   {
+    version: 'v0.5.2',
+    date: 'Feb 2026',
+    title: 'The Global Strategy Update',
+    highlights: 'Regional demand dynamics, data sovereignty laws, multi-site contracts, staff transfers between sites, competitor regional expansion, and regional disaster preparedness.',
+    changes: [
+      { text: 'Regional incidents — 13 disaster types (earthquakes, hurricanes, floods, grid collapse) affecting specific regions based on risk profiles', type: 'new' },
+      { text: 'Disaster preparedness — install seismic reinforcement, flood barriers, hurricane hardening, or elevated equipment to mitigate regional disasters', type: 'new' },
+      { text: 'Demand growth dynamics — regions evolve through emerging, stable, and saturated market phases over time', type: 'new' },
+      { text: 'Data sovereignty — GDPR (EU), LGPD (Brazil), and PDPA (Singapore) rules grant revenue bonuses for compliant contracts', type: 'new' },
+      { text: 'Multi-site contracts — 6 global contracts requiring operational presence in specific regions with completion bonuses up to $100K', type: 'new' },
+      { text: 'Staff transfers — relocate staff between sites with same-continent (8 ticks) or cross-continent (15 ticks) travel time', type: 'new' },
+      { text: 'Competitor regional expansion — AI competitors expand into regions, competing for market share globally', type: 'new' },
+      { text: 'Regional competitor presence visualization in the Market panel', type: 'new' },
+      { text: '5 new achievements for global strategy milestones (Global Deal, Data Sovereign, Staff Mobility, Demand Surfer, Global Empire)', type: 'new' },
+      { text: 'In-game guide updated with demand growth, sovereignty, disaster prep, global contracts, and staff transfer sections', type: 'improved' },
+      { text: '4 new tutorial tips for multi-site contracts, sovereignty, staff transfers, and demand growth', type: 'improved' },
+      { text: 'World Map panel enhanced with demand trend indicators, sovereignty badges, and competitor presence', type: 'improved' },
+      { text: 'Contracts panel now shows global contract offers alongside standard contracts', type: 'improved' },
+    ],
+  },
+  {
     version: 'v0.5.1',
     date: 'Feb 2026',
     title: 'The Global Expansion Update',

@@ -1,5 +1,5 @@
 import { Github, Bug, GitPullRequest } from 'lucide-react'
-import { useGameStore, ENVIRONMENT_CONFIG, SIM, SPACING_CONFIG, COOLING_CONFIG, INROW_COOLING_OPTIONS, COOLING_UNIT_CONFIG, OPS_TIER_CONFIG, SERVER_CONFIG_OPTIONS, ZONE_BONUS_CONFIG, WORKLOAD_CONFIG, ADVANCED_TIER_CONFIG, SPOT_COMPUTE_CONFIG, SITE_TYPE_CONFIG, INTER_SITE_LINK_CONFIG, MAX_LINKS_PER_SITE, EDGE_POP_CDN_REVENUE_PER_GBPS } from '@/stores/gameStore'
+import { useGameStore, ENVIRONMENT_CONFIG, SIM, SPACING_CONFIG, COOLING_CONFIG, INROW_COOLING_OPTIONS, COOLING_UNIT_CONFIG, OPS_TIER_CONFIG, SERVER_CONFIG_OPTIONS, ZONE_BONUS_CONFIG, WORKLOAD_CONFIG, ADVANCED_TIER_CONFIG, SPOT_COMPUTE_CONFIG, SITE_TYPE_CONFIG, INTER_SITE_LINK_CONFIG, MAX_LINKS_PER_SITE, EDGE_POP_CDN_REVENUE_PER_GBPS, DATA_SOVEREIGNTY_CONFIG, MULTI_SITE_CONTRACT_CATALOG, STAFF_TRANSFER_CONFIG, DEMAND_GROWTH_CONFIG, DISASTER_PREP_CONFIG } from '@/stores/gameStore'
 
 const REPO_URL = 'https://github.com/kevinreber/data-center-tycoon'
 
@@ -394,6 +394,101 @@ export function GuidePanel() {
             Max {MAX_LINKS_PER_SITE} links per site.
           </p>
         </div>
+      </div>
+
+      {/* Regional incidents & disaster prep */}
+      <div className="rounded-lg border border-neon-red/20 bg-neon-red/5 p-3">
+        <p className="text-xs font-bold text-neon-red mb-2">REGIONAL INCIDENTS &amp; DISASTER PREP</p>
+        <p className="text-xs font-mono text-muted-foreground mb-2">
+          Each region faces unique natural disasters. Prepare your sites to mitigate damage and keep operations running.
+        </p>
+        <div className="space-y-1.5 mb-2">
+          {Object.values(DISASTER_PREP_CONFIG).map((prep) => (
+            <div key={prep.type} className="text-xs font-mono">
+              <strong className="text-foreground">{prep.label}</strong>
+              <span className="text-muted-foreground"> &mdash; ${prep.cost.toLocaleString()}, {Math.round(prep.damageReduction * 100)}% damage reduction, ${prep.maintenanceCostPerTick}/tick upkeep.</span>
+            </div>
+          ))}
+        </div>
+        <div className="mt-2 pt-2 border-t border-neon-red/10">
+          <p className="text-[10px] font-mono text-muted-foreground">
+            <strong className="text-foreground">Tip:</strong> Check each region&rsquo;s disaster profile before expanding. Earthquake-prone areas need seismic reinforcement; coastal regions need flood barriers.
+          </p>
+        </div>
+      </div>
+
+      {/* Demand growth & market trends */}
+      <div className="rounded-lg border border-neon-green/20 bg-neon-green/5 p-3">
+        <p className="text-xs font-bold text-neon-green mb-2">DEMAND GROWTH &amp; MARKET TRENDS</p>
+        <p className="text-xs font-mono text-muted-foreground mb-2">
+          Regional demand changes over time. Markets cycle through three phases:
+        </p>
+        <div className="space-y-1.5">
+          <div className="text-xs font-mono">
+            <strong className="text-neon-green">&#9650; Emerging</strong>
+            <span className="text-muted-foreground"> &mdash; Demand below {Math.round(DEMAND_GROWTH_CONFIG.emergingThreshold * 100)}%. Grows at +{Math.round(DEMAND_GROWTH_CONFIG.emergingGrowthRate * 100)}% every {DEMAND_GROWTH_CONFIG.growthInterval} ticks. Get in early!</span>
+          </div>
+          <div className="text-xs font-mono">
+            <strong className="text-neon-yellow">&#9679; Stable</strong>
+            <span className="text-muted-foreground"> &mdash; Demand between {Math.round(DEMAND_GROWTH_CONFIG.emergingThreshold * 100)}&ndash;{Math.round(DEMAND_GROWTH_CONFIG.saturatedThreshold * 100)}%. Grows slowly at +{Math.round(DEMAND_GROWTH_CONFIG.stableGrowthRate * 100)}%.</span>
+          </div>
+          <div className="text-xs font-mono">
+            <strong className="text-neon-red">&#9660; Saturated</strong>
+            <span className="text-muted-foreground"> &mdash; Demand above {Math.round(DEMAND_GROWTH_CONFIG.saturatedThreshold * 100)}%. Decays at {Math.round(DEMAND_GROWTH_CONFIG.saturatedDecayRate * 100)}% &mdash; consider diversifying.</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Data sovereignty */}
+      <div className="rounded-lg border border-neon-orange/20 bg-neon-orange/5 p-3">
+        <p className="text-xs font-bold text-neon-orange mb-2">DATA SOVEREIGNTY</p>
+        <p className="text-xs font-mono text-muted-foreground mb-2">
+          Some regions enforce data residency laws. Contracts tied to these regimes pay bonuses when you comply &mdash; or penalties if you don&rsquo;t.
+        </p>
+        <div className="space-y-1.5">
+          {DATA_SOVEREIGNTY_CONFIG.map((rule) => (
+            <div key={rule.regime} className="text-xs font-mono">
+              <strong className="text-foreground">{rule.label}</strong>
+              <span className="text-muted-foreground"> &mdash; {rule.description} <span className="text-neon-green">+{Math.round(rule.revenueBonus * 100)}%</span> bonus, <span className="text-neon-red">{Math.round(rule.nonCompliancePenalty * 100)}%</span> penalty.</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Multi-site contracts */}
+      <div className="rounded-lg border border-neon-yellow/20 bg-neon-yellow/5 p-3">
+        <p className="text-xs font-bold text-neon-yellow mb-2">GLOBAL CONTRACTS</p>
+        <p className="text-xs font-mono text-muted-foreground mb-2">
+          Land lucrative contracts that require operational sites in multiple regions. Found in the <span className="text-neon-cyan">CONTRACTS</span> panel.
+        </p>
+        <div className="space-y-1.5">
+          {MULTI_SITE_CONTRACT_CATALOG.map((c) => (
+            <div key={c.id} className="text-xs font-mono">
+              <strong className="text-foreground">{c.company}</strong>
+              <span className="text-muted-foreground"> &mdash; ${c.revenuePerTick}/tick for {c.durationTicks}t, ${c.completionBonus.toLocaleString()} bonus. Needs {c.requiredRegions.length} regions.{c.sovereigntyRegime ? ` ${c.sovereigntyRegime.toUpperCase()} required.` : ''}</span>
+            </div>
+          ))}
+        </div>
+        <div className="mt-2 pt-2 border-t border-neon-yellow/10">
+          <p className="text-[10px] font-mono text-muted-foreground">
+            <strong className="text-foreground">Tip:</strong> Max 3 active global contracts at once. Missing a required region triggers per-tick penalties and can terminate the contract after 20 consecutive violations.
+          </p>
+        </div>
+      </div>
+
+      {/* Staff transfers */}
+      <div className="rounded-lg border border-neon-cyan/20 bg-neon-cyan/5 p-3">
+        <p className="text-xs font-bold text-neon-cyan mb-2">STAFF TRANSFERS</p>
+        <p className="text-xs font-mono text-muted-foreground mb-2">
+          Move staff between sites to fill skill gaps. Initiate transfers from the <span className="text-neon-cyan">WORLD MAP</span> panel.
+        </p>
+        <ul className="text-xs font-mono text-muted-foreground space-y-1 list-disc list-inside">
+          <li>Base cost: <span className="text-neon-yellow">${STAFF_TRANSFER_CONFIG.baseCost.toLocaleString()}</span> per transfer (scaled by skill level)</li>
+          <li>Same continent: <span className="text-neon-green">{STAFF_TRANSFER_CONFIG.sameContinentTicks} ticks</span> travel time</li>
+          <li>Cross continent: <span className="text-neon-orange">{STAFF_TRANSFER_CONFIG.crossContinentTicks} ticks</span> travel time</li>
+          <li>Max <strong className="text-foreground">3</strong> transfers in transit simultaneously</li>
+          <li>Staff are unavailable during transfer &mdash; plan ahead!</li>
+        </ul>
       </div>
 
       <div className="rounded-lg border border-[#aa44ff]/20 bg-[#aa44ff]/5 p-3">
