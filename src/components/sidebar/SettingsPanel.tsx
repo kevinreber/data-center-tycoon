@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { useGameStore, MAX_SAVE_SLOTS, SUITE_TIERS } from '@/stores/gameStore'
+import { useGameStore, MAX_SAVE_SLOTS, SUITE_TIERS, TUTORIAL_STEPS } from '@/stores/gameStore'
 import type { SaveSlotMeta, LeaderboardCategory } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
-import { Save, Upload, RotateCw, Play, Trash2, Plus, AlertTriangle, Volume2, VolumeX, Trophy } from 'lucide-react'
+import { Save, Upload, RotateCw, Play, Trash2, Plus, AlertTriangle, Volume2, VolumeX, Trophy, BookOpen } from 'lucide-react'
 
 function formatMoney(n: number): string {
   if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`
@@ -101,6 +101,8 @@ export function SettingsPanel() {
     activeSlotId, saveSlots,
     audioSettings, setAudioSettings,
     leaderboardEntries, submitLeaderboardEntry,
+    tutorialEnabled, toggleTutorial, restartTutorial,
+    tutorialStepIndex, tutorialCompleted,
   } = useGameStore()
 
   const [feedback, setFeedback] = useState<string | null>(null)
@@ -188,6 +190,51 @@ export function SettingsPanel() {
         </Button>
         <p className="text-[10px] text-muted-foreground mt-1.5">
           Resets to a fresh game. Existing saves are kept.
+        </p>
+      </div>
+
+      {/* Tutorial */}
+      <div className="border-t border-border pt-3">
+        <div className="flex items-center gap-2 mb-2">
+          <BookOpen className="size-3 text-neon-green" />
+          <span className="text-xs font-bold text-neon-green tracking-widest">TUTORIAL</span>
+        </div>
+
+        {/* Progress */}
+        {tutorialCompleted ? (
+          <p className="text-[10px] text-muted-foreground font-mono mb-2">
+            Tutorial completed!
+          </p>
+        ) : tutorialStepIndex >= 0 ? (
+          <p className="text-[10px] text-muted-foreground font-mono mb-2">
+            Step {tutorialStepIndex + 1} of {TUTORIAL_STEPS.length}: {TUTORIAL_STEPS[tutorialStepIndex]?.title}
+          </p>
+        ) : (
+          <p className="text-[10px] text-muted-foreground font-mono mb-2">
+            Tutorial not started.
+          </p>
+        )}
+
+        <div className="flex gap-1.5">
+          <Button
+            variant={tutorialEnabled ? 'default' : 'outline'}
+            size="xs"
+            className={`text-[9px] flex-1 ${tutorialEnabled ? 'bg-neon-green/20 text-neon-green border-neon-green/30' : ''}`}
+            onClick={() => toggleTutorial()}
+          >
+            {tutorialEnabled ? 'Tutorial ON' : 'Tutorial OFF'}
+          </Button>
+          <Button
+            variant="outline"
+            size="xs"
+            className="text-[9px] flex-1"
+            onClick={() => restartTutorial()}
+          >
+            Restart Tutorial
+          </Button>
+        </div>
+        <p className="text-[10px] text-muted-foreground mt-1.5">
+          Toggle contextual tips and guided walkthrough.
         </p>
       </div>
 

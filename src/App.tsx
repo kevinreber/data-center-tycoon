@@ -4,6 +4,8 @@ import { Sidebar } from '@/components/Sidebar'
 import { LayersPopup } from '@/components/LayersPopup'
 import { CabinetDetailPanel } from '@/components/CabinetDetailPanel'
 import { StatusBar } from '@/components/StatusBar'
+import { WelcomeModal } from '@/components/WelcomeModal'
+import { TutorialOverlay } from '@/components/TutorialOverlay'
 import { useGameStore } from '@/stores/gameStore'
 import type { GameSpeed } from '@/stores/gameStore'
 import { Zap, DollarSign, Thermometer, Activity, Pause, Play, FastForward, Trophy, X, Flame, Eye, ExternalLink, Globe, ArrowLeft } from 'lucide-react'
@@ -324,6 +326,12 @@ function App() {
 
         {/* Bottom status bar */}
         <StatusBar activeNodes={activeNodes} totalNodes={totalNodes} />
+
+        {/* Welcome modal */}
+        <WelcomeModal />
+
+        {/* Tutorial step overlay */}
+        <TutorialOverlay />
 
         {/* Achievement toast */}
         {newAchievement && (

@@ -123,12 +123,14 @@ export function Sidebar() {
   const [isOpen, setIsOpen] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
   const incidentCount = useGameStore((s) => s.activeIncidents.filter((i) => !i.resolved).length)
+  const trackPanelOpen = useGameStore((s) => s.trackPanelOpen)
 
   const togglePanel = (id: PanelId) => {
     const newPanel = activePanel === id ? null : id
     setActivePanel(newPanel)
     if (newPanel) {
       setRenderedPanel(newPanel)
+      trackPanelOpen(newPanel)
       // Trigger slide-in on next frame so the CSS transition fires
       requestAnimationFrame(() => setIsOpen(true))
     } else {

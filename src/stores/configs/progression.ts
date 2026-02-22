@@ -1,4 +1,4 @@
-import type { TechBranch, TechDef, OpsTierConfig, OpsTier, ReputationTier, ContractDef, ContractTier, ComplianceCertId, AchievementDef, IncidentDef, ScenarioDef, TutorialTip, ZoneRequirement } from '../types'
+import type { TechBranch, TechDef, OpsTierConfig, OpsTier, ReputationTier, ContractDef, ContractTier, ComplianceCertId, AchievementDef, IncidentDef, ScenarioDef, TutorialTip, TutorialStep, ZoneRequirement } from '../types'
 
 // ── Tech Tree ──────────────────────────────────────────────────
 
@@ -425,4 +425,147 @@ export const TUTORIAL_TIPS: TutorialTip[] = [
   { id: 'sovereignty_hint', title: 'Data Sovereignty', message: 'Some regions have data sovereignty laws (GDPR, LGPD). Contracts requiring local data residency pay premium rates but need a site in the right region.', category: 'contracts' },
   { id: 'staff_transfer_hint', title: 'Staff Transfers', message: 'Transfer staff between sites to fill critical gaps. Cross-continent transfers take longer but let you leverage experienced engineers globally.', category: 'incidents' },
   { id: 'demand_growth_hint', title: 'Market Dynamics', message: 'Regional demand changes over time! Emerging markets grow fast while saturated markets slow down. Expand early into high-growth regions for maximum returns.', category: 'market' },
+]
+
+// ── Guided Tutorial Steps ───────────────────────────────────────
+//
+// The tutorial tells a story: you've just leased an empty data center suite.
+// Your first customer is waiting. Build infrastructure, get online, earn revenue,
+// and grow into a thriving operation.
+
+export const TUTORIAL_STEPS: TutorialStep[] = [
+  // ── Chapter 1: Your First Rack ────────────────────────────────
+  {
+    id: 'orientation',
+    title: 'Welcome to Your Data Center',
+    objective: 'Look around — this is your empty facility',
+    description: 'You\'ve just leased a small starter suite. The isometric grid in the center is your data center floor. The left sidebar has all your tools. The top bar shows your cash, power, heat, and game speed. Let\'s get to work!',
+    uiHint: 'Top bar: cash ($), power (W), heat (\u00B0C), PUE. Left sidebar: all panels. Bottom bar: tick count & status.',
+    completionCheck: 'always',
+  },
+  {
+    id: 'build_cabinet',
+    title: 'Build Your First Cabinet',
+    objective: 'Place a cabinet on the data center floor',
+    description: 'Every data center starts with cabinets (server racks). Open the BUILD panel in the sidebar — it\'s the green CPU icon near the top. Select "Production" environment, then click "Place Cabinet" and click a tile on the grid.',
+    highlightPanel: 'build',
+    uiHint: 'BUILD panel \u2192 Environment: Production \u2192 Place Cabinet button \u2192 click a grid tile.',
+    completionCheck: 'has_cabinet',
+  },
+  {
+    id: 'add_server',
+    title: 'Install Your First Server',
+    objective: 'Add a server to your cabinet',
+    description: 'Servers are your money-makers — each one earns $12 per tick. Open the BUILD panel and click "Add Server" ($2,000). You\'ll see a green block appear inside your cabinet on the grid.',
+    highlightPanel: 'build',
+    uiHint: 'BUILD panel \u2192 "Add Server" button ($2,000). Each cabinet holds up to 4 servers.',
+    completionCheck: 'has_server',
+  },
+  {
+    id: 'add_leaf',
+    title: 'Get Online',
+    objective: 'Install a leaf switch to connect to the network',
+    description: 'Your server is running, but it\'s not connected to anything! A leaf switch (top-of-rack switch) connects your cabinet to the network. Without it, customers can\'t reach your servers. Click "Add Leaf Switch" in the BUILD panel.',
+    highlightPanel: 'build',
+    uiHint: 'BUILD panel \u2192 "Add Leaf Switch" button ($5,000). The cyan block on top of the cabinet.',
+    completionCheck: 'has_leaf',
+  },
+  {
+    id: 'add_spine',
+    title: 'Complete the Network',
+    objective: 'Add a spine switch to form the network backbone',
+    description: 'Leaf switches need a backbone to route traffic. Spine switches sit above the grid and connect to every leaf — this is called a Clos fabric (spine-leaf topology). Click "Add Spine Switch" in the BUILD panel to complete your network!',
+    highlightPanel: 'build',
+    uiHint: 'BUILD panel \u2192 "Add Spine Switch" button ($12,000). Appears in the orange row above the grid.',
+    completionCheck: 'has_spine',
+  },
+
+  // ── Chapter 2: Going Live ─────────────────────────────────────
+  {
+    id: 'unpause',
+    title: 'Go Live!',
+    objective: 'Unpause the game to start operations',
+    description: 'Your data center is built and connected! Time to flip the switch. Click the speed button in the top-right of the header bar to unpause. Watch the simulation tick and money start flowing in.',
+    uiHint: 'Top bar \u2192 Speed button (shows "PAUSED"). Click it to start at 1x speed. Click again for 2x, 3x.',
+    completionCheck: 'game_unpaused',
+  },
+  {
+    id: 'read_topbar',
+    title: 'Read Your Dashboard',
+    objective: 'Watch your stats change as the simulation runs',
+    description: 'Look at the top bar — your cash is increasing from server revenue! The heat gauge shows cabinet temperature rising. Hover over the $ amount to see a breakdown of income vs expenses. The bottom status bar shows the current tick count and system status.',
+    uiHint: 'Top bar: $ (hover for breakdown), Power (W), Heat (\u00B0C), PUE. Bottom bar: tick, speed, suite tier.',
+    completionCheck: 'earned_revenue',
+  },
+
+  // ── Chapter 3: Managing Heat ──────────────────────────────────
+  {
+    id: 'monitor_heat',
+    title: 'The Heat is On',
+    objective: 'Notice temperatures rising',
+    description: 'Every server generates +1.5\u00B0C of heat per tick. Your air cooling removes -2.0\u00B0C/tick automatically, but as you add more servers it won\'t keep up. If heat hits 80\u00B0C, servers throttle to 50% revenue. At 95\u00B0C, fires break out! Keep watching...',
+    uiHint: 'Top bar heat gauge: green = safe, orange = warm, red = danger. 80\u00B0C = throttle, 95\u00B0C = fire!',
+    completionCheck: 'heat_rising',
+  },
+
+  // ── Chapter 4: Scaling Up ─────────────────────────────────────
+  {
+    id: 'second_cabinet',
+    title: 'Expand Your Operation',
+    objective: 'Build a second cabinet with a server',
+    description: 'One rack isn\'t enough to build an empire. Open the BUILD panel and place another cabinet. Add at least one server to it. Try placing it in the same row as your first — cabinets on both sides of an aisle get a cooling bonus!',
+    highlightPanel: 'build',
+    uiHint: 'BUILD panel \u2192 Place Cabinet \u2192 Add Server. Same row = aisle cooling bonus.',
+    completionCheck: 'has_two_equipped_cabinets',
+  },
+  {
+    id: 'check_finance',
+    title: 'Follow the Money',
+    objective: 'Open the Finance panel to review your books',
+    description: 'You\'re earning revenue, but you\'re also paying for power. Open the FINANCE panel ($ icon in the sidebar) to see your income vs expenses breakdown. Understanding your cash flow is critical — if you run out of money, it\'s game over!',
+    highlightPanel: 'finance',
+    uiHint: 'FINANCE panel: Revenue (servers + contracts) vs Expenses (power + cooling + loans). Net income at bottom.',
+    completionCheck: 'opened_finance',
+  },
+
+  // ── Chapter 5: Operations & Cooling ───────────────────────────
+  {
+    id: 'check_operations',
+    title: 'Manage Your Facility',
+    objective: 'Open the Operations panel',
+    description: 'As your data center grows, you\'ll need better cooling, backup generators, and fire suppression. The OPERATIONS panel (lightning bolt icon) is your control center for keeping things running. Take a look!',
+    highlightPanel: 'operations',
+    uiHint: 'OPERATIONS panel: Cooling upgrades, generators, fire suppression, and operations tier.',
+    completionCheck: 'opened_operations',
+  },
+
+  // ── Chapter 6: Contracts & Growth ─────────────────────────────
+  {
+    id: 'check_contracts',
+    title: 'Land Your First Client',
+    objective: 'Open the Contracts panel to see available deals',
+    description: 'Real money comes from contracts — clients who pay bonus revenue if you meet their SLA (uptime targets). Open the CONTRACTS panel (document icon) to browse available deals. Accept one when you\'re ready!',
+    highlightPanel: 'contracts',
+    uiHint: 'CONTRACTS panel: Bronze/Silver/Gold tiers. Each has revenue bonus + SLA requirements. Accept to start.',
+    completionCheck: 'opened_contracts',
+  },
+
+  // ── Chapter 7: The Bigger Picture ─────────────────────────────
+  {
+    id: 'explore_sidebar',
+    title: 'Explore Your Tools',
+    objective: 'Open any 3 more sidebar panels to discover what\'s available',
+    description: 'Your sidebar has 18 panels covering every aspect of your data center. Try exploring a few: INFRASTRUCTURE for PDUs and cabling, R&D LAB for technology research, FACILITY for suite upgrades and noise management, or PROGRESS for achievements. Each icon\'s tooltip tells you what it does.',
+    uiHint: 'Sidebar icons: hover for tooltips. Green = core, Orange = systems, Cyan = advanced, Yellow = progress.',
+    completionCheck: 'explored_panels',
+  },
+  {
+    id: 'tutorial_complete',
+    title: 'You\'re a Data Center Operator!',
+    objective: 'Tutorial complete — the real game begins',
+    description: 'You\'ve learned the fundamentals: building racks, networking, managing heat, reading your finances, and finding your tools. From here, research new tech, hire staff, take on bigger contracts, upgrade your suite tier, and eventually expand to a global empire. The GUIDE panel (? icon) has detailed info on every system. Good luck!',
+    highlightPanel: 'guide',
+    uiHint: 'Next goals: fill cabinets, upgrade cooling, accept contracts, research tech, upgrade suite tier!',
+    completionCheck: 'always',
+  },
 ]

@@ -20,6 +20,7 @@ import {
   SERVER_CONFIG_OPTIONS,
   SPOT_COMPUTE_CONFIG,
   TUTORIAL_TIPS,
+  TUTORIAL_STEPS,
   INCIDENT_CATALOG,
   SUITE_TIERS,
   OPS_TIER_CONFIG,
@@ -3698,6 +3699,178 @@ describe('Regional Incidents & Disaster Preparedness', () => {
       expect(getState().customRowMode).toBe(false)
       expect(getState().customLayout).toBeNull()
       expect(getState().rowPlacementMode).toBe(false)
+    })
+  })
+})
+
+// ============================================================================
+// Guided Tutorial System
+// ============================================================================
+
+describe('Guided Tutorial System', () => {
+  describe('Welcome modal', () => {
+    it('shows welcome modal on fresh game', () => {
+      expect(getState().showWelcomeModal).toBe(true)
+      expect(getState().tutorialStepIndex).toBe(-1)
+      expect(getState().tutorialCompleted).toBe(false)
+    })
+
+    it('hides welcome modal after resetGame', () => {
+      getState().skipTutorial()
+      expect(getState().showWelcomeModal).toBe(false)
+      getState().resetGame()
+      expect(getState().showWelcomeModal).toBe(true)
+    })
+  })
+
+  describe('startTutorial', () => {
+    it('starts the guided tutorial from step 0', () => {
+      getState().startTutorial()
+      expect(getState().showWelcomeModal).toBe(false)
+      expect(getState().tutorialEnabled).toBe(true)
+      expect(getState().tutorialStepIndex).toBe(0)
+      expect(getState().tutorialCompleted).toBe(false)
+    })
+  })
+
+  describe('skipTutorial', () => {
+    it('hides modal and disables tutorial', () => {
+      getState().skipTutorial()
+      expect(getState().showWelcomeModal).toBe(false)
+      expect(getState().tutorialEnabled).toBe(false)
+      expect(getState().tutorialStepIndex).toBe(-1)
+    })
+  })
+
+  describe('advanceTutorialStep', () => {
+    it('advances to the next step', () => {
+      getState().startTutorial()
+      expect(getState().tutorialStepIndex).toBe(0)
+      getState().advanceTutorialStep()
+      expect(getState().tutorialStepIndex).toBe(1)
+      expect(getState().tutorialCompleted).toBe(false)
+    })
+
+    it('marks tutorial completed at the end', () => {
+      getState().startTutorial()
+      for (let i = 0; i < TUTORIAL_STEPS.length; i++) {
+        getState().advanceTutorialStep()
+      }
+      expect(getState().tutorialCompleted).toBe(true)
+    })
+  })
+
+  describe('restartTutorial', () => {
+    it('resets to welcome modal state', () => {
+      getState().startTutorial()
+      getState().advanceTutorialStep()
+      getState().restartTutorial()
+      expect(getState().showWelcomeModal).toBe(true)
+      expect(getState().tutorialStepIndex).toBe(-1)
+      expect(getState().tutorialCompleted).toBe(false)
+      expect(getState().tutorialEnabled).toBe(true)
+      expect(getState().seenTips).toEqual([])
+      expect(getState().tutorialPanelsOpened).toEqual([])
+    })
+  })
+
+  describe('trackPanelOpen', () => {
+    it('tracks unique panel opens', () => {
+      getState().trackPanelOpen('finance')
+      getState().trackPanelOpen('operations')
+      getState().trackPanelOpen('finance') // duplicate
+      expect(getState().tutorialPanelsOpened).toEqual(['finance', 'operations'])
+    })
+  })
+
+  describe('step completion in tick', () => {
+    it('auto-advances "always" orientation step on first tick', () => {
+      setState({ sandboxMode: true, suiteTier: 'standard' })
+      getState().startTutorial()
+      expect(getState().tutorialStepIndex).toBe(0)
+      expect(TUTORIAL_STEPS[0].completionCheck).toBe('always')
+
+      getState().tick()
+      // "always" step should auto-advance
+      expect(getState().tutorialStepIndex).toBeGreaterThan(0)
+    })
+
+    it('advances has_cabinet step when cabinet is placed', () => {
+      setState({ sandboxMode: true, suiteTier: 'standard' })
+      getState().startTutorial()
+      // Advance past the "always" orientation step
+      getState().tick()
+      const stepBeforeCabinet = getState().tutorialStepIndex
+      expect(TUTORIAL_STEPS[stepBeforeCabinet].completionCheck).toBe('has_cabinet')
+
+      // Place a cabinet
+      getState().addCabinet(0, STD_ROW_0, 'production', 'general', 'north')
+      getState().tick()
+      expect(getState().tutorialStepIndex).toBeGreaterThan(stepBeforeCabinet)
+    })
+
+    it('advances through multiple steps when conditions are met', () => {
+      setState({ sandboxMode: true, suiteTier: 'standard' })
+      getState().startTutorial()
+
+      // Set up cabinet + server + leaf + spine (satisfies early build steps)
+      getState().addCabinet(0, STD_ROW_0, 'production', 'general', 'north')
+      getState().upgradeNextCabinet()
+      getState().addLeafToNextCabinet()
+      getState().addSpineSwitch()
+
+      // Multiple ticks should advance through completed steps
+      for (let i = 0; i < 5; i++) getState().tick()
+      // Should be past orientation + build + server + leaf + spine + unpause = at least step 6
+      expect(getState().tutorialStepIndex).toBeGreaterThanOrEqual(5)
+    })
+
+    it('advances panel-based steps when panels are opened', () => {
+      setState({ sandboxMode: true, suiteTier: 'standard' })
+      getState().startTutorial()
+
+      // Build a full setup to get past build/network steps
+      getState().addCabinet(0, STD_ROW_0, 'production', 'general', 'north')
+      getState().upgradeNextCabinet()
+      getState().addLeafToNextCabinet()
+      getState().addSpineSwitch()
+      // Add a second equipped cabinet for the scale-up step
+      getState().addCabinet(1, STD_ROW_0, 'production', 'general', 'north')
+      getState().upgradeNextCabinet()
+
+      // Run ticks to advance through build/network/unpause/heat steps
+      // (game is running since speed defaults to 1 after startTutorial via gameSpeed)
+      setState({ gameSpeed: 1, money: 60000 })
+      for (let i = 0; i < 10; i++) getState().tick()
+
+      // Now track panel opens for panel-based steps
+      getState().trackPanelOpen('finance')
+      getState().tick()
+      getState().trackPanelOpen('operations')
+      getState().tick()
+      getState().trackPanelOpen('contracts')
+      getState().tick()
+
+      // Track 3 exploration panels
+      getState().trackPanelOpen('research')
+      getState().trackPanelOpen('infrastructure')
+      getState().trackPanelOpen('facility')
+      getState().tick()
+
+      // Should have progressed significantly
+      expect(getState().tutorialStepIndex).toBeGreaterThanOrEqual(10)
+    })
+  })
+
+  describe('save/load preserves tutorial state', () => {
+    it('loadGame suppresses welcome modal', () => {
+      setState({ sandboxMode: true, suiteTier: 'standard' })
+      getState().startTutorial()
+      getState().saveGame(1, 'Test Save')
+      getState().resetGame()
+      expect(getState().showWelcomeModal).toBe(true)
+      getState().loadGame(1)
+      expect(getState().showWelcomeModal).toBe(false)
     })
   })
 })
