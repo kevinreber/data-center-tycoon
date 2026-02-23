@@ -685,6 +685,7 @@ interface GameState {
   skipTutorial: () => void
   advanceTutorialStep: () => void
   restartTutorial: () => void
+  replayTutorial: () => void
   trackPanelOpen: (panelId: string) => void
   // Demo
   loadDemoState: () => void
@@ -3102,6 +3103,9 @@ export const useGameStore = create<GameState>((set) => ({
 
   restartTutorial: () =>
     set({ showWelcomeModal: true, showRegionSelect: false, tutorialEnabled: true, tutorialStepIndex: -1, tutorialCompleted: false, seenTips: [], activeTip: null, tutorialPanelsOpened: [] }),
+
+  replayTutorial: () =>
+    set({ tutorialEnabled: true, tutorialStepIndex: 0, tutorialCompleted: false, tutorialPanelsOpened: [] }),
 
   trackPanelOpen: (panelId: string) =>
     set((state) => {
