@@ -563,9 +563,9 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     id: 'tutorial_complete',
     title: 'You\'re a Data Center Operator!',
     objective: 'Tutorial complete — the real game begins',
-    description: 'You\'ve learned the fundamentals: building racks, networking, managing heat, reading your finances, and finding your tools. From here, research new tech, hire staff, take on bigger contracts, upgrade your suite tier, and eventually expand to a global empire. The GUIDE panel (? icon) has detailed info on every system. Good luck!',
+    description: 'You\'ve learned the fundamentals: building racks, networking, managing heat, reading your finances, and finding your tools. From here, research new tech, hire staff, take on bigger contracts, and upgrade your suite tier. As you grow, establish peering agreements for lower latency and better reputation, install a Meet-Me Room to earn passive interconnection revenue from tenants, and eventually expand globally with Edge PoPs that generate CDN revenue by caching content closer to end users. The GUIDE panel (? icon) has detailed info on every system. Good luck!',
     highlightPanel: 'guide',
-    uiHint: 'Next goals: fill cabinets, upgrade cooling, accept contracts, research tech, upgrade suite tier!',
+    uiHint: 'Next goals: fill cabinets, upgrade cooling, accept contracts, research tech, upgrade suite tier, establish peering!',
     completionCheck: 'always',
   },
 ]
