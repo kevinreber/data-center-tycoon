@@ -420,6 +420,8 @@ interface GameState {
   activeTip: TutorialTip | null
   tutorialEnabled: boolean
   showWelcomeModal: boolean
+  showRegionSelect: boolean
+  hqRegionId: RegionId
   tutorialStepIndex: number
   tutorialCompleted: boolean
   tutorialPanelsOpened: string[]
@@ -678,6 +680,7 @@ interface GameState {
   // Tutorial actions
   dismissTip: (tipId: string) => void
   toggleTutorial: () => void
+  selectHqRegion: (regionId: RegionId) => void
   startTutorial: () => void
   skipTutorial: () => void
   advanceTutorialStep: () => void
@@ -985,6 +988,8 @@ export const useGameStore = create<GameState>((set) => ({
   activeTip: null,
   tutorialEnabled: true,
   showWelcomeModal: true,
+  showRegionSelect: false,
+  hqRegionId: 'ashburn' as RegionId,
   tutorialStepIndex: -1,
   tutorialCompleted: false,
   tutorialPanelsOpened: [],
@@ -3074,10 +3079,17 @@ export const useGameStore = create<GameState>((set) => ({
     set((state) => ({ tutorialEnabled: !state.tutorialEnabled, activeTip: null })),
 
   startTutorial: () =>
-    set({ showWelcomeModal: false, tutorialEnabled: true, tutorialStepIndex: 0, tutorialCompleted: false }),
+    set({ showWelcomeModal: false, showRegionSelect: true, tutorialEnabled: true, tutorialCompleted: false }),
 
   skipTutorial: () =>
-    set({ showWelcomeModal: false, tutorialEnabled: false, tutorialStepIndex: -1, tutorialCompleted: false }),
+    set({ showWelcomeModal: false, showRegionSelect: true, tutorialEnabled: false, tutorialCompleted: false }),
+
+  selectHqRegion: (regionId: RegionId) =>
+    set((state) => ({
+      showRegionSelect: false,
+      hqRegionId: regionId,
+      tutorialStepIndex: state.tutorialEnabled ? 0 : -1,
+    })),
 
   advanceTutorialStep: () =>
     set((state) => {
@@ -3089,7 +3101,7 @@ export const useGameStore = create<GameState>((set) => ({
     }),
 
   restartTutorial: () =>
-    set({ showWelcomeModal: true, tutorialEnabled: true, tutorialStepIndex: -1, tutorialCompleted: false, seenTips: [], activeTip: null, tutorialPanelsOpened: [] }),
+    set({ showWelcomeModal: true, showRegionSelect: false, tutorialEnabled: true, tutorialStepIndex: -1, tutorialCompleted: false, seenTips: [], activeTip: null, tutorialPanelsOpened: [] }),
 
   trackPanelOpen: (panelId: string) =>
     set((state) => {
@@ -3471,6 +3483,8 @@ export const useGameStore = create<GameState>((set) => ({
       activeTip: null,
       tutorialEnabled: true,
       showWelcomeModal: false,
+      showRegionSelect: false,
+      hqRegionId: 'ashburn' as RegionId,
       tutorialStepIndex: -1,
       tutorialCompleted: true,
       tutorialPanelsOpened: [],
@@ -3743,6 +3757,8 @@ export const useGameStore = create<GameState>((set) => ({
         tutorialStepIndex: state.tutorialStepIndex,
         tutorialCompleted: state.tutorialCompleted,
         seenTips: state.seenTips,
+        // Region
+        hqRegionId: state.hqRegionId,
       }
       try {
         localStorage.setItem(SAVE_SLOT_PREFIX + slotId, JSON.stringify(saveData))
@@ -3836,6 +3852,8 @@ export const useGameStore = create<GameState>((set) => ({
         tutorialStepIndex: data.tutorialStepIndex ?? -1,
         tutorialCompleted: data.tutorialCompleted ?? true,
         showWelcomeModal: false,
+        showRegionSelect: false,
+        hqRegionId: (data.hqRegionId as RegionId) ?? state.hqRegionId,
         activeSlotId: slotId,
         hasSaved: true,
         ...calcStats(data.cabinets ?? state.cabinets, data.spineSwitches ?? state.spineSwitches),
@@ -4016,6 +4034,8 @@ export const useGameStore = create<GameState>((set) => ({
       activeTip: null,
       tutorialEnabled: true,
       showWelcomeModal: true,
+      showRegionSelect: false,
+      hqRegionId: 'ashburn' as RegionId,
       tutorialStepIndex: -1,
       tutorialCompleted: false,
       tutorialPanelsOpened: [],
@@ -4889,10 +4909,10 @@ export const useGameStore = create<GameState>((set) => ({
       const cableMgmtConfig = CABLE_MANAGEMENT_CONFIG.find((c) => c.type === state.cableManagementType)
       const facilityCableMessReduction = cableMgmtConfig?.cableMessReduction ?? 0
 
-      // Regional ambient modifier: remote sites have ambient temp shifted by region's coolingEfficiency
+      // Regional ambient modifier: all sites have ambient temp shifted by region's coolingEfficiency
       const activeSiteRegion = state.activeSiteId
         ? REGION_CATALOG.find((r) => r.id === state.sites.find((s) => s.id === state.activeSiteId)?.regionId)
-        : null
+        : REGION_CATALOG.find((r) => r.id === state.hqRegionId)
       const regionalAmbientOffset = activeSiteRegion ? activeSiteRegion.profile.coolingEfficiency : 0
       const effectiveAmbientTemp = SIM.ambientTemp + regionalAmbientOffset
 

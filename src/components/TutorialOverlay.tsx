@@ -7,13 +7,14 @@ export function TutorialOverlay() {
   const tutorialStepIndex = useGameStore((s) => s.tutorialStepIndex)
   const tutorialCompleted = useGameStore((s) => s.tutorialCompleted)
   const showWelcomeModal = useGameStore((s) => s.showWelcomeModal)
+  const showRegionSelect = useGameStore((s) => s.showRegionSelect)
   const activeTip = useGameStore((s) => s.activeTip)
   const skipTutorial = useGameStore((s) => s.skipTutorial)
   const dismissTip = useGameStore((s) => s.dismissTip)
   const advanceTutorialStep = useGameStore((s) => s.advanceTutorialStep)
 
-  // Don't show if welcome modal is open
-  if (showWelcomeModal) return null
+  // Don't show if welcome modal or region select is open
+  if (showWelcomeModal || showRegionSelect) return null
 
   // Show guided step overlay
   if (tutorialEnabled && tutorialStepIndex >= 0 && !tutorialCompleted) {
