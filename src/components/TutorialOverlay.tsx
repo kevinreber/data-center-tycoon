@@ -1,6 +1,7 @@
+import { useState } from 'react'
 import { useGameStore, TUTORIAL_STEPS } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
-import { X, ChevronRight, BookOpen, Lightbulb, Monitor } from 'lucide-react'
+import { X, ChevronRight, BookOpen, Lightbulb, Monitor, RotateCw } from 'lucide-react'
 
 export function TutorialOverlay() {
   const tutorialEnabled = useGameStore((s) => s.tutorialEnabled)
@@ -12,6 +13,8 @@ export function TutorialOverlay() {
   const skipTutorial = useGameStore((s) => s.skipTutorial)
   const dismissTip = useGameStore((s) => s.dismissTip)
   const advanceTutorialStep = useGameStore((s) => s.advanceTutorialStep)
+  const replayTutorial = useGameStore((s) => s.replayTutorial)
+  const [completionDismissed, setCompletionDismissed] = useState(false)
 
   // Don't show if welcome modal or region select is open
   if (showWelcomeModal || showRegionSelect) return null
@@ -108,6 +111,55 @@ export function TutorialOverlay() {
               </Button>
             </div>
           )}
+        </div>
+      </div>
+    )
+  }
+
+  // Show completion banner with replay option
+  if (tutorialCompleted && !completionDismissed) {
+    return (
+      <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-40 w-full max-w-lg px-4">
+        <div className="rounded-lg border border-neon-green/30 bg-card/95 backdrop-blur-sm p-4 shadow-lg glow-green">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <BookOpen className="size-3.5 text-neon-green" />
+              <span className="text-[10px] font-mono font-bold text-neon-green tracking-wider">
+                TUTORIAL COMPLETE
+              </span>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              onClick={() => setCompletionDismissed(true)}
+              className="text-muted-foreground hover:text-foreground"
+              title="Dismiss"
+            >
+              <X className="size-3" />
+            </Button>
+          </div>
+          <p className="text-xs font-mono text-muted-foreground mb-3">
+            You&rsquo;ve completed the guided tutorial. You can replay it anytime from the
+            {' '}<strong className="text-neon-cyan">GUIDE</strong> panel in the sidebar.
+          </p>
+          <div className="flex gap-2 justify-center">
+            <Button
+              onClick={() => { replayTutorial(); setCompletionDismissed(false) }}
+              variant="outline"
+              className="border-neon-green/30 text-neon-green hover:bg-neon-green/10 font-mono text-xs px-4 gap-1.5"
+              size="sm"
+            >
+              <RotateCw className="size-3" />
+              Replay Tutorial
+            </Button>
+            <Button
+              onClick={() => setCompletionDismissed(true)}
+              className="bg-neon-green/20 border border-neon-green/40 text-neon-green hover:bg-neon-green/30 font-mono text-xs px-4"
+              size="sm"
+            >
+              Got it!
+            </Button>
+          </div>
         </div>
       </div>
     )

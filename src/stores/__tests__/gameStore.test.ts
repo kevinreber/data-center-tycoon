@@ -3793,6 +3793,32 @@ describe('Guided Tutorial System', () => {
     })
   })
 
+  describe('replayTutorial', () => {
+    it('restarts tutorial from step 0 without showing welcome modal', () => {
+      getState().startTutorial()
+      getState().selectHqRegion('ashburn')
+      // Advance through several steps to simulate completion
+      for (let i = 0; i < TUTORIAL_STEPS.length; i++) {
+        getState().advanceTutorialStep()
+      }
+      expect(getState().tutorialCompleted).toBe(true)
+
+      getState().replayTutorial()
+      expect(getState().showWelcomeModal).toBe(false)
+      expect(getState().tutorialStepIndex).toBe(0)
+      expect(getState().tutorialCompleted).toBe(false)
+      expect(getState().tutorialEnabled).toBe(true)
+      expect(getState().tutorialPanelsOpened).toEqual([])
+    })
+
+    it('preserves seenTips when replaying', () => {
+      getState().dismissTip('tip_heat')
+      getState().dismissTip('tip_money')
+      getState().replayTutorial()
+      expect(getState().seenTips).toEqual(['tip_heat', 'tip_money'])
+    })
+  })
+
   describe('trackPanelOpen', () => {
     it('tracks unique panel opens', () => {
       getState().trackPanelOpen('finance')
