@@ -3525,8 +3525,6 @@ describe('Regional Incidents & Disaster Preparedness', () => {
     it('placeCustomRow adds a row at specified grid position', () => {
       setState({ sandboxMode: true, suiteTier: 'standard' })
       getState().toggleCustomRowMode()
-      const initialRowCount = getState().customLayout!.cabinetRows.length
-
       // Remove all rows first so we can place fresh ones
       for (const row of [...getState().customLayout!.cabinetRows]) {
         getState().removeCustomRow(row.gridRow)
