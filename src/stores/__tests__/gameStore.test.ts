@@ -3525,8 +3525,6 @@ describe('Regional Incidents & Disaster Preparedness', () => {
     it('placeCustomRow adds a row at specified grid position', () => {
       setState({ sandboxMode: true, suiteTier: 'standard' })
       getState().toggleCustomRowMode()
-      const initialRowCount = getState().customLayout!.cabinetRows.length
-
       // Remove all rows first so we can place fresh ones
       for (const row of [...getState().customLayout!.cabinetRows]) {
         getState().removeCustomRow(row.gridRow)
@@ -3724,27 +3722,45 @@ describe('Guided Tutorial System', () => {
   })
 
   describe('startTutorial', () => {
-    it('starts the guided tutorial from step 0', () => {
+    it('starts the guided tutorial and shows region select', () => {
       getState().startTutorial()
       expect(getState().showWelcomeModal).toBe(false)
+      expect(getState().showRegionSelect).toBe(true)
       expect(getState().tutorialEnabled).toBe(true)
-      expect(getState().tutorialStepIndex).toBe(0)
       expect(getState().tutorialCompleted).toBe(false)
+    })
+
+    it('begins at step 0 after selecting a region', () => {
+      getState().startTutorial()
+      getState().selectHqRegion('ashburn')
+      expect(getState().showRegionSelect).toBe(false)
+      expect(getState().tutorialStepIndex).toBe(0)
+      expect(getState().hqRegionId).toBe('ashburn')
     })
   })
 
   describe('skipTutorial', () => {
-    it('hides modal and disables tutorial', () => {
+    it('hides modal and shows region select', () => {
       getState().skipTutorial()
       expect(getState().showWelcomeModal).toBe(false)
+      expect(getState().showRegionSelect).toBe(true)
+      expect(getState().tutorialEnabled).toBe(false)
+    })
+
+    it('keeps tutorial disabled after region selection', () => {
+      getState().skipTutorial()
+      getState().selectHqRegion('nordics')
+      expect(getState().showRegionSelect).toBe(false)
       expect(getState().tutorialEnabled).toBe(false)
       expect(getState().tutorialStepIndex).toBe(-1)
+      expect(getState().hqRegionId).toBe('nordics')
     })
   })
 
   describe('advanceTutorialStep', () => {
     it('advances to the next step', () => {
       getState().startTutorial()
+      getState().selectHqRegion('ashburn')
       expect(getState().tutorialStepIndex).toBe(0)
       getState().advanceTutorialStep()
       expect(getState().tutorialStepIndex).toBe(1)
@@ -3753,6 +3769,7 @@ describe('Guided Tutorial System', () => {
 
     it('marks tutorial completed at the end', () => {
       getState().startTutorial()
+      getState().selectHqRegion('ashburn')
       for (let i = 0; i < TUTORIAL_STEPS.length; i++) {
         getState().advanceTutorialStep()
       }
@@ -3763,9 +3780,11 @@ describe('Guided Tutorial System', () => {
   describe('restartTutorial', () => {
     it('resets to welcome modal state', () => {
       getState().startTutorial()
+      getState().selectHqRegion('ashburn')
       getState().advanceTutorialStep()
       getState().restartTutorial()
       expect(getState().showWelcomeModal).toBe(true)
+      expect(getState().showRegionSelect).toBe(false)
       expect(getState().tutorialStepIndex).toBe(-1)
       expect(getState().tutorialCompleted).toBe(false)
       expect(getState().tutorialEnabled).toBe(true)
@@ -3787,6 +3806,7 @@ describe('Guided Tutorial System', () => {
     it('auto-advances "always" orientation step on first tick', () => {
       setState({ sandboxMode: true, suiteTier: 'standard' })
       getState().startTutorial()
+      getState().selectHqRegion('ashburn')
       expect(getState().tutorialStepIndex).toBe(0)
       expect(TUTORIAL_STEPS[0].completionCheck).toBe('always')
 
@@ -3798,6 +3818,7 @@ describe('Guided Tutorial System', () => {
     it('advances has_cabinet step when cabinet is placed', () => {
       setState({ sandboxMode: true, suiteTier: 'standard' })
       getState().startTutorial()
+      getState().selectHqRegion('ashburn')
       // Advance past the "always" orientation step
       getState().tick()
       const stepBeforeCabinet = getState().tutorialStepIndex
@@ -3812,6 +3833,7 @@ describe('Guided Tutorial System', () => {
     it('advances through multiple steps when conditions are met', () => {
       setState({ sandboxMode: true, suiteTier: 'standard' })
       getState().startTutorial()
+      getState().selectHqRegion('ashburn')
 
       // Set up cabinet + server + leaf + spine (satisfies early build steps)
       getState().addCabinet(0, STD_ROW_0, 'production', 'general', 'north')
@@ -3828,6 +3850,7 @@ describe('Guided Tutorial System', () => {
     it('advances panel-based steps when panels are opened', () => {
       setState({ sandboxMode: true, suiteTier: 'standard' })
       getState().startTutorial()
+      getState().selectHqRegion('ashburn')
 
       // Build a full setup to get past build/network steps
       getState().addCabinet(0, STD_ROW_0, 'production', 'general', 'north')
@@ -3863,14 +3886,17 @@ describe('Guided Tutorial System', () => {
   })
 
   describe('save/load preserves tutorial state', () => {
-    it('loadGame suppresses welcome modal', () => {
+    it('loadGame suppresses welcome modal and region select', () => {
       setState({ sandboxMode: true, suiteTier: 'standard' })
       getState().startTutorial()
+      getState().selectHqRegion('nordics')
       getState().saveGame(1, 'Test Save')
       getState().resetGame()
       expect(getState().showWelcomeModal).toBe(true)
       getState().loadGame(1)
       expect(getState().showWelcomeModal).toBe(false)
+      expect(getState().showRegionSelect).toBe(false)
+      expect(getState().hqRegionId).toBe('nordics')
     })
   })
 })

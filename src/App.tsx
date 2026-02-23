@@ -5,6 +5,7 @@ import { LayersPopup } from '@/components/LayersPopup'
 import { CabinetDetailPanel } from '@/components/CabinetDetailPanel'
 import { StatusBar } from '@/components/StatusBar'
 import { WelcomeModal } from '@/components/WelcomeModal'
+import { RegionSelectModal } from '@/components/RegionSelectModal'
 import { TutorialOverlay } from '@/components/TutorialOverlay'
 import { useGameStore } from '@/stores/gameStore'
 import type { GameSpeed } from '@/stores/gameStore'
@@ -329,6 +330,9 @@ function App() {
 
         {/* Welcome modal */}
         <WelcomeModal />
+
+        {/* Region selection (after welcome, before tutorial) */}
+        <RegionSelectModal />
 
         {/* Tutorial step overlay */}
         <TutorialOverlay />
