@@ -7,6 +7,8 @@ import type {
   AdvancedTierConfig,
   RackEquipmentConfig,
   AudioSettings,
+  PrestigeBonuses,
+  PrestigeState,
 } from '../types'
 
 // ── Row-End Infrastructure Slot Configs ────────────────────────
@@ -151,3 +153,82 @@ export const DEFAULT_AUDIO_SETTINGS: AudioSettings = {
 
 export const LEADERBOARD_STORAGE_KEY = 'fabric-tycoon-leaderboard'
 export const MAX_LEADERBOARD_ENTRIES = 10
+
+// ── Prestige / New Game+ Config ──────────────────────────────────
+
+export const PRESTIGE_STORAGE_KEY = 'fabric-tycoon-prestige'
+
+/** Requirements to prestige */
+export const PRESTIGE_REQUIREMENTS = {
+  minSuiteTier: 'enterprise' as const,
+  minMoney: 500_000,
+  minReputation: 75,
+  minCabinets: 30,
+}
+
+/** Bonuses granted per prestige level */
+export const PRESTIGE_BONUSES_PER_LEVEL = {
+  revenueMultiplier: 0.05,     // +5% revenue per level
+  powerCostReduction: 0.03,    // -3% power cost per level
+  startingMoneyBonus: 10_000,  // +$10K starting money per level
+  coolingEfficiency: 0.04,     // +4% cooling efficiency per level
+  reputationStartBonus: 3,     // +3 starting reputation per level
+}
+
+/** Maximum prestige level (bonuses cap here) */
+export const MAX_PRESTIGE_LEVEL = 10
+
+/** Points awarded per prestige based on accomplishments */
+export const PRESTIGE_POINT_WEIGHTS = {
+  perCabinet: 10,
+  perAchievement: 25,
+  perCompletedContract: 50,
+  per100kMoney: 15,
+  perSiteBeyondHQ: 100,
+}
+
+export const DEFAULT_PRESTIGE_BONUSES: PrestigeBonuses = {
+  revenueMultiplier: 0,
+  powerCostReduction: 0,
+  startingMoneyBonus: 0,
+  coolingEfficiency: 0,
+  reputationStartBonus: 0,
+}
+
+export const DEFAULT_PRESTIGE_STATE: PrestigeState = {
+  level: 0,
+  totalPrestigePoints: 0,
+  bonuses: { ...DEFAULT_PRESTIGE_BONUSES },
+  highestTickReached: 0,
+  highestRevenueReached: 0,
+  totalRunsCompleted: 0,
+}
+
+/** Calculate bonuses for a given prestige level */
+export function calcPrestigeBonuses(level: number): PrestigeBonuses {
+  const capped = Math.min(level, MAX_PRESTIGE_LEVEL)
+  return {
+    revenueMultiplier: capped * PRESTIGE_BONUSES_PER_LEVEL.revenueMultiplier,
+    powerCostReduction: capped * PRESTIGE_BONUSES_PER_LEVEL.powerCostReduction,
+    startingMoneyBonus: capped * PRESTIGE_BONUSES_PER_LEVEL.startingMoneyBonus,
+    coolingEfficiency: capped * PRESTIGE_BONUSES_PER_LEVEL.coolingEfficiency,
+    reputationStartBonus: capped * PRESTIGE_BONUSES_PER_LEVEL.reputationStartBonus,
+  }
+}
+
+/** Calculate prestige points earned from current run */
+export function calcPrestigePoints(state: {
+  cabinets: { length: number }
+  achievements: { length: number }
+  completedContracts: number
+  money: number
+  sites: { length: number }
+}): number {
+  let points = 0
+  points += state.cabinets.length * PRESTIGE_POINT_WEIGHTS.perCabinet
+  points += state.achievements.length * PRESTIGE_POINT_WEIGHTS.perAchievement
+  points += state.completedContracts * PRESTIGE_POINT_WEIGHTS.perCompletedContract
+  points += Math.floor(state.money / 100_000) * PRESTIGE_POINT_WEIGHTS.per100kMoney
+  points += state.sites.length * PRESTIGE_POINT_WEIGHTS.perSiteBeyondHQ
+  return points
+}
