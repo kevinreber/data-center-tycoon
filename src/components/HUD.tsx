@@ -14,7 +14,8 @@ import {
 export function HUD() {
   const {
     cabinets, spineSwitches, totalPower, coolingPower, money,
-    upgradeNextCabinet, addLeafToNextCabinet, addSpineSwitch,
+    addSpineSwitch,
+    enterEquipmentPlacementMode, equipmentPlacementMode, exitEquipmentPlacementMode,
     toggleCabinetPower, toggleSpinePower,
     revenue, expenses, powerCost, coolingCost, avgHeat, mgmtBonus,
     trafficStats,
@@ -310,47 +311,67 @@ export function HUD() {
                   </TooltipContent>
                 </Tooltip>
               )}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => upgradeNextCabinet()}
-                    disabled={money < RACK_COST.server || !canUpgrade}
-                    className="justify-between font-mono text-xs border-neon-green/20 hover:border-neon-green/50 hover:bg-neon-green/10 hover:text-neon-green transition-all"
-                  >
-                    <span className="flex items-center gap-1.5">
-                      <Plus className="size-3" />
-                      <Server className="size-3" />
-                      Add Server
-                    </span>
-                    <span className="text-muted-foreground">${RACK_COST.server.toLocaleString()}</span>
-                  </Button>
-                </TooltipTrigger>
+              {equipmentPlacementMode === 'server' ? (
+                <div className="flex gap-1.5">
+                  <div className="flex-1 rounded border border-neon-green/40 bg-neon-green/10 px-2 py-1.5 flex items-center gap-1.5">
+                    <Server className="size-3 text-neon-green animate-pulse" />
+                    <span className="text-xs font-mono text-neon-green">Click a cabinet</span>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => exitEquipmentPlacementMode()} className="text-xs text-muted-foreground">Cancel</Button>
+                </div>
+              ) : (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => enterEquipmentPlacementMode('server')}
+                      disabled={money < RACK_COST.server || !canUpgrade}
+                      className="justify-between font-mono text-xs border-neon-green/20 hover:border-neon-green/50 hover:bg-neon-green/10 hover:text-neon-green transition-all"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <Plus className="size-3" />
+                        <Server className="size-3" />
+                        Add Server
+                      </span>
+                      <span className="text-muted-foreground">${RACK_COST.server.toLocaleString()}</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    Click a cabinet to install a server (max {MAX_SERVERS_PER_CABINET} per cabinet, 450W)
+                  </TooltipContent>
+                </Tooltip>
+              )}
+              {equipmentPlacementMode === 'leaf' ? (
+                <div className="flex gap-1.5">
+                  <div className="flex-1 rounded border border-neon-cyan/40 bg-neon-cyan/10 px-2 py-1.5 flex items-center gap-1.5">
+                    <Network className="size-3 text-neon-cyan animate-pulse" />
+                    <span className="text-xs font-mono text-neon-cyan">Click a cabinet</span>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => exitEquipmentPlacementMode()} className="text-xs text-muted-foreground">Cancel</Button>
+                </div>
+              ) : (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => enterEquipmentPlacementMode('leaf')}
+                      disabled={money < RACK_COST.leaf_switch || !canAddLeaf}
+                      className="justify-between font-mono text-xs border-neon-cyan/20 hover:border-neon-cyan/50 hover:bg-neon-cyan/10 hover:text-neon-cyan transition-all"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <Network className="size-3" />
+                        Leaf Switch
+                      </span>
+                      <span className="text-muted-foreground">${RACK_COST.leaf_switch.toLocaleString()}</span>
+                    </Button>
+                  </TooltipTrigger>
                 <TooltipContent side="bottom">
-                  Add a server to the next cabinet with space (max {MAX_SERVERS_PER_CABINET} per cabinet, 450W)
+                  Click a cabinet to mount a ToR leaf switch (150W)
                 </TooltipContent>
               </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => addLeafToNextCabinet()}
-                    disabled={money < RACK_COST.leaf_switch || !canAddLeaf}
-                    className="justify-between font-mono text-xs border-neon-cyan/20 hover:border-neon-cyan/50 hover:bg-neon-cyan/10 hover:text-neon-cyan transition-all"
-                  >
-                    <span className="flex items-center gap-1.5">
-                      <Network className="size-3" />
-                      Leaf Switch
-                    </span>
-                    <span className="text-muted-foreground">${RACK_COST.leaf_switch.toLocaleString()}</span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">
-                  Mount a ToR leaf switch on the next cabinet without one (150W)
-                </TooltipContent>
-              </Tooltip>
+              )}
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
