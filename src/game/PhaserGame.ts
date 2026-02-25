@@ -267,6 +267,11 @@ class DataCenterScene extends Phaser.Scene {
   private selectionGraphics: Phaser.GameObjects.Graphics | null = null
   private onCabinetSelect: ((id: string | null) => void) | null = null
 
+  // Equipment placement mode (server/leaf targeting)
+  private equipmentPlacementMode: 'server' | 'leaf' | null = null
+  private equipHighlightGraphics: Phaser.GameObjects.Graphics | null = null
+  private onEquipmentCabinetClick: ((cabinetId: string) => void) | null = null
+
   // Ambient animation state
   private ambientTime = 0           // accumulated time for ambient cycles (seconds)
   private ambientGraphicsLayer: Phaser.GameObjects.Graphics | null = null
@@ -404,6 +409,17 @@ class DataCenterScene extends Phaser.Scene {
     })
 
     this.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
+      // Equipment placement mode: click a cabinet to install server/leaf
+      if (this.isPotentialDrag && !this.isDragging && this.equipmentPlacementMode) {
+        const wp = this.cameras.main.getWorldPoint(pointer.x, pointer.y)
+        const foundCab = this.findCabinetAtPoint(wp.x, wp.y)
+        if (foundCab && this.onEquipmentCabinetClick) {
+          this.onEquipmentCabinetClick(foundCab)
+        }
+        this.isDragging = false
+        this.isPotentialDrag = false
+        return
+      }
       // If left-click didn't become a drag, treat as cabinet selection click
       if (this.isPotentialDrag && !this.isDragging && !this.placementActive) {
         const wp = this.cameras.main.getWorldPoint(pointer.x, pointer.y)
@@ -3214,6 +3230,61 @@ class DataCenterScene extends Phaser.Scene {
     if (this.selectionGraphics) this.selectionGraphics.destroy()
     this.selectionGraphics = null
     this.clearZoneOverlays()
+  }
+
+  // ── Equipment Placement Mode API ─────────────────────────────
+
+  /** Enter/exit equipment placement mode — highlights valid cabinets */
+  setEquipmentPlacementMode(mode: 'server' | 'leaf' | null, validCabinetIds: string[]) {
+    this.equipmentPlacementMode = mode
+    if (!mode) {
+      if (this.equipHighlightGraphics) {
+        this.equipHighlightGraphics.destroy()
+        this.equipHighlightGraphics = null
+      }
+      return
+    }
+    this.renderEquipmentHighlights(validCabinetIds, mode === 'server' ? 0x00ff88 : 0x00aaff)
+  }
+
+  /** Set callback for cabinet clicks during equipment placement */
+  setOnEquipmentCabinetClick(cb: ((cabinetId: string) => void) | null) {
+    this.onEquipmentCabinetClick = cb
+  }
+
+  /** Render pulsing highlights on valid cabinets for equipment placement */
+  private renderEquipmentHighlights(cabinetIds: string[], color: number) {
+    if (this.equipHighlightGraphics) {
+      this.equipHighlightGraphics.destroy()
+    }
+    this.equipHighlightGraphics = this.add.graphics()
+    this.equipHighlightGraphics.setDepth(48)
+
+    for (const id of cabinetIds) {
+      const entry = this.cabEntries.get(id)
+      if (!entry) continue
+      const { x, y } = this.isoToScreen(entry.col, entry.row)
+
+      // Filled diamond highlight on ground tile
+      this.equipHighlightGraphics.fillStyle(color, 0.15)
+      this.equipHighlightGraphics.beginPath()
+      this.equipHighlightGraphics.moveTo(x, y)
+      this.equipHighlightGraphics.lineTo(x + TILE_W / 2, y + TILE_H / 2)
+      this.equipHighlightGraphics.lineTo(x, y + TILE_H)
+      this.equipHighlightGraphics.lineTo(x - TILE_W / 2, y + TILE_H / 2)
+      this.equipHighlightGraphics.closePath()
+      this.equipHighlightGraphics.fillPath()
+
+      // Border
+      this.equipHighlightGraphics.lineStyle(2, color, 0.6)
+      this.equipHighlightGraphics.beginPath()
+      this.equipHighlightGraphics.moveTo(x, y)
+      this.equipHighlightGraphics.lineTo(x + TILE_W / 2, y + TILE_H / 2)
+      this.equipHighlightGraphics.lineTo(x, y + TILE_H)
+      this.equipHighlightGraphics.lineTo(x - TILE_W / 2, y + TILE_H / 2)
+      this.equipHighlightGraphics.closePath()
+      this.equipHighlightGraphics.strokePath()
+    }
   }
 
   /** Set zone outlines for rendering */

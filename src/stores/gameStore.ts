@@ -295,6 +295,9 @@ interface GameState {
   placementCustomerType: CustomerType         // selected customer type for next placement
   placementFacing: CabinetFacing              // selected facing for next placement
 
+  // Equipment placement mode (server/leaf targeting)
+  equipmentPlacementMode: 'server' | 'leaf' | null  // which equipment type is being placed
+
   // Insurance
   insurancePolicies: InsurancePolicyType[]    // active insurance policies
   insuranceCost: number                       // insurance premiums last tick
@@ -554,6 +557,10 @@ interface GameState {
   togglePlacementFacing: () => void
   upgradeNextCabinet: () => void
   addLeafToNextCabinet: () => void
+  addServerToCabinet: (cabinetId: string) => void
+  addLeafToCabinet: (cabinetId: string) => void
+  enterEquipmentPlacementMode: (type: 'server' | 'leaf') => void
+  exitEquipmentPlacementMode: () => void
   addSpineSwitch: () => void
   toggleCabinetPower: (id: string) => void
   toggleSpinePower: (id: string) => void
@@ -857,6 +864,7 @@ export const useGameStore = create<GameState>((set) => ({
   placementEnvironment: 'production' as CabinetEnvironment,
   placementCustomerType: 'general' as CustomerType,
   placementFacing: 'north' as CabinetFacing,
+  equipmentPlacementMode: null,
 
   // Insurance
   insurancePolicies: [],
@@ -1172,7 +1180,7 @@ export const useGameStore = create<GameState>((set) => ({
     }),
 
   enterPlacementMode: (environment: CabinetEnvironment, customerType: CustomerType, facing?: CabinetFacing) =>
-    set((state) => ({ placementMode: true, placementEnvironment: environment, placementCustomerType: customerType, placementFacing: facing ?? state.placementFacing })),
+    set((state) => ({ placementMode: true, equipmentPlacementMode: null, placementEnvironment: environment, placementCustomerType: customerType, placementFacing: facing ?? state.placementFacing })),
 
   exitPlacementMode: () =>
     set({ placementMode: false }),
@@ -1213,6 +1221,48 @@ export const useGameStore = create<GameState>((set) => ({
         ...calcStats(newCabinets, state.spineSwitches),
       }
     }),
+
+  addServerToCabinet: (cabinetId: string) =>
+    set((state) => {
+      if (state.money < COSTS.server) return state
+      const idx = state.cabinets.findIndex((c) => c.id === cabinetId)
+      if (idx === -1) return state
+      const cab = state.cabinets[idx]
+      if (cab.serverCount >= MAX_SERVERS_PER_CABINET) return state
+      const newCabinets = state.cabinets.map((c, i) =>
+        i === idx ? { ...c, serverCount: c.serverCount + 1 } : c
+      )
+      return {
+        cabinets: newCabinets,
+        money: state.money - COSTS.server,
+        equipmentPlacementMode: null,
+        ...calcStats(newCabinets, state.spineSwitches),
+      }
+    }),
+
+  addLeafToCabinet: (cabinetId: string) =>
+    set((state) => {
+      if (state.money < COSTS.leaf_switch) return state
+      const idx = state.cabinets.findIndex((c) => c.id === cabinetId)
+      if (idx === -1) return state
+      const cab = state.cabinets[idx]
+      if (cab.hasLeafSwitch) return state
+      const newCabinets = state.cabinets.map((c, i) =>
+        i === idx ? { ...c, hasLeafSwitch: true } : c
+      )
+      return {
+        cabinets: newCabinets,
+        money: state.money - COSTS.leaf_switch,
+        equipmentPlacementMode: null,
+        ...calcStats(newCabinets, state.spineSwitches),
+      }
+    }),
+
+  enterEquipmentPlacementMode: (type: 'server' | 'leaf') =>
+    set({ equipmentPlacementMode: type, placementMode: false, selectedCabinetId: null }),
+
+  exitEquipmentPlacementMode: () =>
+    set({ equipmentPlacementMode: null }),
 
   addSpineSwitch: () =>
     set((state) => {
@@ -3502,6 +3552,7 @@ export const useGameStore = create<GameState>((set) => ({
       powerPriceSpikeActive: false,
       powerPriceSpikeTicks: 0,
       placementMode: false,
+      equipmentPlacementMode: null,
       heatMapVisible: false,
       hasSaved: false,
       activeSlotId: null,
@@ -3578,6 +3629,7 @@ export const useGameStore = create<GameState>((set) => ({
       zones: [],
       zoneBonusRevenue: 0,
       placementMode: false,
+      equipmentPlacementMode: null,
       insurancePolicies: [],
       insuranceCost: 0,
       insurancePayouts: 0,
@@ -3951,6 +4003,7 @@ export const useGameStore = create<GameState>((set) => ({
       dedicatedRowBonusRevenue: 0,
       selectedCabinetId: null,
       placementMode: false,
+      equipmentPlacementMode: null,
       insurancePolicies: [],
       insuranceCost: 0,
       insurancePayouts: 0,
