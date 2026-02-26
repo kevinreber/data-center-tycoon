@@ -129,6 +129,8 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* Prevent pull-to-refresh and bounce scrolling on mobile */
+    overscroll-behavior: none;
   }
 }
 
@@ -137,6 +139,26 @@
   display: block;
   width: 100% !important;
   height: 100% !important;
+  /* Prevent default touch behaviors on the game canvas */
+  touch-action: none;
+}
+
+/* Mobile: prevent accidental double-tap zoom and improve touch UX */
+@media (max-width: 767px) {
+  /* Prevent iOS double-tap zoom on interactive elements */
+  button, a, [role="button"] {
+    touch-action: manipulation;
+  }
+
+  /* Ensure the game container fills available space */
+  #phaser-container {
+    touch-action: none;
+  }
+
+  /* Slightly increase minimum button height for touch targets */
+  .min-h-touch {
+    min-height: 44px;
+  }
 }
 
 /* Terminal glow effects */

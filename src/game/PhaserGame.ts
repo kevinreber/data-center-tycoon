@@ -221,6 +221,10 @@ class DataCenterScene extends Phaser.Scene {
   private panOffsetX = 0
   private panOffsetY = 0
   private zoomLevel = 1
+  // Touch gesture support (pinch-to-zoom)
+  private pinchStartDistance = 0
+  private pinchStartZoom = 1
+  private isPinching = false
 
   // Zone outlines
   private zoneGraphics: Phaser.GameObjects.Graphics | null = null
@@ -390,8 +394,20 @@ class DataCenterScene extends Phaser.Scene {
         return
       }
 
-      // Left click: start potential drag (resolved as click or pan on pointerup)
-      if (pointer.leftButtonDown()) {
+      // Check for pinch-to-zoom (two fingers down)
+      if (this.input.pointer1.isDown && this.input.pointer2.isDown) {
+        this.isPinching = true
+        this.isPotentialDrag = false
+        this.isDragging = false
+        const p1 = this.input.pointer1
+        const p2 = this.input.pointer2
+        this.pinchStartDistance = Math.hypot(p2.x - p1.x, p2.y - p1.y)
+        this.pinchStartZoom = this.zoomLevel
+        return
+      }
+
+      // Left click or primary touch: start potential drag (resolved as click or pan on pointerup)
+      if (pointer.leftButtonDown() || pointer.wasTouch) {
         this.isPotentialDrag = true
         this.isDragging = false
         this.clickStartX = pointer.x
@@ -400,7 +416,7 @@ class DataCenterScene extends Phaser.Scene {
         this.dragStartY = pointer.y - this.panOffsetY
       }
 
-      // Right/middle click: immediate drag
+      // Right/middle click: immediate drag (desktop only)
       if (pointer.rightButtonDown() || pointer.middleButtonDown()) {
         this.isDragging = true
         this.dragStartX = pointer.x - this.panOffsetX
@@ -409,6 +425,14 @@ class DataCenterScene extends Phaser.Scene {
     })
 
     this.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
+      // End pinch when fingers are lifted
+      if (this.isPinching) {
+        if (!this.input.pointer1.isDown || !this.input.pointer2.isDown) {
+          this.isPinching = false
+        }
+        return
+      }
+
       // Equipment placement mode: click a cabinet to install server/leaf
       if (this.isPotentialDrag && !this.isDragging && this.equipmentPlacementMode) {
         const wp = this.cameras.main.getWorldPoint(pointer.x, pointer.y)
@@ -420,7 +444,7 @@ class DataCenterScene extends Phaser.Scene {
         this.isPotentialDrag = false
         return
       }
-      // If left-click didn't become a drag, treat as cabinet selection click
+      // If left-click/touch didn't become a drag, treat as cabinet selection click
       if (this.isPotentialDrag && !this.isDragging && !this.placementActive) {
         const wp = this.cameras.main.getWorldPoint(pointer.x, pointer.y)
         // Use visual bounding box hit test so clicking anywhere on the cabinet
@@ -438,7 +462,20 @@ class DataCenterScene extends Phaser.Scene {
     })
 
     this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
-      // Detect when a potential left-click drag exceeds the threshold
+      // Handle pinch-to-zoom (two fingers)
+      if (this.isPinching && this.input.pointer1.isDown && this.input.pointer2.isDown) {
+        const p1 = this.input.pointer1
+        const p2 = this.input.pointer2
+        const currentDist = Math.hypot(p2.x - p1.x, p2.y - p1.y)
+        if (this.pinchStartDistance > 0) {
+          const scale = currentDist / this.pinchStartDistance
+          this.zoomLevel = Math.max(0.3, Math.min(2.5, this.pinchStartZoom * scale))
+          this.cameras.main.setZoom(this.zoomLevel)
+        }
+        return
+      }
+
+      // Detect when a potential left-click/touch drag exceeds the threshold
       if (this.isPotentialDrag && !this.isDragging) {
         const dx = pointer.x - this.clickStartX
         const dy = pointer.y - this.clickStartY
@@ -3927,6 +3964,9 @@ export function createGame(parent: string): Phaser.Game {
     parent,
     transparent: true,
     audio: { disableWebAudio: false },
+    input: {
+      touch: { target: container ?? undefined },
+    },
     scene: DataCenterScene,
     scale: {
       mode: Phaser.Scale.RESIZE,

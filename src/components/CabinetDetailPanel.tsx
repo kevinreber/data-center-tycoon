@@ -126,7 +126,7 @@ function CabinetDetail({ cabinet }: { cabinet: Cabinet }) {
 
   return (
     <TooltipProvider>
-      <div className="absolute bottom-3 right-3 w-72 z-30 rounded-lg border border-neon-cyan/30 bg-card/95 backdrop-blur-sm shadow-lg">
+      <div className="absolute bottom-1.5 right-1.5 left-1.5 md:left-auto md:bottom-3 md:right-3 w-auto md:w-72 z-30 rounded-lg border border-neon-cyan/30 bg-card/95 backdrop-blur-sm shadow-lg max-h-[60vh] md:max-h-none overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between px-3 py-2 border-b border-border">
           <div className="flex items-center gap-2">

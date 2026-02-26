@@ -88,15 +88,17 @@ function App() {
     <TooltipProvider>
       <div className="h-screen flex flex-col bg-background text-foreground font-mono overflow-hidden">
         {/* Top bar */}
-        <header className="flex items-center justify-between px-4 py-2 border-b border-border bg-card">
-          <div className="flex items-center gap-3">
-            <h1 className="text-lg font-bold text-neon-green text-glow-green tracking-wider">
+        <header className="flex items-center justify-between px-2 md:px-4 py-1.5 md:py-2 border-b border-border bg-card gap-2">
+          <div className="flex items-center gap-2 md:gap-3 min-w-0">
+            {/* Leave space for mobile hamburger */}
+            <div className="w-10 md:hidden shrink-0" />
+            <h1 className="text-base md:text-lg font-bold text-neon-green text-glow-green tracking-wider shrink-0">
               DC TYCOON
             </h1>
-            <span className="text-xs text-muted-foreground hidden sm:inline">
+            <span className="text-xs text-muted-foreground hidden lg:inline">
               Build cabinets, design network fabrics, and manage power to scale your data center.
             </span>
-            <span className="inline-block w-2 h-4 bg-neon-green animate-blink ml-1" />
+            <span className="inline-block w-2 h-4 bg-neon-green animate-blink ml-1 hidden sm:inline-block" />
             {!isDemo && (
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -107,7 +109,7 @@ function App() {
                       const demoUrl = `${window.location.origin}${import.meta.env.BASE_URL}?demo=true`
                       window.open(demoUrl, '_blank')
                     }}
-                    className="text-xs text-neon-cyan hover:text-neon-cyan/80 gap-1 ml-2"
+                    className="text-xs text-neon-cyan hover:text-neon-cyan/80 gap-1 ml-2 hidden sm:flex"
                   >
                     <Eye className="size-3" />
                     Demo
@@ -122,29 +124,29 @@ function App() {
           </div>
 
           {/* Top-bar stats */}
-          <div className="flex items-center gap-5 text-xs">
+          <div className="flex items-center gap-2 md:gap-5 text-xs shrink-0">
             {/* Game speed control */}
-            <div className="flex items-center gap-1.5 border-r border-border pr-4 mr-1">
+            <div className="flex items-center gap-1.5 border-r border-border pr-2 md:pr-4 mr-0.5 md:mr-1">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
                     variant="ghost"
                     size="xs"
                     onClick={cycleSpeed}
-                    className={`font-mono text-xs px-2 gap-1.5 ${
+                    className={`font-mono text-xs px-1.5 md:px-2 gap-1 md:gap-1.5 min-h-[32px] ${
                       gameSpeed === 0
                         ? 'text-neon-red'
                         : 'text-neon-green'
                     }`}
                   >
                     {gameSpeed === 0 ? (
-                      <Pause className="size-3" />
+                      <Pause className="size-3.5 md:size-3" />
                     ) : gameSpeed >= 2 ? (
-                      <FastForward className="size-3" />
+                      <FastForward className="size-3.5 md:size-3" />
                     ) : (
-                      <Play className="size-3" />
+                      <Play className="size-3.5 md:size-3" />
                     )}
-                    {SPEED_LABELS[gameSpeed]}
+                    <span className="hidden sm:inline">{SPEED_LABELS[gameSpeed]}</span>
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom">
@@ -155,13 +157,13 @@ function App() {
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <div className="flex items-center gap-1.5 cursor-help">
+                <div className="flex items-center gap-1 md:gap-1.5 cursor-help">
                   <DollarSign className="size-3.5 text-neon-yellow" />
                   <span className="text-neon-yellow text-glow-orange font-bold">
                     ${Math.floor(money).toLocaleString()}
                   </span>
                   {(revenue > 0 || expenses > 0) && (
-                    <span className={`text-xs ${netIncome >= 0 ? 'text-neon-green' : 'text-neon-red'}`}>
+                    <span className={`text-xs hidden sm:inline ${netIncome >= 0 ? 'text-neon-green' : 'text-neon-red'}`}>
                       {netIncome >= 0 ? '+' : ''}{netIncome.toFixed(0)}/t
                     </span>
                   )}
@@ -207,19 +209,19 @@ function App() {
                 </div>
               </TooltipContent>
             </Tooltip>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1 md:gap-1.5 hidden sm:flex">
               <Zap className="size-3.5 text-neon-green" />
               <span className="text-neon-green">
                 {totalPower.toLocaleString()}W
               </span>
             </div>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1 md:gap-1.5">
               <Thermometer className="size-3.5 text-neon-orange" />
               <span className={avgHeat > 60 ? 'text-neon-red text-glow-red' : 'text-neon-orange'}>
                 {avgHeat}°C
               </span>
             </div>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1 md:gap-1.5 hidden sm:flex">
               <Activity className="size-3.5 text-neon-cyan" />
               <span className="text-neon-cyan">
                 PUE {pue || '—'}
@@ -230,11 +232,17 @@ function App() {
 
         {/* Main content area: sidebar + canvas */}
         <main className="flex-1 flex min-h-0">
-          {/* Left sidebar */}
-          <Sidebar />
+          {/* Left sidebar (hidden on mobile — uses overlay drawer instead) */}
+          <div className="hidden md:flex h-full">
+            <Sidebar />
+          </div>
+          {/* Mobile sidebar (overlay drawer) */}
+          <div className="md:hidden">
+            <Sidebar />
+          </div>
 
           {/* Canvas area */}
-          <div className="flex-1 min-h-0 flex flex-col p-3 gap-2">
+          <div className="flex-1 min-h-0 flex flex-col p-1.5 md:p-3 gap-1.5 md:gap-2">
             {/* Demo mode banner */}
             {isDemo && (
               <div className="rounded-lg border border-neon-cyan/40 bg-neon-cyan/10 p-2 flex items-center gap-2 shrink-0">
@@ -339,8 +347,8 @@ function App() {
 
         {/* Achievement toast */}
         {newAchievement && (
-          <div className="fixed bottom-16 right-4 z-50 animate-in slide-in-from-right duration-300">
-            <div className="rounded-lg border border-neon-yellow/40 bg-card p-3 shadow-lg glow-green flex items-center gap-3 min-w-64">
+          <div className="fixed bottom-16 right-2 md:right-4 left-2 md:left-auto z-50 animate-in slide-in-from-right duration-300">
+            <div className="rounded-lg border border-neon-yellow/40 bg-card p-3 shadow-lg glow-green flex items-center gap-3 min-w-0 md:min-w-64">
               <span className="text-2xl">{newAchievement.def.icon}</span>
               <div className="flex-1">
                 <div className="flex items-center gap-1.5 mb-0.5">
