@@ -270,6 +270,11 @@ export const ACHIEVEMENT_CATALOG: AchievementDef[] = [
   { id: 'row_end_equipped', label: 'End Cap Pro', description: 'Install 4 or more row-end infrastructure slots.', icon: '🔌' },
   { id: 'wide_aisles', label: 'Room to Breathe', description: 'Upgrade 2 or more aisles to wider widths.', icon: '↔️' },
   { id: 'rack_detailed', label: 'Rack Architect', description: 'Configure a cabinet with 42U rack detail.', icon: '🗄️' },
+  // Prestige / New Game+ achievements
+  { id: 'first_prestige', label: 'New Game+', description: 'Prestige for the first time.', icon: '🔄' },
+  { id: 'prestige_3', label: 'Third Time\'s the Charm', description: 'Reach prestige level 3.', icon: '⭐' },
+  { id: 'prestige_5', label: 'Veteran Tycoon', description: 'Reach prestige level 5.', icon: '🌟' },
+  { id: 'prestige_max', label: 'Prestige Master', description: 'Reach the maximum prestige level.', icon: '👑' },
 ]
 
 // ── Incident System ─────────────────────────────────────────────

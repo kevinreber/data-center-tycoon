@@ -54,6 +54,7 @@ import {
   ZONE_CONTRACT_CATALOG,
   ZONE_CONTRACT_REQUIREMENTS,
   isZoneRequirementMet,
+  canPrestige,
 } from '@/stores/gameStore'
 import type { RegionId } from '@/stores/gameStore'
 
@@ -3924,6 +3925,204 @@ describe('Guided Tutorial System', () => {
       expect(getState().showRegionSelect).toBe(false)
       expect(getState().hqRegionId).toBe('nordics')
     })
+  })
+})
+
+// ============================================================================
+// Prestige / New Game+
+// ============================================================================
+describe('Prestige / New Game+', () => {
+  beforeEach(() => {
+    // Clear prestige state from localStorage to ensure clean tests
+    localStorage.removeItem('fabric-tycoon-prestige')
+    getState().resetGame()
+  })
+
+  it('initial prestige state is level 0 with no bonuses', () => {
+    const p = getState().prestige
+    expect(p.level).toBe(0)
+    expect(p.totalPrestigePoints).toBe(0)
+    expect(p.bonuses.revenueMultiplier).toBe(0)
+    expect(p.bonuses.powerCostReduction).toBe(0)
+    expect(p.bonuses.startingMoneyBonus).toBe(0)
+    expect(p.bonuses.coolingEfficiency).toBe(0)
+    expect(p.bonuses.reputationStartBonus).toBe(0)
+    expect(p.totalRunsCompleted).toBe(0)
+  })
+
+  it('canPrestige returns false when requirements not met', () => {
+    expect(canPrestige(getState())).toBe(false)
+  })
+
+  it('canPrestige returns true when all requirements met', () => {
+    setState({
+      suiteTier: 'enterprise',
+      money: 600000,
+      reputationScore: 80,
+      cabinets: Array.from({ length: 35 }, (_, i) => ({
+        id: `cab-${i + 1}`, col: i % 14, row: 1,
+        environment: 'production' as const, customerType: 'general' as const,
+        serverCount: 4, hasLeafSwitch: true, powerStatus: true,
+        heatLevel: 22, serverAge: 0, facing: 'south' as const,
+      })),
+    })
+    expect(canPrestige(getState())).toBe(true)
+  })
+
+  it('canPrestige returns false when only some requirements met', () => {
+    // Enterprise tier but not enough money
+    setState({
+      suiteTier: 'enterprise',
+      money: 100000,
+      reputationScore: 80,
+      cabinets: Array.from({ length: 35 }, (_, i) => ({
+        id: `cab-${i + 1}`, col: i % 14, row: 1,
+        environment: 'production' as const, customerType: 'general' as const,
+        serverCount: 4, hasLeafSwitch: true, powerStatus: true,
+        heatLevel: 22, serverAge: 0, facing: 'south' as const,
+      })),
+    })
+    expect(canPrestige(getState())).toBe(false)
+  })
+
+  it('doPrestige increments level and stores bonuses', () => {
+    setState({
+      sandboxMode: true,
+      suiteTier: 'enterprise',
+      money: 600000,
+      reputationScore: 80,
+      cabinets: Array.from({ length: 35 }, (_, i) => ({
+        id: `cab-${i + 1}`, col: i % 14, row: 1,
+        environment: 'production' as const, customerType: 'general' as const,
+        serverCount: 4, hasLeafSwitch: true, powerStatus: true,
+        heatLevel: 22, serverAge: 0, facing: 'south' as const,
+      })),
+      completedContracts: 5,
+    })
+
+    getState().doPrestige()
+
+    const p = getState().prestige
+    expect(p.level).toBe(1)
+    expect(p.totalPrestigePoints).toBeGreaterThan(0)
+    expect(p.bonuses.revenueMultiplier).toBe(0.05)
+    expect(p.bonuses.powerCostReduction).toBe(0.03)
+    expect(p.bonuses.startingMoneyBonus).toBe(10000)
+    expect(p.bonuses.coolingEfficiency).toBe(0.04)
+    expect(p.bonuses.reputationStartBonus).toBe(3)
+    expect(p.totalRunsCompleted).toBe(1)
+  })
+
+  it('doPrestige resets game state but preserves prestige', () => {
+    setState({
+      sandboxMode: true,
+      suiteTier: 'enterprise',
+      money: 600000,
+      reputationScore: 80,
+      tickCount: 500,
+      cabinets: Array.from({ length: 35 }, (_, i) => ({
+        id: `cab-${i + 1}`, col: i % 14, row: 1,
+        environment: 'production' as const, customerType: 'general' as const,
+        serverCount: 4, hasLeafSwitch: true, powerStatus: true,
+        heatLevel: 22, serverAge: 0, facing: 'south' as const,
+      })),
+    })
+
+    getState().doPrestige()
+
+    // Game should be reset
+    expect(getState().cabinets).toHaveLength(0)
+    expect(getState().tickCount).toBe(0)
+    expect(getState().suiteTier).toBe('starter')
+
+    // But prestige bonuses should be applied to starting values
+    expect(getState().money).toBe(50000 + 10000) // base + prestige bonus
+    expect(getState().reputationScore).toBe(20 + 3) // base + prestige bonus
+    expect(getState().prestige.level).toBe(1)
+  })
+
+  it('prestige persists across resetGame', () => {
+    setState({
+      sandboxMode: true,
+      suiteTier: 'enterprise',
+      money: 600000,
+      reputationScore: 80,
+      cabinets: Array.from({ length: 35 }, (_, i) => ({
+        id: `cab-${i + 1}`, col: i % 14, row: 1,
+        environment: 'production' as const, customerType: 'general' as const,
+        serverCount: 4, hasLeafSwitch: true, powerStatus: true,
+        heatLevel: 22, serverAge: 0, facing: 'south' as const,
+      })),
+    })
+
+    getState().doPrestige()
+    expect(getState().prestige.level).toBe(1)
+
+    // Reset game manually — prestige should still be there
+    getState().resetGame()
+    expect(getState().prestige.level).toBe(1)
+    expect(getState().money).toBe(60000) // 50000 + 10000 bonus
+  })
+
+  it('doPrestige does nothing if requirements not met', () => {
+    const moneyBefore = getState().money
+    getState().doPrestige()
+    expect(getState().prestige.level).toBe(0)
+    expect(getState().money).toBe(moneyBefore)
+  })
+
+  it('prestige level caps at MAX_PRESTIGE_LEVEL', () => {
+    // Directly set prestige to max-1 in localStorage
+    const almostMaxPrestige = {
+      level: 9,
+      totalPrestigePoints: 5000,
+      bonuses: {
+        revenueMultiplier: 0.45,
+        powerCostReduction: 0.27,
+        startingMoneyBonus: 90000,
+        coolingEfficiency: 0.36,
+        reputationStartBonus: 27,
+      },
+      highestTickReached: 1000,
+      highestRevenueReached: 500,
+      totalRunsCompleted: 9,
+    }
+    localStorage.setItem('fabric-tycoon-prestige', JSON.stringify(almostMaxPrestige))
+    getState().resetGame()
+
+    expect(getState().prestige.level).toBe(9)
+
+    // Now prestige to 10
+    setState({
+      sandboxMode: true,
+      suiteTier: 'enterprise',
+      money: 600000,
+      reputationScore: 80,
+      cabinets: Array.from({ length: 35 }, (_, i) => ({
+        id: `cab-${i + 1}`, col: i % 14, row: 1,
+        environment: 'production' as const, customerType: 'general' as const,
+        serverCount: 4, hasLeafSwitch: true, powerStatus: true,
+        heatLevel: 22, serverAge: 0, facing: 'south' as const,
+      })),
+    })
+
+    getState().doPrestige()
+    expect(getState().prestige.level).toBe(10)
+
+    // Can't prestige beyond max
+    setState({
+      sandboxMode: true,
+      suiteTier: 'enterprise',
+      money: 600000,
+      reputationScore: 80,
+      cabinets: Array.from({ length: 35 }, (_, i) => ({
+        id: `cab-${i + 1}`, col: i % 14, row: 1,
+        environment: 'production' as const, customerType: 'general' as const,
+        serverCount: 4, hasLeafSwitch: true, powerStatus: true,
+        heatLevel: 22, serverAge: 0, facing: 'south' as const,
+      })),
+    })
+    expect(canPrestige(getState())).toBe(false)
   })
 })
 

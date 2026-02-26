@@ -1334,3 +1334,21 @@ export interface CameraEffect {
   col?: number       // optional grid target for pan effects
   row?: number
 }
+
+// ── Prestige / New Game+ Types ─────────────────────────────────
+export interface PrestigeBonuses {
+  revenueMultiplier: number      // e.g. 1.05 = +5% revenue per prestige level
+  powerCostReduction: number     // e.g. 0.05 = -5% power cost per prestige level
+  startingMoneyBonus: number     // flat bonus added to starting money
+  coolingEfficiency: number      // e.g. 0.05 = +5% cooling rate per prestige level
+  reputationStartBonus: number   // bonus to starting reputation
+}
+
+export interface PrestigeState {
+  level: number                  // current prestige level (0 = never prestiged)
+  totalPrestigePoints: number    // lifetime prestige points earned
+  bonuses: PrestigeBonuses       // current active bonuses
+  highestTickReached: number     // best run length across all prestiges
+  highestRevenueReached: number  // best single-tick revenue across all prestiges
+  totalRunsCompleted: number     // number of times prestiged
+}
