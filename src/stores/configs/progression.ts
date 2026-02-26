@@ -270,6 +270,11 @@ export const ACHIEVEMENT_CATALOG: AchievementDef[] = [
   { id: 'row_end_equipped', label: 'End Cap Pro', description: 'Install 4 or more row-end infrastructure slots.', icon: '🔌' },
   { id: 'wide_aisles', label: 'Room to Breathe', description: 'Upgrade 2 or more aisles to wider widths.', icon: '↔️' },
   { id: 'rack_detailed', label: 'Rack Architect', description: 'Configure a cabinet with 42U rack detail.', icon: '🗄️' },
+  // Prestige / New Game+ achievements
+  { id: 'first_prestige', label: 'New Game+', description: 'Prestige for the first time.', icon: '🔄' },
+  { id: 'prestige_3', label: 'Third Time\'s the Charm', description: 'Reach prestige level 3.', icon: '⭐' },
+  { id: 'prestige_5', label: 'Veteran Tycoon', description: 'Reach prestige level 5.', icon: '🌟' },
+  { id: 'prestige_max', label: 'Prestige Master', description: 'Reach the maximum prestige level.', icon: '👑' },
 ]
 
 // ── Incident System ─────────────────────────────────────────────
@@ -563,9 +568,9 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     id: 'tutorial_complete',
     title: 'You\'re a Data Center Operator!',
     objective: 'Tutorial complete — the real game begins',
-    description: 'You\'ve learned the fundamentals: building racks, networking, managing heat, reading your finances, and finding your tools. From here, research new tech, hire staff, take on bigger contracts, upgrade your suite tier, and eventually expand to a global empire. The GUIDE panel (? icon) has detailed info on every system. Good luck!',
+    description: 'You\'ve learned the fundamentals: building racks, networking, managing heat, reading your finances, and finding your tools. From here, research new tech, hire staff, take on bigger contracts, and upgrade your suite tier. As you grow, establish peering agreements for lower latency and better reputation, install a Meet-Me Room to earn passive interconnection revenue from tenants, and eventually expand globally with Edge PoPs that generate CDN revenue by caching content closer to end users. The GUIDE panel (? icon) has detailed info on every system. Good luck!',
     highlightPanel: 'guide',
-    uiHint: 'Next goals: fill cabinets, upgrade cooling, accept contracts, research tech, upgrade suite tier!',
+    uiHint: 'Next goals: fill cabinets, upgrade cooling, accept contracts, research tech, upgrade suite tier, establish peering!',
     completionCheck: 'always',
   },
 ]

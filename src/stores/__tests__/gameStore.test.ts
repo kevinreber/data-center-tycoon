@@ -54,6 +54,7 @@ import {
   ZONE_CONTRACT_CATALOG,
   ZONE_CONTRACT_REQUIREMENTS,
   isZoneRequirementMet,
+  canPrestige,
 } from '@/stores/gameStore'
 import type { RegionId } from '@/stores/gameStore'
 
@@ -3525,8 +3526,6 @@ describe('Regional Incidents & Disaster Preparedness', () => {
     it('placeCustomRow adds a row at specified grid position', () => {
       setState({ sandboxMode: true, suiteTier: 'standard' })
       getState().toggleCustomRowMode()
-      const initialRowCount = getState().customLayout!.cabinetRows.length
-
       // Remove all rows first so we can place fresh ones
       for (const row of [...getState().customLayout!.cabinetRows]) {
         getState().removeCustomRow(row.gridRow)
@@ -3724,27 +3723,45 @@ describe('Guided Tutorial System', () => {
   })
 
   describe('startTutorial', () => {
-    it('starts the guided tutorial from step 0', () => {
+    it('starts the guided tutorial and shows region select', () => {
       getState().startTutorial()
       expect(getState().showWelcomeModal).toBe(false)
+      expect(getState().showRegionSelect).toBe(true)
       expect(getState().tutorialEnabled).toBe(true)
-      expect(getState().tutorialStepIndex).toBe(0)
       expect(getState().tutorialCompleted).toBe(false)
+    })
+
+    it('begins at step 0 after selecting a region', () => {
+      getState().startTutorial()
+      getState().selectHqRegion('ashburn')
+      expect(getState().showRegionSelect).toBe(false)
+      expect(getState().tutorialStepIndex).toBe(0)
+      expect(getState().hqRegionId).toBe('ashburn')
     })
   })
 
   describe('skipTutorial', () => {
-    it('hides modal and disables tutorial', () => {
+    it('hides modal and shows region select', () => {
       getState().skipTutorial()
       expect(getState().showWelcomeModal).toBe(false)
+      expect(getState().showRegionSelect).toBe(true)
+      expect(getState().tutorialEnabled).toBe(false)
+    })
+
+    it('keeps tutorial disabled after region selection', () => {
+      getState().skipTutorial()
+      getState().selectHqRegion('nordics')
+      expect(getState().showRegionSelect).toBe(false)
       expect(getState().tutorialEnabled).toBe(false)
       expect(getState().tutorialStepIndex).toBe(-1)
+      expect(getState().hqRegionId).toBe('nordics')
     })
   })
 
   describe('advanceTutorialStep', () => {
     it('advances to the next step', () => {
       getState().startTutorial()
+      getState().selectHqRegion('ashburn')
       expect(getState().tutorialStepIndex).toBe(0)
       getState().advanceTutorialStep()
       expect(getState().tutorialStepIndex).toBe(1)
@@ -3753,6 +3770,7 @@ describe('Guided Tutorial System', () => {
 
     it('marks tutorial completed at the end', () => {
       getState().startTutorial()
+      getState().selectHqRegion('ashburn')
       for (let i = 0; i < TUTORIAL_STEPS.length; i++) {
         getState().advanceTutorialStep()
       }
@@ -3763,14 +3781,42 @@ describe('Guided Tutorial System', () => {
   describe('restartTutorial', () => {
     it('resets to welcome modal state', () => {
       getState().startTutorial()
+      getState().selectHqRegion('ashburn')
       getState().advanceTutorialStep()
       getState().restartTutorial()
       expect(getState().showWelcomeModal).toBe(true)
+      expect(getState().showRegionSelect).toBe(false)
       expect(getState().tutorialStepIndex).toBe(-1)
       expect(getState().tutorialCompleted).toBe(false)
       expect(getState().tutorialEnabled).toBe(true)
       expect(getState().seenTips).toEqual([])
       expect(getState().tutorialPanelsOpened).toEqual([])
+    })
+  })
+
+  describe('replayTutorial', () => {
+    it('restarts tutorial from step 0 without showing welcome modal', () => {
+      getState().startTutorial()
+      getState().selectHqRegion('ashburn')
+      // Advance through several steps to simulate completion
+      for (let i = 0; i < TUTORIAL_STEPS.length; i++) {
+        getState().advanceTutorialStep()
+      }
+      expect(getState().tutorialCompleted).toBe(true)
+
+      getState().replayTutorial()
+      expect(getState().showWelcomeModal).toBe(false)
+      expect(getState().tutorialStepIndex).toBe(0)
+      expect(getState().tutorialCompleted).toBe(false)
+      expect(getState().tutorialEnabled).toBe(true)
+      expect(getState().tutorialPanelsOpened).toEqual([])
+    })
+
+    it('preserves seenTips when replaying', () => {
+      getState().dismissTip('tip_heat')
+      getState().dismissTip('tip_money')
+      getState().replayTutorial()
+      expect(getState().seenTips).toEqual(['tip_heat', 'tip_money'])
     })
   })
 
@@ -3787,6 +3833,7 @@ describe('Guided Tutorial System', () => {
     it('auto-advances "always" orientation step on first tick', () => {
       setState({ sandboxMode: true, suiteTier: 'standard' })
       getState().startTutorial()
+      getState().selectHqRegion('ashburn')
       expect(getState().tutorialStepIndex).toBe(0)
       expect(TUTORIAL_STEPS[0].completionCheck).toBe('always')
 
@@ -3798,6 +3845,7 @@ describe('Guided Tutorial System', () => {
     it('advances has_cabinet step when cabinet is placed', () => {
       setState({ sandboxMode: true, suiteTier: 'standard' })
       getState().startTutorial()
+      getState().selectHqRegion('ashburn')
       // Advance past the "always" orientation step
       getState().tick()
       const stepBeforeCabinet = getState().tutorialStepIndex
@@ -3812,6 +3860,7 @@ describe('Guided Tutorial System', () => {
     it('advances through multiple steps when conditions are met', () => {
       setState({ sandboxMode: true, suiteTier: 'standard' })
       getState().startTutorial()
+      getState().selectHqRegion('ashburn')
 
       // Set up cabinet + server + leaf + spine (satisfies early build steps)
       getState().addCabinet(0, STD_ROW_0, 'production', 'general', 'north')
@@ -3828,6 +3877,7 @@ describe('Guided Tutorial System', () => {
     it('advances panel-based steps when panels are opened', () => {
       setState({ sandboxMode: true, suiteTier: 'standard' })
       getState().startTutorial()
+      getState().selectHqRegion('ashburn')
 
       // Build a full setup to get past build/network steps
       getState().addCabinet(0, STD_ROW_0, 'production', 'general', 'north')
@@ -3863,15 +3913,216 @@ describe('Guided Tutorial System', () => {
   })
 
   describe('save/load preserves tutorial state', () => {
-    it('loadGame suppresses welcome modal', () => {
+    it('loadGame suppresses welcome modal and region select', () => {
       setState({ sandboxMode: true, suiteTier: 'standard' })
       getState().startTutorial()
+      getState().selectHqRegion('nordics')
       getState().saveGame(1, 'Test Save')
       getState().resetGame()
       expect(getState().showWelcomeModal).toBe(true)
       getState().loadGame(1)
       expect(getState().showWelcomeModal).toBe(false)
+      expect(getState().showRegionSelect).toBe(false)
+      expect(getState().hqRegionId).toBe('nordics')
     })
+  })
+})
+
+// ============================================================================
+// Prestige / New Game+
+// ============================================================================
+describe('Prestige / New Game+', () => {
+  beforeEach(() => {
+    // Clear prestige state from localStorage to ensure clean tests
+    localStorage.removeItem('fabric-tycoon-prestige')
+    getState().resetGame()
+  })
+
+  it('initial prestige state is level 0 with no bonuses', () => {
+    const p = getState().prestige
+    expect(p.level).toBe(0)
+    expect(p.totalPrestigePoints).toBe(0)
+    expect(p.bonuses.revenueMultiplier).toBe(0)
+    expect(p.bonuses.powerCostReduction).toBe(0)
+    expect(p.bonuses.startingMoneyBonus).toBe(0)
+    expect(p.bonuses.coolingEfficiency).toBe(0)
+    expect(p.bonuses.reputationStartBonus).toBe(0)
+    expect(p.totalRunsCompleted).toBe(0)
+  })
+
+  it('canPrestige returns false when requirements not met', () => {
+    expect(canPrestige(getState())).toBe(false)
+  })
+
+  it('canPrestige returns true when all requirements met', () => {
+    setState({
+      suiteTier: 'enterprise',
+      money: 600000,
+      reputationScore: 80,
+      cabinets: Array.from({ length: 35 }, (_, i) => ({
+        id: `cab-${i + 1}`, col: i % 14, row: 1,
+        environment: 'production' as const, customerType: 'general' as const,
+        serverCount: 4, hasLeafSwitch: true, powerStatus: true,
+        heatLevel: 22, serverAge: 0, facing: 'south' as const,
+      })),
+    })
+    expect(canPrestige(getState())).toBe(true)
+  })
+
+  it('canPrestige returns false when only some requirements met', () => {
+    // Enterprise tier but not enough money
+    setState({
+      suiteTier: 'enterprise',
+      money: 100000,
+      reputationScore: 80,
+      cabinets: Array.from({ length: 35 }, (_, i) => ({
+        id: `cab-${i + 1}`, col: i % 14, row: 1,
+        environment: 'production' as const, customerType: 'general' as const,
+        serverCount: 4, hasLeafSwitch: true, powerStatus: true,
+        heatLevel: 22, serverAge: 0, facing: 'south' as const,
+      })),
+    })
+    expect(canPrestige(getState())).toBe(false)
+  })
+
+  it('doPrestige increments level and stores bonuses', () => {
+    setState({
+      sandboxMode: true,
+      suiteTier: 'enterprise',
+      money: 600000,
+      reputationScore: 80,
+      cabinets: Array.from({ length: 35 }, (_, i) => ({
+        id: `cab-${i + 1}`, col: i % 14, row: 1,
+        environment: 'production' as const, customerType: 'general' as const,
+        serverCount: 4, hasLeafSwitch: true, powerStatus: true,
+        heatLevel: 22, serverAge: 0, facing: 'south' as const,
+      })),
+      completedContracts: 5,
+    })
+
+    getState().doPrestige()
+
+    const p = getState().prestige
+    expect(p.level).toBe(1)
+    expect(p.totalPrestigePoints).toBeGreaterThan(0)
+    expect(p.bonuses.revenueMultiplier).toBe(0.05)
+    expect(p.bonuses.powerCostReduction).toBe(0.03)
+    expect(p.bonuses.startingMoneyBonus).toBe(10000)
+    expect(p.bonuses.coolingEfficiency).toBe(0.04)
+    expect(p.bonuses.reputationStartBonus).toBe(3)
+    expect(p.totalRunsCompleted).toBe(1)
+  })
+
+  it('doPrestige resets game state but preserves prestige', () => {
+    setState({
+      sandboxMode: true,
+      suiteTier: 'enterprise',
+      money: 600000,
+      reputationScore: 80,
+      tickCount: 500,
+      cabinets: Array.from({ length: 35 }, (_, i) => ({
+        id: `cab-${i + 1}`, col: i % 14, row: 1,
+        environment: 'production' as const, customerType: 'general' as const,
+        serverCount: 4, hasLeafSwitch: true, powerStatus: true,
+        heatLevel: 22, serverAge: 0, facing: 'south' as const,
+      })),
+    })
+
+    getState().doPrestige()
+
+    // Game should be reset
+    expect(getState().cabinets).toHaveLength(0)
+    expect(getState().tickCount).toBe(0)
+    expect(getState().suiteTier).toBe('starter')
+
+    // But prestige bonuses should be applied to starting values
+    expect(getState().money).toBe(50000 + 10000) // base + prestige bonus
+    expect(getState().reputationScore).toBe(20 + 3) // base + prestige bonus
+    expect(getState().prestige.level).toBe(1)
+  })
+
+  it('prestige persists across resetGame', () => {
+    setState({
+      sandboxMode: true,
+      suiteTier: 'enterprise',
+      money: 600000,
+      reputationScore: 80,
+      cabinets: Array.from({ length: 35 }, (_, i) => ({
+        id: `cab-${i + 1}`, col: i % 14, row: 1,
+        environment: 'production' as const, customerType: 'general' as const,
+        serverCount: 4, hasLeafSwitch: true, powerStatus: true,
+        heatLevel: 22, serverAge: 0, facing: 'south' as const,
+      })),
+    })
+
+    getState().doPrestige()
+    expect(getState().prestige.level).toBe(1)
+
+    // Reset game manually — prestige should still be there
+    getState().resetGame()
+    expect(getState().prestige.level).toBe(1)
+    expect(getState().money).toBe(60000) // 50000 + 10000 bonus
+  })
+
+  it('doPrestige does nothing if requirements not met', () => {
+    const moneyBefore = getState().money
+    getState().doPrestige()
+    expect(getState().prestige.level).toBe(0)
+    expect(getState().money).toBe(moneyBefore)
+  })
+
+  it('prestige level caps at MAX_PRESTIGE_LEVEL', () => {
+    // Directly set prestige to max-1 in localStorage
+    const almostMaxPrestige = {
+      level: 9,
+      totalPrestigePoints: 5000,
+      bonuses: {
+        revenueMultiplier: 0.45,
+        powerCostReduction: 0.27,
+        startingMoneyBonus: 90000,
+        coolingEfficiency: 0.36,
+        reputationStartBonus: 27,
+      },
+      highestTickReached: 1000,
+      highestRevenueReached: 500,
+      totalRunsCompleted: 9,
+    }
+    localStorage.setItem('fabric-tycoon-prestige', JSON.stringify(almostMaxPrestige))
+    getState().resetGame()
+
+    expect(getState().prestige.level).toBe(9)
+
+    // Now prestige to 10
+    setState({
+      sandboxMode: true,
+      suiteTier: 'enterprise',
+      money: 600000,
+      reputationScore: 80,
+      cabinets: Array.from({ length: 35 }, (_, i) => ({
+        id: `cab-${i + 1}`, col: i % 14, row: 1,
+        environment: 'production' as const, customerType: 'general' as const,
+        serverCount: 4, hasLeafSwitch: true, powerStatus: true,
+        heatLevel: 22, serverAge: 0, facing: 'south' as const,
+      })),
+    })
+
+    getState().doPrestige()
+    expect(getState().prestige.level).toBe(10)
+
+    // Can't prestige beyond max
+    setState({
+      sandboxMode: true,
+      suiteTier: 'enterprise',
+      money: 600000,
+      reputationScore: 80,
+      cabinets: Array.from({ length: 35 }, (_, i) => ({
+        id: `cab-${i + 1}`, col: i % 14, row: 1,
+        environment: 'production' as const, customerType: 'general' as const,
+        serverCount: 4, hasLeafSwitch: true, powerStatus: true,
+        heatLevel: 22, serverAge: 0, facing: 'south' as const,
+      })),
+    })
+    expect(canPrestige(getState())).toBe(false)
   })
 })
 

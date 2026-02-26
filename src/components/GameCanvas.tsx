@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
 import type Phaser from 'phaser'
 import { createGame, getScene } from '@/game/PhaserGame'
-import { useGameStore, getSuiteLimits, getPlacementHints, SUITE_TIERS, ENVIRONMENT_CONFIG, CUSTOMER_TYPE_CONFIG } from '@/stores/gameStore'
+import { useGameStore, getSuiteLimits, getPlacementHints, SUITE_TIERS, ENVIRONMENT_CONFIG, CUSTOMER_TYPE_CONFIG, MAX_SERVERS_PER_CABINET } from '@/stores/gameStore'
 import { SIM } from '@/stores/constants'
 import type { DedicatedRowInfo } from '@/stores/gameStore'
 import { Crosshair } from 'lucide-react'
@@ -46,6 +46,7 @@ export function GameCanvas() {
   const activeSiteId = useGameStore((s) => s.activeSiteId)
   const customLayout = useGameStore((s) => s.customLayout)
   const rowPlacementMode = useGameStore((s) => s.rowPlacementMode)
+  const equipmentPlacementMode = useGameStore((s) => s.equipmentPlacementMode)
 
   // ── Detect site switch and trigger full Phaser re-render ─────────
   useEffect(() => {
@@ -98,6 +99,16 @@ export function GameCanvas() {
   // Cabinet selection handler — called from Phaser when user clicks a cabinet
   const handleCabinetSelect = useCallback((id: string | null) => {
     useGameStore.getState().selectCabinet(id)
+  }, [])
+
+  // Equipment placement click handler — installs server/leaf on clicked cabinet
+  const handleEquipmentCabinetClick = useCallback((cabinetId: string) => {
+    const state = useGameStore.getState()
+    if (state.equipmentPlacementMode === 'server') {
+      state.addServerToCabinet(cabinetId)
+    } else if (state.equipmentPlacementMode === 'leaf') {
+      state.addLeafToCabinet(cabinetId)
+    }
   }, [])
 
   useEffect(() => {
@@ -156,6 +167,31 @@ export function GameCanvas() {
     }
   }, [rowPlacementMode, sceneReady])
 
+  // Sync equipment placement mode (server/leaf targeting) to Phaser
+  useEffect(() => {
+    if (!gameRef.current) return
+    const scene = getScene(gameRef.current)
+    if (!scene) return
+
+    scene.setOnEquipmentCabinetClick(handleEquipmentCabinetClick)
+
+    if (equipmentPlacementMode) {
+      const state = useGameStore.getState()
+      const validIds = state.cabinets
+        .filter((c) =>
+          equipmentPlacementMode === 'server'
+            ? c.serverCount < MAX_SERVERS_PER_CABINET
+            : !c.hasLeafSwitch
+        )
+        .map((c) => c.id)
+      scene.setEquipmentPlacementMode(equipmentPlacementMode, validIds)
+      scene.clearSelection()
+      useGameStore.getState().selectCabinet(null)
+    } else {
+      scene.setEquipmentPlacementMode(null, [])
+    }
+  }, [equipmentPlacementMode, cabinets, handleEquipmentCabinetClick, sceneReady])
+
   // Sync placement facing to Phaser (updates zone overlays when user changes direction)
   useEffect(() => {
     if (!gameRef.current) return
@@ -164,10 +200,14 @@ export function GameCanvas() {
     scene.setPlacementFacing(placementFacing)
   }, [placementFacing, sceneReady])
 
-  // Keyboard shortcuts during placement mode (R = rotate facing, Esc = cancel)
+  // Keyboard shortcuts during placement mode (R = rotate facing, Esc = cancel equipment placement)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const state = useGameStore.getState()
+      if (e.key === 'Escape' && state.equipmentPlacementMode) {
+        state.exitEquipmentPlacementMode()
+        return
+      }
       if (!state.placementMode) return
       if (e.key === 'r' || e.key === 'R') {
         state.togglePlacementFacing()
@@ -555,7 +595,11 @@ export function GameCanvas() {
       className={`w-full h-full rounded-lg border overflow-hidden relative scanlines ${
         placementMode
           ? 'border-neon-green/60 glow-green ring-1 ring-neon-green/30'
-          : 'border-border glow-green'
+          : equipmentPlacementMode === 'server'
+            ? 'border-neon-green/40 ring-1 ring-neon-green/20'
+            : equipmentPlacementMode === 'leaf'
+              ? 'border-neon-cyan/40 ring-1 ring-neon-cyan/20'
+              : 'border-border glow-green'
       }`}
       style={{ background: 'linear-gradient(180deg, #060a10 0%, #0a1018 50%, #060a10 100%)' }}
       onContextMenu={(e) => e.preventDefault()}

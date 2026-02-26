@@ -1,14 +1,45 @@
-import { Github, Bug, GitPullRequest } from 'lucide-react'
+import { Github, Bug, GitPullRequest, BookOpen, RotateCw } from 'lucide-react'
 import { useGameStore, ENVIRONMENT_CONFIG, SIM, SPACING_CONFIG, COOLING_CONFIG, INROW_COOLING_OPTIONS, COOLING_UNIT_CONFIG, OPS_TIER_CONFIG, SERVER_CONFIG_OPTIONS, ZONE_BONUS_CONFIG, WORKLOAD_CONFIG, ADVANCED_TIER_CONFIG, SPOT_COMPUTE_CONFIG, SITE_TYPE_CONFIG, INTER_SITE_LINK_CONFIG, MAX_LINKS_PER_SITE, EDGE_POP_CDN_REVENUE_PER_GBPS, DATA_SOVEREIGNTY_CONFIG, MULTI_SITE_CONTRACT_CATALOG, STAFF_TRANSFER_CONFIG, DEMAND_GROWTH_CONFIG, DISASTER_PREP_CONFIG } from '@/stores/gameStore'
+import { Button } from '@/components/ui/button'
 
 const REPO_URL = 'https://github.com/kevinreber/data-center-tycoon'
 
 export function GuidePanel() {
   const money = useGameStore((s) => s.money)
   const cabinets = useGameStore((s) => s.cabinets)
+  const tutorialCompleted = useGameStore((s) => s.tutorialCompleted)
+  const tutorialStepIndex = useGameStore((s) => s.tutorialStepIndex)
+  const replayTutorial = useGameStore((s) => s.replayTutorial)
+
+  const tutorialInProgress = tutorialStepIndex >= 0 && !tutorialCompleted
 
   return (
     <div className="flex flex-col gap-3">
+      {/* Replay Tutorial */}
+      <div className="rounded-lg border border-neon-green/20 bg-neon-green/5 p-3">
+        <div className="flex items-center gap-2 mb-2">
+          <BookOpen className="size-3.5 text-neon-green" />
+          <span className="text-xs font-bold text-neon-green tracking-widest">GUIDED TUTORIAL</span>
+        </div>
+        <p className="text-xs font-mono text-muted-foreground mb-2">
+          {tutorialCompleted
+            ? 'You\'ve completed the guided tutorial. Replay it anytime to refresh your knowledge.'
+            : tutorialInProgress
+              ? 'Tutorial in progress — follow the steps at the bottom of the screen.'
+              : 'Walk through the basics of building and managing your data center.'}
+        </p>
+        <Button
+          variant="outline"
+          size="sm"
+          className="text-xs gap-1.5 font-mono w-full border-neon-green/30 text-neon-green hover:bg-neon-green/10"
+          onClick={() => replayTutorial()}
+          disabled={tutorialInProgress}
+        >
+          <RotateCw className="size-3" />
+          {tutorialInProgress ? 'Tutorial In Progress...' : 'Replay Tutorial'}
+        </Button>
+      </div>
+
       <div className="rounded-lg border border-neon-green/20 bg-neon-green/5 p-3 glow-green">
         <p className="text-xs font-bold text-neon-green mb-2">GETTING STARTED</p>
         <ol className="text-xs font-mono text-muted-foreground space-y-2 list-decimal list-inside">

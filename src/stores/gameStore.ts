@@ -43,6 +43,7 @@ export type {
   CustomRow, RackEquipmentType, RackSlot, RackEquipmentConfig, RackDetail,
   LeaderboardCategory, LeaderboardEntry, AudioSettings,
   FloatingTextEvent, CameraEffect, CameraEffectType,
+  PrestigeBonuses, PrestigeState,
 } from './types'
 
 import type {
@@ -71,6 +72,7 @@ import type {
   RackDetail, LeaderboardEntry, LeaderboardCategory, AudioSettings,
   FloatingTextEvent, CameraEffect,
   DataCenterLayout, DataCenterRow,
+  PrestigeState,
 } from './types'
 
 // ── Re-export constants ────────────────────────────────────────
@@ -101,8 +103,8 @@ export { getChillerConnection } from './chiller'
 import { getChillerConnection } from './chiller'
 
 // ── Re-export new feature configs ─────────────────────────────
-export { ROW_END_SLOT_CONFIG, MAX_ROW_END_SLOTS, AISLE_WIDTH_CONFIG, RAISED_FLOOR_CONFIG, CABLE_MANAGEMENT_CONFIG, WORKLOAD_CONFIG, MAX_WORKLOADS_PER_CABINET, MAX_ACTIVE_WORKLOADS, ADVANCED_TIER_CONFIG, RACK_EQUIPMENT_CONFIG, RACK_TOTAL_U, DEFAULT_AUDIO_SETTINGS, LEADERBOARD_STORAGE_KEY, MAX_LEADERBOARD_ENTRIES } from './configs/features'
-import { ROW_END_SLOT_CONFIG, AISLE_WIDTH_CONFIG, RAISED_FLOOR_CONFIG, CABLE_MANAGEMENT_CONFIG, WORKLOAD_CONFIG, MAX_ACTIVE_WORKLOADS, ADVANCED_TIER_CONFIG, RACK_EQUIPMENT_CONFIG, RACK_TOTAL_U, DEFAULT_AUDIO_SETTINGS, LEADERBOARD_STORAGE_KEY, MAX_LEADERBOARD_ENTRIES } from './configs/features'
+export { ROW_END_SLOT_CONFIG, MAX_ROW_END_SLOTS, AISLE_WIDTH_CONFIG, RAISED_FLOOR_CONFIG, CABLE_MANAGEMENT_CONFIG, WORKLOAD_CONFIG, MAX_WORKLOADS_PER_CABINET, MAX_ACTIVE_WORKLOADS, ADVANCED_TIER_CONFIG, RACK_EQUIPMENT_CONFIG, RACK_TOTAL_U, DEFAULT_AUDIO_SETTINGS, LEADERBOARD_STORAGE_KEY, MAX_LEADERBOARD_ENTRIES, PRESTIGE_STORAGE_KEY, PRESTIGE_REQUIREMENTS, PRESTIGE_BONUSES_PER_LEVEL, MAX_PRESTIGE_LEVEL, PRESTIGE_POINT_WEIGHTS, DEFAULT_PRESTIGE_STATE, calcPrestigeBonuses, calcPrestigePoints } from './configs/features'
+import { ROW_END_SLOT_CONFIG, AISLE_WIDTH_CONFIG, RAISED_FLOOR_CONFIG, CABLE_MANAGEMENT_CONFIG, WORKLOAD_CONFIG, MAX_ACTIVE_WORKLOADS, ADVANCED_TIER_CONFIG, RACK_EQUIPMENT_CONFIG, RACK_TOTAL_U, DEFAULT_AUDIO_SETTINGS, LEADERBOARD_STORAGE_KEY, MAX_LEADERBOARD_ENTRIES, PRESTIGE_STORAGE_KEY, PRESTIGE_REQUIREMENTS, DEFAULT_PRESTIGE_STATE, calcPrestigeBonuses, calcPrestigePoints, MAX_PRESTIGE_LEVEL } from './configs/features'
 
 
 // ── Save/Load Helpers (private) ─────────────────────────────────
@@ -295,6 +297,9 @@ interface GameState {
   placementCustomerType: CustomerType         // selected customer type for next placement
   placementFacing: CabinetFacing              // selected facing for next placement
 
+  // Equipment placement mode (server/leaf targeting)
+  equipmentPlacementMode: 'server' | 'leaf' | null  // which equipment type is being placed
+
   // Insurance
   insurancePolicies: InsurancePolicyType[]    // active insurance policies
   insuranceCost: number                       // insurance premiums last tick
@@ -420,6 +425,8 @@ interface GameState {
   activeTip: TutorialTip | null
   tutorialEnabled: boolean
   showWelcomeModal: boolean
+  showRegionSelect: boolean
+  hqRegionId: RegionId
   tutorialStepIndex: number
   tutorialCompleted: boolean
   tutorialPanelsOpened: string[]
@@ -544,6 +551,9 @@ interface GameState {
   // Demo mode
   isDemo: boolean
 
+  // Prestige / New Game+
+  prestige: PrestigeState
+
   // Actions
   selectCabinet: (id: string | null) => void
   addCabinet: (col: number, row: number, environment: CabinetEnvironment, customerType?: CustomerType, facing?: CabinetFacing) => void
@@ -552,6 +562,10 @@ interface GameState {
   togglePlacementFacing: () => void
   upgradeNextCabinet: () => void
   addLeafToNextCabinet: () => void
+  addServerToCabinet: (cabinetId: string) => void
+  addLeafToCabinet: (cabinetId: string) => void
+  enterEquipmentPlacementMode: (type: 'server' | 'leaf') => void
+  exitEquipmentPlacementMode: () => void
   addSpineSwitch: () => void
   toggleCabinetPower: (id: string) => void
   toggleSpinePower: (id: string) => void
@@ -678,10 +692,12 @@ interface GameState {
   // Tutorial actions
   dismissTip: (tipId: string) => void
   toggleTutorial: () => void
+  selectHqRegion: (regionId: RegionId) => void
   startTutorial: () => void
   skipTutorial: () => void
   advanceTutorialStep: () => void
   restartTutorial: () => void
+  replayTutorial: () => void
   trackPanelOpen: (panelId: string) => void
   // Demo
   loadDemoState: () => void
@@ -692,6 +708,8 @@ interface GameState {
   deleteGame: (slotId: number) => void
   resetGame: () => void
   refreshSaveSlots: () => void
+  // Prestige / New Game+
+  doPrestige: () => void
   tick: () => void
 }
 
@@ -726,6 +744,40 @@ function restoreIdCounters(data: Record<string, unknown>) {
   nextGeneratorId = maxIdNum(generators, 'gen-') + 1
   nextIncidentId = 1
   nextContractId = 1
+}
+
+// ── Prestige persistence helpers ──────────────────────────────
+function loadPrestige(): PrestigeState {
+  try {
+    const raw = localStorage.getItem(PRESTIGE_STORAGE_KEY)
+    if (!raw) return { ...DEFAULT_PRESTIGE_STATE }
+    const data = JSON.parse(raw) as PrestigeState
+    return { ...DEFAULT_PRESTIGE_STATE, ...data }
+  } catch {
+    return { ...DEFAULT_PRESTIGE_STATE }
+  }
+}
+
+function savePrestige(state: PrestigeState): void {
+  try {
+    localStorage.setItem(PRESTIGE_STORAGE_KEY, JSON.stringify(state))
+  } catch {
+    // Silently fail if localStorage is unavailable
+  }
+}
+
+// ── Prestige eligibility check (standalone, not a store action) ──
+export function canPrestige(state: Pick<GameState, 'suiteTier' | 'money' | 'reputationScore' | 'cabinets' | 'prestige'>): boolean {
+  const tierOrder = ['starter', 'standard', 'professional', 'enterprise']
+  const playerTierIdx = tierOrder.indexOf(state.suiteTier)
+  const requiredTierIdx = tierOrder.indexOf(PRESTIGE_REQUIREMENTS.minSuiteTier)
+  return (
+    playerTierIdx >= requiredTierIdx &&
+    state.money >= PRESTIGE_REQUIREMENTS.minMoney &&
+    state.reputationScore >= PRESTIGE_REQUIREMENTS.minReputation &&
+    state.cabinets.length >= PRESTIGE_REQUIREMENTS.minCabinets &&
+    state.prestige.level < MAX_PRESTIGE_LEVEL
+  )
 }
 
 export const useGameStore = create<GameState>((set) => ({
@@ -853,6 +905,7 @@ export const useGameStore = create<GameState>((set) => ({
   placementEnvironment: 'production' as CabinetEnvironment,
   placementCustomerType: 'general' as CustomerType,
   placementFacing: 'north' as CabinetFacing,
+  equipmentPlacementMode: null,
 
   // Insurance
   insurancePolicies: [],
@@ -985,6 +1038,8 @@ export const useGameStore = create<GameState>((set) => ({
   activeTip: null,
   tutorialEnabled: true,
   showWelcomeModal: true,
+  showRegionSelect: false,
+  hqRegionId: 'ashburn' as RegionId,
   tutorialStepIndex: -1,
   tutorialCompleted: false,
   tutorialPanelsOpened: [],
@@ -1104,6 +1159,9 @@ export const useGameStore = create<GameState>((set) => ({
   // Demo mode
   isDemo: false,
 
+  // Prestige / New Game+
+  prestige: loadPrestige(),
+
   // Save / Load
   hasSaved: false,
   activeSlotId: null,
@@ -1166,7 +1224,7 @@ export const useGameStore = create<GameState>((set) => ({
     }),
 
   enterPlacementMode: (environment: CabinetEnvironment, customerType: CustomerType, facing?: CabinetFacing) =>
-    set((state) => ({ placementMode: true, placementEnvironment: environment, placementCustomerType: customerType, placementFacing: facing ?? state.placementFacing })),
+    set((state) => ({ placementMode: true, equipmentPlacementMode: null, placementEnvironment: environment, placementCustomerType: customerType, placementFacing: facing ?? state.placementFacing })),
 
   exitPlacementMode: () =>
     set({ placementMode: false }),
@@ -1207,6 +1265,48 @@ export const useGameStore = create<GameState>((set) => ({
         ...calcStats(newCabinets, state.spineSwitches),
       }
     }),
+
+  addServerToCabinet: (cabinetId: string) =>
+    set((state) => {
+      if (state.money < COSTS.server) return state
+      const idx = state.cabinets.findIndex((c) => c.id === cabinetId)
+      if (idx === -1) return state
+      const cab = state.cabinets[idx]
+      if (cab.serverCount >= MAX_SERVERS_PER_CABINET) return state
+      const newCabinets = state.cabinets.map((c, i) =>
+        i === idx ? { ...c, serverCount: c.serverCount + 1 } : c
+      )
+      return {
+        cabinets: newCabinets,
+        money: state.money - COSTS.server,
+        equipmentPlacementMode: null,
+        ...calcStats(newCabinets, state.spineSwitches),
+      }
+    }),
+
+  addLeafToCabinet: (cabinetId: string) =>
+    set((state) => {
+      if (state.money < COSTS.leaf_switch) return state
+      const idx = state.cabinets.findIndex((c) => c.id === cabinetId)
+      if (idx === -1) return state
+      const cab = state.cabinets[idx]
+      if (cab.hasLeafSwitch) return state
+      const newCabinets = state.cabinets.map((c, i) =>
+        i === idx ? { ...c, hasLeafSwitch: true } : c
+      )
+      return {
+        cabinets: newCabinets,
+        money: state.money - COSTS.leaf_switch,
+        equipmentPlacementMode: null,
+        ...calcStats(newCabinets, state.spineSwitches),
+      }
+    }),
+
+  enterEquipmentPlacementMode: (type: 'server' | 'leaf') =>
+    set({ equipmentPlacementMode: type, placementMode: false, selectedCabinetId: null }),
+
+  exitEquipmentPlacementMode: () =>
+    set({ equipmentPlacementMode: null }),
 
   addSpineSwitch: () =>
     set((state) => {
@@ -3074,10 +3174,17 @@ export const useGameStore = create<GameState>((set) => ({
     set((state) => ({ tutorialEnabled: !state.tutorialEnabled, activeTip: null })),
 
   startTutorial: () =>
-    set({ showWelcomeModal: false, tutorialEnabled: true, tutorialStepIndex: 0, tutorialCompleted: false }),
+    set({ showWelcomeModal: false, showRegionSelect: true, tutorialEnabled: true, tutorialCompleted: false }),
 
   skipTutorial: () =>
-    set({ showWelcomeModal: false, tutorialEnabled: false, tutorialStepIndex: -1, tutorialCompleted: false }),
+    set({ showWelcomeModal: false, showRegionSelect: true, tutorialEnabled: false, tutorialCompleted: false }),
+
+  selectHqRegion: (regionId: RegionId) =>
+    set((state) => ({
+      showRegionSelect: false,
+      hqRegionId: regionId,
+      tutorialStepIndex: state.tutorialEnabled ? 0 : -1,
+    })),
 
   advanceTutorialStep: () =>
     set((state) => {
@@ -3089,7 +3196,10 @@ export const useGameStore = create<GameState>((set) => ({
     }),
 
   restartTutorial: () =>
-    set({ showWelcomeModal: true, tutorialEnabled: true, tutorialStepIndex: -1, tutorialCompleted: false, seenTips: [], activeTip: null, tutorialPanelsOpened: [] }),
+    set({ showWelcomeModal: true, showRegionSelect: false, tutorialEnabled: true, tutorialStepIndex: -1, tutorialCompleted: false, seenTips: [], activeTip: null, tutorialPanelsOpened: [] }),
+
+  replayTutorial: () =>
+    set({ tutorialEnabled: true, tutorialStepIndex: 0, tutorialCompleted: false, tutorialPanelsOpened: [] }),
 
   trackPanelOpen: (panelId: string) =>
     set((state) => {
@@ -3471,6 +3581,8 @@ export const useGameStore = create<GameState>((set) => ({
       activeTip: null,
       tutorialEnabled: true,
       showWelcomeModal: false,
+      showRegionSelect: false,
+      hqRegionId: 'ashburn' as RegionId,
       tutorialStepIndex: -1,
       tutorialCompleted: true,
       tutorialPanelsOpened: [],
@@ -3484,6 +3596,7 @@ export const useGameStore = create<GameState>((set) => ({
       powerPriceSpikeActive: false,
       powerPriceSpikeTicks: 0,
       placementMode: false,
+      equipmentPlacementMode: null,
       heatMapVisible: false,
       hasSaved: false,
       activeSlotId: null,
@@ -3560,6 +3673,7 @@ export const useGameStore = create<GameState>((set) => ({
       zones: [],
       zoneBonusRevenue: 0,
       placementMode: false,
+      equipmentPlacementMode: null,
       insurancePolicies: [],
       insuranceCost: 0,
       insurancePayouts: 0,
@@ -3743,6 +3857,8 @@ export const useGameStore = create<GameState>((set) => ({
         tutorialStepIndex: state.tutorialStepIndex,
         tutorialCompleted: state.tutorialCompleted,
         seenTips: state.seenTips,
+        // Region
+        hqRegionId: state.hqRegionId,
       }
       try {
         localStorage.setItem(SAVE_SLOT_PREFIX + slotId, JSON.stringify(saveData))
@@ -3836,6 +3952,8 @@ export const useGameStore = create<GameState>((set) => ({
         tutorialStepIndex: data.tutorialStepIndex ?? -1,
         tutorialCompleted: data.tutorialCompleted ?? true,
         showWelcomeModal: false,
+        showRegionSelect: false,
+        hqRegionId: (data.hqRegionId as RegionId) ?? state.hqRegionId,
         activeSlotId: slotId,
         hasSaved: true,
         ...calcStats(data.cabinets ?? state.cabinets, data.spineSwitches ?? state.spineSwitches),
@@ -3866,12 +3984,13 @@ export const useGameStore = create<GameState>((set) => ({
     nextCompetitorId = 1
     nextSiteId = 1
     nextLinkId = 1
+    const prestigeState = loadPrestige()
     set({
       cabinets: [],
       spineSwitches: [],
       totalPower: 0,
       coolingPower: 0,
-      money: 50000,
+      money: 50000 + prestigeState.bonuses.startingMoneyBonus,
       pue: 0,
       avgHeat: SIM.ambientTemp,
       mgmtBonus: 0,
@@ -3905,7 +4024,7 @@ export const useGameStore = create<GameState>((set) => ({
       unlockedTech: [],
       activeResearch: null,
       rdSpent: 0,
-      reputationScore: 20,
+      reputationScore: 20 + prestigeState.bonuses.reputationStartBonus,
       uptimeTicks: 0,
       totalOperatingTicks: 0,
       powerPriceMultiplier: 1.0,
@@ -3929,6 +4048,7 @@ export const useGameStore = create<GameState>((set) => ({
       dedicatedRowBonusRevenue: 0,
       selectedCabinetId: null,
       placementMode: false,
+      equipmentPlacementMode: null,
       insurancePolicies: [],
       insuranceCost: 0,
       insurancePayouts: 0,
@@ -4016,6 +4136,8 @@ export const useGameStore = create<GameState>((set) => ({
       activeTip: null,
       tutorialEnabled: true,
       showWelcomeModal: true,
+      showRegionSelect: false,
+      hqRegionId: 'ashburn' as RegionId,
       tutorialStepIndex: -1,
       tutorialCompleted: false,
       tutorialPanelsOpened: [],
@@ -4068,12 +4190,51 @@ export const useGameStore = create<GameState>((set) => ({
       audioSettings: { ...DEFAULT_AUDIO_SETTINGS },
       pendingFloatingTexts: [],
       pendingCameraEffects: [],
+      prestige: prestigeState,
     })
   },
 
   refreshSaveSlots: () =>
     set({ saveSlots: getSaveIndex() }),
 
+  // ── Prestige / New Game+ ──────────────────────────────────────
+  doPrestige: () => {
+    // Read current state to compute prestige points
+    let didPrestige = false
+    set((state) => {
+      if (!canPrestige(state)) return {}
+
+      const currentPrestige = state.prestige
+      const pointsEarned = calcPrestigePoints({
+        cabinets: state.cabinets,
+        achievements: state.achievements,
+        completedContracts: state.completedContracts,
+        money: state.money,
+        sites: state.sites,
+      })
+
+      const newLevel = Math.min(currentPrestige.level + 1, MAX_PRESTIGE_LEVEL)
+      const newBonuses = calcPrestigeBonuses(newLevel)
+      const newPrestige: PrestigeState = {
+        level: newLevel,
+        totalPrestigePoints: currentPrestige.totalPrestigePoints + pointsEarned,
+        bonuses: newBonuses,
+        highestTickReached: Math.max(currentPrestige.highestTickReached, state.tickCount),
+        highestRevenueReached: Math.max(currentPrestige.highestRevenueReached, state.revenue),
+        totalRunsCompleted: currentPrestige.totalRunsCompleted + 1,
+      }
+
+      // Persist prestige to localStorage before reset
+      savePrestige(newPrestige)
+      didPrestige = true
+      return {}
+    })
+    // After saving prestige to localStorage, do a full game reset
+    // resetGame() reads the new prestige from localStorage and applies bonuses
+    if (didPrestige) {
+      useGameStore.getState().resetGame()
+    }
+  },
 
   tick: () =>
     set((state) => {
@@ -4889,10 +5050,10 @@ export const useGameStore = create<GameState>((set) => ({
       const cableMgmtConfig = CABLE_MANAGEMENT_CONFIG.find((c) => c.type === state.cableManagementType)
       const facilityCableMessReduction = cableMgmtConfig?.cableMessReduction ?? 0
 
-      // Regional ambient modifier: remote sites have ambient temp shifted by region's coolingEfficiency
+      // Regional ambient modifier: all sites have ambient temp shifted by region's coolingEfficiency
       const activeSiteRegion = state.activeSiteId
         ? REGION_CATALOG.find((r) => r.id === state.sites.find((s) => s.id === state.activeSiteId)?.regionId)
-        : null
+        : REGION_CATALOG.find((r) => r.id === state.hqRegionId)
       const regionalAmbientOffset = activeSiteRegion ? activeSiteRegion.profile.coolingEfficiency : 0
       const effectiveAmbientTemp = SIM.ambientTemp + regionalAmbientOffset
 
@@ -4964,7 +5125,8 @@ export const useGameStore = create<GameState>((set) => ({
         const zoneHeatBoost = zoneHeatReduction * SIM.heatPerServer // scale zone heat reduction relative to heat generation
         const baseCooling = state.coolingUnits.length > 0 ? unitCooling : coolingConfig.coolingRate
         const infraCooling = facilityRowEndCooling + facilityAisleWidthCooling + facilityRaisedFloorCooling + facilityCableMessReduction
-        heat -= (baseCooling + techCoolingBonus + aisleCoolingBoost + inRowBonus + staffCoolingBonus + zoneHeatBoost + dedicatedRowCoolingBonus + infraCooling) * incidentCoolingMult
+        const prestigeCoolingBoost = state.prestige.level > 0 ? (1 + state.prestige.bonuses.coolingEfficiency) : 1
+        heat -= (baseCooling + techCoolingBonus + aisleCoolingBoost + inRowBonus + staffCoolingBonus + zoneHeatBoost + dedicatedRowCoolingBonus + infraCooling) * incidentCoolingMult * prestigeCoolingBoost
 
         // Incident heat spike
         heat += incidentHeatAdd
@@ -5138,6 +5300,11 @@ export const useGameStore = create<GameState>((set) => ({
       }
       revenue *= incidentRevenueMult * outagePenalty
 
+      // Prestige revenue bonus
+      if (state.prestige.level > 0) {
+        revenue *= (1 + state.prestige.bonuses.revenueMultiplier)
+      }
+
       // Floating text: aggregate revenue (show every 4th tick to reduce visual noise)
       if (revenue > 0 && newTickCount % 4 === 0) {
         // Pick a random active cabinet to show revenue above
@@ -5176,7 +5343,8 @@ export const useGameStore = create<GameState>((set) => ({
       // 4. Calculate expenses (with spot pricing, incident power surge, customer type power draw)
       const regionalPowerMult = activeSiteRegion ? activeSiteRegion.profile.powerCostMultiplier : 1
       const effectivePower = Math.round(stats.totalPower * incidentPowerMult)
-      const spotPowerCost = SIM.powerCostPerKW * effectivePowerPrice * regionalPowerMult
+      const prestigePowerDiscount = state.prestige.level > 0 ? (1 - state.prestige.bonuses.powerCostReduction) : 1
+      const spotPowerCost = SIM.powerCostPerKW * effectivePowerPrice * regionalPowerMult * prestigePowerDiscount
       const powerCost = +(effectivePower / 1000 * spotPowerCost).toFixed(2)
       const coolingCost = +(adjustedCoolingPower / 1000 * spotPowerCost).toFixed(2)
       // Cooling unit power draw
@@ -6304,6 +6472,11 @@ export const useGameStore = create<GameState>((set) => ({
       if (state.rowEndSlots.length >= 4) unlock('row_end_equipped')
       if (Object.keys(state.aisleWidths).length >= 2) unlock('wide_aisles')
       if (Object.keys(state.rackDetails).length >= 1) unlock('rack_detailed')
+      // Prestige achievements
+      if (state.prestige.level >= 1) unlock('first_prestige')
+      if (state.prestige.level >= 3) unlock('prestige_3')
+      if (state.prestige.level >= 5) unlock('prestige_5')
+      if (state.prestige.level >= MAX_PRESTIGE_LEVEL) unlock('prestige_max')
 
       // ── Phase 6 — Multi-Site Expansion Tick ────────────────────
       const suiteTierOrder: SuiteTier[] = ['starter', 'standard', 'professional', 'enterprise']

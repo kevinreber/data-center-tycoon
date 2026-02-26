@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useGameStore, SIM, DEPRECIATION, POWER_DRAW, ENVIRONMENT_CONFIG, CUSTOMER_TYPE_CONFIG, MAX_SERVERS_PER_CABINET, ZONE_BONUS_CONFIG, calcMixedEnvPenalties, DEDICATED_ROW_BONUS_CONFIG, RACK_EQUIPMENT_CONFIG, RACK_TOTAL_U } from '@/stores/gameStore'
+import { useGameStore, SIM, DEPRECIATION, POWER_DRAW, ENVIRONMENT_CONFIG, CUSTOMER_TYPE_CONFIG, MAX_SERVERS_PER_CABINET, ZONE_BONUS_CONFIG, calcMixedEnvPenalties, DEDICATED_ROW_BONUS_CONFIG, RACK_EQUIPMENT_CONFIG, RACK_TOTAL_U, RACK_COST } from '@/stores/gameStore'
 import type { Cabinet, RackEquipmentType } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -10,7 +10,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import {
-  X, Power, Thermometer, Clock, RefreshCw, Server,
+  X, Power, Thermometer, Clock, RefreshCw, Server, Plus,
   Network, ArrowUpDown, Cpu, Zap, DollarSign, LayoutGrid, AlertTriangle,
 } from 'lucide-react'
 
@@ -85,6 +85,7 @@ function CabinetDetail({ cabinet }: { cabinet: Cabinet }) {
     toggleCabinetPower, refreshServers, money,
     selectCabinet, coolingType, trafficStats, zones, cabinets, dedicatedRows,
     rackDetails, installRackEquipment, removeRackEquipment,
+    addServerToCabinet, addLeafToCabinet,
   } = useGameStore()
 
   const envConfig = ENVIRONMENT_CONFIG[cabinet.environment]
@@ -275,6 +276,52 @@ function CabinetDetail({ cabinet }: { cabinet: Cabinet }) {
           {/* Actions */}
           <div className="flex flex-col gap-1.5">
             <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">Actions</div>
+
+            {/* Install Server / Install Leaf */}
+            <div className="flex gap-1.5">
+              {cabinet.serverCount < MAX_SERVERS_PER_CABINET && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="xs"
+                      className="flex-1 text-[10px] gap-1 border-neon-green/30 text-neon-green hover:bg-neon-green/10"
+                      onClick={() => addServerToCabinet(cabinet.id)}
+                      disabled={money < RACK_COST.server}
+                    >
+                      <Plus className="size-3" />
+                      <Server className="size-3" />
+                      Server (${RACK_COST.server.toLocaleString()})
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    Install a server in this cabinet ({cabinet.serverCount}/{MAX_SERVERS_PER_CABINET} slots used)
+                    {money < RACK_COST.server && <><br /><span className="text-neon-red">Insufficient funds</span></>}
+                  </TooltipContent>
+                </Tooltip>
+              )}
+              {!cabinet.hasLeafSwitch && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="xs"
+                      className="flex-1 text-[10px] gap-1 border-neon-cyan/30 text-neon-cyan hover:bg-neon-cyan/10"
+                      onClick={() => addLeafToCabinet(cabinet.id)}
+                      disabled={money < RACK_COST.leaf_switch}
+                    >
+                      <Plus className="size-3" />
+                      <Network className="size-3" />
+                      Leaf (${RACK_COST.leaf_switch.toLocaleString()})
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    Install a leaf switch in this cabinet
+                    {money < RACK_COST.leaf_switch && <><br /><span className="text-neon-red">Insufficient funds</span></>}
+                  </TooltipContent>
+                </Tooltip>
+              )}
+            </div>
 
             <div className="flex gap-1.5">
               <Tooltip>

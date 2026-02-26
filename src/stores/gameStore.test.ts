@@ -316,4 +316,161 @@ describe('cabinet placement', () => {
       expect(useGameStore.getState().aisleContainments).toHaveLength(0)
     })
   })
+
+  describe('manual server placement', () => {
+    describe('addServerToCabinet', () => {
+      it('adds a server to a specific cabinet', () => {
+        useGameStore.getState().addCabinet(0, STARTER_ROW_0, 'production')
+        const cabId = useGameStore.getState().cabinets[0].id
+        expect(useGameStore.getState().cabinets[0].serverCount).toBe(1)
+
+        useGameStore.getState().addServerToCabinet(cabId)
+
+        expect(useGameStore.getState().cabinets[0].serverCount).toBe(2)
+      })
+
+      it('deducts server cost', () => {
+        useGameStore.getState().addCabinet(0, STARTER_ROW_0, 'production')
+        const cabId = useGameStore.getState().cabinets[0].id
+        const moneyBefore = useGameStore.getState().money
+
+        useGameStore.getState().addServerToCabinet(cabId)
+
+        expect(useGameStore.getState().money).toBe(moneyBefore - 2000)
+      })
+
+      it('refuses when cabinet is full', () => {
+        useGameStore.getState().addCabinet(0, STARTER_ROW_0, 'production')
+        const cabId = useGameStore.getState().cabinets[0].id
+        // Fill cabinet to max (4 servers)
+        useGameStore.getState().addServerToCabinet(cabId)
+        useGameStore.getState().addServerToCabinet(cabId)
+        useGameStore.getState().addServerToCabinet(cabId)
+        expect(useGameStore.getState().cabinets[0].serverCount).toBe(4)
+
+        const moneyBefore = useGameStore.getState().money
+        useGameStore.getState().addServerToCabinet(cabId)
+
+        expect(useGameStore.getState().cabinets[0].serverCount).toBe(4)
+        expect(useGameStore.getState().money).toBe(moneyBefore)
+      })
+
+      it('refuses with insufficient funds', () => {
+        useGameStore.getState().addCabinet(0, STARTER_ROW_0, 'production')
+        const cabId = useGameStore.getState().cabinets[0].id
+        useGameStore.setState({ money: 100 })
+
+        useGameStore.getState().addServerToCabinet(cabId)
+
+        expect(useGameStore.getState().cabinets[0].serverCount).toBe(1)
+      })
+
+      it('refuses for non-existent cabinet id', () => {
+        useGameStore.getState().addCabinet(0, STARTER_ROW_0, 'production')
+        const moneyBefore = useGameStore.getState().money
+
+        useGameStore.getState().addServerToCabinet('cab-999')
+
+        expect(useGameStore.getState().money).toBe(moneyBefore)
+      })
+
+      it('targets the correct cabinet when multiple exist', () => {
+        useGameStore.getState().addCabinet(0, STARTER_ROW_0, 'production')
+        useGameStore.getState().addCabinet(1, STARTER_ROW_0, 'production')
+        const cabs = useGameStore.getState().cabinets
+        const secondCabId = cabs[1].id
+
+        useGameStore.getState().addServerToCabinet(secondCabId)
+
+        const updated = useGameStore.getState().cabinets
+        expect(updated[0].serverCount).toBe(1) // first unchanged
+        expect(updated[1].serverCount).toBe(2) // second got the server
+      })
+
+      it('exits equipment placement mode after install', () => {
+        useGameStore.getState().addCabinet(0, STARTER_ROW_0, 'production')
+        const cabId = useGameStore.getState().cabinets[0].id
+        useGameStore.getState().enterEquipmentPlacementMode('server')
+        expect(useGameStore.getState().equipmentPlacementMode).toBe('server')
+
+        useGameStore.getState().addServerToCabinet(cabId)
+
+        expect(useGameStore.getState().equipmentPlacementMode).toBeNull()
+      })
+    })
+
+    describe('addLeafToCabinet', () => {
+      it('adds a leaf switch to a specific cabinet', () => {
+        useGameStore.getState().addCabinet(0, STARTER_ROW_0, 'production')
+        const cabId = useGameStore.getState().cabinets[0].id
+        expect(useGameStore.getState().cabinets[0].hasLeafSwitch).toBe(false)
+
+        useGameStore.getState().addLeafToCabinet(cabId)
+
+        expect(useGameStore.getState().cabinets[0].hasLeafSwitch).toBe(true)
+      })
+
+      it('refuses when cabinet already has a leaf switch', () => {
+        useGameStore.getState().addCabinet(0, STARTER_ROW_0, 'production')
+        const cabId = useGameStore.getState().cabinets[0].id
+        useGameStore.getState().addLeafToCabinet(cabId)
+        const moneyBefore = useGameStore.getState().money
+
+        useGameStore.getState().addLeafToCabinet(cabId)
+
+        expect(useGameStore.getState().money).toBe(moneyBefore)
+      })
+
+      it('targets the correct cabinet when multiple exist', () => {
+        useGameStore.getState().addCabinet(0, STARTER_ROW_0, 'production')
+        useGameStore.getState().addCabinet(1, STARTER_ROW_0, 'production')
+        const secondCabId = useGameStore.getState().cabinets[1].id
+
+        useGameStore.getState().addLeafToCabinet(secondCabId)
+
+        const updated = useGameStore.getState().cabinets
+        expect(updated[0].hasLeafSwitch).toBe(false) // first unchanged
+        expect(updated[1].hasLeafSwitch).toBe(true) // second got the leaf
+      })
+    })
+
+    describe('equipment placement mode', () => {
+      it('enterEquipmentPlacementMode sets mode and clears cabinet placement', () => {
+        useGameStore.getState().enterPlacementMode('production', 'general')
+        expect(useGameStore.getState().placementMode).toBe(true)
+
+        useGameStore.getState().enterEquipmentPlacementMode('server')
+
+        expect(useGameStore.getState().equipmentPlacementMode).toBe('server')
+        expect(useGameStore.getState().placementMode).toBe(false)
+      })
+
+      it('exitEquipmentPlacementMode clears the mode', () => {
+        useGameStore.getState().enterEquipmentPlacementMode('leaf')
+        expect(useGameStore.getState().equipmentPlacementMode).toBe('leaf')
+
+        useGameStore.getState().exitEquipmentPlacementMode()
+
+        expect(useGameStore.getState().equipmentPlacementMode).toBeNull()
+      })
+
+      it('entering cabinet placement mode clears equipment placement mode', () => {
+        useGameStore.getState().enterEquipmentPlacementMode('server')
+        expect(useGameStore.getState().equipmentPlacementMode).toBe('server')
+
+        useGameStore.getState().enterPlacementMode('production', 'general')
+
+        expect(useGameStore.getState().equipmentPlacementMode).toBeNull()
+        expect(useGameStore.getState().placementMode).toBe(true)
+      })
+
+      it('equipmentPlacementMode resets on resetGame', () => {
+        useGameStore.getState().enterEquipmentPlacementMode('server')
+
+        useGameStore.getState().resetGame()
+
+        expect(useGameStore.getState().equipmentPlacementMode).toBeNull()
+      })
+    })
+  })
 })
