@@ -92,6 +92,13 @@ All complete. Staff, environment, security, and competitors create a living worl
 - [x] 4 premium contract types gated by compliance (healthcare, finance, government)
 - [x] Security panel with tier, features, and compliance status
 - [x] 4 achievements: Locked Down, Fully Compliant, Fort Knox, Government Contractor
+- [x] Network Access Control Lists (NACLs) — 4 policy tiers (Open, Standard, Strict, Zero Trust)
+- [x] NACL bandwidth overhead tradeoff (0–10% throughput reduction for packet inspection)
+- [x] NACL network defense — blocks DDoS and ransomware incidents per tick
+- [x] NACL policies gated by security tier (Enhanced+ for Standard, Maximum for Zero Trust)
+- [x] NACL UI in Security panel with policy selection, defense stats, and attack counter
+- [x] 3 NACL achievements: Firewall Admin, Zero Trust Architect, DDoS Denied
+- [x] NACL tutorial tip triggers when security tier supports filtering
 
 ### 4D. Competitor AI ✅
 - [x] Competitor type with name, personality, strength, specialization, reputation

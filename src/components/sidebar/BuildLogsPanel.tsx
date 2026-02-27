@@ -16,6 +16,21 @@ interface VersionEntry {
 
 const CHANGELOG: VersionEntry[] = [
   {
+    version: 'v0.5.3',
+    date: 'Feb 2026',
+    title: 'The Network Security Update',
+    highlights: 'Network Access Control Lists (NACLs) add network-level defense against DDoS and ransomware. Choose from 4 NACL policies with tradeoffs between security and bandwidth.',
+    changes: [
+      { text: 'NACL policies — 4 tiers (Open, Standard, Strict, Zero Trust) with increasing network defense and bandwidth overhead', type: 'new' },
+      { text: 'Network attack blocking — NACLs automatically block DDoS and ransomware incidents each tick based on defense rating', type: 'new' },
+      { text: 'Bandwidth tradeoff — stricter NACL policies reduce effective traffic throughput (3–10% overhead)', type: 'new' },
+      { text: '3 new achievements: Firewall Admin, Zero Trust Architect, DDoS Denied', type: 'new' },
+      { text: 'NACL tutorial tip triggers when security tier supports filtering but no policy is set', type: 'new' },
+      { text: 'Security panel updated with dedicated NACL section showing policy selection, defense stats, and attack counter', type: 'improved' },
+      { text: 'In-game guide updated with NACL documentation showing all policy tiers and tradeoffs', type: 'improved' },
+    ],
+  },
+  {
     version: 'v0.5.2',
     date: 'Feb 2026',
     title: 'The Global Strategy Update',

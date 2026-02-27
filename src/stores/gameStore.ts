@@ -44,6 +44,7 @@ export type {
   LeaderboardCategory, LeaderboardEntry, AudioSettings,
   FloatingTextEvent, CameraEffect, CameraEffectType,
   PrestigeBonuses, PrestigeState,
+  NaclPolicy, NaclPolicyConfig,
 } from './types'
 
 import type {
@@ -73,6 +74,7 @@ import type {
   FloatingTextEvent, CameraEffect,
   DataCenterLayout, DataCenterRow,
   PrestigeState,
+  NaclPolicy,
 } from './types'
 
 // ── Re-export constants ────────────────────────────────────────
@@ -92,8 +94,8 @@ import { TECH_TREE, OPS_TIER_CONFIG, OPS_TIER_ORDER, CONTRACT_CATALOG, CONTRACT_
 export { LOAN_OPTIONS, POWER_MARKET, DEPRECIATION, INSURANCE_OPTIONS, DRILL_CONFIG, VALUATION_MILESTONES, PATENT_CONFIG, RFP_CONFIG, SPOT_COMPUTE_CONFIG, MAINTENANCE_CONFIG, PEERING_OPTIONS, INTERCONNECT_PORT_CONFIG, MEETME_ROOM_CONFIG, INTERCONNECT_TENANTS, SUPPLY_CHAIN_CONFIG, SEASON_CONFIG, WEATHER_CONDITION_CONFIG, STAFF_ROLE_CONFIG, STAFF_CERT_CONFIG, SHIFT_PATTERN_CONFIG, MAX_STAFF_BY_TIER, FIRST_NAMES, LAST_NAMES, generateStaffName } from './configs/economy'
 import { LOAN_OPTIONS, POWER_MARKET, DEPRECIATION, INSURANCE_OPTIONS, DRILL_CONFIG, VALUATION_MILESTONES, PATENT_CONFIG, RFP_CONFIG, SPOT_COMPUTE_CONFIG, MAINTENANCE_CONFIG, PEERING_OPTIONS, INTERCONNECT_PORT_CONFIG, MEETME_ROOM_CONFIG, INTERCONNECT_TENANTS, SUPPLY_CHAIN_CONFIG, SEASON_CONFIG, WEATHER_CONDITION_CONFIG, STAFF_ROLE_CONFIG, STAFF_CERT_CONFIG, SHIFT_PATTERN_CONFIG, MAX_STAFF_BY_TIER, generateStaffName } from './configs/economy'
 
-export { ENERGY_SOURCE_CONFIG, GREEN_CERT_CONFIG, CARBON_TAX_SCHEDULE, WATER_USAGE_CONFIG, EWASTE_CONFIG, SECURITY_FEATURE_CONFIG, SECURITY_TIER_CONFIG, COMPLIANCE_CERT_CONFIG, COMPETITOR_PERSONALITIES, COMPETITOR_NAMES, COMPETITOR_SCALE_CONFIG, MULTI_SITE_GATE, SITE_TYPE_CONFIG, REGION_CATALOG, REGION_RESEARCH_COST, MAX_SITES, INTER_SITE_LINK_CONFIG, DISTANCE_LATENCY_MODIFIER, EDGE_POP_CDN_REVENUE_PER_GBPS, MAX_LINKS_PER_SITE, BANDWIDTH_OVERAGE_COST, REGIONAL_INCIDENT_CATALOG, DISASTER_PREP_CONFIG, MAX_REGIONAL_INCIDENTS, DATA_SOVEREIGNTY_CONFIG, MULTI_SITE_CONTRACT_CATALOG, MAX_MULTI_SITE_CONTRACTS, STAFF_TRANSFER_CONFIG, MAX_STAFF_TRANSFERS, DEMAND_GROWTH_CONFIG, COMPETITOR_REGIONAL_CONFIG, getRegionSovereignty } from './configs/world'
-import { ENERGY_SOURCE_CONFIG, GREEN_CERT_CONFIG, CARBON_TAX_SCHEDULE, WATER_USAGE_CONFIG, EWASTE_CONFIG, SECURITY_FEATURE_CONFIG, SECURITY_TIER_CONFIG, COMPLIANCE_CERT_CONFIG, COMPETITOR_PERSONALITIES, COMPETITOR_NAMES, COMPETITOR_SCALE_CONFIG, MULTI_SITE_GATE, SITE_TYPE_CONFIG, REGION_CATALOG, REGION_RESEARCH_COST, MAX_SITES, INTER_SITE_LINK_CONFIG, DISTANCE_LATENCY_MODIFIER, EDGE_POP_CDN_REVENUE_PER_GBPS, MAX_LINKS_PER_SITE, REGIONAL_INCIDENT_CATALOG, DISASTER_PREP_CONFIG, MAX_REGIONAL_INCIDENTS, DATA_SOVEREIGNTY_CONFIG, MULTI_SITE_CONTRACT_CATALOG, MAX_MULTI_SITE_CONTRACTS, STAFF_TRANSFER_CONFIG, MAX_STAFF_TRANSFERS, DEMAND_GROWTH_CONFIG, COMPETITOR_REGIONAL_CONFIG } from './configs/world'
+export { ENERGY_SOURCE_CONFIG, GREEN_CERT_CONFIG, CARBON_TAX_SCHEDULE, WATER_USAGE_CONFIG, EWASTE_CONFIG, SECURITY_FEATURE_CONFIG, SECURITY_TIER_CONFIG, COMPLIANCE_CERT_CONFIG, COMPETITOR_PERSONALITIES, COMPETITOR_NAMES, COMPETITOR_SCALE_CONFIG, MULTI_SITE_GATE, SITE_TYPE_CONFIG, REGION_CATALOG, REGION_RESEARCH_COST, MAX_SITES, INTER_SITE_LINK_CONFIG, DISTANCE_LATENCY_MODIFIER, EDGE_POP_CDN_REVENUE_PER_GBPS, MAX_LINKS_PER_SITE, BANDWIDTH_OVERAGE_COST, REGIONAL_INCIDENT_CATALOG, DISASTER_PREP_CONFIG, MAX_REGIONAL_INCIDENTS, DATA_SOVEREIGNTY_CONFIG, MULTI_SITE_CONTRACT_CATALOG, MAX_MULTI_SITE_CONTRACTS, STAFF_TRANSFER_CONFIG, MAX_STAFF_TRANSFERS, DEMAND_GROWTH_CONFIG, COMPETITOR_REGIONAL_CONFIG, getRegionSovereignty, NACL_POLICY_CONFIG, NACL_BLOCKED_INCIDENT_TYPES } from './configs/world'
+import { ENERGY_SOURCE_CONFIG, GREEN_CERT_CONFIG, CARBON_TAX_SCHEDULE, WATER_USAGE_CONFIG, EWASTE_CONFIG, SECURITY_FEATURE_CONFIG, SECURITY_TIER_CONFIG, COMPLIANCE_CERT_CONFIG, COMPETITOR_PERSONALITIES, COMPETITOR_NAMES, COMPETITOR_SCALE_CONFIG, MULTI_SITE_GATE, SITE_TYPE_CONFIG, REGION_CATALOG, REGION_RESEARCH_COST, MAX_SITES, INTER_SITE_LINK_CONFIG, DISTANCE_LATENCY_MODIFIER, EDGE_POP_CDN_REVENUE_PER_GBPS, MAX_LINKS_PER_SITE, REGIONAL_INCIDENT_CATALOG, DISASTER_PREP_CONFIG, MAX_REGIONAL_INCIDENTS, DATA_SOVEREIGNTY_CONFIG, MULTI_SITE_CONTRACT_CATALOG, MAX_MULTI_SITE_CONTRACTS, STAFF_TRANSFER_CONFIG, MAX_STAFF_TRANSFERS, DEMAND_GROWTH_CONFIG, COMPETITOR_REGIONAL_CONFIG, NACL_POLICY_CONFIG, NACL_BLOCKED_INCIDENT_TYPES } from './configs/world'
 
 // ── Re-export calculations ─────────────────────────────────────
 export { coolingOverheadFactor, calcManagementBonus, calcTrafficWithCapacity, calcCabinetCooling, getCabinetsInPDURange, getPDULoad, isPDUOverloaded, calcCableLength, getFacingOffsets, calcAisleBonus, countAisleViolations, getAdjacentCabinets, hasMaintenanceAccess, calcSpacingHeatEffect, countMessyCables, calcZones, isZoneRequirementMet, calcMixedEnvPenalties, calcDedicatedRows, getSuiteLimits, getCabinetRowAtGrid, getValidCabinetGridRows, getRowFacing, getPlacementHints, getActiveLayout, formatGameTime, getReputationTier } from './calculations'
@@ -452,6 +454,8 @@ interface GameState {
   securityMaintenanceCost: number
   intrusionsBlocked: number
   auditCooldown: number
+  naclPolicy: NaclPolicy
+  networkAttacksBlocked: number
 
   // Phase 4D — Competitor AI
   competitors: Competitor[]
@@ -648,6 +652,7 @@ interface GameState {
   // Phase 4C — Security & Compliance actions
   upgradeSecurityTier: (tier: SecurityTier) => void
   startComplianceAudit: (certId: ComplianceCertId) => void
+  setNaclPolicy: (policy: NaclPolicy) => void
   // Phase 4D — Competitor AI actions
   counterPoachOffer: () => void
   // Operations Progression actions
@@ -1065,6 +1070,8 @@ export const useGameStore = create<GameState>((set) => ({
   securityMaintenanceCost: 0,
   intrusionsBlocked: 0,
   auditCooldown: 0,
+  naclPolicy: 'open' as NaclPolicy,
+  networkAttacksBlocked: 0,
 
   // Phase 4D — Competitor AI
   competitors: [] as Competitor[],
@@ -2384,6 +2391,16 @@ export const useGameStore = create<GameState>((set) => ({
       }
     }),
 
+  setNaclPolicy: (policy: NaclPolicy) =>
+    set((state) => {
+      const config = NACL_POLICY_CONFIG.find((c) => c.policy === policy)
+      if (!config) return state
+      // Check security tier requirement
+      const tierOrder: SecurityTier[] = ['basic', 'enhanced', 'high_security', 'maximum']
+      if (tierOrder.indexOf(state.securityTier) < tierOrder.indexOf(config.requiredSecurityTier)) return state
+      return { naclPolicy: policy }
+    }),
+
   // ── Phase 4D: Competitor AI Actions ────────────────────────────
 
   counterPoachOffer: () =>
@@ -3555,6 +3572,8 @@ export const useGameStore = create<GameState>((set) => ({
       securityMaintenanceCost: 18,
       intrusionsBlocked: 4,
       auditCooldown: 0,
+      naclPolicy: 'standard' as NaclPolicy,
+      networkAttacksBlocked: 2,
       // Competitor AI
       competitors: demoCompetitors,
       competitorBids: [],
@@ -3780,6 +3799,8 @@ export const useGameStore = create<GameState>((set) => ({
       securityMaintenanceCost: 0,
       intrusionsBlocked: 0,
       auditCooldown: 0,
+      naclPolicy: 'open' as NaclPolicy,
+      networkAttacksBlocked: 0,
       // Phase 4D — Competitor AI
       competitors: [] as Competitor[],
       competitorBids: [] as CompetitorBid[],
@@ -4142,6 +4163,15 @@ export const useGameStore = create<GameState>((set) => ({
       tutorialCompleted: false,
       tutorialPanelsOpened: [],
       activeSlotId: null,
+      // Security & Compliance
+      securityTier: 'basic' as SecurityTier,
+      installedSecurityFeatures: ['badge_access'] as SecurityFeatureId[],
+      complianceCerts: [] as ActiveComplianceCert[],
+      securityMaintenanceCost: 0,
+      intrusionsBlocked: 0,
+      auditCooldown: 0,
+      naclPolicy: 'open' as NaclPolicy,
+      networkAttacksBlocked: 0,
       // Operations Progression
       opsTier: 'manual' as OpsTier,
       opsAutoResolvedCount: 0,
@@ -5470,8 +5500,10 @@ export const useGameStore = create<GameState>((set) => ({
       const netIncome = revenue + contractRevenue - expenses - loanPayments - contractPenalties
       const newMoney = Math.round((state.money + netIncome) * 100) / 100
 
-      // 8. Calculate traffic flows (with tech link capacity override)
-      const effectiveDemand = demandMultiplier * incidentTrafficMult
+      // 8. Calculate traffic flows (with tech link capacity override + NACL overhead)
+      const naclConfig = NACL_POLICY_CONFIG.find((c) => c.policy === state.naclPolicy)
+      const naclOverhead = naclConfig?.bandwidthOverhead ?? 0
+      const effectiveDemand = demandMultiplier * incidentTrafficMult * (1 - naclOverhead)
       const trafficStats = hasTech('optical_interconnect')
         ? calcTrafficWithCapacity(newCabinets, spineSwitches, effectiveDemand, techLinkCapacity)
         : calcTraffic(newCabinets, spineSwitches, effectiveDemand)
@@ -5932,7 +5964,7 @@ export const useGameStore = create<GameState>((set) => ({
 
       // ── Phase 4C: Security & Compliance ───────────────────────────
       const securityTierConfig = SECURITY_TIER_CONFIG.find((c) => c.tier === state.securityTier)
-      const securityMaintenanceCost = securityTierConfig?.maintenancePerTick ?? 0
+      const securityMaintenanceCost = (securityTierConfig?.maintenancePerTick ?? 0) + (NACL_POLICY_CONFIG.find((c) => c.policy === state.naclPolicy)?.costPerTick ?? 0)
 
       // Process compliance audits
       let complianceCerts = state.complianceCerts.map((cert) => {
@@ -5986,6 +6018,20 @@ export const useGameStore = create<GameState>((set) => ({
       })
 
       const auditCooldown = Math.max(0, state.auditCooldown - 1)
+
+      // NACL network attack blocking (DDoS, ransomware)
+      const naclDefense = naclConfig?.networkDefenseBonus ?? 0
+      let networkAttacksBlocked = state.networkAttacksBlocked
+      activeIncidents = activeIncidents.map((inc) => {
+        if ((NACL_BLOCKED_INCIDENT_TYPES as readonly string[]).includes(inc.def.type) && !inc.resolved && naclDefense > 0) {
+          if (Math.random() < naclDefense) {
+            networkAttacksBlocked++
+            incidentLog = [`NACL blocked: ${inc.def.label}`, ...incidentLog].slice(0, 10)
+            return { ...inc, resolved: true }
+          }
+        }
+        return inc
+      })
 
       // ── Phase 4D: Competitor AI ───────────────────────────────────
       let competitors = [...state.competitors]
@@ -6237,6 +6283,7 @@ export const useGameStore = create<GameState>((set) => ({
       if (priceWarActive && !state.priceWarActive) logEvent('system', 'Competitor price war started!', 'warning')
       if (competitors.length > state.competitors.length) logEvent('system', 'New competitor entered the market', 'info')
       if (intrusionsBlocked > state.intrusionsBlocked) logEvent('incident', 'Security intrusion blocked', 'success')
+      if (networkAttacksBlocked > state.networkAttacksBlocked) logEvent('incident', 'NACL blocked network attack', 'success')
       if (complianceCerts.some((c) => !c.auditInProgress && c.grantedAtTick === newTickCount)) logEvent('achievement', 'Compliance certification granted!', 'success')
       if (opsAutoResolvedCount > state.opsAutoResolvedCount) logEvent('system', 'Ops automation auto-resolved an incident', 'success')
       if (opsPreventedCount > state.opsPreventedCount) logEvent('system', 'Ops monitoring prevented an incident', 'info')
@@ -6302,6 +6349,7 @@ export const useGameStore = create<GameState>((set) => ({
           if (tip.id === 'security_upgrade' && state.securityTier === 'basic' && newCabinets.length >= 8) trigger = true
           if (tip.id === 'intrusion_detected' && activeIncidents.some((i) => securityIncidentTypes.includes(i.def.type))) trigger = true
           if (tip.id === 'compliance_expiring' && complianceCerts.some((c) => !c.auditInProgress && c.expiresAtTick - newTickCount < 30)) trigger = true
+          if (tip.id === 'nacl_available' && state.securityTier !== 'basic' && state.naclPolicy === 'open') trigger = true
           // Phase 4D — Competitor tips
           if (tip.id === 'competitor_appeared' && competitors.length === 1 && state.competitors.length === 0) trigger = true
           if (tip.id === 'competitor_bidding' && competitorBids.length > 0 && state.competitorBids.length === 0) trigger = true
@@ -6445,6 +6493,10 @@ export const useGameStore = create<GameState>((set) => ({
       if (state.securityTier === 'high_security' || state.securityTier === 'maximum') unlock('locked_down')
       if (complianceCerts.filter((c) => !c.auditInProgress && c.grantedAtTick > 0).length >= 3) unlock('fully_compliant')
       if (intrusionsBlocked >= 10) unlock('fort_knox')
+      // NACL achievements
+      if (state.naclPolicy !== 'open') unlock('firewall_admin')
+      if (state.naclPolicy === 'zero_trust') unlock('zero_trust_architect')
+      if (networkAttacksBlocked >= 5) unlock('ddos_denied')
       // Check government contractor (completed a FedRAMP-gated contract)
       if (completedContracts > state.completedContracts) {
         const justCompleted = state.activeContracts.find((c) => c.status === 'active' && c.ticksRemaining <= 1)
@@ -6949,6 +7001,7 @@ export const useGameStore = create<GameState>((set) => ({
         securityMaintenanceCost,
         intrusionsBlocked,
         auditCooldown,
+        networkAttacksBlocked,
         // Phase 4D — Competitor AI
         competitors,
         competitorBids,

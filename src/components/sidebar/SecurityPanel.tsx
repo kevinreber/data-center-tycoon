@@ -1,8 +1,8 @@
-import { useGameStore, SECURITY_TIER_CONFIG, COMPLIANCE_CERT_CONFIG, SECURITY_FEATURE_CONFIG } from '@/stores/gameStore'
+import { useGameStore, SECURITY_TIER_CONFIG, COMPLIANCE_CERT_CONFIG, SECURITY_FEATURE_CONFIG, NACL_POLICY_CONFIG } from '@/stores/gameStore'
 import type { SecurityTier } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Shield, Lock, FileCheck, Eye, AlertTriangle } from 'lucide-react'
+import { Shield, Lock, FileCheck, Eye, AlertTriangle, Network } from 'lucide-react'
 import {
   Tooltip,
   TooltipContent,
@@ -15,6 +15,7 @@ export function SecurityPanel() {
     complianceCerts, startComplianceAudit, auditCooldown,
     intrusionsBlocked, securityMaintenanceCost,
     reputationScore, staff, tickCount,
+    naclPolicy, setNaclPolicy, networkAttacksBlocked,
   } = useGameStore()
 
   const currentTierConfig = SECURITY_TIER_CONFIG.find((c) => c.tier === securityTier)
@@ -27,6 +28,8 @@ export function SecurityPanel() {
     const feat = SECURITY_FEATURE_CONFIG.find((f) => f.id === fId)
     return sum + (feat?.intrusionDefense ?? 0)
   }, 0)
+
+  const currentNaclConfig = NACL_POLICY_CONFIG.find((c) => c.policy === naclPolicy)
 
   return (
     <div className="flex flex-col gap-4">
@@ -127,6 +130,88 @@ export function SecurityPanel() {
         {securityTier === 'maximum' && (
           <p className="text-xs text-neon-green/60 italic mt-1">Maximum security achieved.</p>
         )}
+      </div>
+
+      {/* Network Access Control Lists */}
+      <div className="border-t border-border pt-3">
+        <div className="flex items-center gap-2 mb-2">
+          <Network className="size-3" style={{ color: currentNaclConfig?.color ?? '#888' }} />
+          <span className="text-xs font-bold" style={{ color: currentNaclConfig?.color ?? '#888' }}>
+            NETWORK ACLs
+          </span>
+          <Badge
+            className="ml-auto font-mono text-xs border"
+            style={{
+              backgroundColor: `${currentNaclConfig?.color ?? '#888'}20`,
+              color: currentNaclConfig?.color ?? '#888',
+              borderColor: `${currentNaclConfig?.color ?? '#888'}40`,
+            }}
+          >
+            {currentNaclConfig?.label ?? naclPolicy}
+          </Badge>
+        </div>
+        <div className="flex flex-col gap-1 mb-2">
+          <div className="flex justify-between text-xs">
+            <span className="text-muted-foreground">Network Defense</span>
+            <span className="text-neon-green tabular-nums">{Math.round((currentNaclConfig?.networkDefenseBonus ?? 0) * 100)}%</span>
+          </div>
+          <div className="flex justify-between text-xs">
+            <span className="text-muted-foreground">Bandwidth Overhead</span>
+            <span className={`tabular-nums ${(currentNaclConfig?.bandwidthOverhead ?? 0) > 0 ? 'text-neon-red' : 'text-neon-green'}`}>
+              {currentNaclConfig?.bandwidthOverhead ? `-${Math.round(currentNaclConfig.bandwidthOverhead * 100)}%` : '0%'}
+            </span>
+          </div>
+          <div className="flex justify-between text-xs">
+            <span className="text-muted-foreground">NACL Cost</span>
+            <span className="text-neon-orange tabular-nums">${currentNaclConfig?.costPerTick ?? 0}/tick</span>
+          </div>
+          <div className="flex justify-between text-xs">
+            <span className="text-muted-foreground">Attacks Blocked</span>
+            <span className="text-neon-green tabular-nums">{networkAttacksBlocked}</span>
+          </div>
+        </div>
+
+        {/* NACL Policy Options */}
+        <div className="flex flex-col gap-1">
+          {NACL_POLICY_CONFIG.map((config) => {
+            const isActive = naclPolicy === config.policy
+            const meetsTier = tierOrder.indexOf(securityTier) >= tierOrder.indexOf(config.requiredSecurityTier)
+            return (
+              <Tooltip key={config.policy}>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setNaclPolicy(config.policy)}
+                    disabled={isActive || !meetsTier}
+                    className="justify-between font-mono text-xs transition-all"
+                    style={{
+                      borderColor: isActive ? `${config.color}60` : `${config.color}30`,
+                      backgroundColor: isActive ? `${config.color}15` : undefined,
+                    }}
+                  >
+                    <span className="flex items-center gap-1.5 truncate">
+                      <Network className="size-3" style={{ color: config.color }} />
+                      {config.label}
+                      {isActive && <Badge className="bg-neon-green/20 text-neon-green text-[9px] border-neon-green/30 py-0 px-1">ACTIVE</Badge>}
+                    </span>
+                    <span className="text-muted-foreground">${config.costPerTick}/tick</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="max-w-56">
+                  {config.description}
+                  <br />Network defense: +{Math.round(config.networkDefenseBonus * 100)}%
+                  <br />Bandwidth overhead: -{Math.round(config.bandwidthOverhead * 100)}%
+                  <br />Cost: ${config.costPerTick}/tick
+                  {config.enablesCompliance.length > 0 && (
+                    <><br />Enables: {config.enablesCompliance.join(', ').toUpperCase()}</>
+                  )}
+                  {!meetsTier && <><br /><span className="text-neon-red">Needs: {config.requiredSecurityTier} security</span></>}
+                </TooltipContent>
+              </Tooltip>
+            )
+          })}
+        </div>
       </div>
 
       {/* Compliance Certifications */}

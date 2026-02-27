@@ -20,6 +20,7 @@ import type {
   StaffTransferConfig,
   SovereigntyRegime,
   RegionId,
+  NaclPolicyConfig,
 } from '../types'
 
 // ── Carbon & Environmental Config ───────────────────────────────────
@@ -111,6 +112,18 @@ export const COMPLIANCE_CERT_CONFIG: ComplianceCertConfig[] = [
     requirements: { minSecurityTier: 'maximum', requiredFeatures: ['cctv', 'badge_access', 'biometric', 'mantrap', 'cage_isolation', 'encrypted_network', 'security_noc'], minReputation: 75, minSecurityOfficers: 2 },
     auditCost: 50000, auditDurationTicks: 20, auditInterval: 400, revenueBonus: 0.50, color: '#ff4444' },
 ]
+
+// ── Network Access Control List (NACL) Config ──────────────────────────
+
+export const NACL_POLICY_CONFIG: NaclPolicyConfig[] = [
+  { policy: 'open', label: 'Open', description: 'No network filtering. Maximum throughput, zero network-level defense.', costPerTick: 0, bandwidthOverhead: 0, networkDefenseBonus: 0, requiredSecurityTier: 'basic', enablesCompliance: [], color: '#888888' },
+  { policy: 'standard', label: 'Standard Filtering', description: 'Basic stateful packet inspection. Blocks common attack vectors with minimal overhead.', costPerTick: 50, bandwidthOverhead: 0.03, networkDefenseBonus: 0.15, requiredSecurityTier: 'enhanced', enablesCompliance: ['soc2_type1'], color: '#44aaff' },
+  { policy: 'strict', label: 'Strict Filtering', description: 'Deep packet inspection with application-layer rules. Strong defense at moderate throughput cost.', costPerTick: 150, bandwidthOverhead: 0.06, networkDefenseBonus: 0.30, requiredSecurityTier: 'high_security', enablesCompliance: ['pci_dss', 'hipaa'], color: '#ff8844' },
+  { policy: 'zero_trust', label: 'Zero Trust', description: 'Full traffic encryption, micro-segmentation, and continuous verification. Maximum defense, significant overhead.', costPerTick: 400, bandwidthOverhead: 0.10, networkDefenseBonus: 0.50, requiredSecurityTier: 'maximum', enablesCompliance: ['fedramp'], color: '#ff4444' },
+]
+
+/** Network incident types that NACLs can block */
+export const NACL_BLOCKED_INCIDENT_TYPES = ['ddos', 'ransomware'] as const
 
 // ── Competitor AI Config ────────────────────────────────────────────
 

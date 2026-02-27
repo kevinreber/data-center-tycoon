@@ -6,6 +6,7 @@ import type {
   ActiveIncident,
   StaffMember,
   CoolingUnit,
+  NaclPolicy,
 } from '@/stores/gameStore'
 import {
   SUPPLY_CHAIN_CONFIG,
@@ -55,6 +56,8 @@ import {
   ZONE_CONTRACT_REQUIREMENTS,
   isZoneRequirementMet,
   canPrestige,
+  NACL_POLICY_CONFIG,
+  NACL_BLOCKED_INCIDENT_TYPES,
 } from '@/stores/gameStore'
 import type { RegionId } from '@/stores/gameStore'
 
@@ -4123,6 +4126,154 @@ describe('Prestige / New Game+', () => {
       })),
     })
     expect(canPrestige(getState())).toBe(false)
+  })
+})
+
+describe('NACL System', () => {
+  it('should start with open NACL policy', () => {
+    expect(getState().naclPolicy).toBe('open')
+    expect(getState().networkAttacksBlocked).toBe(0)
+  })
+
+  it('should allow setting NACL policy when security tier meets requirement', () => {
+    setState({ securityTier: 'enhanced' })
+    getState().setNaclPolicy('standard')
+    expect(getState().naclPolicy).toBe('standard')
+  })
+
+  it('should reject NACL policy when security tier is insufficient', () => {
+    setState({ securityTier: 'basic' })
+    getState().setNaclPolicy('standard')
+    expect(getState().naclPolicy).toBe('open') // unchanged
+  })
+
+  it('should reject zero_trust when not at maximum security', () => {
+    setState({ securityTier: 'high_security' })
+    getState().setNaclPolicy('zero_trust')
+    expect(getState().naclPolicy).toBe('open') // unchanged
+  })
+
+  it('should allow zero_trust at maximum security', () => {
+    setState({ securityTier: 'maximum' })
+    getState().setNaclPolicy('zero_trust')
+    expect(getState().naclPolicy).toBe('zero_trust')
+  })
+
+  it('should allow downgrading NACL policy', () => {
+    setState({ securityTier: 'maximum', naclPolicy: 'zero_trust' as NaclPolicy })
+    getState().setNaclPolicy('open')
+    expect(getState().naclPolicy).toBe('open')
+  })
+
+  it('NACL cost should be included in security maintenance', () => {
+    setupBasicDataCenter()
+    setState({ securityTier: 'enhanced', naclPolicy: 'standard' as NaclPolicy })
+    getState().tick()
+    const state = getState()
+    // Enhanced tier = 8/tick + standard NACL = 50/tick = 58/tick total
+    expect(state.securityMaintenanceCost).toBe(58)
+  })
+
+  it('NACL bandwidth overhead should reduce effective traffic', () => {
+    setupBasicDataCenter()
+    // First tick with open NACL to get baseline
+    setState({ naclPolicy: 'open' as NaclPolicy })
+    getState().tick()
+    const openBandwidth = getState().trafficStats.totalBandwidthGbps
+
+    // Reset and tick with strict NACL (6% overhead)
+    getState().resetGame()
+    setupBasicDataCenter()
+    setState({ naclPolicy: 'strict' as NaclPolicy, securityTier: 'high_security' })
+    getState().tick()
+    const strictBandwidth = getState().trafficStats.totalBandwidthGbps
+
+    // Strict should have lower bandwidth than open (if traffic is flowing)
+    if (openBandwidth > 0) {
+      expect(strictBandwidth).toBeLessThan(openBandwidth)
+    }
+  })
+
+  it('NACL should block network attack incidents (DDoS/ransomware)', () => {
+    setupBasicDataCenter()
+    const ddosDef = INCIDENT_CATALOG.find((d) => d.type === 'ddos')!
+    const incident: ActiveIncident = {
+      id: 'test-ddos-1',
+      def: ddosDef,
+      ticksRemaining: 5,
+      resolved: false,
+    }
+    // Set high NACL defense to make blocking near-certain
+    setState({
+      activeIncidents: [incident],
+      naclPolicy: 'zero_trust' as NaclPolicy,
+      securityTier: 'maximum',
+    })
+
+    // Run multiple ticks to give blocking a chance (50% per tick)
+    let blocked = false
+    for (let i = 0; i < 20; i++) {
+      getState().tick()
+      if (getState().networkAttacksBlocked > 0) {
+        blocked = true
+        break
+      }
+      // Re-inject the incident if it resolved naturally
+      if (!getState().activeIncidents.some((inc) => inc.id === 'test-ddos-1')) {
+        setState({
+          activeIncidents: [incident],
+        })
+      }
+    }
+    expect(blocked).toBe(true)
+  })
+
+  it('open NACL policy should not block network attacks', () => {
+    setupBasicDataCenter()
+    const ddosDef = INCIDENT_CATALOG.find((d) => d.type === 'ddos')!
+    const incident: ActiveIncident = {
+      id: 'test-ddos-2',
+      def: ddosDef,
+      ticksRemaining: 5,
+      resolved: false,
+    }
+    setState({
+      activeIncidents: [incident],
+      naclPolicy: 'open' as NaclPolicy,
+    })
+    getState().tick()
+    // With open policy (0% defense), attacks should not be blocked by NACLs
+    expect(getState().networkAttacksBlocked).toBe(0)
+  })
+
+  it('NACL config should have correct structure', () => {
+    expect(NACL_POLICY_CONFIG).toHaveLength(4)
+    for (const config of NACL_POLICY_CONFIG) {
+      expect(config.policy).toBeDefined()
+      expect(config.label).toBeDefined()
+      expect(config.costPerTick).toBeGreaterThanOrEqual(0)
+      expect(config.bandwidthOverhead).toBeGreaterThanOrEqual(0)
+      expect(config.bandwidthOverhead).toBeLessThanOrEqual(1)
+      expect(config.networkDefenseBonus).toBeGreaterThanOrEqual(0)
+      expect(config.networkDefenseBonus).toBeLessThanOrEqual(1)
+    }
+  })
+
+  it('NACL blocked incident types should match known incidents', () => {
+    for (const type of NACL_BLOCKED_INCIDENT_TYPES) {
+      const found = INCIDENT_CATALOG.find((d) => d.type === type)
+      expect(found).toBeDefined()
+    }
+  })
+
+  it('should reset NACL state on resetGame', () => {
+    setState({
+      naclPolicy: 'strict' as NaclPolicy,
+      networkAttacksBlocked: 10,
+    })
+    getState().resetGame()
+    expect(getState().naclPolicy).toBe('open')
+    expect(getState().networkAttacksBlocked).toBe(0)
   })
 })
 
