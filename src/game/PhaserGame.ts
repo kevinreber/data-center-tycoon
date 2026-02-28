@@ -2083,6 +2083,52 @@ class DataCenterScene extends Phaser.Scene {
     }
   }
 
+  /** Spawn construction dust settling particles (site completed) */
+  spawnConstructionDust() {
+    const w = this.scale.width
+    const h = this.scale.height
+    // Gray/brown dust particles settling from above
+    for (let i = 0; i < 25; i++) {
+      const startX = w * 0.2 + Math.random() * w * 0.6
+      const startY = h * 0.3 + Math.random() * h * 0.2
+      this.particles.push({
+        x: startX,
+        y: startY,
+        vx: (Math.random() - 0.5) * 15,
+        vy: 8 + Math.random() * 12,        // settling downward
+        color: Math.random() > 0.5 ? 0x8b7355 : 0x9e9e9e,  // brown / gray
+        alpha: 0.6 + Math.random() * 0.3,
+        life: 1.5 + Math.random() * 1.0,
+        maxLife: 2.5,
+        size: 2 + Math.random() * 3,
+      })
+    }
+    // A few lighter "debris" particles
+    for (let i = 0; i < 8; i++) {
+      this.particles.push({
+        x: w * 0.3 + Math.random() * w * 0.4,
+        y: h * 0.4 + Math.random() * h * 0.1,
+        vx: (Math.random() - 0.5) * 25,
+        vy: -5 + Math.random() * 10,       // some fly up slightly
+        color: 0xccbb99,                    // light tan
+        alpha: 0.4,
+        life: 0.8 + Math.random() * 0.5,
+        maxLife: 1.3,
+        size: 1 + Math.random() * 1.5,
+      })
+    }
+  }
+
+  /** Camera effect for bankruptcy — slow zoom out with desaturation feel */
+  cameraBankruptcyZoom() {
+    const cam = this.cameras.main
+    // Slow zoom out to show the whole facility
+    const targetZoom = Math.max(0.4, (this.zoomLevel ?? 1) * 0.5)
+    cam.zoomTo(targetZoom, 2000, 'Power2')
+    // Heavy shake first
+    cam.shake(300, 0.012)
+  }
+
   /** Update and render all active particles */
   private updateParticles(dt: number) {
     if (this.particles.length === 0 && this.particleGraphicsLayer) {

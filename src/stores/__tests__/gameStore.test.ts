@@ -3703,6 +3703,184 @@ describe('Regional Incidents & Disaster Preparedness', () => {
       expect(getState().rowPlacementMode).toBe(false)
     })
   })
+
+  // ══════════════════════════════════════════════════════════════
+  // Flexible Row Placement (move, resize, flip)
+  // ══════════════════════════════════════════════════════════════
+
+  describe('Flexible Row Placement', () => {
+    it('moveCustomRow moves a row to a new valid position', () => {
+      setState({ sandboxMode: true, suiteTier: 'standard' })
+      getState().toggleCustomRowMode()
+      // Clear existing rows
+      for (const row of [...getState().customLayout!.cabinetRows]) {
+        getState().removeCustomRow(row.gridRow)
+      }
+      // Place a single row
+      getState().placeCustomRow(3, 'south')
+      expect(getState().customLayout!.cabinetRows).toHaveLength(1)
+      expect(getState().customLayout!.cabinetRows[0].gridRow).toBe(3)
+
+      // Move it to position 5
+      getState().moveCustomRow(3, 5)
+      expect(getState().customLayout!.cabinetRows).toHaveLength(1)
+      expect(getState().customLayout!.cabinetRows[0].gridRow).toBe(5)
+    })
+
+    it('moveCustomRow remaps cabinets on moved row', () => {
+      setState({ sandboxMode: true, money: 999999, suiteTier: 'standard' })
+      getState().toggleCustomRowMode()
+      // Clear and place a row
+      for (const row of [...getState().customLayout!.cabinetRows]) {
+        getState().removeCustomRow(row.gridRow)
+      }
+      getState().placeCustomRow(3, 'south')
+      // Place a cabinet on the row
+      getState().addCabinet(0, 3, 'production')
+      expect(getState().cabinets.some(c => c.row === 3)).toBe(true)
+
+      // Move the row
+      getState().moveCustomRow(3, 6)
+      // Cabinet should have moved to the new row
+      expect(getState().cabinets.some(c => c.row === 6)).toBe(true)
+      expect(getState().cabinets.some(c => c.row === 3)).toBe(false)
+    })
+
+    it('moveCustomRow rejects invalid target (corridor)', () => {
+      setState({ sandboxMode: true, suiteTier: 'standard' })
+      getState().toggleCustomRowMode()
+      for (const row of [...getState().customLayout!.cabinetRows]) {
+        getState().removeCustomRow(row.gridRow)
+      }
+      getState().placeCustomRow(3, 'south')
+
+      // Try moving to corridor (row 0)
+      getState().moveCustomRow(3, 0)
+      expect(getState().customLayout!.cabinetRows[0].gridRow).toBe(3) // unchanged
+    })
+
+    it('moveCustomRow rejects target too close to another row', () => {
+      setState({ sandboxMode: true, suiteTier: 'standard' })
+      getState().toggleCustomRowMode()
+      for (const row of [...getState().customLayout!.cabinetRows]) {
+        getState().removeCustomRow(row.gridRow)
+      }
+      getState().placeCustomRow(3, 'south')
+      getState().placeCustomRow(6, 'north')
+
+      // Try moving row at 3 to position 5 (too close to row at 6)
+      getState().moveCustomRow(3, 5)
+      expect(getState().customLayout!.cabinetRows.find(r => r.gridRow === 3)).toBeTruthy() // unchanged
+    })
+
+    it('resizeCustomRow changes row slot count', () => {
+      setState({ sandboxMode: true, suiteTier: 'standard' })
+      getState().toggleCustomRowMode()
+      const row = getState().customLayout!.cabinetRows[0]
+      const originalSlots = row.slots
+
+      getState().resizeCustomRow(row.gridRow, originalSlots - 2)
+      const updated = getState().customLayout!.cabinetRows.find(r => r.gridRow === row.gridRow)
+      expect(updated!.slots).toBe(originalSlots - 2)
+    })
+
+    it('resizeCustomRow clamps to min 1 slot', () => {
+      setState({ sandboxMode: true, suiteTier: 'standard' })
+      getState().toggleCustomRowMode()
+      const row = getState().customLayout!.cabinetRows[0]
+
+      getState().resizeCustomRow(row.gridRow, 0)
+      const updated = getState().customLayout!.cabinetRows.find(r => r.gridRow === row.gridRow)
+      expect(updated!.slots).toBeGreaterThanOrEqual(1)
+    })
+
+    it('resizeCustomRow clamps to max cols for tier', () => {
+      setState({ sandboxMode: true, suiteTier: 'standard' })
+      getState().toggleCustomRowMode()
+      const row = getState().customLayout!.cabinetRows[0]
+
+      getState().resizeCustomRow(row.gridRow, 100)
+      const updated = getState().customLayout!.cabinetRows.find(r => r.gridRow === row.gridRow)
+      expect(updated!.slots).toBe(SUITE_TIERS.standard.cols)
+    })
+
+    it('flipCustomRow reverses row facing', () => {
+      setState({ sandboxMode: true, suiteTier: 'standard' })
+      getState().toggleCustomRowMode()
+      const row = getState().customLayout!.cabinetRows[0]
+      const originalFacing = row.facing
+
+      getState().flipCustomRow(row.gridRow)
+      const updated = getState().customLayout!.cabinetRows.find(r => r.gridRow === row.gridRow)
+      expect(updated!.facing).toBe(originalFacing === 'south' ? 'north' : 'south')
+    })
+
+    it('flipCustomRow updates cabinet facing on that row', () => {
+      setState({ sandboxMode: true, money: 999999, suiteTier: 'standard' })
+      getState().toggleCustomRowMode()
+      const row = getState().customLayout!.cabinetRows[0]
+
+      // Place a cabinet
+      getState().addCabinet(0, row.gridRow, 'production')
+      const cab = getState().cabinets.find(c => c.row === row.gridRow)!
+      const originalFacing = cab.facing
+
+      getState().flipCustomRow(row.gridRow)
+      const updatedCab = getState().cabinets.find(c => c.row === row.gridRow)!
+      expect(updatedCab.facing).toBe(originalFacing === 'south' ? 'north' : 'south')
+    })
+  })
+
+  // ══════════════════════════════════════════════════════════════
+  // Bankruptcy / Game Over
+  // ══════════════════════════════════════════════════════════════
+
+  describe('Bankruptcy / Game Over', () => {
+    it('initializes with gameOver false', () => {
+      expect(getState().gameOver).toBe(false)
+      expect(getState().bankruptcyTicks).toBe(0)
+    })
+
+    it('does not trigger bankruptcy in sandbox mode', () => {
+      setState({ sandboxMode: true, money: -50000 })
+      for (let i = 0; i < 40; i++) getState().tick()
+      expect(getState().gameOver).toBe(false)
+    })
+
+    it('increments bankruptcyTicks when money below threshold', () => {
+      // Use very negative money so even after tick adjustments it stays below -10000
+      setState({ sandboxMode: false, money: -100000, cabinets: [], spineSwitches: [], loans: [], activeContracts: [], staff: [] })
+      getState().tick()
+      expect(getState().bankruptcyTicks).toBeGreaterThanOrEqual(1)
+    })
+
+    it('resets bankruptcyTicks when money recovers above threshold', () => {
+      setState({ sandboxMode: false, money: 500000, bankruptcyTicks: 10, cabinets: [], spineSwitches: [], loans: [], activeContracts: [], staff: [] })
+      getState().tick()
+      expect(getState().bankruptcyTicks).toBe(0)
+    })
+
+    it('triggers gameOver after sustained negative balance', () => {
+      // Set money very negative and bankruptcyTicks at 29 (one tick from bankruptcy)
+      setState({ sandboxMode: false, money: -100000, bankruptcyTicks: 29, cabinets: [], spineSwitches: [], loans: [], activeContracts: [], staff: [] })
+      getState().tick()
+      expect(getState().gameOver).toBe(true)
+    })
+
+    it('stops ticking after gameOver', () => {
+      setState({ sandboxMode: false, gameOver: true })
+      const tickBefore = getState().tickCount
+      getState().tick()
+      expect(getState().tickCount).toBe(tickBefore) // unchanged
+    })
+
+    it('resetGame clears gameOver state', () => {
+      setState({ gameOver: true, bankruptcyTicks: 30 })
+      getState().resetGame()
+      expect(getState().gameOver).toBe(false)
+      expect(getState().bankruptcyTicks).toBe(0)
+    })
+  })
 })
 
 // ============================================================================

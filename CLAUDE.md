@@ -336,7 +336,7 @@ Audio types:
 
 Visual feedback types:
 - `FloatingTextEvent` — floating text animation (amount, position, color, type)
-- `CameraEffectType` = `'shake_light' | 'shake_medium' | 'shake_heavy' | 'zoom_pulse' | 'zoom_reveal'`
+- `CameraEffectType` = `'shake_light' | 'shake_medium' | 'shake_heavy' | 'zoom_pulse' | 'zoom_reveal' | 'bankruptcy_zoom'`
 - `CameraEffect` — camera effect with type and timestamp
 
 Tutorial types:
@@ -407,6 +407,7 @@ Key interfaces (core):
 | Advanced Tiers | `unlockAdvancedTier` |
 | 42U Rack | `installRackEquipment`, `removeRackEquipment` |
 | View Mode | `setViewMode` |
+| Row Placement | `toggleCustomRowMode`, `placeCustomRow`, `removeCustomRow`, `moveCustomRow`, `resizeCustomRow`, `flipCustomRow`, `autoLayoutRows`, `enterRowPlacementMode`, `exitRowPlacementMode`, `toggleRowPlacementFacing` |
 | Audio | `updateAudioSettings` |
 | Leaderboard | `submitLeaderboardEntry` |
 | Sandbox/Demo | `toggleSandboxMode`, `loadDemoState`, `exitDemo` |
@@ -493,6 +494,8 @@ gridRow 4: Corridor (bottom access)
 - `setWeatherCondition(weather, season, gameHour)` — set weather/day-night state
 - `spawnFireParticles(col, row)` / `spawnSparkParticles(col, row)` / `spawnCoolMist(col, row)` / `spawnHeatShimmer(col, row)` / `spawnRefreshSparkle(col, row)` — particle effects
 - `spawnIncidentPulse(col, row)` / `spawnAchievementShower()` — event particles
+- `spawnConstructionDust()` — settling brown/gray dust particles on site construction completion
+- `cameraBankruptcyZoom()` — slow zoom out (0.5x) with heavy shake for game over
 - `playRemovalEffect(col, row)` — equipment removal animation
 
 ### UI Architecture
@@ -511,7 +514,7 @@ The UI uses a **sidebar-driven navigation pattern**:
 
 `GameCanvas` manages the Phaser game instance lifecycle and syncs Zustand state changes to the Phaser scene via `useEffect` hooks. It tracks previous counts via `useRef` to only add new objects, not re-create existing ones.
 
-**Sync effects (~31 total):**
+**Sync effects (~32 total):**
 1. Detect site switch and trigger full Phaser re-render
 2. Initialize Phaser game, poll for scene ready
 3. Sync placement mode + tile click/hover callbacks
@@ -537,12 +540,13 @@ The UI uses a **sidebar-driven navigation pattern**:
 23. Sync row-end slots
 24. Sync audio settings
 25. Dispatch floating text events
-26. Dispatch camera effects
-27. Sync worker sprites from staff state
-28. Dispatch workers to active incidents
-29. Sync weather/day-night conditions
-30. Spawn particle effects for fires, throttling, PDU overloads, cooling
-31. Spawn achievement gold shower particles
+26. Dispatch camera effects (includes bankruptcy zoom)
+27. Detect site construction completion and spawn construction dust particles
+28. Sync worker sprites from staff state
+29. Dispatch workers to active incidents
+30. Sync weather/day-night conditions
+31. Spawn particle effects for fires, throttling, PDU overloads, cooling
+32. Spawn achievement gold shower particles
 
 ### Game Tick Loop — `src/App.tsx`
 
@@ -578,6 +582,7 @@ A `setInterval` in `App.tsx` calls `tick()` at the rate determined by `gameSpeed
 28. **Competitor AI**: Spawns/grows competitors, processes bids, price wars, staff poaching, market share calculation
 29. **Multi-site expansion**: Ticks site construction, inter-site link reliability, regional incidents, edge PoP CDN revenue, disaster prep maintenance
 30. **Global strategy**: Demand growth per region (emerging/stable/saturated), multi-site contract compliance and revenue, staff transfers, competitor regional expansion
+31. **Bankruptcy detection**: Checks if cash reserves fall below -$10,000 threshold; increments counter per tick while below; triggers game over after 30 consecutive ticks (skipped in sandbox mode)
 
 ## Game Systems
 
@@ -737,6 +742,27 @@ A `setInterval` in `App.tsx` calls `tick()` at the rate determined by `gameSpeed
 - **Sub-floor view**: Third view mode showing cooling pipes, power conduits, and below-floor infrastructure
 - **Sound effects**: Procedural Web Audio API synthesis (placement, alerts, achievements, ambient hum)
 - **Placement animations**: Expanding neon ring effect on equipment placement
+
+**Flexible Row Placement (Custom Row Mode):**
+- Toggle custom row layout mode in Build panel to enable row editing on an expanded floor plan
+- **Move rows**: Shift rows up/down on the grid (validates corridors, minimum gap, remaps cabinets)
+- **Resize rows**: Expand/shrink individual row slot count (1 to max cols per tier, validates placed cabinets)
+- **Flip rows**: Reverse row facing (north/south), updates all cabinets on that row
+- **Remove rows**: Delete empty rows from the layout
+- **Auto-layout**: Evenly space all rows (only when no cabinets placed)
+- Validation: rows cannot overlap, minimum 1-row gap (fire code), cannot exceed tier's max row count
+- Actions: `toggleCustomRowMode`, `placeCustomRow`, `removeCustomRow`, `moveCustomRow`, `resizeCustomRow`, `flipCustomRow`, `autoLayoutRows`
+
+**Bankruptcy & Game Over:**
+- Cash reserves falling below **-$10,000** starts a bankruptcy countdown
+- Counter increments 1 per tick while below threshold; resets to 0 if cash recovers
+- After **30 consecutive ticks** below threshold, game over is triggered
+- Skipped entirely in **sandbox mode**
+- Visual feedback: slow camera zoom out (0.5x), heavy camera shake, "BANKRUPT" floating text
+- Event logged: "Company declared bankrupt. Cash reserves depleted for too long."
+- Game over modal shows stats (ticks survived, cabinets, balance, nodes) with restart option
+- Tick loop halts after game over (`tick()` returns early)
+- State fields: `gameOver` (boolean), `bankruptcyTicks` (number)
 
 **Additional Systems:**
 - **Patents**: Patent unlocked technologies for ongoing royalty income

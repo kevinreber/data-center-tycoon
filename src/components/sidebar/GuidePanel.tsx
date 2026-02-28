@@ -72,6 +72,20 @@ export function GuidePanel() {
         </ol>
       </div>
 
+      {/* Bankruptcy warning */}
+      <div className="rounded-lg border border-neon-red/20 bg-neon-red/5 p-3">
+        <p className="text-xs font-bold text-neon-red mb-2">BANKRUPTCY &amp; GAME OVER</p>
+        <p className="text-xs font-mono text-muted-foreground mb-2">
+          If your cash falls below <span className="text-neon-red">-$10,000</span> for <strong className="text-foreground">30 consecutive ticks</strong>, your company goes bankrupt and the game ends.
+          A warning counter appears in the status bar when you&rsquo;re in the danger zone.
+        </p>
+        <ul className="text-xs font-mono text-muted-foreground space-y-1 list-disc list-inside">
+          <li>Reduce expenses: power down idle cabinets, cancel unneeded peering or insurance</li>
+          <li>Boost revenue: take a loan, accept contracts, sell spot compute</li>
+          <li>Sandbox mode disables bankruptcy &mdash; toggle it in <span className="text-neon-cyan">SETTINGS</span></li>
+        </ul>
+      </div>
+
       {/* Layout strategy guide */}
       <div className="rounded-lg border border-neon-cyan/20 bg-neon-cyan/5 p-3">
         <p className="text-xs font-bold text-neon-cyan mb-2">LAYOUT &amp; AISLES</p>
@@ -115,6 +129,25 @@ export function GuidePanel() {
             <strong className="text-foreground">Pro tip:</strong> The row layout handles hot/cold aisle separation automatically.
             Fill both sides of an aisle to earn up to {Math.round(SPACING_CONFIG.maxAisleSpacingBonus * 100)}% cooling bonus.
             At Standard tier+, upgrade aisles with <strong className="text-foreground">containment</strong> for even better cooling.
+          </p>
+        </div>
+      </div>
+
+      {/* Flexible row placement */}
+      <div className="rounded-lg border border-neon-orange/20 bg-neon-orange/5 p-3">
+        <p className="text-xs font-bold text-neon-orange mb-2">FLEXIBLE ROW PLACEMENT</p>
+        <p className="text-xs font-mono text-muted-foreground mb-2">
+          Enable <strong className="text-foreground">Custom Row Mode</strong> in the <span className="text-neon-cyan">BUILD</span> panel to take full control of your floor plan.
+        </p>
+        <ul className="text-xs font-mono text-muted-foreground space-y-1 list-disc list-inside">
+          <li><strong className="text-foreground">Move rows</strong> &mdash; Reposition rows up or down on the grid (fire code spacing enforced)</li>
+          <li><strong className="text-foreground">Resize rows</strong> &mdash; Shrink or expand row slot count to fit your layout</li>
+          <li><strong className="text-foreground">Flip facing</strong> &mdash; Reverse a row&rsquo;s cabinet facing direction (N&harr;S)</li>
+          <li><strong className="text-foreground">Add/remove rows</strong> &mdash; Add new cabinet rows or remove empty ones</li>
+        </ul>
+        <div className="mt-2 pt-2 border-t border-neon-orange/10">
+          <p className="text-[10px] font-mono text-muted-foreground">
+            <strong className="text-foreground">Note:</strong> Rows must maintain minimum fire code spacing. Cabinets on a moved row are automatically repositioned. You can only remove rows with no placed cabinets.
           </p>
         </div>
       </div>
