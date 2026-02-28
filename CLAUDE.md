@@ -88,7 +88,7 @@ src/
 │   │   ├── equipment.ts        # Cooling, server config, PDU, cable tray, aisle configs
 │   │   ├── features.ts         # Row-end slots, aisle widths, raised floor, cable mgmt, workloads, advanced tiers, rack equipment, audio
 │   │   ├── infrastructure.ts   # Busway, cross-connect, in-row cooling, spacing, zone configs
-│   │   ├── progression.ts      # Tech tree, achievements (103), incidents (21), contracts, scenarios, tutorial tips (42), guided tutorial steps
+│   │   ├── progression.ts      # Tech tree, achievements (106), incidents (21), contracts, scenarios, tutorial tips (43), guided tutorial steps
 │   │   └── world.ts            # Staff, supply chain, weather, interconnection, peering, competitors, regions, sites, sovereignty, demand
 │   ├── gameStore.test.ts       # Vitest tests for cabinet placement and placement hints
 │   ├── __tests__/
@@ -150,7 +150,7 @@ All game state lives in a **single Zustand store** (`useGameStore`). The store (
 - **Spacing & layout configs** (`SPACING_CONFIG`): adjacency heat penalties, aisle bonuses, airflow bonuses, maintenance access, fire spread mechanics
 - **Zone bonus configs** (`ZONE_BONUS_CONFIG`): minimum cluster size (3), environment and customer type bonuses
 - **Economy configs**: loan options, depreciation, power market parameters, insurance options, valuation milestones
-- **Progression configs**: tech tree (9 techs), contracts (9 base + 4 compliance-gated + zone contracts), achievements (103), incidents (21 types), scenarios (5)
+- **Progression configs**: tech tree (9 techs), contracts (9 base + 4 compliance-gated + zone contracts), achievements (106), incidents (21 types), scenarios (5)
 - **Staff configs** (`STAFF_ROLE_CONFIG`, `STAFF_CERT_CONFIG`, `SHIFT_PATTERN_CONFIG`): roles, certifications, shift costs
 - **Supply chain configs** (`SUPPLY_CHAIN_CONFIG`): lead times, bulk discounts, shortage mechanics
 - **Weather configs** (`SEASON_CONFIG`, `WEATHER_CONDITION_CONFIG`): seasonal/weather ambient modifiers
@@ -161,7 +161,7 @@ All game state lives in a **single Zustand store** (`useGameStore`). The store (
 - **Power redundancy configs** (`POWER_REDUNDANCY_CONFIG`): N, N+1, 2N levels
 - **Noise configs** (`NOISE_CONFIG`): noise generation, complaints, fines, sound barriers
 - **Spot compute configs** (`SPOT_COMPUTE_CONFIG`): dynamic spot market pricing
-- **Tutorial tips** (`TUTORIAL_TIPS`): 42 contextual gameplay tips (including carbon, security, market, operations, cooling, infrastructure, and multi-site tips)
+- **Tutorial tips** (`TUTORIAL_TIPS`): 43 contextual gameplay tips (including carbon, security, NACL, market, operations, cooling, infrastructure, and multi-site tips)
 - **Guided tutorial steps** (`TUTORIAL_STEPS`): Step-by-step guided tutorial for new players with completion checks and panel highlights
 - **Energy source configs** (`ENERGY_SOURCE_CONFIG`): 4 energy sources with cost/carbon/reliability
 - **Green cert configs** (`GREEN_CERT_CONFIG`): 4 green certifications with requirements and bonuses
@@ -169,6 +169,8 @@ All game state lives in a **single Zustand store** (`useGameStore`). The store (
 - **Security tier configs** (`SECURITY_TIER_CONFIG`): 4 security tiers with costs and included features
 - **Security feature configs** (`SECURITY_FEATURE_CONFIG`): 7 security features with defense bonuses
 - **Compliance cert configs** (`COMPLIANCE_CERT_CONFIG`): 5 compliance certifications with audit mechanics
+- **NACL policy configs** (`NACL_POLICY_CONFIG`): 4 network ACL policy tiers (open, standard, strict, zero_trust) with cost, bandwidth overhead, and network defense bonuses
+- **NACL blocked incident types** (`NACL_BLOCKED_INCIDENT_TYPES`): incident types blockable by NACLs (ddos, ransomware)
 - **Competitor configs** (`COMPETITOR_PERSONALITIES`): 5 AI competitor personality profiles
 - **Operations Progression configs** (`OPS_TIER_CONFIG`): 4 ops tiers with unlock requirements, benefits, and upgrade costs
 - **Row-end slot configs** (`ROW_END_SLOT_CONFIG`): 4 row-end infrastructure types with costs and effects
@@ -263,7 +265,8 @@ Security & compliance types:
 - `SecurityTier` = `'basic' | 'enhanced' | 'high_security' | 'maximum'`
 - `SecurityFeatureId` = `'cctv' | 'badge_access' | 'biometric' | 'mantrap' | 'cage_isolation' | 'encrypted_network' | 'security_noc'`
 - `ComplianceCertId` = `'soc2_type1' | 'soc2_type2' | 'hipaa' | 'pci_dss' | 'fedramp'`
-- `ActiveComplianceCert`, `SecurityFeatureConfig`, `SecurityTierConfig`, `ComplianceCertConfig` interfaces
+- `NaclPolicy` = `'open' | 'standard' | 'strict' | 'zero_trust'`
+- `ActiveComplianceCert`, `SecurityFeatureConfig`, `SecurityTierConfig`, `ComplianceCertConfig`, `NaclPolicyConfig` interfaces
 
 Competitor AI types:
 - `CompetitorPersonality` = `'budget' | 'premium' | 'green' | 'aggressive' | 'steady'`
@@ -389,7 +392,7 @@ Key interfaces (core):
 | RFP Bidding | `bidOnRFP` |
 | Scenarios | `startScenario`, `abandonScenario` |
 | Carbon/Environment | `setEnergySource`, `applyForGreenCert`, `disposeEWaste` |
-| Security/Compliance | `upgradeSecurityTier`, `startComplianceAudit` |
+| Security/Compliance | `upgradeSecurityTier`, `startComplianceAudit`, `setNaclPolicy` |
 | Operations | `upgradeOpsTier` |
 | Competitor AI | `counterPoachOffer` |
 | Multi-Site Expansion | `toggleWorldMap`, `researchRegion`, `purchaseSite`, `switchSite`, `installInterSiteLink`, `installDisasterPrep` |
@@ -564,14 +567,14 @@ A `setInterval` in `App.tsx` calls `tick()` at the rate determined by `gameSpeed
 17. **Contracts**: Checks SLA compliance, termination/completion logic
 18. **Reputation**: Adjusts score based on SLAs, outages, fires, violations
 19. **Depreciation**: Ages servers, reduces efficiency after 30% of 800-tick lifespan
-20. **Achievements**: Checks 103 achievement conditions
+20. **Achievements**: Checks 106 achievement conditions
 21. **Traffic**: ECMP distribution across active spines
 22. **Capacity history**: Records snapshot of current stats each tick (capped at 100 entries)
 23. **Lifetime stats**: Updates running totals (revenue, expenses, peak temp, uptime streaks, etc.)
 24. **Event logging**: Records significant events (capped at 200 entries)
 25. **Tutorial**: Triggers contextual tips based on game state
 26. **Carbon/Environment**: Calculates emissions, carbon tax, water usage, e-waste penalties, green cert eligibility
-27. **Security/Compliance**: Processes audits, expires certifications, blocks intrusion incidents, calculates security maintenance
+27. **Security/Compliance**: Processes audits, expires certifications, blocks intrusion incidents, NACL network attack blocking (DDoS/ransomware), calculates security maintenance (includes NACL cost)
 28. **Competitor AI**: Spawns/grows competitors, processes bids, price wars, staff poaching, market share calculation
 29. **Multi-site expansion**: Ticks site construction, inter-site link reliability, regional incidents, edge PoP CDN revenue, disaster prep maintenance
 30. **Global strategy**: Demand growth per region (emerging/stable/saturated), multi-site contract compliance and revenue, staff transfers, competitor regional expansion
@@ -685,6 +688,7 @@ A `setInterval` in `App.tsx` calls `tick()` at the rate determined by `gameSpeed
 - **7 security features**: badge_access, CCTV, biometric, mantrap, cage_isolation, encrypted_network, security_noc
 - **5 compliance certs**: SOC 2 Type I/II, HIPAA, PCI-DSS, FedRAMP with audit mechanics
 - **Intrusion incidents**: tailgating, social_engineering, break_in — blocked by security features
+- **Network ACLs**: 4 policy tiers (open, standard, strict, zero_trust) with bandwidth overhead vs network defense tradeoff; blocks DDoS and ransomware incidents
 - **4 premium contracts** gated by compliance (HealthNet EMR, TradeFast HFT, GovSecure Cloud, PayStream)
 
 **Competitor AI:**

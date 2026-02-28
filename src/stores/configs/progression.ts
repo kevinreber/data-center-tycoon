@@ -216,6 +216,9 @@ export const ACHIEVEMENT_CATALOG: AchievementDef[] = [
   { id: 'fully_compliant', label: 'Fully Compliant', description: 'Hold 3 or more compliance certifications simultaneously.', icon: '📋' },
   { id: 'fort_knox', label: 'Fort Knox', description: 'Block 10 intrusion attempts with security features.', icon: '🏰' },
   { id: 'gov_contractor', label: 'Government Contractor', description: 'Complete a FedRAMP-gated contract.', icon: '🏛️' },
+  { id: 'firewall_admin', label: 'Firewall Admin', description: 'Set a NACL policy above Open.', icon: '🧱' },
+  { id: 'zero_trust_architect', label: 'Zero Trust Architect', description: 'Activate Zero Trust NACL policy.', icon: '🛡️' },
+  { id: 'ddos_denied', label: 'DDoS Denied', description: 'Block 5 network attacks with NACLs.', icon: '🚫' },
   // Phase 4D — Competitor AI achievements
   { id: 'market_leader', label: 'Market Leader', description: 'Achieve 50% or greater market share.', icon: '📊' },
   { id: 'monopoly', label: 'Monopoly', description: 'Win 5 contracts that competitors bid on.', icon: '🏅' },
@@ -407,6 +410,7 @@ export const TUTORIAL_TIPS: TutorialTip[] = [
   { id: 'security_upgrade', title: 'Security Matters', message: 'Upgrading security unlocks premium compliance certifications and lucrative government/healthcare contracts.', category: 'security' },
   { id: 'intrusion_detected', title: 'Intrusion Alert!', message: 'A security intrusion was detected! Higher security tiers and features reduce intrusion frequency and impact.', category: 'security' },
   { id: 'compliance_expiring', title: 'Certification Expiring', message: 'A compliance certification is about to expire! Re-audit before the deadline to keep your premium contracts.', category: 'security' },
+  { id: 'nacl_available', title: 'Network ACLs Available', message: 'Your security tier now supports network access control lists. Set a NACL policy in the Security panel to block DDoS and ransomware attacks — but watch the bandwidth overhead!', category: 'security' },
   // Phase 4D — Competitor AI tips
   { id: 'competitor_appeared', title: 'New Competitor!', message: 'A rival data center company has entered the market. They will compete for contracts — act fast to secure deals!', category: 'market' },
   { id: 'competitor_bidding', title: 'Competition!', message: 'A competitor is bidding on a contract you may want. Accept quickly before they win it!', category: 'market' },

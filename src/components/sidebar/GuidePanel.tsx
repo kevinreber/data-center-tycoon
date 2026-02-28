@@ -1,5 +1,5 @@
 import { Github, Bug, GitPullRequest, BookOpen, RotateCw } from 'lucide-react'
-import { useGameStore, ENVIRONMENT_CONFIG, SIM, SPACING_CONFIG, COOLING_CONFIG, INROW_COOLING_OPTIONS, COOLING_UNIT_CONFIG, OPS_TIER_CONFIG, SERVER_CONFIG_OPTIONS, ZONE_BONUS_CONFIG, WORKLOAD_CONFIG, ADVANCED_TIER_CONFIG, SPOT_COMPUTE_CONFIG, SITE_TYPE_CONFIG, INTER_SITE_LINK_CONFIG, MAX_LINKS_PER_SITE, EDGE_POP_CDN_REVENUE_PER_GBPS, DATA_SOVEREIGNTY_CONFIG, MULTI_SITE_CONTRACT_CATALOG, STAFF_TRANSFER_CONFIG, DEMAND_GROWTH_CONFIG, DISASTER_PREP_CONFIG } from '@/stores/gameStore'
+import { useGameStore, ENVIRONMENT_CONFIG, SIM, SPACING_CONFIG, COOLING_CONFIG, INROW_COOLING_OPTIONS, COOLING_UNIT_CONFIG, OPS_TIER_CONFIG, SERVER_CONFIG_OPTIONS, ZONE_BONUS_CONFIG, WORKLOAD_CONFIG, ADVANCED_TIER_CONFIG, SPOT_COMPUTE_CONFIG, SITE_TYPE_CONFIG, INTER_SITE_LINK_CONFIG, MAX_LINKS_PER_SITE, EDGE_POP_CDN_REVENUE_PER_GBPS, DATA_SOVEREIGNTY_CONFIG, MULTI_SITE_CONTRACT_CATALOG, STAFF_TRANSFER_CONFIG, DEMAND_GROWTH_CONFIG, DISASTER_PREP_CONFIG, NACL_POLICY_CONFIG } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
 
 const REPO_URL = 'https://github.com/kevinreber/data-center-tycoon'
@@ -197,6 +197,29 @@ export function GuidePanel() {
           <li><strong className="text-foreground">Premium contracts</strong> &mdash; Compliance certs unlock high-value contracts.</li>
           <li><strong className="text-foreground">Intrusions</strong> &mdash; Security features block tailgating &amp; break-ins.</li>
         </ul>
+      </div>
+
+      <div className="rounded-lg border border-[#ff4444]/20 bg-[#ff4444]/5 p-3">
+        <p className="text-xs font-bold text-[#ff4444] mb-2">NETWORK ACCESS CONTROL LISTS (NACLs)</p>
+        <p className="text-xs font-mono text-muted-foreground mb-2">
+          Set a NACL policy in the <span className="text-neon-cyan">SECURITY</span> panel to add network-level defense against DDoS and ransomware attacks. Higher policies provide stronger protection but reduce bandwidth throughput.
+        </p>
+        <div className="space-y-1.5">
+          {NACL_POLICY_CONFIG.map((cfg) => (
+            <div key={cfg.policy} className="flex gap-2 items-start">
+              <div className="w-3 h-3 rounded-sm shrink-0 mt-0.5" style={{ backgroundColor: cfg.color }} />
+              <div className="text-xs font-mono">
+                <strong style={{ color: cfg.color }}>{cfg.label}</strong>
+                <span className="text-muted-foreground"> &mdash; ${cfg.costPerTick}/tick, {Math.round(cfg.networkDefenseBonus * 100)}% network defense, -{Math.round(cfg.bandwidthOverhead * 100)}% bandwidth. Requires {cfg.requiredSecurityTier} security.</span>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-2 pt-2 border-t border-[#ff4444]/10">
+          <p className="text-[10px] font-mono text-muted-foreground">
+            <strong className="text-foreground">Tradeoff:</strong> Stricter policies cost more and reduce throughput, but block network attacks (DDoS, ransomware) automatically each tick. Zero Trust is the strongest but takes 10% bandwidth.
+          </p>
+        </div>
       </div>
 
       <div className="rounded-lg border border-neon-cyan/20 bg-neon-cyan/5 p-3">

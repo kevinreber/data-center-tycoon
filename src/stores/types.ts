@@ -21,6 +21,19 @@ export type GreenCert = 'energy_star' | 'leed_silver' | 'leed_gold' | 'carbon_ne
 export type SecurityTier = 'basic' | 'enhanced' | 'high_security' | 'maximum'
 export type SecurityFeatureId = 'cctv' | 'badge_access' | 'biometric' | 'mantrap' | 'cage_isolation' | 'encrypted_network' | 'security_noc'
 export type ComplianceCertId = 'soc2_type1' | 'soc2_type2' | 'hipaa' | 'pci_dss' | 'fedramp'
+export type NaclPolicy = 'open' | 'standard' | 'strict' | 'zero_trust'
+
+export interface NaclPolicyConfig {
+  policy: NaclPolicy
+  label: string
+  description: string
+  costPerTick: number
+  bandwidthOverhead: number       // 0–1 fraction of bandwidth lost to inspection
+  networkDefenseBonus: number     // 0–1 added to network intrusion defense
+  requiredSecurityTier: SecurityTier
+  enablesCompliance: ComplianceCertId[]  // compliance certs that require this NACL policy minimum
+  color: string
+}
 
 // ── Competitor AI Types ────────────────────────────────────────
 export type CompetitorPersonality = 'budget' | 'premium' | 'green' | 'aggressive' | 'steady'

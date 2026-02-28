@@ -45,6 +45,7 @@ A web-based, 2D isometric Tycoon game (think Roller Coaster Tycoon) where the pl
 - **Clos Fabric** — Build a Spine-Leaf network. Every leaf switch connects to every spine via ECMP for fault-tolerant traffic routing.
 - **Meet-Me Room** — Install an interconnection facility to earn passive revenue from network tenants. Add ports to increase capacity.
 - **Network Peering** — Establish peering agreements (Free Peering, Paid Peering, Transit, IX Port) to reduce latency and improve reputation.
+- **Network ACLs** — Configure network access control policies from Open to Zero Trust. Higher policies add network defense against DDoS and ransomware but cost bandwidth overhead. Strict and Zero Trust enable compliance certifications like PCI-DSS, HIPAA, and FedRAMP.
 
 ### Global Expansion
 - **Multi-Site Empire** — Expand beyond a single facility to build data centers across 15 global regions from Ashburn to Tokyo. 6 site types: Headquarters, Edge PoP, Colocation, Hyperscale, Network Hub, and Disaster Recovery.
