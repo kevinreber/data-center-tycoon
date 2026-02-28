@@ -1340,7 +1340,7 @@ export interface FloatingTextEvent {
   center?: boolean   // if true, display at viewport center
 }
 
-export type CameraEffectType = 'shake_light' | 'shake_medium' | 'shake_heavy' | 'zoom_pulse' | 'zoom_reveal'
+export type CameraEffectType = 'shake_light' | 'shake_medium' | 'shake_heavy' | 'zoom_pulse' | 'zoom_reveal' | 'bankruptcy_zoom'
 
 export interface CameraEffect {
   type: CameraEffectType

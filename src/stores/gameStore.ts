@@ -526,11 +526,15 @@ interface GameState {
   // Advanced Scaling Tiers
   advancedTier: AdvancedTier | null
 
-  // Player-Built Rows (custom row mode)
+  // Player-Built Rows (custom row mode + flexible placement)
   customRowMode: boolean
   customLayout: DataCenterLayout | null
   rowPlacementMode: boolean
   rowPlacementFacing: CabinetFacing
+
+  // Bankruptcy / Game Over
+  gameOver: boolean
+  bankruptcyTicks: number   // consecutive ticks with money < threshold
 
   // 42U Rack Model
   rackDetails: Record<string, RackDetail>   // cabinet ID → rack detail
@@ -686,6 +690,9 @@ interface GameState {
   toggleCustomRowMode: () => void
   placeCustomRow: (gridRow: number, facing: CabinetFacing) => void
   removeCustomRow: (gridRow: number) => void
+  moveCustomRow: (gridRow: number, newGridRow: number) => void
+  resizeCustomRow: (gridRow: number, newSlots: number) => void
+  flipCustomRow: (gridRow: number) => void
   autoLayoutRows: () => void
   enterRowPlacementMode: (facing: CabinetFacing) => void
   exitRowPlacementMode: () => void
@@ -1147,6 +1154,10 @@ export const useGameStore = create<GameState>((set) => ({
   customLayout: null as DataCenterLayout | null,
   rowPlacementMode: false,
   rowPlacementFacing: 'south' as CabinetFacing,
+
+  // Bankruptcy / Game Over
+  gameOver: false,
+  bankruptcyTicks: 0,
 
   // 42U Rack Model
   rackDetails: {} as Record<string, RackDetail>,
@@ -3102,6 +3113,90 @@ export const useGameStore = create<GameState>((set) => ({
       return { customLayout: layout }
     }),
 
+  moveCustomRow: (gridRow: number, newGridRow: number) =>
+    set((state) => {
+      if (!state.customRowMode || !state.customLayout) return state
+      const floorPlan = FLOOR_PLAN_CONFIG[state.suiteTier]
+
+      // Validate target is interior (not corridors)
+      if (newGridRow <= 0 || newGridRow >= floorPlan.totalGridRows - 1) return state
+      // Validate target is not already occupied by another row
+      const otherRows = state.customLayout.cabinetRows.filter(r => r.gridRow !== gridRow)
+      if (otherRows.some(r => r.gridRow === newGridRow)) return state
+      // Validate minimum gap from other rows
+      const tooClose = otherRows.some(r => Math.abs(r.gridRow - newGridRow) < MIN_ROW_GAP + 1)
+      if (tooClose) return state
+
+      const rowToMove = state.customLayout.cabinetRows.find(r => r.gridRow === gridRow)
+      if (!rowToMove) return state
+
+      // Remap cabinets on this row to the new grid position
+      const cabinets = state.cabinets.map(c =>
+        c.row === gridRow ? { ...c, row: newGridRow } : c
+      )
+      const updatedRows = state.customLayout.cabinetRows.map(r =>
+        r.gridRow === gridRow ? { ...r, gridRow: newGridRow } : r
+      )
+      const reindexed = [...updatedRows].sort((a, b) => a.gridRow - b.gridRow).map((r, i) => ({ ...r, id: i }))
+      const layout = buildLayoutFromRows(reindexed, floorPlan.totalGridRows)
+
+      return {
+        customLayout: layout,
+        cabinets,
+        ...calcStats(cabinets, state.spineSwitches),
+        aisleBonus: calcAisleBonus(cabinets, state.suiteTier, state.aisleContainments, layout),
+      }
+    }),
+
+  resizeCustomRow: (gridRow: number, newSlots: number) =>
+    set((state) => {
+      if (!state.customRowMode || !state.customLayout) return state
+      const maxCols = SUITE_TIERS[state.suiteTier].cols
+      const clampedSlots = Math.max(1, Math.min(newSlots, maxCols))
+
+      const rowToResize = state.customLayout.cabinetRows.find(r => r.gridRow === gridRow)
+      if (!rowToResize) return state
+
+      // Cannot shrink below the number of cabinets currently in the row
+      const cabsInRow = state.cabinets.filter(c => c.row === gridRow)
+      const maxUsedCol = cabsInRow.reduce((max, c) => Math.max(max, c.col), -1)
+      if (clampedSlots <= maxUsedCol) return state
+
+      const updatedRows = state.customLayout.cabinetRows.map(r =>
+        r.gridRow === gridRow ? { ...r, slots: clampedSlots } : r
+      )
+      const floorPlan = FLOOR_PLAN_CONFIG[state.suiteTier]
+      const layout = buildLayoutFromRows(updatedRows, floorPlan.totalGridRows)
+
+      return { customLayout: layout }
+    }),
+
+  flipCustomRow: (gridRow: number) =>
+    set((state) => {
+      if (!state.customRowMode || !state.customLayout) return state
+
+      const rowToFlip = state.customLayout.cabinetRows.find(r => r.gridRow === gridRow)
+      if (!rowToFlip) return state
+
+      const newFacing: CabinetFacing = rowToFlip.facing === 'south' ? 'north' : 'south'
+      const updatedRows = state.customLayout.cabinetRows.map(r =>
+        r.gridRow === gridRow ? { ...r, facing: newFacing } : r
+      )
+      // Update facing on all cabinets in this row
+      const cabinets = state.cabinets.map(c =>
+        c.row === gridRow ? { ...c, facing: newFacing } : c
+      )
+      const floorPlan = FLOOR_PLAN_CONFIG[state.suiteTier]
+      const layout = buildLayoutFromRows(updatedRows, floorPlan.totalGridRows)
+
+      return {
+        customLayout: layout,
+        cabinets,
+        ...calcStats(cabinets, state.spineSwitches),
+        aisleBonus: calcAisleBonus(cabinets, state.suiteTier, state.aisleContainments, layout),
+      }
+    }),
+
   enterRowPlacementMode: (facing: CabinetFacing) =>
     set({ rowPlacementMode: true, rowPlacementFacing: facing, placementMode: false }),
 
@@ -3860,6 +3955,8 @@ export const useGameStore = create<GameState>((set) => ({
         aisleContainments: state.aisleContainments,
         customRowMode: state.customRowMode,
         customLayout: state.customLayout,
+        gameOver: state.gameOver,
+        bankruptcyTicks: state.bankruptcyTicks,
         stockPrice: state.stockPrice,
         stockHistory: state.stockHistory,
         valuationMilestonesReached: state.valuationMilestonesReached,
@@ -3954,6 +4051,8 @@ export const useGameStore = create<GameState>((set) => ({
         aisleContainments: data.aisleContainments ?? state.aisleContainments,
         customRowMode: data.customRowMode ?? false,
         customLayout: data.customLayout ?? null,
+        gameOver: data.gameOver ?? false,
+        bankruptcyTicks: data.bankruptcyTicks ?? 0,
         stockPrice: data.stockPrice ?? state.stockPrice,
         stockHistory: data.stockHistory ?? state.stockHistory,
         valuationMilestonesReached: data.valuationMilestonesReached ?? state.valuationMilestonesReached,
@@ -4216,6 +4315,8 @@ export const useGameStore = create<GameState>((set) => ({
       customLayout: null,
       rowPlacementMode: false,
       rowPlacementFacing: 'south' as CabinetFacing,
+      gameOver: false,
+      bankruptcyTicks: 0,
       rackDetails: {},
       audioSettings: { ...DEFAULT_AUDIO_SETTINGS },
       pendingFloatingTexts: [],
@@ -4268,6 +4369,8 @@ export const useGameStore = create<GameState>((set) => ({
 
   tick: () =>
     set((state) => {
+      // Do not tick if game is over
+      if (state.gameOver) return state
       const newTickCount = state.tickCount + 1
       const floatingTexts: FloatingTextEvent[] = []
       const cameraEffects: CameraEffect[] = []
@@ -4948,6 +5051,22 @@ export const useGameStore = create<GameState>((set) => ({
           }
         }
 
+        // Bankruptcy detection (early return path — no cabinets/spines)
+        const earlyMoney = state.sandboxMode ? 999999999 : Math.round((state.money - loanPayments - earlyLinkCost + earlyEdgePopCDNRevenue) * 100) / 100
+        const EARLY_BANKRUPTCY_THRESHOLD = -10000
+        const EARLY_BANKRUPTCY_TICKS = 30
+        let earlyBankruptcyTicks = state.bankruptcyTicks
+        let earlyGameOver: boolean = state.gameOver
+        if (!state.sandboxMode && !state.gameOver && earlyMoney < EARLY_BANKRUPTCY_THRESHOLD) {
+          earlyBankruptcyTicks += 1
+          if (earlyBankruptcyTicks >= EARLY_BANKRUPTCY_TICKS) {
+            earlyGameOver = true
+            floatingTexts.push({ text: 'BANKRUPT', color: '#ff2222', center: true })
+          }
+        } else if (earlyMoney >= EARLY_BANKRUPTCY_THRESHOLD) {
+          earlyBankruptcyTicks = 0
+        }
+
         return {
           tickCount: newTickCount,
           gameHour: newHour,
@@ -4957,7 +5076,7 @@ export const useGameStore = create<GameState>((set) => ({
           spikeMagnitude,
           loans: updatedLoans,
           loanPayments: +loanPayments.toFixed(2),
-          money: state.sandboxMode ? 999999999 : Math.round((state.money - loanPayments - earlyLinkCost + earlyEdgePopCDNRevenue) * 100) / 100,
+          money: earlyMoney,
           activeIncidents,
           incidentLog,
           resolvedCount,
@@ -4984,6 +5103,9 @@ export const useGameStore = create<GameState>((set) => ({
           // Tutorial
           tutorialStepIndex: earlyTutorialStepIndex,
           tutorialCompleted: earlyTutorialCompleted,
+          // Bankruptcy
+          gameOver: earlyGameOver,
+          bankruptcyTicks: earlyBankruptcyTicks,
         }
       }
 
@@ -6866,6 +6988,24 @@ export const useGameStore = create<GameState>((set) => ({
         ? 999999999
         : Math.round((state.money + revenue + adjustedContractRevenue + patentIncome + milestoneMoney + phase5Income + phase6Income + phase6DIncome + newFeatureIncome + (insurancePayouts - state.insurancePayouts) - expenses - loanPayments - contractPenalties - insuranceCost - staffCostPerTick - phase5Expenses - phase4Expenses - phase6Expenses - phase6DExpenses) * 100) / 100
 
+      // ── Bankruptcy detection ──────────────────────────────────────
+      const BANKRUPTCY_THRESHOLD = -10000
+      const BANKRUPTCY_TICKS_REQUIRED = 30
+      const effectiveMoney = state.sandboxMode ? 999999999 : finalNewMoney
+      let bankruptcyTicks = state.bankruptcyTicks
+      let gameOver: boolean = state.gameOver
+      if (!state.sandboxMode && !state.gameOver && effectiveMoney < BANKRUPTCY_THRESHOLD) {
+        bankruptcyTicks += 1
+        if (bankruptcyTicks >= BANKRUPTCY_TICKS_REQUIRED) {
+          gameOver = true
+          cameraEffects.push({ type: 'bankruptcy_zoom' })
+          floatingTexts.push({ text: 'BANKRUPT', color: '#ff2222', center: true })
+          eventLog.push({ tick: newTickCount, gameHour: newHour, category: 'finance' as EventCategory, message: 'Company declared bankrupt. Cash reserves depleted for too long.', severity: 'error' as EventSeverity })
+        }
+      } else if (effectiveMoney >= BANKRUPTCY_THRESHOLD) {
+        bankruptcyTicks = 0
+      }
+
       return {
         cabinets: newCabinets,
         spineSwitches,
@@ -7046,6 +7186,9 @@ export const useGameStore = create<GameState>((set) => ({
         completedWorkloads,
         failedWorkloads,
         workloadRevenue: +workloadRevenue.toFixed(2),
+        // Bankruptcy
+        gameOver,
+        bankruptcyTicks,
         // Floating text events
         pendingFloatingTexts: floatingTexts,
         // Camera effects

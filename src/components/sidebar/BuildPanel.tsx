@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useGameStore, RACK_COST, MAX_SERVERS_PER_CABINET, ENVIRONMENT_CONFIG, CUSTOMER_TYPE_CONFIG, SUITE_TIERS, getSuiteLimits, DEDICATED_ROW_BONUS_CONFIG, MIXED_ENV_PENALTY_CONFIG, FLOOR_PLAN_CONFIG } from '@/stores/gameStore'
 import type { CabinetEnvironment, CustomerType } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
-import { Server, Network, Plus, MousePointer, Rows3, LayoutGrid, Trash2, Wand2 } from 'lucide-react'
+import { Server, Network, Plus, MousePointer, Rows3, LayoutGrid, Trash2, Wand2, ArrowUp, ArrowDown, FlipVertical, Minus } from 'lucide-react'
 import {
   Tooltip,
   TooltipContent,
@@ -18,7 +18,7 @@ export function BuildPanel() {
     equipmentPlacementMode, enterEquipmentPlacementMode, exitEquipmentPlacementMode,
     mixedEnvPenaltyCount, dedicatedRows, zones,
     customRowMode, customLayout, rowPlacementMode,
-    toggleCustomRowMode, removeCustomRow, autoLayoutRows,
+    toggleCustomRowMode, removeCustomRow, moveCustomRow, resizeCustomRow, flipCustomRow, autoLayoutRows,
     enterRowPlacementMode, exitRowPlacementMode, toggleRowPlacementFacing,
     rowPlacementFacing,
   } = useGameStore()
@@ -65,35 +65,106 @@ export function BuildPanel() {
             </TooltipContent>
           </Tooltip>
         </div>
-        <div className="flex gap-1 flex-wrap">
+        <div className="flex flex-col gap-1">
           {layout.cabinetRows.map((row) => {
             const rowCabs = cabinets.filter(c => c.row === row.gridRow)
             const fill = rowCabs.length
             const canRemove = customRowMode && fill === 0
+            const maxCols = suiteLimits.cols
             return (
-              <Tooltip key={row.id}>
-                <TooltipTrigger asChild>
-                  <span className={`text-xs font-mono px-1 rounded border flex items-center gap-0.5 ${
-                    fill > 0 ? 'border-neon-green/30 text-neon-green/80' : 'border-border/30 text-muted-foreground/50'
-                  }`}>
-                    R{row.id + 1} {row.facing === 'north' ? '▲' : '▼'} {fill}/{row.slots}
+              <div key={row.id} className={`flex items-center gap-1 text-xs font-mono px-1.5 py-0.5 rounded border ${
+                fill > 0 ? 'border-neon-green/30 text-neon-green/80' : 'border-border/30 text-muted-foreground/50'
+              }`}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="flex items-center gap-0.5 min-w-0 flex-1">
+                      R{row.id + 1} {row.facing === 'north' ? '▲' : '▼'} {fill}/{row.slots}
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="right" className="max-w-48">
+                    <p className="font-bold">Row {row.id + 1} (grid row {row.gridRow})</p>
+                    <p className="text-xs mt-1">Facing {row.facing} — {fill}/{row.slots} slots filled</p>
+                    {customRowMode && fill === 0 && <p className="text-xs text-neon-red/80 mt-1">Remove empty row or move it</p>}
+                    {customRowMode && fill > 0 && <p className="text-xs text-muted-foreground mt-1">Remove cabinets to delete/resize row</p>}
+                  </TooltipContent>
+                </Tooltip>
+                {customRowMode && (
+                  <div className="flex items-center gap-0.5 ml-auto shrink-0">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); moveCustomRow(row.gridRow, row.gridRow - 1) }}
+                          className="text-muted-foreground/60 hover:text-neon-cyan p-0.5"
+                          title="Move up"
+                        >
+                          <ArrowUp className="size-2.5" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top"><p>Move row up</p></TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); moveCustomRow(row.gridRow, row.gridRow + 1) }}
+                          className="text-muted-foreground/60 hover:text-neon-cyan p-0.5"
+                          title="Move down"
+                        >
+                          <ArrowDown className="size-2.5" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top"><p>Move row down</p></TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); flipCustomRow(row.gridRow) }}
+                          className="text-muted-foreground/60 hover:text-neon-orange p-0.5"
+                          title="Flip facing"
+                        >
+                          <FlipVertical className="size-2.5" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top"><p>Flip row facing ({row.facing === 'north' ? '▲→▼' : '▼→▲'})</p></TooltipContent>
+                    </Tooltip>
+                    {row.slots > 1 && fill === 0 && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); resizeCustomRow(row.gridRow, row.slots - 1) }}
+                            className="text-muted-foreground/60 hover:text-neon-yellow p-0.5"
+                            title="Shrink"
+                          >
+                            <Minus className="size-2.5" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top"><p>Shrink row ({row.slots}→{row.slots - 1} slots)</p></TooltipContent>
+                      </Tooltip>
+                    )}
+                    {row.slots < maxCols && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); resizeCustomRow(row.gridRow, row.slots + 1) }}
+                            className="text-muted-foreground/60 hover:text-neon-yellow p-0.5"
+                            title="Expand"
+                          >
+                            <Plus className="size-2.5" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top"><p>Expand row ({row.slots}→{row.slots + 1} slots)</p></TooltipContent>
+                      </Tooltip>
+                    )}
                     {canRemove && (
                       <button
                         onClick={(e) => { e.stopPropagation(); removeCustomRow(row.gridRow) }}
-                        className="text-neon-red/60 hover:text-neon-red ml-0.5"
+                        className="text-neon-red/60 hover:text-neon-red p-0.5"
                       >
                         <Trash2 className="size-2.5" />
                       </button>
                     )}
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent side="right" className="max-w-48">
-                  <p className="font-bold">Row {row.id + 1} (grid row {row.gridRow})</p>
-                  <p className="text-xs mt-1">Facing {row.facing} — {fill}/{row.slots} slots filled</p>
-                  {customRowMode && fill === 0 && <p className="text-xs text-neon-red/80 mt-1">Click x to remove this empty row</p>}
-                  {customRowMode && fill > 0 && <p className="text-xs text-muted-foreground mt-1">Remove all cabinets first to delete row</p>}
-                </TooltipContent>
-              </Tooltip>
+                  </div>
+                )}
+              </div>
             )
           })}
         </div>

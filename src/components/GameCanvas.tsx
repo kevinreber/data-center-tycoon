@@ -485,9 +485,27 @@ export function GameCanvas() {
         case 'shake_heavy': scene.cameraShake('heavy'); break
         case 'zoom_pulse': scene.cameraZoomPulse(); break
         case 'zoom_reveal': scene.cameraZoomReveal(); break
+        case 'bankruptcy_zoom': scene.cameraBankruptcyZoom(); break
       }
     }
   }, [pendingCameraEffects, sceneReady])
+
+  // Detect site construction completion → spawn dust particles
+  const sites = useGameStore((s) => s.sites)
+  const prevOperationalSites = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    if (!gameRef.current) return
+    const scene = getScene(gameRef.current)
+    if (!scene) return
+    const currentOperational = new Set(sites.filter(s => s.operational).map(s => s.id))
+    // Find newly operational sites (were not operational before)
+    for (const id of currentOperational) {
+      if (!prevOperationalSites.current.has(id)) {
+        scene.spawnConstructionDust()
+      }
+    }
+    prevOperationalSites.current = currentOperational
+  }, [sites, sceneReady])
 
   // Sync worker sprites (peeps) from staff state to Phaser
   const staff = useGameStore((s) => s.staff)

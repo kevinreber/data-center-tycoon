@@ -9,7 +9,7 @@ import { RegionSelectModal } from '@/components/RegionSelectModal'
 import { TutorialOverlay } from '@/components/TutorialOverlay'
 import { useGameStore } from '@/stores/gameStore'
 import type { GameSpeed } from '@/stores/gameStore'
-import { Zap, DollarSign, Thermometer, Activity, Pause, Play, FastForward, Trophy, X, Flame, Eye, ExternalLink, Globe, ArrowLeft } from 'lucide-react'
+import { Zap, DollarSign, Thermometer, Activity, Pause, Play, FastForward, Trophy, X, Flame, Eye, ExternalLink, Globe, ArrowLeft, Skull, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Tooltip,
@@ -41,6 +41,7 @@ function App() {
     powerOutage, outageTicksRemaining, fireActive, suppressionType,
     isDemo, loadDemoState, exitDemo,
     worldMapOpen, activeSiteId, sites, toggleWorldMap, switchSite,
+    gameOver, tickCount, resetGame,
   } = useGameStore()
   const totalNodes = cabinets.length + spineSwitches.length
   const activeNodes = cabinets.filter((c) => c.powerStatus).length + spineSwitches.filter((s) => s.powerStatus).length
@@ -344,6 +345,47 @@ function App() {
 
         {/* Tutorial step overlay */}
         <TutorialOverlay />
+
+        {/* Game Over modal */}
+        {gameOver && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm">
+            <div className="rounded-xl border-2 border-neon-red/60 bg-card p-6 md:p-8 shadow-2xl max-w-md w-full mx-4 text-center">
+              <Skull className="size-12 text-neon-red mx-auto mb-3" />
+              <h2 className="text-2xl font-bold text-neon-red tracking-widest mb-2">BANKRUPT</h2>
+              <p className="text-sm text-muted-foreground mb-4">
+                Your data center ran out of funds. Cash stayed below -$10,000 for too long.
+              </p>
+              <div className="grid grid-cols-2 gap-3 text-xs font-mono mb-6 border border-border/30 rounded-lg p-3 bg-muted/20">
+                <div className="flex flex-col items-center gap-1">
+                  <span className="text-muted-foreground">Ticks Survived</span>
+                  <span className="text-neon-cyan text-lg font-bold">{tickCount.toLocaleString()}</span>
+                </div>
+                <div className="flex flex-col items-center gap-1">
+                  <span className="text-muted-foreground">Peak Cabinets</span>
+                  <span className="text-neon-green text-lg font-bold">{cabinets.length}</span>
+                </div>
+                <div className="flex flex-col items-center gap-1">
+                  <span className="text-muted-foreground">Final Balance</span>
+                  <span className="text-neon-red text-lg font-bold">${Math.floor(money).toLocaleString()}</span>
+                </div>
+                <div className="flex flex-col items-center gap-1">
+                  <span className="text-muted-foreground">Nodes Built</span>
+                  <span className="text-neon-orange text-lg font-bold">{cabinets.length + spineSwitches.length}</span>
+                </div>
+              </div>
+              <div className="flex gap-3 justify-center">
+                <Button
+                  variant="outline"
+                  onClick={() => resetGame()}
+                  className="gap-2 border-neon-red/40 hover:border-neon-red text-neon-red hover:bg-neon-red/10"
+                >
+                  <RotateCcw className="size-4" />
+                  New Game
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Achievement toast */}
         {newAchievement && (
