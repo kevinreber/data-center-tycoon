@@ -34,6 +34,19 @@ Every piece of state that React needs to push into Phaser should have:
 
 These are called from `GameCanvas.tsx` via `useEffect` hooks — never call store actions from inside Phaser.
 
+## Particle Effects
+
+Particle effects use an array-based `Particle[]` system updated each frame in `updateParticles(dt)`. Spawn helpers create particles with position, velocity, color, alpha, life, and size properties. Existing particle spawners:
+- `spawnFireParticles(col, row)` / `spawnSparkParticles(col, row)` / `spawnCoolMist(col, row)` / `spawnHeatShimmer(col, row)` / `spawnRefreshSparkle(col, row)` — equipment-positioned effects
+- `spawnIncidentPulse(col, row)` — incident alert ring
+- `spawnConstructionDust()` — brown/gray settling particles for site construction completion
+- `spawnAchievementShower()` — full-screen gold particle shower
+
+## Camera Effects
+
+Camera effects are dispatched from the store via `pendingCameraEffects` and consumed by `GameCanvas.tsx`:
+- `cameraBankruptcyZoom()` — slow zoom out to 0.5x over 2000ms with 300ms heavy shake (triggered on game over)
+
 ## Data Flow Direction
 
 **React/Zustand → Phaser only.** The Phaser scene is a rendering target. It receives state and renders it. It does not read from or write to the Zustand store directly.

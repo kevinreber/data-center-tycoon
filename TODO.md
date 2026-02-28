@@ -1,7 +1,7 @@
 # Fabric Tycoon — Consolidated Feature Tracker
 
 > Single source of truth for all features — completed, in progress, and pending.
-> Last audited: 2026-02-18
+> Last audited: 2026-02-28
 
 ---
 

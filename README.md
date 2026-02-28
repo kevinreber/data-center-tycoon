@@ -82,6 +82,7 @@ A web-based, 2D isometric Tycoon game (think Roller Coaster Tycoon) where the pl
 - **Achievements** — Unlock 103 achievements for milestones across all game systems.
 - **Scenarios** — Play themed challenges with specific goals and constraints.
 - **Leaderboards** — Track your best revenue, uptime, and cabinet count across sessions.
+- **Bankruptcy** — If cash reserves fall below -$10,000 for 30 consecutive ticks, the company goes bankrupt and the game ends. Manage finances carefully or face a forced restart.
 
 ### Staff & Operations
 - **Hiring** — Recruit Network Engineers, System Admins, Security Specialists, and Facilities Managers.
