@@ -434,6 +434,8 @@ export const TUTORIAL_TIPS: TutorialTip[] = [
   { id: 'sovereignty_hint', title: 'Data Sovereignty', message: 'Some regions have data sovereignty laws (GDPR, LGPD). Contracts requiring local data residency pay premium rates but need a site in the right region.', category: 'contracts' },
   { id: 'staff_transfer_hint', title: 'Staff Transfers', message: 'Transfer staff between sites to fill critical gaps. Cross-continent transfers take longer but let you leverage experienced engineers globally.', category: 'incidents' },
   { id: 'demand_growth_hint', title: 'Market Dynamics', message: 'Regional demand changes over time! Emerging markets grow fast while saturated markets slow down. Expand early into high-growth regions for maximum returns.', category: 'market' },
+  // Layout mode tip
+  { id: 'guided_layout_hint', title: 'Guided Layout Mode', message: 'Try Guided layout mode in the Build panel for a pre-structured hot/cold aisle layout with optimal airflow. Great for learning proper data center design before customizing your own.', category: 'build' },
 ]
 
 // ── Guided Tutorial Steps ───────────────────────────────────────

@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useGameStore, RACK_COST, MAX_SERVERS_PER_CABINET, ENVIRONMENT_CONFIG, CUSTOMER_TYPE_CONFIG, SUITE_TIERS, getSuiteLimits, DEDICATED_ROW_BONUS_CONFIG, MIXED_ENV_PENALTY_CONFIG, FLOOR_PLAN_CONFIG } from '@/stores/gameStore'
-import type { CabinetEnvironment, CustomerType } from '@/stores/gameStore'
+import type { CabinetEnvironment, CustomerType, LayoutMode } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
-import { Server, Network, Plus, MousePointer, Rows3, LayoutGrid, Trash2, Wand2, ArrowUp, ArrowDown, FlipVertical, Minus } from 'lucide-react'
+import { Server, Network, Plus, MousePointer, Rows3, Trash2, Wand2, ArrowUp, ArrowDown, FlipVertical, Minus } from 'lucide-react'
 import {
   Tooltip,
   TooltipContent,
@@ -17,8 +17,8 @@ export function BuildPanel() {
     placementMode, enterPlacementMode,
     equipmentPlacementMode, enterEquipmentPlacementMode, exitEquipmentPlacementMode,
     mixedEnvPenaltyCount, dedicatedRows, zones,
-    customRowMode, customLayout, rowPlacementMode,
-    toggleCustomRowMode, removeCustomRow, moveCustomRow, resizeCustomRow, flipCustomRow, autoLayoutRows,
+    customRowMode, customLayout, rowPlacementMode, layoutMode,
+    setLayoutMode, removeCustomRow, moveCustomRow, resizeCustomRow, flipCustomRow, autoLayoutRows,
     enterRowPlacementMode, exitRowPlacementMode, toggleRowPlacementFacing,
     rowPlacementFacing,
   } = useGameStore()
@@ -47,23 +47,34 @@ export function BuildPanel() {
               {layout.cabinetRows.length}{customRowMode ? `/${floorPlan.maxCabinetRows}` : ''} rows · {layout.aisles.length} aisles
             </span>
           </div>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="xs"
-                onClick={toggleCustomRowMode}
-                className={`text-[9px] font-mono h-4 px-1.5 ${customRowMode ? 'text-neon-cyan border-neon-cyan/40' : 'text-muted-foreground'}`}
-              >
-                <LayoutGrid className="size-2.5 mr-0.5" />
-                {customRowMode ? 'Custom' : 'Auto'}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="right" className="max-w-52">
-              <p className="font-bold">{customRowMode ? 'Custom Row Layout' : 'Auto Row Layout'}</p>
-              <p className="text-xs mt-1">{customRowMode ? 'Design your own row layout. Place and remove rows on the expanded floor plan.' : 'Switch to custom mode to place rows manually for strategic spacing.'}</p>
-            </TooltipContent>
-          </Tooltip>
+          <div className="flex gap-0.5">
+            {(['auto', 'guided', 'custom'] as LayoutMode[]).map((mode) => (
+              <Tooltip key={mode}>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    onClick={() => setLayoutMode(mode)}
+                    className={`text-[9px] font-mono h-4 px-1 ${
+                      layoutMode === mode
+                        ? mode === 'guided' ? 'text-neon-green border-neon-green/40' : mode === 'custom' ? 'text-neon-cyan border-neon-cyan/40' : 'text-muted-foreground border-border/40'
+                        : 'text-muted-foreground/50'
+                    }`}
+                  >
+                    {mode === 'auto' ? 'Auto' : mode === 'guided' ? 'Guided' : 'Custom'}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="max-w-52">
+                  <p className="font-bold">{mode === 'auto' ? 'Auto Layout' : mode === 'guided' ? 'Guided Layout' : 'Custom Layout'}</p>
+                  <p className="text-xs mt-1">{
+                    mode === 'auto' ? 'Default tier layout with balanced row spacing.' :
+                    mode === 'guided' ? 'Structured hot/cold aisle layout with guaranteed proper airflow. Rows are pre-positioned for optimal cooling — recommended for new players.' :
+                    'Full control: place, move, resize, and flip rows anywhere on the floor plan.'
+                  }</p>
+                </TooltipContent>
+              </Tooltip>
+            ))}
+          </div>
         </div>
         <div className="flex flex-col gap-1">
           {layout.cabinetRows.map((row) => {
@@ -168,6 +179,13 @@ export function BuildPanel() {
             )
           })}
         </div>
+
+        {/* Guided layout info */}
+        {layoutMode === 'guided' && !customRowMode && (
+          <div className="flex items-center gap-1.5 mt-1 pt-1 border-t border-border/20">
+            <span className="text-[10px] font-mono text-neon-green/80">Structured layout — optimal hot/cold aisles</span>
+          </div>
+        )}
 
         {/* Custom row mode controls */}
         {customRowMode && (

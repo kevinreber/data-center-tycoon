@@ -45,6 +45,7 @@ export type {
   FloatingTextEvent, CameraEffect, CameraEffectType,
   PrestigeBonuses, PrestigeState,
   NaclPolicy, NaclPolicyConfig,
+  LayoutMode,
 } from './types'
 
 import type {
@@ -75,6 +76,7 @@ import type {
   DataCenterLayout, DataCenterRow,
   PrestigeState,
   NaclPolicy,
+  LayoutMode,
 } from './types'
 
 // ── Re-export constants ────────────────────────────────────────
@@ -531,6 +533,7 @@ interface GameState {
   customLayout: DataCenterLayout | null
   rowPlacementMode: boolean
   rowPlacementFacing: CabinetFacing
+  layoutMode: LayoutMode  // 'auto' = tier default, 'custom' = player-built, 'guided' = structured
 
   // Bankruptcy / Game Over
   gameOver: boolean
@@ -688,6 +691,7 @@ interface GameState {
   cancelWorkload: (workloadId: string) => void
   unlockAdvancedTier: (tier: AdvancedTier) => void
   toggleCustomRowMode: () => void
+  setLayoutMode: (mode: LayoutMode) => void
   placeCustomRow: (gridRow: number, facing: CabinetFacing) => void
   removeCustomRow: (gridRow: number) => void
   moveCustomRow: (gridRow: number, newGridRow: number) => void
@@ -1154,6 +1158,7 @@ export const useGameStore = create<GameState>((set) => ({
   customLayout: null as DataCenterLayout | null,
   rowPlacementMode: false,
   rowPlacementFacing: 'south' as CabinetFacing,
+  layoutMode: 'auto' as LayoutMode,
 
   // Bankruptcy / Game Over
   gameOver: false,
@@ -3012,6 +3017,7 @@ export const useGameStore = create<GameState>((set) => ({
         })
         return {
           customRowMode: true,
+          layoutMode: 'custom' as LayoutMode,
           customLayout: layout,
           cabinets,
           ...calcStats(cabinets, state.spineSwitches),
@@ -3029,13 +3035,116 @@ export const useGameStore = create<GameState>((set) => ({
         })
         return {
           customRowMode: false,
+          layoutMode: 'auto' as LayoutMode,
           customLayout: null,
           rowPlacementMode: false,
           cabinets,
           ...calcStats(cabinets, state.spineSwitches),
         }
       }
-      return { customRowMode: enabling }
+      return { customRowMode: enabling, layoutMode: enabling ? 'custom' as LayoutMode : 'auto' as LayoutMode }
+    }),
+
+  setLayoutMode: (mode: LayoutMode) =>
+    set((state) => {
+      if (mode === state.layoutMode) return state
+
+      // Switching to guided mode: generate structured hot/cold aisle layout
+      if (mode === 'guided') {
+        const defaultLayout = SUITE_TIERS[state.suiteTier].layout
+        const floorPlan = FLOOR_PLAN_CONFIG[state.suiteTier]
+        const cols = SUITE_TIERS[state.suiteTier].cols
+        const maxRows = floorPlan.maxCabinetRows
+
+        // Structured layout: alternating south/north facing with guaranteed aisles
+        // Pattern: corridor, row(S), cold aisle, row(N), hot aisle, row(S), cold aisle, row(N), ..., corridor
+        const placedRows: DataCenterRow[] = []
+        const interiorRows = floorPlan.totalGridRows - 2 // exclude top/bottom corridors
+        // Even spacing with 2-row gap for proper aisle placement
+        const spacing = Math.max(2, Math.floor(interiorRows / maxRows))
+        for (let i = 0; i < maxRows; i++) {
+          const gridRow = 1 + Math.min(i * spacing, interiorRows - 1)
+          const facing: CabinetFacing = i % 2 === 0 ? 'south' : 'north'
+          placedRows.push({ id: i, gridRow, facing, slots: cols })
+        }
+        const layout = buildLayoutFromRows(placedRows, floorPlan.totalGridRows)
+
+        // Remap existing cabinets to guided layout grid rows
+        const oldLayout = state.customLayout ?? defaultLayout
+        const cabinets = state.cabinets.map(cab => {
+          const oldRow = oldLayout.cabinetRows.find(r => r.gridRow === cab.row)
+          if (!oldRow) return cab
+          const newRow = placedRows.find(r => r.id === oldRow.id)
+          if (!newRow || newRow.gridRow === cab.row) return cab
+          return { ...cab, row: newRow.gridRow, facing: newRow.facing }
+        })
+
+        return {
+          layoutMode: 'guided',
+          customRowMode: false,
+          customLayout: layout,
+          rowPlacementMode: false,
+          cabinets,
+          ...calcStats(cabinets, state.spineSwitches),
+        }
+      }
+
+      // Switching to custom mode: enter custom row editing
+      if (mode === 'custom') {
+        // Delegate to existing toggleCustomRowMode behavior by enabling custom mode
+        const floorPlan = FLOOR_PLAN_CONFIG[state.suiteTier]
+        const cols = SUITE_TIERS[state.suiteTier].cols
+        const maxRows = floorPlan.maxCabinetRows
+        const interiorRows = floorPlan.totalGridRows - 2
+        const spacing = Math.max(2, Math.floor(interiorRows / maxRows))
+
+        // Start from current layout or generate fresh
+        const sourceLayout = state.customLayout ?? SUITE_TIERS[state.suiteTier].layout
+        const placedRows: DataCenterRow[] = sourceLayout.cabinetRows.map((r, i) => ({
+          ...r,
+          id: i,
+          gridRow: state.layoutMode === 'auto' ? 1 + Math.min(i * spacing, interiorRows - 1) : r.gridRow,
+          slots: r.slots || cols,
+        }))
+        const layout = buildLayoutFromRows(placedRows, floorPlan.totalGridRows)
+
+        const cabinets = state.cabinets.map(cab => {
+          const oldRow = sourceLayout.cabinetRows.find(r => r.gridRow === cab.row)
+          if (!oldRow) return cab
+          const newRow = placedRows.find(r => r.id === oldRow.id)
+          if (!newRow || newRow.gridRow === cab.row) return cab
+          return { ...cab, row: newRow.gridRow, facing: newRow.facing }
+        })
+
+        return {
+          layoutMode: 'custom',
+          customRowMode: true,
+          customLayout: layout,
+          rowPlacementMode: false,
+          cabinets,
+          ...calcStats(cabinets, state.spineSwitches),
+        }
+      }
+
+      // Switching to auto mode: revert to tier default layout
+      const defaultLayout = SUITE_TIERS[state.suiteTier].layout
+      const oldLayout = state.customLayout ?? defaultLayout
+      const cabinets = state.cabinets.map(cab => {
+        const customRow = oldLayout.cabinetRows.find(r => r.gridRow === cab.row)
+        if (!customRow) return cab
+        const defaultRow = defaultLayout.cabinetRows.find(r => r.id === customRow.id)
+        if (!defaultRow || defaultRow.gridRow === cab.row) return cab
+        return { ...cab, row: defaultRow.gridRow, facing: defaultRow.facing }
+      })
+
+      return {
+        layoutMode: 'auto',
+        customRowMode: false,
+        customLayout: null,
+        rowPlacementMode: false,
+        cabinets,
+        ...calcStats(cabinets, state.spineSwitches),
+      }
     }),
 
   placeCustomRow: (gridRow: number, facing: CabinetFacing) =>
@@ -4315,6 +4424,7 @@ export const useGameStore = create<GameState>((set) => ({
       customLayout: null,
       rowPlacementMode: false,
       rowPlacementFacing: 'south' as CabinetFacing,
+      layoutMode: 'auto' as LayoutMode,
       gameOver: false,
       bankruptcyTicks: 0,
       rackDetails: {},
