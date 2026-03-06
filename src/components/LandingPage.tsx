@@ -274,7 +274,7 @@ export function LandingPage({ onPlay }: LandingPageProps) {
 
         {/* Title */}
         <h1 className="text-4xl md:text-6xl font-bold tracking-[0.2em] text-neon-green text-glow-green landing-title mb-2">
-          FABRIC TYCOON
+          DATA CENTER TYCOON
         </h1>
         <p className="text-sm md:text-base text-muted-foreground tracking-widest mb-1 landing-fade-in" style={{ animationDelay: '0.3s' }}>
           DATA CENTER SIMULATOR
@@ -344,7 +344,7 @@ export function LandingPage({ onPlay }: LandingPageProps) {
       {/* Footer */}
       <div className="w-full border-t border-border/30 py-4 text-center relative z-20 landing-fade-in" style={{ animationDelay: '2.2s' }}>
         <p className="text-[10px] text-muted-foreground/50 tracking-wider">
-          FABRIC TYCOON v0.5.2 &middot; BUILT WITH REACT + PHASER + ZUSTAND
+          DC TYCOON v0.5.2 &middot; BUILT WITH REACT + PHASER + ZUSTAND
         </p>
       </div>
     </div>
