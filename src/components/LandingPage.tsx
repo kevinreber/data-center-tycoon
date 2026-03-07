@@ -190,11 +190,13 @@ function DataCenterSVG() {
         const pad = 4 // inset from face edges
 
         // Helper: parallelogram band on the left face from fraction f1 to f2 (0=top, 1=bottom)
+        // Adjusts y for padding so bar edges stay parallel to the face's isometric edges
+        const padSlant = pad * (hh / hw) // y correction to maintain isometric angle
         const leftFaceBand = (f1: number, f2: number) => {
-          const tl = { x: cx - hw + pad, y: cy - h + f1 * h }
-          const tr = { x: cx - pad, y: cy + hh - h + f1 * h }
-          const br = { x: cx - pad, y: cy + hh - h + f2 * h }
-          const bl = { x: cx - hw + pad, y: cy - h + f2 * h }
+          const tl = { x: cx - hw + pad, y: cy - h + f1 * h + padSlant }
+          const tr = { x: cx - pad, y: cy + hh - h + f1 * h - padSlant }
+          const br = { x: cx - pad, y: cy + hh - h + f2 * h - padSlant }
+          const bl = { x: cx - hw + pad, y: cy - h + f2 * h + padSlant }
           return `${tl.x},${tl.y} ${tr.x},${tr.y} ${br.x},${br.y} ${bl.x},${bl.y}`
         }
 
