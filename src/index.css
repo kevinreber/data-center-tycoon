@@ -231,3 +231,65 @@
 .animate-blink {
   animation: blink 1s step-end infinite;
 }
+
+/* Landing page animations */
+@keyframes landing-title-appear {
+  0% { opacity: 0; letter-spacing: 0.6em; filter: blur(8px); }
+  60% { opacity: 1; filter: blur(0); }
+  100% { letter-spacing: 0.2em; }
+}
+.landing-title {
+  animation: landing-title-appear 1.2s ease-out forwards;
+}
+
+@keyframes landing-fade-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.landing-fade-in {
+  opacity: 0;
+  animation: landing-fade-in 0.6s ease-out forwards;
+}
+
+@keyframes landing-cabinet-appear {
+  from { opacity: 0; transform: translateY(8px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.landing-cabinet {
+  opacity: 0;
+  animation: landing-cabinet-appear 0.4s ease-out forwards;
+}
+
+@keyframes landing-spine-appear {
+  from { opacity: 0; transform: scaleX(0.5); }
+  to { opacity: 1; transform: scaleX(1); }
+}
+.landing-spine {
+  opacity: 0;
+  animation: landing-spine-appear 0.5s ease-out forwards;
+}
+
+@keyframes landing-traffic-draw {
+  from { stroke-dashoffset: 40; opacity: 0; }
+  to { stroke-dashoffset: 0; opacity: 1; }
+}
+.landing-traffic-line {
+  opacity: 0;
+  animation: landing-traffic-draw 0.8s ease-out forwards;
+}
+
+@keyframes landing-led-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.2; }
+}
+.landing-led {
+  animation: landing-led-blink 1.5s ease-in-out infinite;
+}
+
+@keyframes landing-pulse-border {
+  0%, 100% { border-color: #00ff8850; box-shadow: 0 0 10px #00ff8833; }
+  50% { border-color: #00ff8880; box-shadow: 0 0 20px #00ff8844, 0 0 40px #00ff8822; }
+}
+.landing-pulse-border {
+  animation: landing-pulse-border 2.5s ease-in-out infinite;
+}

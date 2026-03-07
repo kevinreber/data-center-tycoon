@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { GameCanvas } from '@/components/GameCanvas'
 import { Sidebar } from '@/components/Sidebar'
 import { LayersPopup } from '@/components/LayersPopup'
@@ -10,6 +10,7 @@ import { TutorialOverlay } from '@/components/TutorialOverlay'
 import { useGameStore } from '@/stores/gameStore'
 import type { GameSpeed } from '@/stores/gameStore'
 import { Zap, DollarSign, Thermometer, Activity, Pause, Play, FastForward, Trophy, X, Flame, Eye, ExternalLink, Globe, ArrowLeft, Skull, RotateCcw } from 'lucide-react'
+import { LandingPage } from '@/components/LandingPage'
 import { Button } from '@/components/ui/button'
 import {
   Tooltip,
@@ -49,6 +50,13 @@ function App() {
   const tickRef = useRef(tick)
   useEffect(() => { tickRef.current = tick }, [tick])
 
+  // Landing page: show unless demo mode or returning player with existing game
+  const isReturningPlayer = cabinets.length > 0 || isDemo
+  const [showLanding, setShowLanding] = useState(() => {
+    const params = new URLSearchParams(window.location.search)
+    return params.get('demo') !== 'true' && !isReturningPlayer
+  })
+
   // Auto-load demo from URL parameter (?demo=true)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -87,6 +95,7 @@ function App() {
 
   return (
     <TooltipProvider>
+      {showLanding && <LandingPage onPlay={() => setShowLanding(false)} />}
       <div className="h-screen flex flex-col bg-background text-foreground font-mono overflow-hidden">
         {/* Top bar */}
         <header className="flex items-center justify-between px-2 md:px-4 py-1.5 md:py-2 border-b border-border bg-card gap-2">
