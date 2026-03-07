@@ -191,10 +191,10 @@ A suggested sequencing that layers features for maximum impact at each stage:
 18. ~~Competitor AI~~
 
 ### Phase 5 — Add Longevity (make it replayable) ✅
-19. ~~Achievement system~~ (89 achievements implemented)
+19. ~~Achievement system~~ (106 achievements implemented)
 20. ~~Sandbox mode~~
 21. ~~Scenario challenges~~ (5 scenarios)
-22. Multi-site expansion (Phase 6A store/types done, 6B–6D pending)
+22. ~~Multi-site expansion~~ (Phase 6A–6D all complete)
 
 ---
 
@@ -1187,13 +1187,17 @@ interface TutorialTip {
 
 These are ideas that expand on the row-based layout system introduced with the realistic data center layout feature.
 
-### Player-Built Rows
-**Impact: High | Effort: Medium** — *Not yet implemented*
-Instead of pre-defined rows per suite tier, let the player choose where to place rows on the floor plan. This adds another layer of strategic planning — players decide row count, spacing, and orientation. Could introduce constraints like minimum aisle width, maximum row length, and fire code compliance.
+### Player-Built Rows ✅
+**Impact: High | Effort: Medium** — *Implemented*
+Custom Row Mode lets players choose where to place rows on an expanded floor plan. Players control row count, spacing, and orientation with fire code constraints (minimum 1-row gap). Actions: place, remove, move, resize, flip, auto-layout. UI in Build panel with per-row controls.
 
-### Flexible Row Placement
-**Impact: Medium | Effort: High** — *Not yet implemented*
-Semi-free-form row positioning on a larger floor plan grid. Players could drag and drop rows, adjust row length, and create non-uniform layouts. Would require significant UI work for a row-placement editor and more complex validation logic.
+### Flexible Row Placement ✅
+**Impact: Medium | Effort: High** — *Implemented*
+Full row editor on the expanded floor plan grid. Players can move rows up/down, resize individual row slot counts, flip facing (north/south), and remove empty rows. Auto-layout option evenly spaces rows when no cabinets are placed. Validation: corridors protected, fire code gap enforced, cabinet remap on move.
+
+### Structured / Guided Layout ✅
+**Impact: Medium | Effort: Medium** — *Implemented*
+Three layout modes in Build panel: Auto (tier default), Guided (structured hot/cold aisle layout with optimal airflow — recommended for new players), and Custom (full manual control). Guided mode pre-positions rows with alternating south/north facing for guaranteed proper aisle formation.
 
 ### Row-End Infrastructure Slots ✅
 **Impact: Medium | Effort: Low** — *Implemented*
@@ -1996,9 +2000,172 @@ Row 3 (cabinets)  ← facing north (exhaust →)
 
 **Why deferred:** Option B (free-form with soft constraints) was chosen because it preserves player agency — you can make bad decisions and learn from them, which is better tycoon gameplay. The penalty/bonus system creates more strategic depth and encourages learning real DC layout principles organically.
 
-**Possible future use:**
-- Could be offered as a "guided layout" toggle in settings for newer players
-- Could be a tutorial scenario ("Design a proper data center from scratch")
-- Could be the default for a future "enterprise" or "colocation" game mode where clients expect structured layouts
+**Resolution:** The "Guided Layout" mode (v0.5.2) implements the structured layout concept as one of three layout modes (Auto/Guided/Custom), offering the pre-structured approach alongside free-form building. Players can choose guided mode for guaranteed proper hot/cold aisle formation, addressing the original goal without removing player agency.
 
 **Effort:** Medium | **Impact:** Medium — Would replace the soft-constraint system, not complement it.
+
+---
+
+## Phase 7 — Endgame, Mastery & Community (make it unforgettable)
+
+Phases 1–6 deliver a complete tycoon game from single rack to global empire. Phase 7 focuses on **endgame depth**, **mastery loops**, **social features**, and **content that gives the game long-term legs**. These features assume all prior systems are solid and add layers for players who've "beaten" the game and want more.
+
+---
+
+### 7A. Acquisition & M&A System
+
+**Goal:** Buy out struggling competitors or sell your company for a massive payout. The ultimate endgame power move.
+
+| Feature | Description | Impact | Effort | Why it matters |
+|---------|-------------|--------|--------|----------------|
+| Competitor acquisition | When a competitor's strength drops below a threshold (outage, debt), offer to acquire them. Gain their contracts, sites, and market share. Price scales with their assets. | High | High | The tycoon endgame fantasy: becoming so dominant you buy the competition. Natural extension of the competitor AI system. |
+| Hostile takeover defense | Aggressive competitors can attempt hostile takeover if your stock price drops too low. Defend by buying back shares or improving valuation. | Medium | Medium | Adds stakes to poor performance — you can actually lose your company, not just go bankrupt. |
+| IPO event | Go public at a valuation milestone. Unlocks shareholder pressure (quarterly targets) but provides massive capital injection for expansion. | Medium | Medium | A different kind of progression gate. Going public changes how you play — short-term pressure vs. long-term strategy. |
+| Exit strategy | Sell the company to a hyperscaler (AWS/GCP/Azure equivalent). Score based on total valuation. Acts as a "soft ending" with stats and replay incentive. | Medium | Low | Gives completionists a definitive "I won" moment while encouraging replay for a higher sale price. |
+
+---
+
+### 7B. Dynamic Event Chains & Story Arcs
+
+**Goal:** Multi-stage narrative events that unfold over dozens of ticks, creating memorable moments and forcing difficult decisions.
+
+| Feature | Description | Impact | Effort | Why it matters |
+|---------|-------------|--------|--------|----------------|
+| Event chains | Multi-part events that branch based on player choices. E.g., "Government Investigation" → choose to cooperate (reputation hit, fine) or fight (legal costs, potential vindication or worse penalties). | High | High | Transforms incidents from random annoyances into memorable stories. The best tycoon games have events you remember and tell people about. |
+| Seasonal story arcs | 4 major story arcs per "year" of gameplay: holiday traffic surge, summer cooling crisis, audit season, end-of-year budget pressure. Each with 3–5 stages. | Medium | Medium | Creates rhythm and predictability that players can plan around, while still surprising with branch outcomes. |
+| Black swan events | Extremely rare (0.01% per tick), extremely impactful global events: worldwide chip shortage, internet backbone outage, new regulation banning crypto mining, breakthrough in quantum computing. Affect all sites and competitors. | High | Medium | "Remember when the global fiber cut happened?" These become the stories players share. Rare enough to feel special, impactful enough to be memorable. |
+| Customer narratives | Named customers with ongoing stories. "MegaCorp" starts small, grows, demands more capacity, eventually either churns to a competitor or becomes your anchor tenant. | Medium | High | Emotional investment in your customers. Losing a named customer who's been with you for 500 ticks hurts more than losing "Contract #47." |
+
+---
+
+### 7C. Automation & Scripting Layer
+
+**Goal:** Let advanced players create automation rules for routine operations, reducing micromanagement in the late game.
+
+| Feature | Description | Impact | Effort | Why it matters |
+|---------|-------------|--------|--------|----------------|
+| Policy engine | Define rules like "If cabinet temp > 75°C, power off servers in row 3" or "If money > $100K, auto-accept gold contracts" or "If noise > 65dB, activate sound barriers." Visual rule builder, not coding. | High | High | The game gets complex at scale. Automation is the reward for understanding the systems deeply. Also real DCs use policy engines (e.g., DCIM software). |
+| Auto-scaling policies | Set thresholds for automatic server deployment: "Maintain 20% spare capacity" or "Scale up when spot price > 2x." Costs money per policy active. | Medium | Medium | Mirrors real cloud auto-scaling. Rewards players who understand demand patterns. |
+| Alert thresholds | Configurable alerts: "Notify me when PUE > 1.5" or "Alert when any cabinet > 70°C." Appear as floating text + event log entries. | Low | Low | Quality of life for experienced players managing many sites. Low effort, high utility. |
+| Runbook templates | Pre-built automation sequences for common scenarios: "Hurricane prep" (shut down non-essential, activate generators, notify customers), "Traffic surge response" (spin up spot capacity, engage peering). | Medium | Medium | Teaches best practices while providing useful automation. Players learn from the templates then customize. |
+
+---
+
+### 7D. Prestige System Expansion
+
+**Goal:** Deepen the prestige/new game+ loop with more meaningful choices and progression across runs.
+
+| Feature | Description | Impact | Effort | Why it matters |
+|---------|-------------|--------|--------|----------------|
+| Prestige tech tree | Permanent unlocks earned with prestige currency: faster research, cheaper first cabinets, starting with a staff member, bonus starting reputation. 15-20 nodes across 3 branches. | High | Medium | Makes each prestige run feel different. Players choose their "build order" for prestige upgrades, creating replay variety. |
+| Legacy contracts | Special contracts only available in NG+ that reference your previous run: "Your old customer MegaCorp wants to return" with boosted revenue. | Medium | Low | Connects runs narratively. Makes prestige feel like building a legacy, not starting over. |
+| Challenge modifiers | Optional difficulty modifiers for prestige runs: "No Loans," "Double Heat," "Accelerated Depreciation," "Aggressive Competitors." Each adds a prestige point multiplier. | Medium | Medium | For mastery players who want more challenge. Self-imposed difficulty with tangible rewards. |
+| Hall of Fame | Cross-run statistics and personal bests: fastest to Enterprise tier, highest single-run revenue, most sites in one run, longest uptime. Persistent across prestiges. | Low | Low | Long-term progression tracking that persists forever. "I've played 47 runs and my best was..." |
+
+---
+
+### 7E. Network Topology Sandbox
+
+**Goal:** A dedicated mode for designing and testing Clos fabric topologies, separate from the tycoon game.
+
+| Feature | Description | Impact | Effort | Why it matters |
+|---------|-------------|--------|--------|----------------|
+| Topology designer | Free-form network topology builder: drag switches, draw connections, set link capacities. Simulate traffic patterns and observe ECMP behavior. | Medium | High | The networking is a unique differentiator. A standalone mode lets networking enthusiasts (and students) explore without the tycoon overhead. Educational value. |
+| Traffic simulator | Generate configurable traffic patterns (bursty, steady, elephant flows) and watch how they distribute across the fabric. Visualize congestion and failover in real time. | Medium | Medium | Makes the invisible (network traffic) visible. Powerful learning tool for understanding spine-leaf architecture. |
+| Failure injection | Manually fail links and switches to observe rerouting behavior. "What happens if I lose spine 3?" with real-time visualization. | Low | Low | The "chaos engineering" approach applied to a game. Educational and satisfying. |
+
+---
+
+### 7F. Customer Relationship Management (CRM)
+
+**Goal:** Named customers with persistence, loyalty, demands, and relationships that evolve over time.
+
+| Feature | Description | Impact | Effort | Why it matters |
+|---------|-------------|--------|--------|----------------|
+| Named tenants | Instead of anonymous contracts, named companies (procedurally generated or from a pool) that occupy cabinets, have preferences, and leave reviews affecting reputation. | High | Medium | Transforms contracts from abstract numbers into relationships. "TechVault has been our tenant for 300 ticks" creates attachment. |
+| Tenant satisfaction | Each tenant has a satisfaction score based on uptime, temperature, latency, and incident history. High satisfaction = renewal + referrals. Low = churn risk. | Medium | Medium | Creates a softer, more nuanced version of contract SLAs. You can have an unhappy tenant who hasn't technically violated SLA yet. |
+| Tenant demands | Tenants occasionally request upgrades: "Can you add redundant power to our cages?" or "We need PCI compliance within 50 ticks or we'll leave." Adds narrative pressure to infrastructure decisions. | Medium | Medium | Gives infrastructure upgrades a human motivation. You're not upgrading security because a number said so — you're doing it because TechVault asked. |
+| Referral network | Satisfied tenants refer new customers. A tenant with 90+ satisfaction has a 5% chance per 50 ticks of bringing in a referral (new contract at +10% revenue). | Low | Low | Rewards consistently good operations with organic growth. Virtuous cycle. |
+
+---
+
+### 7G. Multiplayer / Async Competition
+
+**Goal:** Compete with other players without requiring real-time multiplayer infrastructure.
+
+| Feature | Description | Impact | Effort | Why it matters |
+|---------|-------------|--------|--------|----------------|
+| Ghost runs | Upload your run's timeline (key metrics per tick) to compare against other players' runs. See their revenue/expansion curve overlaid on yours as you play. | Medium | Medium | "Racing against a ghost" is proven fun (Mario Kart time trials). Low-tech multiplayer that creates competition without servers. |
+| Weekly challenges | Seeded scenarios that everyone plays with the same starting conditions. Leaderboard for best score/time/efficiency. New challenge each week. | High | Medium | The "daily puzzle" engagement model. Gives players a reason to return regularly. Requires a lightweight backend (or use a free service). |
+| Shared leaderboards | Cloud-backed leaderboards (Firebase/Supabase) replacing localStorage. Categories: highest revenue, best PUE, fastest to Enterprise, most sites. | Medium | Medium | Makes the game feel alive and competitive. "I'm #47 globally for PUE efficiency." |
+
+---
+
+### 7H. Accessibility & Quality of Life
+
+**Goal:** Polish features that make the game more accessible and enjoyable for all players.
+
+| Feature | Description | Impact | Effort | Why it matters |
+|---------|-------------|--------|--------|----------------|
+| Colorblind modes | Alternative color palettes for common types of color vision deficiency (protanopia, deuteranopia, tritanopia). Affects neon theme, heat maps, zone overlays. | Medium | Low | Opens the game to ~8% of male players. Low effort, high accessibility impact. |
+| Speed controls expansion | Add 4x and 5x speed for late-game players who want to fast-forward. Also "tick to next event" that auto-advances until something interesting happens. | Medium | Low | Late game can feel slow when you're waiting for construction or research. Speed helps without changing balance. |
+| Keyboard shortcuts | Hotkeys for common actions: 1-5 for speed, B for build, S for server, space for pause. Configurable in settings. | Low | Low | Power user feature. Experienced players save clicks. Standard for tycoon games. |
+| Stats export | Export game stats/history as CSV or JSON for players who want to analyze their runs externally. | Low | Low | Niche but beloved feature. Data center operators *love* metrics and spreadsheets. |
+| Mobile/touch support | Touch-friendly controls: tap to place, pinch to zoom, swipe to pan. Responsive sidebar for smaller screens. | Medium | High | Opens up a new platform. Tycoon games work well on tablets. Significant UI rework needed. |
+
+---
+
+### Phase 7 — Recommended Implementation Order
+
+1. **Prestige System Expansion** (7D) — Deepens existing system, adds replay value immediately
+2. **Customer Relationship Management** (7F) — Named tenants transform contract gameplay
+3. **Dynamic Event Chains** (7B) — Creates memorable moments and narrative depth
+4. **Automation & Scripting** (7C) — Addresses late-game micromanagement
+5. **Accessibility & QoL** (7H) — Broadens player base, low effort items first
+6. **Acquisition & M&A** (7A) — Endgame power fantasy, depends on competitor AI maturity
+7. **Multiplayer / Async Competition** (7G) — Community engagement, requires backend
+8. **Network Topology Sandbox** (7E) — Educational niche, standalone mode
+
+### Phase 7 — Estimated Effort Summary
+
+| Feature | New Types | New Constants | Store Fields | Tick Logic | UI | Achievements |
+|---------|-----------|--------------|-------------|------------|-----|-------------|
+| 7A: Acquisition & M&A | 3 | 2 configs | ~8 fields, 4 actions | Acquisition logic, IPO | Acquisition panel, stock UI | 4 |
+| 7B: Event Chains | 4 | 1 catalog | ~6 fields, 3 actions | Chain progression, branching | Event chain modal, choice UI | 4 |
+| 7C: Automation | 3 | 1 config | ~5 fields, 4 actions | Policy evaluation | Rule builder UI, policy panel | 3 |
+| 7D: Prestige Expansion | 2 | 1 tree config | ~4 fields, 3 actions | Prestige bonus application | Prestige tech tree UI | 3 |
+| 7E: Topology Sandbox | 2 | 0 | ~6 fields, 5 actions | Traffic simulation | Topology designer canvas | 2 |
+| 7F: CRM | 3 | 1 config | ~5 fields, 3 actions | Satisfaction, referrals | Tenant panel, satisfaction UI | 4 |
+| 7G: Multiplayer | 2 | 0 | ~3 fields, 2 actions | Timeline export | Leaderboard, ghost overlay | 2 |
+| 7H: QoL | 1 | 1 config | ~3 fields, 2 actions | — | Settings additions | 0 |
+
+### Quick Reference: Phase 7 Effort vs. Impact
+
+```
+                        LOW EFFORT          MEDIUM EFFORT         HIGH EFFORT
+                   ┌──────────────────┬──────────────────┬──────────────────┐
+                   │                  │                  │                  │
+    HIGH IMPACT    │                  │  Prestige expand │  Event chains    │
+                   │                  │  Weekly challs   │  Policy engine   │
+                   │                  │  Named tenants   │  Acquisitions    │
+                   ├──────────────────┼──────────────────┼──────────────────┤
+                   │                  │                  │                  │
+    MEDIUM IMPACT  │  Colorblind      │  Ghost runs      │  Topology        │
+                   │  Speed controls  │  Leaderboards    │   sandbox        │
+                   │  Alert thresholds│  Auto-scaling    │  Touch/mobile    │
+                   │  Exit strategy   │  Satisfaction    │                  │
+                   │                  │  Story arcs      │                  │
+                   ├──────────────────┼──────────────────┼──────────────────┤
+                   │                  │                  │                  │
+    LOW IMPACT     │  Hotkeys         │  Failure inject  │                  │
+                   │  Stats export    │  Runbook temps   │                  │
+                   │  Hall of Fame    │  Referrals       │                  │
+                   │  Legacy contracts│                  │                  │
+                   └──────────────────┴──────────────────┴──────────────────┘
+```
+
+**Best bets (high impact, medium effort):** Prestige expansion, weekly challenges, named tenants.
+
+**Quick wins (medium impact, low effort):** Colorblind modes, speed controls, alert thresholds, exit strategy.
+
+**The big ones (high impact, high effort):** Dynamic event chains, automation policy engine, acquisition system.

@@ -381,6 +381,7 @@ export interface OpsTierConfig {
 
 // ── Infrastructure Layout Types ────────────────────────────────
 export type CabinetFacing = 'north' | 'south' | 'east' | 'west'
+export type LayoutMode = 'auto' | 'custom' | 'guided'
 
 export interface PDU {
   id: string

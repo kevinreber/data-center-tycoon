@@ -1,7 +1,7 @@
 # Fabric Tycoon — Consolidated Feature Tracker
 
 > Single source of truth for all features — completed, in progress, and pending.
-> Last audited: 2026-02-28
+> Last audited: 2026-03-02
 
 ---
 
@@ -190,7 +190,7 @@ All Phase 5 store/tick systems are implemented.
 - [x] 3 achievements: Statistician, Ironman, Big Spender
 
 ### 5L. Tooltip Tutorial System ✅
-- [x] 27 contextual tips triggered during gameplay
+- [x] 44 contextual tips triggered during gameplay
 - [x] Dismissible toast notifications, never repeat
 - [x] Can be disabled entirely in settings
 - [x] Covers carbon, security, and market tips
@@ -546,6 +546,35 @@ Make scenarios a first-class feature rather than a settings toggle.
 
 ---
 
+### Player-Built Rows (Custom Row Mode) ✅
+
+Full row editing on an expanded floor plan grid.
+
+- [x] Custom Row Mode toggle in Build panel (Auto ↔ Custom ↔ Guided)
+- [x] Place new rows at any valid grid position with facing selection
+- [x] Move rows up/down with cabinet remapping
+- [x] Resize individual row slot counts (shrink/expand)
+- [x] Flip row facing (north ↔ south) with cabinet update
+- [x] Remove empty rows
+- [x] Auto-layout: evenly space rows when no cabinets placed
+- [x] Fire code validation (minimum 1-row gap between rows)
+- [x] Row placement mode with click-to-place interaction
+
+---
+
+### Structured / Guided Layout Mode ✅
+
+Pre-structured hot/cold aisle layout for optimal airflow — recommended for new players.
+
+- [x] Three layout modes: Auto (tier default), Guided (structured), Custom (manual)
+- [x] Guided mode generates optimal hot/cold aisle row placement with alternating facing
+- [x] Layout mode selector in Build panel with tooltips explaining each mode
+- [x] Cabinet remapping when switching between layout modes
+- [x] Tutorial tip for guided layout mode
+- [x] Guided mode info bar showing structured layout status
+
+---
+
 ### Leaderboards ✅
 
 Local leaderboard system using localStorage.
@@ -577,13 +606,14 @@ Ideas for further encouraging organized cabinet layouts. Zone Adjacency Bonus (w
 | Phase 3 (Depth) | 9 | 9 | 0 |
 | Phase 4 (World) | 44 | 44 | 0 |
 | Phase 5 (Longevity) | 60+ | 60+ | 0 |
+| Phase 6 (Multi-Site) | 20+ | 20+ | 0 |
 | Rendering & Views | 21 | 21 | 0 |
 | UX / Camera | 6 | 6 | 0 |
-| Game Feel & Polish (RCT-Style) | ~60 | ~57 | ~3 |
-| **Other Pending Features** | **~35** | **~32** | **~3** |
+| Game Feel & Polish (RCT-Style) | ~60 | ~60 | 0 |
+| Other Features | ~35 | ~35 | 0 |
 
-**Current version:** v0.5.0 — 89 achievements, 34 tutorial tips, 250 tests passing.
+**Current version:** v0.5.2 — 106 achievements, 44 tutorial tips, 393 tests passing.
 
-**Implemented features:** 230+ items across Phases 1–5, rendering, UX, capacity planning, operations progression, cooling infrastructure (placeable units + chiller plants + pipes), cabinet organization incentives, sub-floor view, 42U rack model, advanced scaling tiers (Nuclear/Fusion), workload simulation, sound effects, enhanced sound effects (HVAC noise, per-equipment placement sounds, alert/economy/UI sounds), placement animations with Phaser tweens, enhanced build animations (server install pulse, leaf switch flash, equipment removal), camera juice effects (shake/zoom pulse/zoom reveal/smooth pan to placed cabinet), ambient animations (LED pulses, fan rotation, spine glow), weather particle overlays (rain, snow, heat shimmer), day/night ambient light cycle, particle effects for events (fire, sparks, cooling mist, heat shimmer, sparkle bursts, warning pulses, achievement showers), worker sprites with pathfinding and role-colored uniforms, scenario presentation with star ratings and progression, sidebar slide transitions, leaderboards, row-end slots, aisle width upgrades, raised floor, cable management, floating world-space text, and visual state differentiation.
+**Implemented features:** 260+ items across Phases 1–6, rendering, UX, capacity planning, operations progression, cooling infrastructure (placeable units + chiller plants + pipes), cabinet organization incentives (zones, dedicated rows, mixed-env penalties), sub-floor view, 42U rack model, advanced scaling tiers (Nuclear/Fusion), workload simulation, sound effects (procedural Web Audio synthesis with per-event sounds), placement animations with Phaser tweens, enhanced build animations (server install pulse, leaf switch flash, equipment removal), camera juice effects (shake/zoom pulse/zoom reveal/smooth pan/bankruptcy zoom), ambient animations (LED pulses, fan rotation, spine glow), weather particle overlays (rain, snow, heat shimmer), day/night ambient light cycle, particle effects for events (fire, sparks, cooling mist, heat shimmer, sparkle bursts, warning pulses, achievement showers, construction dust), worker sprites with pathfinding and role-colored uniforms, scenario presentation with star ratings and progression, sidebar slide transitions, leaderboards, row-end slots, aisle width upgrades, raised floor, cable management, floating world-space text, visual state differentiation, multi-site expansion (15 regions, 6 site types, inter-site networking, regional incidents, disaster prep), global strategy layer (demand growth, data sovereignty, multi-site contracts, staff transfers, competitor regional expansion), NACL policies, prestige/new game+, player-built rows with custom row mode, and guided/structured layout mode.
 
-**Remaining features:** ~20 items, primarily multi-site expansion (Phase 6A–6D) and a couple of ambient animation items already covered by visual state differentiation.
+**Remaining features:** All planned features through Phase 6 are implemented. See BRAINSTORM.md for Phase 7 ideas.
