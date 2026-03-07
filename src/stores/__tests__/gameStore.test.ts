@@ -2453,8 +2453,29 @@ describe('Phase 6 — Multi-Site Expansion', () => {
 
   describe('regional modifiers', () => {
     it('applies regional power cost multiplier to active remote site', () => {
-      const siteId = setupOperationalSite()
-      // Add cabinet to HQ
+      // Use bay_area (powerCostMultiplier: 1.4) instead of ashburn (0.8, same as HQ)
+      setupMultiSiteUnlocked()
+      getState().researchRegion('bay_area')
+      getState().purchaseSite('bay_area', 'edge_pop', 'Bay Area Edge')
+      const siteId = getState().sites[0].id
+      setState({
+        sites: getState().sites.map((s) => ({
+          ...s,
+          operational: true,
+          constructionTicksRemaining: 0,
+          snapshot: {
+            cabinets: [], spineSwitches: [], pdus: [], cableTrays: [], cableRuns: [],
+            coolingUnits: [], chillerPlants: [], coolingPipes: [],
+            busways: [], crossConnects: [], inRowCoolers: [],
+            rowEndSlots: [], aisleContainments: [], aisleWidths: {},
+            raisedFloorTier: 'none' as const, cableManagementType: 'none' as const,
+            coolingType: 'air' as const, suiteTier: 'starter' as const,
+            totalPower: 0, avgHeat: 22, revenue: 0, expenses: 0,
+          },
+        })),
+      })
+
+      // Add cabinet to HQ (Ashburn, powerCostMultiplier: 0.8)
       getState().addCabinet(0, 1, 'production', 'general', 'south')
       getState().upgradeNextCabinet()
       getState().addSpineSwitch()
@@ -2463,7 +2484,7 @@ describe('Phase 6 — Multi-Site Expansion', () => {
       getState().tick()
       const hqExpenses = getState().expenses
 
-      // Switch to remote site and add same equipment
+      // Switch to remote site (Bay Area, powerCostMultiplier: 1.4) and add same equipment
       getState().switchSite(siteId)
       getState().addCabinet(0, 1, 'production', 'general', 'south')
       getState().upgradeNextCabinet()
@@ -2471,13 +2492,11 @@ describe('Phase 6 — Multi-Site Expansion', () => {
       getState().tick()
       const remoteExpenses = getState().expenses
 
-      // Ashburn has powerCostMultiplier of 0.8, so expenses should differ
+      // Bay Area has powerCostMultiplier 1.4 vs Ashburn's 0.8, so expenses must differ
+      const bayAreaRegion = REGION_CATALOG.find((r) => r.id === 'bay_area')!
       const ashburnRegion = REGION_CATALOG.find((r) => r.id === 'ashburn')!
-      // Remote expenses should be scaled by regional power cost
-      // (exact comparison is complex due to many factors, just verify they differ if multiplier != 1)
-      if (ashburnRegion.profile.powerCostMultiplier !== 1) {
-        expect(remoteExpenses).not.toBe(hqExpenses)
-      }
+      expect(bayAreaRegion.profile.powerCostMultiplier).not.toBe(ashburnRegion.profile.powerCostMultiplier)
+      expect(remoteExpenses).not.toBe(hqExpenses)
     })
   })
 })
