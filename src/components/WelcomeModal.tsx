@@ -15,7 +15,7 @@ export function WelcomeModal() {
         {/* Title */}
         <div className="mb-3 text-center">
           <h1 className="text-2xl font-bold tracking-wider text-neon-green font-mono">
-            FABRIC TYCOON
+            DC TYCOON
           </h1>
           <p className="text-xs font-mono text-muted-foreground mt-1">
             Data Center Simulator
