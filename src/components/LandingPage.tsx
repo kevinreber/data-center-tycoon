@@ -13,25 +13,62 @@ const FEATURES = [
   { icon: Cpu, label: 'Research & Upgrade', desc: 'Tech tree, ops tiers, and advanced scaling', color: 'text-neon-orange' },
 ]
 
+/** Isometric helpers */
+const TW = 52 // tile width
+const TH = 26 // tile height
+const OX = 240 // origin X (center of 480-wide viewbox)
+const OY = 130 // origin Y — centered vertically for the scene
+const CAB_H = 48 // cabinet height in px
+
+function isoX(col: number, row: number) { return OX + (col - row) * TW / 2 }
+function isoY(col: number, row: number) { return OY + (col + row) * TH / 2 }
+
+/** Renders a single isometric box (3 visible faces) */
+function IsoBox({ col, row, h, topFill, leftFill, rightFill, stroke, strokeW = 0.7, opacity = 1 }: {
+  col: number; row: number; h: number
+  topFill: string; leftFill: string; rightFill: string
+  stroke: string; strokeW?: number; opacity?: number
+}) {
+  const cx = isoX(col, row)
+  const cy = isoY(col, row)
+  const hw = TW / 2
+  const hh = TH / 2
+  return (
+    <g opacity={opacity}>
+      {/* Right face (darkest — drawn first, behind) */}
+      <polygon
+        points={`${cx},${cy + hh - h} ${cx + hw},${cy - h} ${cx + hw},${cy} ${cx},${cy + hh}`}
+        fill={rightFill} stroke={stroke} strokeWidth={strokeW}
+      />
+      {/* Left face (medium) */}
+      <polygon
+        points={`${cx - hw},${cy - h} ${cx},${cy + hh - h} ${cx},${cy + hh} ${cx - hw},${cy}`}
+        fill={leftFill} stroke={stroke} strokeWidth={strokeW}
+      />
+      {/* Top face (lightest) */}
+      <polygon
+        points={`${cx},${cy - hh - h} ${cx + hw},${cy - h} ${cx},${cy + hh - h} ${cx - hw},${cy - h}`}
+        fill={topFill} stroke={stroke} strokeWidth={strokeW}
+      />
+    </g>
+  )
+}
+
+/** Cabinet positions */
+const CAB_ROW_0 = [0, 1, 2, 3].map(c => ({ col: c, row: 0 }))
+const CAB_ROW_1 = [0, 1, 2].map(c => ({ col: c, row: 2 }))
+const ALL_CABS = [...CAB_ROW_0, ...CAB_ROW_1]
+
+/** Spine switch X/Y positions (above and centered over cabinets) */
+const SPINES = [
+  { x: OX - 10, y: 48 },
+  { x: OX + 70, y: 48 },
+]
+
 /** Isometric SVG illustration of a mini data center */
 function DataCenterSVG() {
-  // Isometric projection helpers
-  const TW = 44 // tile width
-  const TH = 22 // tile height
-  const OX = 240 // origin X (center of 480-wide viewbox)
-  const OY = 105 // origin Y
-  const CAB_H = 40 // cabinet height in px
-
-  const ix = (col: number, row: number) => OX + (col - row) * TW / 2
-  const iy = (col: number, row: number) => OY + (col + row) * TH / 2
-
-  // Cabinet positions: row 0 (4 cabs), row 2 (3 cabs)
-  const cabRow0 = [0, 1, 2, 3].map(c => ({ col: c, row: 0 }))
-  const cabRow1 = [0, 1, 2].map(c => ({ col: c, row: 2 }))
-  const allCabs = [...cabRow0, ...cabRow1]
-
   return (
-    <svg viewBox="0 0 480 300" className="w-full max-w-xl mx-auto" aria-label="Isometric data center illustration">
+    <svg viewBox="0 0 480 280" className="w-full max-w-xl mx-auto" aria-label="Isometric data center illustration">
       <defs>
         <filter id="glow-g" x="-50%" y="-50%" width="200%" height="200%">
           <feGaussianBlur stdDeviation="3" result="blur" />
@@ -45,14 +82,25 @@ function DataCenterSVG() {
           <feGaussianBlur stdDeviation="2" result="blur" />
           <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
         </filter>
+        {/* Radial fade mask for endless grid effect */}
+        <radialGradient id="grid-fade" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="white" stopOpacity="1" />
+          <stop offset="60%" stopColor="white" stopOpacity="0.7" />
+          <stop offset="100%" stopColor="white" stopOpacity="0" />
+        </radialGradient>
+        <mask id="grid-mask">
+          <rect x="0" y="0" width="480" height="280" fill="url(#grid-fade)" />
+        </mask>
       </defs>
 
-      {/* Isometric floor grid */}
-      <g opacity="0.12">
-        {Array.from({ length: 5 }, (_, c) =>
-          Array.from({ length: 4 }, (_, r) => {
-            const cx = ix(c, r)
-            const cy = iy(c, r)
+      {/* Endless isometric floor grid — extends well beyond viewbox, fades at edges */}
+      <g opacity="0.15" mask="url(#grid-mask)">
+        {Array.from({ length: 16 }, (_, c) =>
+          Array.from({ length: 12 }, (_, r) => {
+            const gc = c - 5
+            const gr = r - 3
+            const cx = isoX(gc, gr)
+            const cy = isoY(gc, gr)
             const hw = TW / 2
             const hh = TH / 2
             return (
@@ -61,246 +109,180 @@ function DataCenterSVG() {
                 points={`${cx},${cy - hh} ${cx + hw},${cy} ${cx},${cy + hh} ${cx - hw},${cy}`}
                 fill="none"
                 stroke="#00ff88"
-                strokeWidth="0.6"
+                strokeWidth="0.5"
               />
             )
           })
         )}
       </g>
 
-      {/* Spine switches (flat isometric boxes at top) */}
-      {[0, 1].map((i) => {
-        const sx = OX + 60 + i * 80
-        const sy = 42
-        const sw = 48
+      {/* Spine switches (isometric flat boxes above cabinets) */}
+      {SPINES.map((sp, i) => {
+        const sw = 56
         const sh = 10
         return (
           <g key={`spine-${i}`} className="landing-spine" style={{ animationDelay: `${1.1 + i * 0.2}s` }}>
             {/* Top face */}
             <polygon
-              points={`${sx},${sy - 5} ${sx + sw / 2},${sy} ${sx},${sy + 5} ${sx - sw / 2},${sy}`}
-              fill="#1a1005"
-              stroke="#ff6644"
-              strokeWidth="0.8"
+              points={`${sp.x},${sp.y - 6} ${sp.x + sw / 2},${sp.y} ${sp.x},${sp.y + 6} ${sp.x - sw / 2},${sp.y}`}
+              fill="#1a1005" stroke="#ff6644" strokeWidth="0.8"
             />
-            {/* Front-left face */}
+            {/* Left face */}
             <polygon
-              points={`${sx - sw / 2},${sy} ${sx},${sy + 5} ${sx},${sy + 5 + sh} ${sx - sw / 2},${sy + sh}`}
-              fill="#120a02"
-              stroke="#ff6644"
-              strokeWidth="0.6"
+              points={`${sp.x - sw / 2},${sp.y} ${sp.x},${sp.y + 6} ${sp.x},${sp.y + 6 + sh} ${sp.x - sw / 2},${sp.y + sh}`}
+              fill="#120a02" stroke="#ff6644" strokeWidth="0.6"
             />
-            {/* Front-right face */}
+            {/* Right face */}
             <polygon
-              points={`${sx},${sy + 5} ${sx + sw / 2},${sy} ${sx + sw / 2},${sy + sh} ${sx},${sy + 5 + sh}`}
-              fill="#0d0801"
-              stroke="#ff6644"
-              strokeWidth="0.6"
+              points={`${sp.x},${sp.y + 6} ${sp.x + sw / 2},${sp.y} ${sp.x + sw / 2},${sp.y + sh} ${sp.x},${sp.y + 6 + sh}`}
+              fill="#0d0801" stroke="#ff6644" strokeWidth="0.6"
             />
-            {/* Port lights */}
-            {[-12, -4, 4, 12].map((dx, li) => (
-              <circle key={li} cx={sx + dx} cy={sy} r="1.2" fill="#ff6644" opacity="0.7" filter="url(#glow-o)" />
+            {/* Port LEDs on top face */}
+            {[-14, -7, 0, 7, 14].map((dx, li) => (
+              <circle key={li} cx={sp.x + dx} cy={sp.y} r="1.5" fill="#ff6644" opacity="0.7" filter="url(#glow-o)" />
             ))}
-            <text x={sx} y={sy + 3} textAnchor="middle" fontSize="5" fill="#ff6644" fontFamily="monospace" opacity="0.6">SPINE</text>
           </g>
         )
       })}
 
-      {/* Traffic lines (leaf → spine) — solid thin lines */}
-      <g className="landing-traffic">
-        {allCabs.slice(0, 5).map((cab, i) => {
-          const cx = ix(cab.col, cab.row)
-          const cy = iy(cab.col, cab.row) - CAB_H
-          const spineIdx = i % 2
-          const sx = OX + 60 + spineIdx * 80
-          const sy = 52
+      {/* Traffic lines (leaf top → spine) */}
+      <g>
+        {ALL_CABS.slice(0, 5).map((cab, i) => {
+          const cx = isoX(cab.col, cab.row)
+          const cy = isoY(cab.col, cab.row) - CAB_H - TH / 2
+          const sp = SPINES[i % 2]
           return (
-            <line
-              key={`tl-${i}`}
-              x1={cx} y1={cy} x2={sx} y2={sy}
-              stroke="#00ff8830"
-              strokeWidth="0.8"
+            <line key={`tl-${i}`}
+              x1={cx} y1={cy} x2={sp.x} y2={sp.y + 16}
+              stroke="#00ff8825" strokeWidth="0.8"
               className="landing-traffic-line"
-              style={{ animationDelay: `${1.5 + i * 0.12}s` }}
+              style={{ animationDelay: `${1.5 + i * 0.1}s` }}
             />
           )
         })}
       </g>
 
-      {/* Packet dots along traffic lines */}
-      {allCabs.slice(0, 4).map((cab, i) => {
-        const cx = ix(cab.col, cab.row)
-        const cy = iy(cab.col, cab.row) - CAB_H
-        const spineIdx = i % 2
-        const sx = OX + 60 + spineIdx * 80
-        const sy = 52
+      {/* Packet dots */}
+      {ALL_CABS.slice(0, 4).map((cab, i) => {
+        const cx = isoX(cab.col, cab.row)
+        const cy = isoY(cab.col, cab.row) - CAB_H - TH / 2
+        const sp = SPINES[i % 2]
         const color = i % 2 === 0 ? '#00ff88' : '#00aaff'
         return (
-          <circle key={`pkt-${i}`} r="2" fill={color} filter="url(#glow-g)">
-            <animate attributeName="cx" values={`${cx};${sx};${cx}`} dur={`${2.5 + i * 0.3}s`} repeatCount="indefinite" begin={`${2 + i * 0.4}s`} />
-            <animate attributeName="cy" values={`${cy};${sy};${cy}`} dur={`${2.5 + i * 0.3}s`} repeatCount="indefinite" begin={`${2 + i * 0.4}s`} />
-            <animate attributeName="opacity" values="0;1;1;0" dur={`${2.5 + i * 0.3}s`} repeatCount="indefinite" begin={`${2 + i * 0.4}s`} />
+          <circle key={`pkt-${i}`} r="2.5" fill={color} filter="url(#glow-g)">
+            <animate attributeName="cx" values={`${cx};${sp.x};${cx}`} dur={`${2.5 + i * 0.3}s`} repeatCount="indefinite" begin={`${2 + i * 0.5}s`} />
+            <animate attributeName="cy" values={`${cy};${sp.y + 16};${cy}`} dur={`${2.5 + i * 0.3}s`} repeatCount="indefinite" begin={`${2 + i * 0.5}s`} />
+            <animate attributeName="opacity" values="0;1;1;0" dur={`${2.5 + i * 0.3}s`} repeatCount="indefinite" begin={`${2 + i * 0.5}s`} />
           </circle>
         )
       })}
 
-      {/* Cabinets — proper isometric cubes */}
-      {allCabs.map((cab, idx) => {
-        const cx = ix(cab.col, cab.row)
-        const cy = iy(cab.col, cab.row)
+      {/* Cabinets */}
+      {ALL_CABS.map((cab, idx) => {
+        const cx = isoX(cab.col, cab.row)
+        const cy = isoY(cab.col, cab.row)
         const hw = TW / 2
         const hh = TH / 2
-        const h = CAB_H
         const servers = cab.row === 0 ? (cab.col < 3 ? 4 : 2) : (cab.col < 2 ? 3 : 1)
         const hasLeaf = cab.row === 0 ? cab.col < 3 : cab.col < 2
 
         return (
           <g key={`cab-${idx}`} className="landing-cabinet" style={{ animationDelay: `${idx * 0.12}s` }}>
-            {/* Right face (darkest) */}
-            <polygon
-              points={`${cx},${cy + hh - h} ${cx + hw},${cy - h} ${cx + hw},${cy} ${cx},${cy + hh}`}
-              fill="#081420"
+            <IsoBox col={cab.col} row={cab.row} h={CAB_H}
+              topFill="#122030" leftFill="#0c1a28" rightFill="#081420"
               stroke="#1a3a5a"
-              strokeWidth="0.6"
-            />
-            {/* Left face (medium) */}
-            <polygon
-              points={`${cx - hw},${cy - h} ${cx},${cy + hh - h} ${cx},${cy + hh} ${cx - hw},${cy}`}
-              fill="#0c1a28"
-              stroke="#1a3a5a"
-              strokeWidth="0.6"
-            />
-            {/* Top face (lightest) */}
-            <polygon
-              points={`${cx},${cy - hh - h} ${cx + hw},${cy - h} ${cx},${cy + hh - h} ${cx - hw},${cy - h}`}
-              fill="#122030"
-              stroke="#1a3a5a"
-              strokeWidth="0.6"
             />
 
-            {/* Server bars on left face */}
+            {/* Server bars on left face (parallel to face angle) */}
             {Array.from({ length: servers }, (_, si) => {
-              const barY = cy - h + 8 + si * 8
+              const barY = cy - CAB_H + 10 + si * 9
+              const slant = hh / CAB_H * 9
               return (
-                <line
-                  key={si}
-                  x1={cx - hw + 3} y1={barY + hh * 0.15}
-                  x2={cx - 2} y2={barY - hh * 0.15}
-                  stroke="#00ff88"
-                  strokeWidth="2.5"
-                  opacity="0.7"
-                  filter="url(#glow-g)"
+                <line key={si}
+                  x1={cx - hw + 4} y1={barY + slant / 2}
+                  x2={cx - 2} y2={barY - slant / 2}
+                  stroke="#00ff88" strokeWidth="3" opacity="0.75" filter="url(#glow-g)"
                 />
               )
             })}
 
-            {/* Leaf switch bar (cyan, at top of left face) */}
-            {hasLeaf && (
-              <line
-                x1={cx - hw + 3} y1={cy - h + 4 + hh * 0.15}
-                x2={cx - 2} y2={cy - h + 4 - hh * 0.15}
-                stroke="#00aaff"
-                strokeWidth="2"
-                opacity="0.8"
-                filter="url(#glow-c)"
-              />
-            )}
+            {/* Leaf switch (cyan bar at top of left face) */}
+            {hasLeaf && (() => {
+              const barY = cy - CAB_H + 5
+              const slant = hh / CAB_H * 5
+              return (
+                <line
+                  x1={cx - hw + 4} y1={barY + slant}
+                  x2={cx - 2} y2={barY - slant}
+                  stroke="#00aaff" strokeWidth="2.5" opacity="0.85" filter="url(#glow-c)"
+                />
+              )
+            })()}
 
-            {/* LED indicator */}
+            {/* LED indicator on right face */}
             <circle
-              cx={cx + hw - 4}
-              cy={cy - h + 6}
-              r="1.5"
-              fill="#00ff88"
-              filter="url(#glow-g)"
-              className="landing-led"
-              style={{ animationDelay: `${idx * 0.3}s` }}
+              cx={cx + hw - 5} cy={cy - CAB_H + 8}
+              r="1.8" fill="#00ff88" filter="url(#glow-g)"
+              className="landing-led" style={{ animationDelay: `${idx * 0.3}s` }}
             />
           </g>
         )
       })}
 
-      {/* Cooling unit (isometric box, right side) */}
+      {/* Cooling unit (CRAC) */}
       <g className="landing-cabinet" style={{ animationDelay: '1.0s' }}>
+        <IsoBox col={4} row={1} h={32}
+          topFill="#0a2030" leftFill="#081822" rightFill="#061018"
+          stroke="#00aaff" opacity={0.85}
+        />
         {(() => {
-          const cx = ix(4, 1)
-          const cy = iy(4, 1)
-          const hw = TW / 2
-          const hh = TH / 2
-          const h = 28
+          const cx = isoX(4, 1)
+          const cy = isoY(4, 1)
+          const fanY = cy - 32
           return (
             <>
-              {/* Right face */}
-              <polygon
-                points={`${cx},${cy + hh - h} ${cx + hw},${cy - h} ${cx + hw},${cy} ${cx},${cy + hh}`}
-                fill="#061018"
-                stroke="#00aaff"
-                strokeWidth="0.6"
-                opacity="0.8"
-              />
-              {/* Left face */}
-              <polygon
-                points={`${cx - hw},${cy - h} ${cx},${cy + hh - h} ${cx},${cy + hh} ${cx - hw},${cy}`}
-                fill="#081822"
-                stroke="#00aaff"
-                strokeWidth="0.6"
-                opacity="0.8"
-              />
-              {/* Top face */}
-              <polygon
-                points={`${cx},${cy - hh - h} ${cx + hw},${cy - h} ${cx},${cy + hh - h} ${cx - hw},${cy - h}`}
-                fill="#0a2030"
-                stroke="#00aaff"
-                strokeWidth="0.6"
-                opacity="0.8"
-              />
-              {/* Fan circle on top */}
-              <circle cx={cx} cy={cy - h + hh * 0.1} r="5" fill="none" stroke="#00aaff" strokeWidth="0.5" opacity="0.4" />
-              <line x1={cx - 4} y1={cy - h + hh * 0.1} x2={cx + 4} y2={cy - h + hh * 0.1} stroke="#00aaff" strokeWidth="0.8" opacity="0.6">
-                <animateTransform attributeName="transform" type="rotate" from={`0 ${cx} ${cy - h + hh * 0.1}`} to={`360 ${cx} ${cy - h + hh * 0.1}`} dur="1.5s" repeatCount="indefinite" />
-              </line>
-              <text x={cx - 1} y={cy - 2} textAnchor="middle" fontSize="5" fill="#00aaff" fontFamily="monospace" opacity="0.5">CRAC</text>
+              {/* Spinning fan on top face */}
+              <circle cx={cx} cy={fanY} r="6" fill="none" stroke="#00aaff" strokeWidth="0.6" opacity="0.5" />
+              <g>
+                <line x1={cx - 5} y1={fanY} x2={cx + 5} y2={fanY} stroke="#00aaff" strokeWidth="1" opacity="0.6">
+                  <animateTransform attributeName="transform" type="rotate" from={`0 ${cx} ${fanY}`} to={`360 ${cx} ${fanY}`} dur="1.5s" repeatCount="indefinite" />
+                </line>
+                <line x1={cx} y1={fanY - 5} x2={cx} y2={fanY + 5} stroke="#00aaff" strokeWidth="1" opacity="0.6">
+                  <animateTransform attributeName="transform" type="rotate" from={`0 ${cx} ${fanY}`} to={`360 ${cx} ${fanY}`} dur="1.5s" repeatCount="indefinite" />
+                </line>
+              </g>
             </>
           )
         })()}
       </g>
 
-      {/* Heat shimmer on the last row-0 cabinet (col 3) */}
+      {/* Heat shimmer on hot cabinet (col 3, row 0) */}
       {(() => {
-        const cx = ix(3, 0)
-        const cy = iy(3, 0) - CAB_H - 5
+        const cx = isoX(3, 0)
+        const cy = isoY(3, 0) - CAB_H - TH / 2 - 2
         return (
           <g opacity="0.5">
-            <line x1={cx - 3} y1={cy} x2={cx - 2} y2={cy - 15} stroke="#ff6644" strokeWidth="1" filter="url(#glow-o)">
-              <animate attributeName="y2" values={`${cy - 15};${cy - 20};${cy - 15}`} dur="2s" repeatCount="indefinite" />
-              <animate attributeName="opacity" values="0.3;0.7;0.3" dur="2s" repeatCount="indefinite" />
-            </line>
-            <line x1={cx + 3} y1={cy} x2={cx + 4} y2={cy - 13} stroke="#ff6644" strokeWidth="1" filter="url(#glow-o)">
-              <animate attributeName="y2" values={`${cy - 13};${cy - 18};${cy - 13}`} dur="2.3s" repeatCount="indefinite" />
-              <animate attributeName="opacity" values="0.2;0.6;0.2" dur="2.3s" repeatCount="indefinite" />
-            </line>
+            {[-4, 0, 4].map((dx, i) => (
+              <line key={i} x1={cx + dx} y1={cy} x2={cx + dx + 1} y2={cy - 14} stroke="#ff6644" strokeWidth="1" filter="url(#glow-o)">
+                <animate attributeName="y2" values={`${cy - 14};${cy - 20};${cy - 14}`} dur={`${1.8 + i * 0.3}s`} repeatCount="indefinite" />
+                <animate attributeName="opacity" values="0.2;0.7;0.2" dur={`${1.8 + i * 0.3}s`} repeatCount="indefinite" />
+              </line>
+            ))}
           </g>
         )
       })()}
 
       {/* Revenue floating text */}
       {[0, 1, 2].map((i) => {
-        const cab = allCabs[i]
-        const cx = ix(cab.col, cab.row)
-        const startY = iy(cab.col, cab.row) - CAB_H - 8
+        const cab = ALL_CABS[i]
+        const cx = isoX(cab.col, cab.row)
+        const startY = isoY(cab.col, cab.row) - CAB_H - TH / 2 - 4
         return (
-          <text
-            key={`rev-${i}`}
-            x={cx}
-            textAnchor="middle"
-            fontSize="8"
-            fill="#ffaa00"
-            fontFamily="monospace"
-            fontWeight="bold"
-            filter="url(#glow-o)"
+          <text key={`rev-${i}`} x={cx} textAnchor="middle"
+            fontSize="9" fill="#ffaa00" fontFamily="monospace" fontWeight="bold" filter="url(#glow-o)"
           >
             +$12
-            <animate attributeName="y" values={`${startY};${startY - 25}`} dur="2.4s" repeatCount="indefinite" begin={`${2.5 + i * 0.8}s`} />
+            <animate attributeName="y" values={`${startY};${startY - 28}`} dur="2.4s" repeatCount="indefinite" begin={`${2.5 + i * 0.8}s`} />
             <animate attributeName="opacity" values="0;1;1;0" dur="2.4s" repeatCount="indefinite" begin={`${2.5 + i * 0.8}s`} />
           </text>
         )
