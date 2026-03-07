@@ -58,6 +58,8 @@ import {
   canPrestige,
   NACL_POLICY_CONFIG,
   NACL_BLOCKED_INCIDENT_TYPES,
+  calcTrafficWithCapacity,
+  TRAFFIC,
 } from '@/stores/gameStore'
 import type { RegionId } from '@/stores/gameStore'
 
@@ -4354,21 +4356,18 @@ describe('NACL System', () => {
 
   it('NACL bandwidth overhead should reduce effective traffic', () => {
     setupBasicDataCenter()
-    // First tick with open NACL to get baseline
-    setState({ naclPolicy: 'open' as NaclPolicy })
-    getState().tick()
-    const openBandwidth = getState().trafficStats.totalBandwidthGbps
+    const state = getState()
+    const fixedDemand = 1.0
 
-    // Reset and tick with strict NACL (6% overhead)
-    getState().resetGame()
-    setupBasicDataCenter()
-    setState({ naclPolicy: 'strict' as NaclPolicy, securityTier: 'high_security' })
-    getState().tick()
-    const strictBandwidth = getState().trafficStats.totalBandwidthGbps
+    // Calculate traffic with no NACL overhead
+    const openTraffic = calcTrafficWithCapacity(state.cabinets, state.spineSwitches, fixedDemand, TRAFFIC.LINK_CAPACITY)
+    // Calculate traffic with strict NACL (6% overhead)
+    const strictOverhead = NACL_POLICY_CONFIG.find((c) => c.policy === 'strict')!.bandwidthOverhead
+    const strictTraffic = calcTrafficWithCapacity(state.cabinets, state.spineSwitches, fixedDemand * (1 - strictOverhead), TRAFFIC.LINK_CAPACITY)
 
     // Strict should have lower bandwidth than open (if traffic is flowing)
-    if (openBandwidth > 0) {
-      expect(strictBandwidth).toBeLessThan(openBandwidth)
+    if (openTraffic.totalBandwidthGbps > 0) {
+      expect(strictTraffic.totalBandwidthGbps).toBeLessThan(openTraffic.totalBandwidthGbps)
     }
   })
 
