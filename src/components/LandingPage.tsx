@@ -59,10 +59,10 @@ const CAB_ROW_0 = [0, 1, 2].map(c => ({ col: c, row: 0 }))
 const CAB_ROW_1 = [0, 1].map(c => ({ col: c, row: 2 }))
 const ALL_CABS = [...CAB_ROW_0, ...CAB_ROW_1]
 
-/** Spine switch positions (centered above the cabinet cluster) */
+/** Spine switch positions — well above cabinets to avoid overlap */
 const SPINES = [
-  { x: OX + 10, y: 32 },
-  { x: OX + 90, y: 32 },
+  { x: OX + 10, y: 14 },
+  { x: OX + 90, y: 14 },
 ]
 
 /** Isometric SVG illustration of a mini data center */
@@ -184,8 +184,19 @@ function DataCenterSVG() {
         const cy = isoY(cab.col, cab.row)
         const hw = TW / 2
         const hh = TH / 2
+        const h = CAB_H
         const servers = cab.row === 0 ? (cab.col < 2 ? 4 : 3) : (cab.col < 1 ? 3 : 2)
         const hasLeaf = cab.row === 0 || cab.col < 1
+        const pad = 4 // inset from face edges
+
+        // Helper: parallelogram band on the left face from fraction f1 to f2 (0=top, 1=bottom)
+        const leftFaceBand = (f1: number, f2: number) => {
+          const tl = { x: cx - hw + pad, y: cy - h + f1 * h }
+          const tr = { x: cx - pad, y: cy + hh - h + f1 * h }
+          const br = { x: cx - pad, y: cy + hh - h + f2 * h }
+          const bl = { x: cx - hw + pad, y: cy - h + f2 * h }
+          return `${tl.x},${tl.y} ${tr.x},${tr.y} ${br.x},${br.y} ${bl.x},${bl.y}`
+        }
 
         return (
           <g key={`cab-${idx}`} className="landing-cabinet" style={{ animationDelay: `${idx * 0.12}s` }}>
@@ -194,38 +205,35 @@ function DataCenterSVG() {
               stroke="#1a3a5a"
             />
 
-            {/* Server bars on left face — thick glowing lines */}
+            {/* Leaf switch — filled cyan parallelogram at top of left face */}
+            {hasLeaf && (
+              <polygon
+                points={leftFaceBand(0.04, 0.16)}
+                fill="#00aaff" opacity="0.7" filter="url(#glow-c)"
+                stroke="#00ddff" strokeWidth="0.5"
+              />
+            )}
+
+            {/* Server bars — filled green parallelograms on left face */}
             {Array.from({ length: servers }, (_, si) => {
-              const barY = cy - CAB_H + 14 + si * 12
-              const slant = (hh / CAB_H) * 12
+              const top = 0.20 + si * 0.19
               return (
-                <line key={si}
-                  x1={cx - hw + 5} y1={barY + slant / 2}
-                  x2={cx - 3} y2={barY - slant / 2}
-                  stroke="#00ff88" strokeWidth="4" opacity="0.8" filter="url(#glow-g)"
+                <polygon key={si}
+                  points={leftFaceBand(top, top + 0.13)}
+                  fill="#00ff88" opacity="0.65" filter="url(#glow-g)"
+                  stroke="#00ff88" strokeWidth="0.3"
                 />
               )
             })}
 
-            {/* Leaf switch (cyan bar at very top of left face) */}
-            {hasLeaf && (() => {
-              const barY = cy - CAB_H + 7
-              const slant = (hh / CAB_H) * 7
-              return (
-                <line
-                  x1={cx - hw + 5} y1={barY + slant}
-                  x2={cx - 3} y2={barY - slant}
-                  stroke="#00aaff" strokeWidth="3.5" opacity="0.9" filter="url(#glow-c)"
-                />
-              )
-            })()}
-
-            {/* LED indicator on right face */}
-            <circle
-              cx={cx + hw - 6} cy={cy - CAB_H + 10}
-              r="2.5" fill="#00ff88" filter="url(#glow-g)"
-              className="landing-led" style={{ animationDelay: `${idx * 0.3}s` }}
-            />
+            {/* LED indicators on right face */}
+            {[0.15, 0.35, 0.55].map((f, i) => (
+              <circle key={i}
+                cx={cx + hw - 6} cy={cy - h + f * h}
+                r="2" fill={i === 2 ? '#ff6644' : '#00ff88'} filter={i === 2 ? 'url(#glow-o)' : 'url(#glow-g)'}
+                className="landing-led" style={{ animationDelay: `${idx * 0.3 + i * 0.5}s` }}
+              />
+            ))}
           </g>
         )
       })}
