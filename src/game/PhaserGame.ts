@@ -1298,6 +1298,7 @@ class DataCenterScene extends Phaser.Scene {
       // ── Pixel art sprite rendering (High quality) ──
       const cabSprite = this.add.image(cx, cy - CABINET_ENCLOSURE_DEPTH / 2, 'px_cabinet')
         .setOrigin(0.5, 0.7)
+        .setScale(0.5)
         .setAlpha(0.95 * powerMult)
         .setDepth(baseDepth - 1)
       const envTint = ENVIRONMENT_CONFIG[entry.environment].frameColors.top
@@ -1312,6 +1313,7 @@ class DataCenterScene extends Phaser.Scene {
         for (let i = 0; i < entry.serverCount; i++) {
           const srvSprite = this.add.image(cx, slotY - SERVER_DEPTH / 2, 'px_server')
             .setOrigin(0.5, 0.5)
+            .setScale(0.5)
             .setAlpha(0.95 * serverOpacity * powerMult)
             .setDepth(baseDepth)
           if (this.layerColors.server) {
@@ -1327,6 +1329,7 @@ class DataCenterScene extends Phaser.Scene {
       if (entry.hasLeafSwitch && leafVis) {
         const leafSprite = this.add.image(cx, leafSlotY - LEAF_DEPTH / 2, 'px_leaf')
           .setOrigin(0.5, 0.5)
+          .setScale(0.5)
           .setAlpha(0.95 * leafOpacity * powerMult)
           .setDepth(baseDepth)
         if (this.layerColors.leaf_switch) {
@@ -1680,6 +1683,7 @@ class DataCenterScene extends Phaser.Scene {
       // Pixel art spine rendering
       const spineSprite = this.add.image(x, y + SPINE_H / 2 - SPINE_DEPTH / 2, 'px_spine')
         .setOrigin(0.5, 0.5)
+        .setScale(0.5)
         .setAlpha(0.95 * opacity * powerMult)
         .setDepth(5)
       if (this.layerColors.spine_switch) {
@@ -2831,6 +2835,7 @@ class DataCenterScene extends Phaser.Scene {
     if (usePixelArt) {
       const pduSprite = this.add.image(cx, cy - 6, 'px_pdu')
         .setOrigin(0.5, 0.5)
+        .setScale(0.5)
         .setAlpha(0.9)
         .setDepth(baseDepth)
       if (entry.overloaded) {
@@ -2954,6 +2959,7 @@ class DataCenterScene extends Phaser.Scene {
     if (usePixelArt) {
       const coolSprite = this.add.image(cx, cy - 10, 'px_cooling')
         .setOrigin(0.5, 0.5)
+        .setScale(0.5)
         .setScale(0.8)
         .setDepth(baseDepth)
       if (entry.operational) {

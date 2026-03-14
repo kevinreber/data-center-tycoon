@@ -1,29 +1,29 @@
 /**
  * Runtime pixel art sprite generation for data center equipment.
- * Generates canvas textures styled after realistic data center aesthetics —
- * dark charcoal server racks with subtle LED accents, inspired by games
- * like Startup Company.
  *
- * All sprites are drawn onto HTML Canvas elements and registered as Phaser textures.
+ * All textures are generated at 2x resolution and displayed at 0.5 scale
+ * for crisp rendering. Drawing uses logical (1x) coordinates via ctx.scale(2,2).
  */
 import Phaser from 'phaser'
 
-// ── Pixel Art Drawing Helpers ──────────────────────────────────
+// ── Drawing Helpers (all coords are in logical/1x space) ──────
 
-/** Fill a rectangle on the canvas context */
 function rect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, color: string) {
   ctx.fillStyle = color
-  ctx.fillRect(Math.floor(x), Math.floor(y), Math.ceil(w), Math.ceil(h))
+  ctx.fillRect(x, y, w, h)
 }
 
-/** Draw a single pixel (default 2x2 for crispness at small sizes) */
-function px(ctx: CanvasRenderingContext2D, x: number, y: number, color: string, size = 2) {
-  ctx.fillStyle = color
-  ctx.fillRect(Math.floor(x), Math.floor(y), size, size)
+function line(ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number, color: string, width = 1) {
+  ctx.strokeStyle = color
+  ctx.lineWidth = width
+  ctx.beginPath()
+  ctx.moveTo(x1, y1)
+  ctx.lineTo(x2, y2)
+  ctx.stroke()
 }
 
-/** Draw an isometric diamond (top face) */
-function isoDiamond(ctx: CanvasRenderingContext2D, cx: number, cy: number, w: number, h: number, color: string) {
+/** Fill an isometric top face (diamond) */
+function isoTop(ctx: CanvasRenderingContext2D, cx: number, cy: number, w: number, h: number, color: string) {
   ctx.fillStyle = color
   ctx.beginPath()
   ctx.moveTo(cx, cy - h / 2)
@@ -34,402 +34,321 @@ function isoDiamond(ctx: CanvasRenderingContext2D, cx: number, cy: number, w: nu
   ctx.fill()
 }
 
-/** Draw an isometric left face (parallelogram) */
-function isoLeftFace(ctx: CanvasRenderingContext2D, cx: number, cy: number, w: number, h: number, depth: number, color: string) {
-  const hw = w / 2
-  const hh = h / 2
+/** Fill an isometric left face */
+function isoLeft(ctx: CanvasRenderingContext2D, cx: number, cy: number, w: number, h: number, depth: number, color: string) {
   ctx.fillStyle = color
+  ctx.beginPath()
+  ctx.moveTo(cx - w / 2, cy)
+  ctx.lineTo(cx, cy + h / 2)
+  ctx.lineTo(cx, cy + h / 2 + depth)
+  ctx.lineTo(cx - w / 2, cy + depth)
+  ctx.closePath()
+  ctx.fill()
+}
+
+/** Fill an isometric right face */
+function isoRight(ctx: CanvasRenderingContext2D, cx: number, cy: number, w: number, h: number, depth: number, color: string) {
+  ctx.fillStyle = color
+  ctx.beginPath()
+  ctx.moveTo(cx + w / 2, cy)
+  ctx.lineTo(cx, cy + h / 2)
+  ctx.lineTo(cx, cy + h / 2 + depth)
+  ctx.lineTo(cx + w / 2, cy + depth)
+  ctx.closePath()
+  ctx.fill()
+}
+
+/** Stroke isometric cube edges for clean definition */
+function isoCubeEdges(ctx: CanvasRenderingContext2D, cx: number, cy: number, w: number, h: number, depth: number, color: string, width = 0.5) {
+  const hw = w / 2, hh = h / 2
+  ctx.strokeStyle = color
+  ctx.lineWidth = width
+  ctx.beginPath()
+  // Top face
+  ctx.moveTo(cx, cy - hh)
+  ctx.lineTo(cx + hw, cy)
+  ctx.lineTo(cx, cy + hh)
+  ctx.lineTo(cx - hw, cy)
+  ctx.closePath()
+  ctx.stroke()
+  // Left vertical
   ctx.beginPath()
   ctx.moveTo(cx - hw, cy)
-  ctx.lineTo(cx, cy + hh)
-  ctx.lineTo(cx, cy + hh + depth)
   ctx.lineTo(cx - hw, cy + depth)
-  ctx.closePath()
-  ctx.fill()
-}
-
-/** Draw an isometric right face (parallelogram) */
-function isoRightFace(ctx: CanvasRenderingContext2D, cx: number, cy: number, w: number, h: number, depth: number, color: string) {
-  const hw = w / 2
-  const hh = h / 2
-  ctx.fillStyle = color
+  ctx.stroke()
+  // Front vertical
+  ctx.beginPath()
+  ctx.moveTo(cx, cy + hh)
+  ctx.lineTo(cx, cy + hh + depth)
+  ctx.stroke()
+  // Right vertical
   ctx.beginPath()
   ctx.moveTo(cx + hw, cy)
-  ctx.lineTo(cx, cy + hh)
-  ctx.lineTo(cx, cy + hh + depth)
   ctx.lineTo(cx + hw, cy + depth)
-  ctx.closePath()
-  ctx.fill()
+  ctx.stroke()
+  // Bottom left edge
+  ctx.beginPath()
+  ctx.moveTo(cx - hw, cy + depth)
+  ctx.lineTo(cx, cy + hh + depth)
+  ctx.stroke()
+  // Bottom right edge
+  ctx.beginPath()
+  ctx.moveTo(cx + hw, cy + depth)
+  ctx.lineTo(cx, cy + hh + depth)
+  ctx.stroke()
 }
 
-// ── Cabinet Sprite (64×96) ─────────────────────────────────────
-// Dark charcoal server rack with visible front mesh, green LEDs,
-// and realistic detail.
+// ── Cabinet Sprite (64×96 logical → 128×192 actual) ───────────
 
-function generateCabinetTexture(canvas: HTMLCanvasElement) {
-  const W = 64
-  const H = 96
-  canvas.width = W
-  canvas.height = H
-  const ctx = canvas.getContext('2d')!
-  ctx.clearRect(0, 0, W, H)
-  ctx.imageSmoothingEnabled = false
-
-  const cx = W / 2
+function generateCabinetTexture(ctx: CanvasRenderingContext2D) {
+  const cx = 32
+  const topY = 8         // where the top face diamond sits
   const cubeW = 44
   const cubeH = 22
   const depth = 56
 
-  // Top face — dark steel
-  isoDiamond(ctx, cx, 16, cubeW, cubeH, '#3a3e48')
+  // Three faces — dark charcoal with clear value separation
+  isoTop(ctx, cx, topY, cubeW, cubeH, '#454b55')    // top — lightest
+  isoLeft(ctx, cx, topY, cubeW, cubeH, depth, '#2a2e36')   // left — darkest
+  isoRight(ctx, cx, topY, cubeW, cubeH, depth, '#363b44')  // right/front — mid
 
-  // Top face detail — exhaust fan grates (circles approximated as dots)
-  for (let i = -2; i <= 2; i++) {
-    const gx = cx + i * 4
-    px(ctx, gx, 14, '#2a2e36', 2)
-    px(ctx, gx - 1, 16, '#2a2e36', 1)
-  }
-  // Fan center dots
-  px(ctx, cx - 5, 15, '#22262e', 2)
-  px(ctx, cx + 5, 15, '#22262e', 2)
+  // Bold edge outlines for clean definition
+  isoCubeEdges(ctx, cx, topY, cubeW, cubeH, depth, '#5a6272', 0.8)
 
-  // Left face — dark side panel with ventilation
-  isoLeftFace(ctx, cx, 16, cubeW, cubeH, depth, '#282c34')
+  // ── Right face (front panel) detail ──
+  const railL = cx + 3
+  const railR = cx + cubeW / 2 - 3
 
-  // Right face — front panel (slightly lighter to read detail)
-  isoRightFace(ctx, cx, 16, cubeW, cubeH, depth, '#32363e')
+  // Vertical rack rails
+  line(ctx, railL, topY + cubeH / 2 + 2, railL, topY + cubeH / 2 + depth - 2, '#4e5460', 0.8)
+  line(ctx, railR, topY + cubeH / 2 + 2, railR, topY + cubeH / 2 + depth - 2, '#4e5460', 0.8)
 
-  // ── Front panel detail (right face) ──
+  // Server bay dividers (8 slots)
+  const bayH = (depth - 6) / 8
+  for (let i = 0; i < 8; i++) {
+    const by = topY + cubeH / 2 + 3 + i * bayH
 
-  // Steel frame rails (two vertical lines on the front)
-  const railX1 = cx + 2
-  const railX2 = cx + cubeW / 2 - 2
-  for (let dy = 0; dy < depth; dy += 1) {
-    const yOff = 27 + dy
-    px(ctx, railX1, yOff, '#444850', 1)
-    px(ctx, railX2, yOff, '#444850', 1)
-  }
+    // Divider line
+    line(ctx, railL + 1, by, railR - 1, by, '#1e2228', 0.5)
 
-  // Server bay horizontal dividers (dark lines showing U-slot separators)
-  for (let slot = 0; slot < 8; slot++) {
-    const sy = 29 + slot * 6
-    ctx.fillStyle = '#1e2228'
-    ctx.fillRect(railX1 + 1, sy, railX2 - railX1 - 1, 1)
+    // Server faceplate (slightly different shade)
+    rect(ctx, railL + 1, by + 0.5, railR - railL - 2, bayH - 1.5, '#2e333b')
 
-    // Server faceplate fill (slightly lighter than frame)
-    ctx.fillStyle = '#2e3238'
-    ctx.fillRect(railX1 + 1, sy + 1, railX2 - railX1 - 1, 4)
-
-    // Green activity LED per server bay
-    if (slot < 6) {
-      px(ctx, railX2 - 2, sy + 2, '#00cc44', 1)
-    }
-
-    // Drive bay indicators (small dark squares)
+    // Drive bay dots
     for (let d = 0; d < 3; d++) {
-      px(ctx, railX1 + 3 + d * 4, sy + 2, '#1a1e24', 2)
+      rect(ctx, railL + 3 + d * 3.5, by + 2, 2, 2, '#1e2228')
+    }
+
+    // LED indicator (green for active bays)
+    if (i < 6) {
+      rect(ctx, railR - 3, by + 2, 1.5, 1.5, '#00cc44')
     }
   }
 
-  // ── Left face ventilation pattern ──
-  for (let row = 0; row < 8; row++) {
-    for (let col = 0; col < 3; col++) {
-      const vx = cx - cubeW / 2 + 3 + col * 4
-      const vy = 30 + row * 6 + col * 2
-      px(ctx, vx, vy, '#1e2228', 1)
-      px(ctx, vx + 1, vy + 1, '#1e2228', 1)
+  // ── Left face (side panel) ventilation ──
+  for (let i = 0; i < 6; i++) {
+    const vy = topY + cubeH / 2 + 6 + i * 8
+    for (let j = 0; j < 3; j++) {
+      const vx = cx - cubeW / 2 + 3 + j * 3.5
+      rect(ctx, vx, vy + j * 1.5, 2, 1, '#1e2228')
     }
   }
 
-  // Top edge highlight (subtle steel gleam)
-  ctx.strokeStyle = 'rgba(80, 90, 100, 0.4)'
-  ctx.lineWidth = 0.5
-  ctx.beginPath()
-  ctx.moveTo(cx, 5)
-  ctx.lineTo(cx + cubeW / 2, 16)
-  ctx.stroke()
-  ctx.beginPath()
-  ctx.moveTo(cx, 5)
-  ctx.lineTo(cx - cubeW / 2, 16)
-  ctx.stroke()
+  // ── Top face detail — exhaust vents ──
+  for (let i = -1; i <= 1; i++) {
+    rect(ctx, cx + i * 6 - 1, topY - 2, 2, 4, 'rgba(40, 44, 52, 0.6)')
+  }
 
-  // Bottom base plate
-  rect(ctx, cx - cubeW / 2 + 2, 16 + cubeH / 2 + depth - 2, cubeW - 4, 2, '#22262e')
-
-  // Bottom feet
-  rect(ctx, cx - cubeW / 2 + 3, 16 + cubeH / 2 + depth, 4, 2, '#1a1e24')
-  rect(ctx, cx + cubeW / 2 - 7, 16 + cubeH / 2 + depth, 4, 2, '#1a1e24')
+  // Bottom base
+  const bottomY = topY + cubeH / 2 + depth
+  rect(ctx, cx - cubeW / 2 + 2, bottomY - 1, cubeW - 4, 1.5, '#222630')
 }
 
-// ── Server Sprite (48×16) ──────────────────────────────────────
-// Dark server blade with subtle green LED accent.
+// ── Server Sprite (48×16 logical → 96×32 actual) ──────────────
+// Simple horizontal bar with LED — not a full iso cube.
 
-function generateServerTexture(canvas: HTMLCanvasElement) {
-  const W = 48
-  const H = 16
-  canvas.width = W
-  canvas.height = H
-  const ctx = canvas.getContext('2d')!
-  ctx.clearRect(0, 0, W, H)
-  ctx.imageSmoothingEnabled = false
-
-  const cx = W / 2
+function generateServerTexture(ctx: CanvasRenderingContext2D) {
+  const cx = 24
   const cubeW = 36
-  const cubeH = 10
-  const depth = 8
+  const cubeH = 9
+  const depth = 7
+  const topY = 2
 
-  // Top face — dark steel
-  isoDiamond(ctx, cx, 2, cubeW, cubeH, '#3a4048')
+  // Clean iso cube
+  isoTop(ctx, cx, topY, cubeW, cubeH, '#3e4550')
+  isoLeft(ctx, cx, topY, cubeW, cubeH, depth, '#2a3038')
+  isoRight(ctx, cx, topY, cubeW, cubeH, depth, '#343a44')
 
-  // Left face — side panel
-  isoLeftFace(ctx, cx, 2, cubeW, cubeH, depth, '#282e34')
+  // Edge definition
+  isoCubeEdges(ctx, cx, topY, cubeW, cubeH, depth, '#525a66', 0.5)
 
-  // Right face — front panel
-  isoRightFace(ctx, cx, 2, cubeW, cubeH, depth, '#323840')
-
-  // Drive bay indicators (small dark insets)
-  for (let i = 0; i < 4; i++) {
-    const bx = cx + 2 + i * 4
-    px(ctx, bx, 9, '#1e2228', 2)
-  }
-
-  // Power/activity LED — green
-  px(ctx, cx + cubeW / 2 - 6, 8, '#00dd55', 2)
-
-  // Ventilation slots on left face
+  // Simple front panel detail
+  const fy = topY + cubeH / 2 + 1
   for (let i = 0; i < 3; i++) {
-    px(ctx, cx - cubeW / 2 + 3 + i * 4, 9, '#1e2228', 1)
-    px(ctx, cx - cubeW / 2 + 3 + i * 4, 11, '#1e2228', 1)
+    rect(ctx, cx + 2 + i * 4, fy + 1, 2.5, 2, '#1e2228')
   }
 
-  // Subtle top face heatsink detail
-  for (let i = -2; i <= 2; i++) {
-    px(ctx, cx + i * 3, 2, 'rgba(50, 56, 64, 0.6)', 1)
-  }
+  // Green activity LED
+  rect(ctx, cx + cubeW / 2 - 5, fy + 1, 2, 2, '#00dd55')
 }
 
-// ── Leaf Switch Sprite (48×14) ─────────────────────────────────
-// Dark network switch with cyan port indicators.
+// ── Leaf Switch Sprite (48×14 logical → 96×28 actual) ─────────
 
-function generateLeafTexture(canvas: HTMLCanvasElement) {
-  const W = 48
-  const H = 14
-  canvas.width = W
-  canvas.height = H
-  const ctx = canvas.getContext('2d')!
-  ctx.clearRect(0, 0, W, H)
-  ctx.imageSmoothingEnabled = false
-
-  const cx = W / 2
+function generateLeafTexture(ctx: CanvasRenderingContext2D) {
+  const cx = 24
   const cubeW = 36
-  const cubeH = 8
-  const depth = 6
+  const cubeH = 7
+  const depth = 5
+  const topY = 2
 
-  // Top face — dark steel
-  isoDiamond(ctx, cx, 2, cubeW, cubeH, '#363c44')
+  // Clean iso cube
+  isoTop(ctx, cx, topY, cubeW, cubeH, '#3a4250')
+  isoLeft(ctx, cx, topY, cubeW, cubeH, depth, '#283038')
+  isoRight(ctx, cx, topY, cubeW, cubeH, depth, '#323a44')
 
-  // Left face
-  isoLeftFace(ctx, cx, 2, cubeW, cubeH, depth, '#262c32')
+  // Edge definition
+  isoCubeEdges(ctx, cx, topY, cubeW, cubeH, depth, '#4a5262', 0.5)
 
-  // Right face — port panel
-  isoRightFace(ctx, cx, 2, cubeW, cubeH, depth, '#303640')
-
-  // Port indicators on right face — row of cyan dots
-  for (let i = 0; i < 6; i++) {
-    const px1 = cx + 2 + i * 3
-    px(ctx, px1, 8, '#0088aa', 1)
+  // Port indicators — row of cyan dots on right face
+  const fy = topY + cubeH / 2 + 1
+  for (let i = 0; i < 5; i++) {
+    rect(ctx, cx + 2 + i * 3, fy + 1, 1.5, 1.5, '#0099bb')
   }
 
-  // Second row of ports (darker, unused)
-  for (let i = 0; i < 6; i++) {
-    const px1 = cx + 2 + i * 3
-    px(ctx, px1, 10, '#1a2028', 1)
-  }
-
-  // Activity LED — cyan
-  px(ctx, cx + 1, 7, '#00bbdd', 2)
+  // Activity LED
+  rect(ctx, cx + 1, fy, 2, 2, '#00ccee')
 }
 
-// ── Spine Switch Sprite (64×32) ────────────────────────────────
-// Dark chassis with orange status accents.
+// ── Spine Switch Sprite (64×32 logical → 128×64 actual) ───────
 
-function generateSpineTexture(canvas: HTMLCanvasElement) {
-  const W = 64
-  const H = 32
-  canvas.width = W
-  canvas.height = H
-  const ctx = canvas.getContext('2d')!
-  ctx.clearRect(0, 0, W, H)
-  ctx.imageSmoothingEnabled = false
-
-  const cx = W / 2
+function generateSpineTexture(ctx: CanvasRenderingContext2D) {
+  const cx = 32
   const cubeW = 50
   const cubeH = 14
   const depth = 12
+  const topY = 4
 
-  // Top face — dark metal
-  isoDiamond(ctx, cx, 6, cubeW, cubeH, '#3a3e46')
+  // Clean iso cube
+  isoTop(ctx, cx, topY, cubeW, cubeH, '#444a54')
+  isoLeft(ctx, cx, topY, cubeW, cubeH, depth, '#2c3038')
+  isoRight(ctx, cx, topY, cubeW, cubeH, depth, '#383e48')
 
-  // Left face — side panel
-  isoLeftFace(ctx, cx, 6, cubeW, cubeH, depth, '#282c34')
+  // Bold edge outlines
+  isoCubeEdges(ctx, cx, topY, cubeW, cubeH, depth, '#5c6472', 0.7)
 
-  // Right face — front panel
-  isoRightFace(ctx, cx, 6, cubeW, cubeH, depth, '#323840')
-
-  // Heatsink fins on top face
-  for (let i = -4; i <= 4; i++) {
-    ctx.fillStyle = 'rgba(50, 56, 64, 0.5)'
-    ctx.fillRect(cx + i * 3, 5, 1, 3)
-  }
-
-  // High-density port array on right face
+  // Port array on right face (2 rows)
+  const fy = topY + cubeH / 2 + 2
   for (let row = 0; row < 2; row++) {
-    for (let col = 0; col < 8; col++) {
-      const portX = cx + 3 + col * 3
-      const portY = 15 + row * 3
-      const portColor = row === 0 ? '#cc7722' : '#1e2228'
-      px(ctx, portX, portY, portColor, 1)
+    for (let col = 0; col < 7; col++) {
+      const color = row === 0 ? '#cc7722' : '#1e2228'
+      rect(ctx, cx + 3 + col * 3, fy + row * 3, 1.5, 1.5, color)
     }
   }
 
   // Status LED — orange
-  px(ctx, cx + 2, 14, '#ff8833', 2)
+  rect(ctx, cx + 2, fy - 1, 2, 2, '#ff8833')
 
-  // Fan grilles on left face
-  const fanCx1 = cx - cubeW / 2 + 8
-  const fanCx2 = cx - cubeW / 2 + 18
-  const fanY = 17
-  ctx.strokeStyle = '#3a3e46'
-  ctx.lineWidth = 0.8
-  ctx.beginPath()
-  ctx.arc(fanCx1, fanY, 3, 0, Math.PI * 2)
-  ctx.stroke()
-  ctx.beginPath()
-  ctx.arc(fanCx2, fanY, 3, 0, Math.PI * 2)
-  ctx.stroke()
+  // Heatsink fins on top
+  for (let i = -3; i <= 3; i++) {
+    line(ctx, cx + i * 4, topY - 2, cx + i * 4, topY + 1, 'rgba(55, 60, 70, 0.5)', 0.5)
+  }
 }
 
-// ── Cooling Unit Sprite (48×40) ────────────────────────────────
-// Blue-gray equipment with fan and pipe detail.
+// ── Cooling Unit Sprite (48×40 logical → 96×80 actual) ────────
 
-function generateCoolingTexture(canvas: HTMLCanvasElement) {
-  const W = 48
-  const H = 40
-  canvas.width = W
-  canvas.height = H
-  const ctx = canvas.getContext('2d')!
-  ctx.clearRect(0, 0, W, H)
-  ctx.imageSmoothingEnabled = false
-
-  const cx = W / 2
+function generateCoolingTexture(ctx: CanvasRenderingContext2D) {
+  const cx = 24
   const cubeW = 30
-  const cubeH = 16
+  const cubeH = 14
   const depth = 18
+  const topY = 5
 
-  // Top face — blue-gray
-  isoDiamond(ctx, cx, 6, cubeW, cubeH, '#3a4858')
+  isoTop(ctx, cx, topY, cubeW, cubeH, '#3a4858')
+  isoLeft(ctx, cx, topY, cubeW, cubeH, depth, '#283848')
+  isoRight(ctx, cx, topY, cubeW, cubeH, depth, '#304050')
 
-  // Left face
-  isoLeftFace(ctx, cx, 6, cubeW, cubeH, depth, '#283848')
+  isoCubeEdges(ctx, cx, topY, cubeW, cubeH, depth, '#506878', 0.6)
 
-  // Right face
-  isoRightFace(ctx, cx, 6, cubeW, cubeH, depth, '#304050')
-
-  // Fan grille on top face (concentric rings)
-  ctx.strokeStyle = 'rgba(80, 140, 200, 0.4)'
+  // Fan on top face
+  ctx.strokeStyle = 'rgba(80, 140, 200, 0.5)'
   ctx.lineWidth = 0.8
   ctx.beginPath()
-  ctx.arc(cx, 6, 4, 0, Math.PI * 2)
+  ctx.arc(cx, topY, 4, 0, Math.PI * 2)
   ctx.stroke()
   ctx.beginPath()
-  ctx.arc(cx, 6, 2, 0, Math.PI * 2)
+  ctx.arc(cx, topY, 1.5, 0, Math.PI * 2)
   ctx.stroke()
 
   // Pipe connections on left face
-  rect(ctx, cx - cubeW / 2 + 2, 20, 3, 2, '#2868a8')
-  rect(ctx, cx - cubeW / 2 + 2, 26, 3, 2, '#2868a8')
+  const ly = topY + cubeH / 2 + 4
+  rect(ctx, cx - cubeW / 2 + 2, ly, 3, 2, '#3080c0')
+  rect(ctx, cx - cubeW / 2 + 2, ly + 6, 3, 2, '#3080c0')
 
   // Control panel on right face
-  rect(ctx, cx + 3, 18, 8, 6, '#1a2838')
-  // LED indicators
-  px(ctx, cx + 4, 19, '#00cc44', 1)
-  px(ctx, cx + 6, 19, '#cc8800', 1)
-  px(ctx, cx + 8, 19, '#00cc44', 1)
-
-  // Temperature display
-  rect(ctx, cx + 4, 21, 6, 2, '#0a1828')
+  const ry = topY + cubeH / 2 + 3
+  rect(ctx, cx + 3, ry, 8, 5, '#1a2838')
+  rect(ctx, cx + 4, ry + 1, 1.5, 1.5, '#00cc44')
+  rect(ctx, cx + 7, ry + 1, 1.5, 1.5, '#cc8800')
 }
 
-// ── PDU Sprite (40×28) ─────────────────────────────────────────
-// Dark gray with amber power accents.
+// ── PDU Sprite (40×28 logical → 80×56 actual) ─────────────────
 
-function generatePDUTexture(canvas: HTMLCanvasElement) {
-  const W = 40
-  const H = 28
-  canvas.width = W
-  canvas.height = H
-  const ctx = canvas.getContext('2d')!
-  ctx.clearRect(0, 0, W, H)
-  ctx.imageSmoothingEnabled = false
-
-  const cx = W / 2
+function generatePDUTexture(ctx: CanvasRenderingContext2D) {
+  const cx = 20
   const cubeW = 26
   const cubeH = 12
   const depth = 10
+  const topY = 4
 
-  // Top face — dark metal
-  isoDiamond(ctx, cx, 5, cubeW, cubeH, '#3a3830')
+  isoTop(ctx, cx, topY, cubeW, cubeH, '#484438')
+  isoLeft(ctx, cx, topY, cubeW, cubeH, depth, '#2e2c22')
+  isoRight(ctx, cx, topY, cubeW, cubeH, depth, '#3c3830')
 
-  // Left face
-  isoLeftFace(ctx, cx, 5, cubeW, cubeH, depth, '#2a2820')
-
-  // Right face
-  isoRightFace(ctx, cx, 5, cubeW, cubeH, depth, '#343228')
+  isoCubeEdges(ctx, cx, topY, cubeW, cubeH, depth, '#5a5648', 0.6)
 
   // Power outlets on right face
+  const ry = topY + cubeH / 2 + 2
   for (let i = 0; i < 3; i++) {
-    const ox = cx + 2 + i * 4
-    const oy = 14
-    rect(ctx, ox, oy, 2, 3, '#1e1c16')
-    px(ctx, ox, oy, '#cc9900', 1)
-  }
-
-  // Circuit breaker switches on left face
-  for (let i = 0; i < 2; i++) {
-    const sx = cx - cubeW / 2 + 3 + i * 5
-    rect(ctx, sx, 14, 2, 4, '#222018')
+    rect(ctx, cx + 2 + i * 4, ry, 2.5, 3, '#1e1c16')
+    rect(ctx, cx + 2 + i * 4, ry, 1, 1, '#cc9900')
   }
 
   // Power LED — amber
-  px(ctx, cx + 2, 12, '#ddaa00', 2)
-
-  // Cable entry at bottom
-  rect(ctx, cx - 2, 20, 4, 2, '#1a1810')
+  rect(ctx, cx + 2, ry - 1, 2, 2, '#ddaa00')
 }
 
 // ── Public API ─────────────────────────────────────────────────
 
-/** Generate all pixel art textures and register them with the Phaser texture manager */
+/** Texture specs: [key, generator, logicalWidth, logicalHeight] */
+const TEXTURE_SPECS: [string, (ctx: CanvasRenderingContext2D) => void, number, number][] = [
+  ['px_cabinet', generateCabinetTexture, 64, 96],
+  ['px_server', generateServerTexture, 48, 16],
+  ['px_leaf', generateLeafTexture, 48, 14],
+  ['px_spine', generateSpineTexture, 64, 32],
+  ['px_cooling', generateCoolingTexture, 48, 40],
+  ['px_pdu', generatePDUTexture, 40, 28],
+]
+
+/** Generate all pixel art textures at 2x resolution.
+ *  Sprites should be displayed with setScale(0.5) for crisp rendering. */
 export function generatePixelArtTextures(scene: Phaser.Scene): boolean {
   const tm = scene.textures
 
   // Only generate once
   if (tm.exists('px_cabinet')) return true
 
-  const generators: [string, (c: HTMLCanvasElement) => void][] = [
-    ['px_cabinet', generateCabinetTexture],
-    ['px_server', generateServerTexture],
-    ['px_leaf', generateLeafTexture],
-    ['px_spine', generateSpineTexture],
-    ['px_cooling', generateCoolingTexture],
-    ['px_pdu', generatePDUTexture],
-  ]
-
-  for (const [key, gen] of generators) {
-    const canvasTexture = tm.createCanvas(key, 64, 96)
+  for (const [key, gen, w, h] of TEXTURE_SPECS) {
+    // Create canvas at 2x resolution
+    const canvasTexture = tm.createCanvas(key, w * 2, h * 2)
     if (!canvasTexture) return false
     const canvas = canvasTexture.getSourceImage() as HTMLCanvasElement
-    gen(canvas)
+    canvas.width = w * 2
+    canvas.height = h * 2
+    const ctx = canvas.getContext('2d')!
+    ctx.imageSmoothingEnabled = false
+    // Scale 2x so drawing commands use logical coordinates
+    ctx.scale(2, 2)
+    gen(ctx)
     canvasTexture.refresh()
   }
 
