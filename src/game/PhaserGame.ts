@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
-import type { LayerVisibility, LayerOpacity, LayerColors, LayerColorOverrides, TrafficLink, CabinetEnvironment, CabinetFacing, PlacementHint, DataCenterLayout, CoolingUnitType, ChillerTier, ViewMode, RowEndSlot } from '@/stores/gameStore'
+import type { LayerVisibility, LayerOpacity, LayerColors, LayerColorOverrides, TrafficLink, CabinetEnvironment, CabinetFacing, PlacementHint, DataCenterLayout, CoolingUnitType, ChillerTier, ViewMode, RowEndSlot, GraphicsQuality } from '@/stores/gameStore'
 import { DEFAULT_COLORS, ENVIRONMENT_CONFIG, MAX_SERVERS_PER_CABINET, getFacingOffsets, COOLING_UNIT_CONFIG, CHILLER_PLANT_CONFIG, ROW_END_SLOT_CONFIG } from '@/stores/gameStore'
+import { generatePixelArtTextures } from './spriteGenerator'
 
 const COLORS = DEFAULT_COLORS
 
@@ -305,25 +306,17 @@ class DataCenterScene extends Phaser.Scene {
   private spineSprites: Map<string, Phaser.GameObjects.Image> = new Map()
   private pduSprites: Map<string, Phaser.GameObjects.Image> = new Map()
   private coolingUnitSprites: Map<string, Phaser.GameObjects.Image> = new Map()
-  private spritesLoaded = false
+  private pixelArtReady = false
+  private _graphicsQuality: GraphicsQuality = 'high'
 
   constructor() {
     super({ key: 'DataCenterScene' })
   }
 
-  /** Load sprite assets */
+  /** Preload phase — pixel art textures are generated in create() instead */
   preload() {
-    const base = import.meta.env.BASE_URL ?? '/'
-    // Load SVGs at 2x native resolution for crisp rendering when zoomed
-    this.load.svg('sprite_cabinet', `${base}sprites/cabinet.svg`, { width: 128, height: 192 })
-    this.load.svg('sprite_server', `${base}sprites/server.svg`, { width: 96, height: 32 })
-    this.load.svg('sprite_leaf', `${base}sprites/leaf-switch.svg`, { width: 96, height: 24 })
-    this.load.svg('sprite_spine', `${base}sprites/spine-switch.svg`, { width: 128, height: 64 })
-    this.load.svg('sprite_cooling', `${base}sprites/cooling-unit.svg`, { width: 96, height: 80 })
-    this.load.svg('sprite_pdu', `${base}sprites/pdu.svg`, { width: 80, height: 56 })
-    this.load.on('complete', () => {
-      this.spritesLoaded = true
-    })
+    // No external sprite assets needed — all textures are generated at runtime
+    // via spriteGenerator.ts in the create() method.
   }
 
   /** Compute offsets to center all content (spine area + grid) both horizontally and vertically */
@@ -351,6 +344,9 @@ class DataCenterScene extends Phaser.Scene {
 
   create() {
     this.computeLayout()
+
+    // Generate pixel art textures for high-quality rendering
+    this.pixelArtReady = generatePixelArtTextures(this)
 
     this.drawSpineFloor()
     this.drawFloor()
@@ -1296,18 +1292,17 @@ class DataCenterScene extends Phaser.Scene {
     const leafOpacity = this.layerOpacity.leaf_switch
     const powerMult = entry.powerOn ? 1 : 0.2
 
-    if (this.spritesLoaded) {
-      // ── Sprite-based rendering ──
-      // Cabinet enclosure sprite — no tint, shows native metal gray with env wireframe accent
-      const cabSprite = this.add.image(cx, cy - CABINET_ENCLOSURE_DEPTH / 2, 'sprite_cabinet')
+    const usePixelArt = this._graphicsQuality === 'high' && this.pixelArtReady
+
+    if (usePixelArt) {
+      // ── Pixel art sprite rendering (High quality) ──
+      const cabSprite = this.add.image(cx, cy - CABINET_ENCLOSURE_DEPTH / 2, 'px_cabinet')
         .setOrigin(0.5, 0.7)
-        .setScale(0.5)
-        .setAlpha(0.9 * powerMult)
+        .setAlpha(0.95 * powerMult)
         .setDepth(baseDepth - 1)
-      // Light environment tint: blend mostly white with a hint of environment color
       const envTint = ENVIRONMENT_CONFIG[entry.environment].frameColors.top
       if (entry.environment !== 'production') {
-        cabSprite.setTint(this.blendTint(0xffffff, envTint, 0.2))
+        cabSprite.setTint(this.blendTint(0xffffff, envTint, 0.25))
       }
       sprites.push(cabSprite)
 
@@ -1315,17 +1310,14 @@ class DataCenterScene extends Phaser.Scene {
       let slotY = cy - BASE_DEPTH - SECTION_GAP
       if (serverVis) {
         for (let i = 0; i < entry.serverCount; i++) {
-          const srvSprite = this.add.image(cx, slotY - SERVER_DEPTH / 2, 'sprite_server')
+          const srvSprite = this.add.image(cx, slotY - SERVER_DEPTH / 2, 'px_server')
             .setOrigin(0.5, 0.5)
-            .setScale(0.5)
-            .setAlpha(0.9 * serverOpacity * powerMult)
+            .setAlpha(0.95 * serverOpacity * powerMult)
             .setDepth(baseDepth)
-          // Only tint if user has custom color override, otherwise use native SVG green
           if (this.layerColors.server) {
             srvSprite.setTint(serverColors.top)
           }
           sprites.push(srvSprite)
-
           slotY -= SERVER_DEPTH + SECTION_GAP
         }
       }
@@ -1333,19 +1325,17 @@ class DataCenterScene extends Phaser.Scene {
       // Leaf switch sprite at top of cabinet
       const leafSlotY = cy - BASE_DEPTH - SECTION_GAP - MAX_SERVERS_PER_CABINET * (SERVER_DEPTH + SECTION_GAP)
       if (entry.hasLeafSwitch && leafVis) {
-        const leafSprite = this.add.image(cx, leafSlotY - LEAF_DEPTH / 2, 'sprite_leaf')
+        const leafSprite = this.add.image(cx, leafSlotY - LEAF_DEPTH / 2, 'px_leaf')
           .setOrigin(0.5, 0.5)
-          .setScale(0.5)
-          .setAlpha(0.9 * leafOpacity * powerMult)
+          .setAlpha(0.95 * leafOpacity * powerMult)
           .setDepth(baseDepth)
-        // Only tint if user has custom color override
         if (this.layerColors.leaf_switch) {
           leafSprite.setTint(leafColors.top)
         }
         sprites.push(leafSprite)
       }
     } else {
-      // ── Fallback: procedural rendering ──
+      // ── Enhanced procedural rendering (Low quality / fallback) ──
       // 1. Full-height cabinet enclosure
       const cabinetAlpha = 0.6 * powerMult
       this.drawIsoCube(g, cx, cy, CUBE_W, CUBE_H, CABINET_ENCLOSURE_DEPTH, CABINET_COLORS, cabinetAlpha)
@@ -1354,6 +1344,24 @@ class DataCenterScene extends Phaser.Scene {
       const envColor = ENVIRONMENT_CONFIG[entry.environment].frameColors.top
       this.drawIsoWireframe(g, cx, cy, CUBE_W, CUBE_H, CABINET_ENCLOSURE_DEPTH, envColor, 0.5 * powerMult)
 
+      // Rack rail detail lines on cabinet enclosure
+      const hw = CUBE_W / 2
+      const hh = CUBE_H / 2
+      g.lineStyle(0.5, 0x8899aa, 0.3 * powerMult)
+      // Left rail
+      g.lineBetween(cx - hw + 4, cy + hh - CABINET_ENCLOSURE_DEPTH + 2, cx - hw + 4, cy + hh)
+      // Right rail
+      g.lineBetween(cx + hw - 4, cy + hh - CABINET_ENCLOSURE_DEPTH + 2, cx + hw - 4, cy + hh)
+
+      // U-slot horizontal marks
+      for (let u = 0; u < 4; u++) {
+        const uy = cy + hh - CABINET_ENCLOSURE_DEPTH + 4 + u * 10
+        if (uy < cy + hh) {
+          g.lineStyle(0.5, 0x556677, 0.25 * powerMult)
+          g.lineBetween(cx + 3, uy, cx + hw - 5, uy)
+        }
+      }
+
       // 2. Server layers
       let slotY = cy - BASE_DEPTH - SECTION_GAP
       if (serverVis) {
@@ -1361,18 +1369,22 @@ class DataCenterScene extends Phaser.Scene {
           const alpha = 0.9 * serverOpacity * powerMult
           this.drawIsoCube(g, cx, slotY, CUBE_W - SERVER_INSET, CUBE_H - SERVER_INSET / 2, SERVER_DEPTH, serverColors, alpha)
 
+          // Drive bay detail pattern on right face
+          const srvHw = (CUBE_W - SERVER_INSET) / 2
           if (serverOpacity > 0.3) {
-            const ledColor = `#${serverColors.top.toString(16).padStart(6, '0')}`
-            const led = this.add
-              .text(cx + (CUBE_W - SERVER_INSET) / 2 - 4, slotY - SERVER_DEPTH + 1, '●', {
-                fontFamily: 'monospace',
-                fontSize: '5px',
-                color: ledColor,
-              })
-              .setOrigin(0.5)
-              .setAlpha(entry.powerOn ? 0.9 * serverOpacity : 0.1)
-              .setDepth(baseDepth + 1)
-            labels.push(led)
+            for (let d = 0; d < 3; d++) {
+              const dx = cx + 2 + d * 5
+              const dy = slotY + 1
+              g.fillStyle(serverColors.front, 0.6 * serverOpacity * powerMult)
+              g.fillRect(dx, dy, 3, 2)
+            }
+          }
+
+          // Status LED
+          if (serverOpacity > 0.3) {
+            const ledColor = entry.powerOn ? serverColors.top : 0x333333
+            g.fillStyle(ledColor, entry.powerOn ? 0.9 * serverOpacity : 0.2)
+            g.fillRect(cx + srvHw - 3, slotY - SERVER_DEPTH + 2, 2, 2)
           }
 
           slotY -= SERVER_DEPTH + SECTION_GAP
@@ -1385,18 +1397,18 @@ class DataCenterScene extends Phaser.Scene {
         const alpha = 0.9 * leafOpacity * powerMult
         this.drawIsoCube(g, cx, leafSlotY, CUBE_W - SERVER_INSET, CUBE_H - SERVER_INSET / 2, LEAF_DEPTH, leafColors, alpha)
 
+        // Port indicator dots on right face
         if (leafOpacity > 0.3) {
-          const ledColor = `#${leafColors.top.toString(16).padStart(6, '0')}`
-          const led = this.add
-            .text(cx, leafSlotY - LEAF_DEPTH - 4, '●', {
-              fontFamily: 'monospace',
-              fontSize: '6px',
-              color: ledColor,
-            })
-            .setOrigin(0.5)
-            .setAlpha(entry.powerOn ? 1 * leafOpacity : 0.1)
-            .setDepth(baseDepth + 1)
-          labels.push(led)
+          for (let p = 0; p < 5; p++) {
+            const portX = cx + 1 + p * 4
+            g.fillStyle(leafColors.top, 0.7 * leafOpacity * powerMult)
+            g.fillRect(portX, leafSlotY, 2, 1)
+          }
+
+          // Activity LED
+          const ledColor = entry.powerOn ? leafColors.top : 0x333333
+          g.fillStyle(ledColor, entry.powerOn ? 1 * leafOpacity : 0.15)
+          g.fillRect(cx - 1, leafSlotY - LEAF_DEPTH + 1, 2, 2)
         }
       }
     }
@@ -1653,21 +1665,38 @@ class DataCenterScene extends Phaser.Scene {
 
     const g = this.add.graphics()
 
-    if (this.spritesLoaded) {
-      // Sprite-based spine rendering — native orange SVG, only tint on custom override
-      const spineSprite = this.add.image(x, y + SPINE_H / 2 - SPINE_DEPTH / 2, 'sprite_spine')
+    const usePixelArt = this._graphicsQuality === 'high' && this.pixelArtReady
+
+    if (usePixelArt) {
+      // Pixel art spine rendering
+      const spineSprite = this.add.image(x, y + SPINE_H / 2 - SPINE_DEPTH / 2, 'px_spine')
         .setOrigin(0.5, 0.5)
-        .setScale(0.5)
-        .setAlpha(0.9 * opacity * powerMult)
+        .setAlpha(0.95 * opacity * powerMult)
         .setDepth(5)
       if (this.layerColors.spine_switch) {
         spineSprite.setTint(spineColors.top)
       }
       this.spineSprites.set(entry.id, spineSprite)
     } else {
-      // Fallback: procedural
+      // Enhanced procedural spine rendering
       const alpha = 0.9 * opacity * powerMult
       this.drawIsoCube(g, x, y + SPINE_H / 2, SPINE_W, SPINE_H, SPINE_DEPTH, spineColors, alpha)
+
+      // Port array detail on right face
+      if (opacity > 0.3) {
+        const spineHw = SPINE_W / 2
+        for (let p = 0; p < 6; p++) {
+          const portX = x + 3 + p * 4
+          const portY = y + SPINE_H / 2 + 2
+          g.fillStyle(spineColors.top, 0.5 * opacity * powerMult)
+          g.fillRect(portX, portY, 2, 1)
+        }
+
+        // Fan grille indicators on left face
+        g.lineStyle(0.5, spineColors.side, 0.3 * opacity * powerMult)
+        g.strokeCircle(x - spineHw + 8, y + SPINE_H / 2 + 3, 3)
+        g.strokeCircle(x - spineHw + 18, y + SPINE_H / 2 + 3, 3)
+      }
     }
 
     g.setDepth(5)
@@ -2788,23 +2817,29 @@ class DataCenterScene extends Phaser.Scene {
     const g = this.add.graphics()
     const baseDepth = 10 + entry.row * this.cabCols + entry.col
 
-    if (this.spritesLoaded) {
-      // Sprite-based PDU rendering — native amber, tint red only when overloaded
-      const pduSprite = this.add.image(cx, cy - 6, 'sprite_pdu')
+    const usePixelArt = this._graphicsQuality === 'high' && this.pixelArtReady
+
+    if (usePixelArt) {
+      const pduSprite = this.add.image(cx, cy - 6, 'px_pdu')
         .setOrigin(0.5, 0.5)
-        .setScale(0.5)
-        .setAlpha(0.85)
+        .setAlpha(0.9)
         .setDepth(baseDepth)
       if (entry.overloaded) {
         pduSprite.setTint(0xff4444)
       }
       this.pduSprites.set(entry.id, pduSprite)
     } else {
-      // Fallback: procedural
+      // Enhanced procedural PDU
       const pduColor = entry.overloaded
         ? { top: 0xff4444, side: 0xcc2222, front: 0x991111 }
         : { top: 0xffaa00, side: 0xcc8800, front: 0x996600 }
       this.drawIsoCube(g, cx, cy, CUBE_W * 0.6, CUBE_H * 0.6, 6, pduColor, 0.8)
+
+      // Power outlet indicators
+      for (let i = 0; i < 3; i++) {
+        g.fillStyle(entry.overloaded ? 0xff6666 : 0xffcc00, 0.5)
+        g.fillRect(cx + 1 + i * 4, cy + 1, 2, 2)
+      }
     }
 
     g.setDepth(baseDepth)
@@ -2905,27 +2940,34 @@ class DataCenterScene extends Phaser.Scene {
     const hexStr = cfg.color.replace('#', '')
     const colorNum = parseInt(hexStr, 16)
 
-    if (this.spritesLoaded) {
-      // Sprite-based cooling unit rendering — native blue, tint red when failed
-      const coolSprite = this.add.image(cx, cy - 10, 'sprite_cooling')
+    const usePixelArt = this._graphicsQuality === 'high' && this.pixelArtReady
+
+    if (usePixelArt) {
+      const coolSprite = this.add.image(cx, cy - 10, 'px_cooling')
         .setOrigin(0.5, 0.5)
-        .setScale(0.35)
+        .setScale(0.8)
         .setDepth(baseDepth)
       if (entry.operational) {
-        coolSprite.setAlpha(0.85)
+        coolSprite.setAlpha(0.9)
+        coolSprite.setTint(colorNum)
       } else {
         coolSprite.setTint(0xff2222)
         coolSprite.setAlpha(0.6)
       }
       this.coolingUnitSprites.set(entry.id, coolSprite)
     } else {
-      // Fallback: procedural
+      // Enhanced procedural cooling unit
       const darkerColor = ((colorNum >> 1) & 0x7f7f7f)
       const darkestColor = ((colorNum >> 2) & 0x3f3f3f)
 
       if (entry.operational) {
         this.drawIsoCube(g, cx, cy, CUBE_W * 0.5, CUBE_H * 0.5, 8,
           { top: colorNum, side: darkerColor, front: darkestColor }, 0.85)
+
+        // Fan grille on top
+        g.lineStyle(0.5, colorNum, 0.3)
+        g.strokeCircle(cx, cy - 8, 4)
+        g.strokeCircle(cx, cy - 8, 2)
       } else {
         this.drawIsoCube(g, cx, cy, CUBE_W * 0.5, CUBE_H * 0.5, 8,
           { top: 0xff2222, side: 0xaa1111, front: 0x770808 }, 0.6)
@@ -4075,6 +4117,16 @@ class DataCenterScene extends Phaser.Scene {
     if (muted && this.ambientOscillator) {
       this.setAmbientAudio(false)
     }
+  }
+
+  /** Set graphics quality and re-render all equipment */
+  setGraphicsQuality(quality: GraphicsQuality) {
+    if (this._graphicsQuality === quality) return
+    this._graphicsQuality = quality
+    this.rerenderAll()
+    // Also re-render infrastructure
+    for (const entry of this.pduEntries.values()) this.renderPDU(entry)
+    for (const entry of this.coolingUnitEntries.values()) this.renderCoolingUnit(entry)
   }
 
   // ── Camera Juice ──────────────────────────────────────
