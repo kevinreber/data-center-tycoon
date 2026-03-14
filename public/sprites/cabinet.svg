@@ -1,36 +1,45 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="64" height="96" viewBox="0 0 64 96">
-  <!-- Isometric server cabinet/rack - dark metal with neon accents -->
-  <!-- Left face (darker) -->
-  <polygon points="4,48 32,64 32,92 4,76" fill="#2a3340" stroke="#3d4d5d" stroke-width="0.5"/>
-  <!-- Right face (slightly lighter) -->
-  <polygon points="60,48 32,64 32,92 60,76" fill="#344050" stroke="#3d4d5d" stroke-width="0.5"/>
+  <!-- Isometric server cabinet/rack - light base for Phaser multiplicative tinting -->
+  <!-- Left face -->
+  <polygon points="4,48 32,64 32,92 4,76" fill="#8899aa" stroke="#aabbcc" stroke-width="0.5"/>
+  <!-- Right face -->
+  <polygon points="60,48 32,64 32,92 60,76" fill="#99aabb" stroke="#aabbcc" stroke-width="0.5"/>
   <!-- Top face -->
-  <polygon points="32,32 60,48 32,64 4,48" fill="#4a5a6a" stroke="#556677" stroke-width="0.5"/>
+  <polygon points="32,32 60,48 32,64 4,48" fill="#bbccdd" stroke="#ccddee" stroke-width="0.5"/>
 
   <!-- Ventilation slots on left face -->
-  <line x1="10" y1="54" x2="28" y2="63" stroke="#1a2530" stroke-width="1" opacity="0.6"/>
-  <line x1="10" y1="58" x2="28" y2="67" stroke="#1a2530" stroke-width="1" opacity="0.6"/>
-  <line x1="10" y1="62" x2="28" y2="71" stroke="#1a2530" stroke-width="1" opacity="0.6"/>
+  <line x1="10" y1="54" x2="28" y2="63" stroke="#667788" stroke-width="1.2" opacity="0.7"/>
+  <line x1="10" y1="58" x2="28" y2="67" stroke="#667788" stroke-width="1.2" opacity="0.7"/>
+  <line x1="10" y1="62" x2="28" y2="71" stroke="#667788" stroke-width="1.2" opacity="0.7"/>
+  <line x1="10" y1="66" x2="28" y2="75" stroke="#667788" stroke-width="1.2" opacity="0.6"/>
 
-  <!-- Front panel detail on right face - rack rails -->
-  <line x1="38" y1="52" x2="38" y2="74" stroke="#556677" stroke-width="0.5" opacity="0.5"/>
-  <line x1="54" y1="52" x2="54" y2="74" stroke="#556677" stroke-width="0.5" opacity="0.5"/>
+  <!-- Front panel rack rails on right face -->
+  <line x1="37" y1="51" x2="37" y2="75" stroke="#bbccdd" stroke-width="0.8" opacity="0.6"/>
+  <line x1="55" y1="51" x2="55" y2="75" stroke="#bbccdd" stroke-width="0.8" opacity="0.6"/>
 
-  <!-- U-slots (horizontal lines representing rack units) -->
-  <line x1="39" y1="54" x2="53" y2="54" stroke="#1a2530" stroke-width="0.8" opacity="0.4"/>
-  <line x1="39" y1="57" x2="53" y2="57" stroke="#1a2530" stroke-width="0.8" opacity="0.4"/>
-  <line x1="39" y1="60" x2="53" y2="60" stroke="#1a2530" stroke-width="0.8" opacity="0.4"/>
-  <line x1="39" y1="63" x2="53" y2="63" stroke="#1a2530" stroke-width="0.8" opacity="0.4"/>
-  <line x1="39" y1="66" x2="53" y2="66" stroke="#1a2530" stroke-width="0.8" opacity="0.4"/>
-  <line x1="39" y1="69" x2="53" y2="69" stroke="#1a2530" stroke-width="0.8" opacity="0.4"/>
-  <line x1="39" y1="72" x2="53" y2="72" stroke="#1a2530" stroke-width="0.8" opacity="0.4"/>
+  <!-- U-slot horizontal lines (rack units) -->
+  <line x1="38" y1="53" x2="54" y2="53" stroke="#556677" stroke-width="0.8" opacity="0.6"/>
+  <line x1="38" y1="56" x2="54" y2="56" stroke="#556677" stroke-width="0.8" opacity="0.6"/>
+  <line x1="38" y1="59" x2="54" y2="59" stroke="#556677" stroke-width="0.8" opacity="0.6"/>
+  <line x1="38" y1="62" x2="54" y2="62" stroke="#556677" stroke-width="0.8" opacity="0.6"/>
+  <line x1="38" y1="65" x2="54" y2="65" stroke="#556677" stroke-width="0.8" opacity="0.6"/>
+  <line x1="38" y1="68" x2="54" y2="68" stroke="#556677" stroke-width="0.8" opacity="0.6"/>
+  <line x1="38" y1="71" x2="54" y2="71" stroke="#556677" stroke-width="0.8" opacity="0.6"/>
+  <line x1="38" y1="74" x2="54" y2="74" stroke="#556677" stroke-width="0.8" opacity="0.5"/>
 
   <!-- Top panel vents -->
-  <line x1="18" y1="42" x2="32" y2="50" stroke="#3d4d5d" stroke-width="0.5" opacity="0.5"/>
-  <line x1="22" y1="40" x2="36" y2="48" stroke="#3d4d5d" stroke-width="0.5" opacity="0.5"/>
-  <line x1="26" y1="38" x2="40" y2="46" stroke="#3d4d5d" stroke-width="0.5" opacity="0.5"/>
+  <line x1="16" y1="42" x2="30" y2="50" stroke="#99aabb" stroke-width="0.6" opacity="0.5"/>
+  <line x1="22" y1="40" x2="36" y2="48" stroke="#99aabb" stroke-width="0.6" opacity="0.5"/>
+  <line x1="28" y1="38" x2="42" y2="46" stroke="#99aabb" stroke-width="0.6" opacity="0.5"/>
 
-  <!-- Bottom feet/base -->
-  <rect x="8" y="76" width="4" height="2" rx="0.5" fill="#1a2530" opacity="0.7"/>
-  <rect x="52" y="76" width="4" height="2" rx="0.5" fill="#1a2530" opacity="0.7"/>
+  <!-- Door handle on right face -->
+  <rect x="44" y="56" width="1.5" height="10" rx="0.5" fill="#ddeeff" opacity="0.5"/>
+
+  <!-- Bottom feet -->
+  <rect x="7" y="76" width="5" height="2" rx="0.5" fill="#667788" opacity="0.5"/>
+  <rect x="52" y="76" width="5" height="2" rx="0.5" fill="#667788" opacity="0.5"/>
+
+  <!-- Subtle edge highlights -->
+  <line x1="4" y1="48" x2="32" y2="32" stroke="#ddeeff" stroke-width="0.3" opacity="0.4"/>
+  <line x1="32" y1="32" x2="60" y2="48" stroke="#ddeeff" stroke-width="0.3" opacity="0.3"/>
 </svg>

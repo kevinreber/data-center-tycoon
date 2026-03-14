@@ -314,12 +314,13 @@ class DataCenterScene extends Phaser.Scene {
   /** Load sprite assets */
   preload() {
     const base = import.meta.env.BASE_URL ?? '/'
-    this.load.svg('sprite_cabinet', `${base}sprites/cabinet.svg`, { width: 64, height: 96 })
-    this.load.svg('sprite_server', `${base}sprites/server.svg`, { width: 48, height: 16 })
-    this.load.svg('sprite_leaf', `${base}sprites/leaf-switch.svg`, { width: 48, height: 12 })
-    this.load.svg('sprite_spine', `${base}sprites/spine-switch.svg`, { width: 64, height: 32 })
-    this.load.svg('sprite_cooling', `${base}sprites/cooling-unit.svg`, { width: 48, height: 40 })
-    this.load.svg('sprite_pdu', `${base}sprites/pdu.svg`, { width: 40, height: 28 })
+    // Load SVGs at 2x native resolution for crisp rendering when zoomed
+    this.load.svg('sprite_cabinet', `${base}sprites/cabinet.svg`, { width: 128, height: 192 })
+    this.load.svg('sprite_server', `${base}sprites/server.svg`, { width: 96, height: 32 })
+    this.load.svg('sprite_leaf', `${base}sprites/leaf-switch.svg`, { width: 96, height: 24 })
+    this.load.svg('sprite_spine', `${base}sprites/spine-switch.svg`, { width: 128, height: 64 })
+    this.load.svg('sprite_cooling', `${base}sprites/cooling-unit.svg`, { width: 96, height: 80 })
+    this.load.svg('sprite_pdu', `${base}sprites/pdu.svg`, { width: 80, height: 56 })
     this.load.on('complete', () => {
       this.spritesLoaded = true
     })
@@ -1297,14 +1298,17 @@ class DataCenterScene extends Phaser.Scene {
 
     if (this.spritesLoaded) {
       // ── Sprite-based rendering ──
-      // Cabinet enclosure sprite
+      // Cabinet enclosure sprite — no tint, shows native metal gray with env wireframe accent
       const cabSprite = this.add.image(cx, cy - CABINET_ENCLOSURE_DEPTH / 2, 'sprite_cabinet')
         .setOrigin(0.5, 0.7)
-        .setAlpha(0.85 * powerMult)
+        .setScale(0.5)
+        .setAlpha(0.9 * powerMult)
         .setDepth(baseDepth - 1)
-      // Environment tint
+      // Light environment tint: blend mostly white with a hint of environment color
       const envTint = ENVIRONMENT_CONFIG[entry.environment].frameColors.top
-      cabSprite.setTint(this.blendTint(0xffffff, envTint, 0.15))
+      if (entry.environment !== 'production') {
+        cabSprite.setTint(this.blendTint(0xffffff, envTint, 0.2))
+      }
       sprites.push(cabSprite)
 
       // Server sprites stacked inside the cabinet
@@ -1313,10 +1317,13 @@ class DataCenterScene extends Phaser.Scene {
         for (let i = 0; i < entry.serverCount; i++) {
           const srvSprite = this.add.image(cx, slotY - SERVER_DEPTH / 2, 'sprite_server')
             .setOrigin(0.5, 0.5)
+            .setScale(0.5)
             .setAlpha(0.9 * serverOpacity * powerMult)
             .setDepth(baseDepth)
-          // Tint server sprite to match configured color
-          srvSprite.setTint(serverColors.top)
+          // Only tint if user has custom color override, otherwise use native SVG green
+          if (this.layerColors.server) {
+            srvSprite.setTint(serverColors.top)
+          }
           sprites.push(srvSprite)
 
           slotY -= SERVER_DEPTH + SECTION_GAP
@@ -1328,9 +1335,13 @@ class DataCenterScene extends Phaser.Scene {
       if (entry.hasLeafSwitch && leafVis) {
         const leafSprite = this.add.image(cx, leafSlotY - LEAF_DEPTH / 2, 'sprite_leaf')
           .setOrigin(0.5, 0.5)
+          .setScale(0.5)
           .setAlpha(0.9 * leafOpacity * powerMult)
           .setDepth(baseDepth)
-        leafSprite.setTint(leafColors.top)
+        // Only tint if user has custom color override
+        if (this.layerColors.leaf_switch) {
+          leafSprite.setTint(leafColors.top)
+        }
         sprites.push(leafSprite)
       }
     } else {
@@ -1643,12 +1654,15 @@ class DataCenterScene extends Phaser.Scene {
     const g = this.add.graphics()
 
     if (this.spritesLoaded) {
-      // Sprite-based spine rendering
+      // Sprite-based spine rendering — native orange SVG, only tint on custom override
       const spineSprite = this.add.image(x, y + SPINE_H / 2 - SPINE_DEPTH / 2, 'sprite_spine')
         .setOrigin(0.5, 0.5)
+        .setScale(0.5)
         .setAlpha(0.9 * opacity * powerMult)
         .setDepth(5)
-      spineSprite.setTint(spineColors.top)
+      if (this.layerColors.spine_switch) {
+        spineSprite.setTint(spineColors.top)
+      }
       this.spineSprites.set(entry.id, spineSprite)
     } else {
       // Fallback: procedural
@@ -2775,12 +2789,15 @@ class DataCenterScene extends Phaser.Scene {
     const baseDepth = 10 + entry.row * this.cabCols + entry.col
 
     if (this.spritesLoaded) {
-      // Sprite-based PDU rendering
+      // Sprite-based PDU rendering — native amber, tint red only when overloaded
       const pduSprite = this.add.image(cx, cy - 6, 'sprite_pdu')
         .setOrigin(0.5, 0.5)
+        .setScale(0.5)
         .setAlpha(0.85)
         .setDepth(baseDepth)
-      pduSprite.setTint(entry.overloaded ? 0xff4444 : 0xffaa00)
+      if (entry.overloaded) {
+        pduSprite.setTint(0xff4444)
+      }
       this.pduSprites.set(entry.id, pduSprite)
     } else {
       // Fallback: procedural
@@ -2889,13 +2906,12 @@ class DataCenterScene extends Phaser.Scene {
     const colorNum = parseInt(hexStr, 16)
 
     if (this.spritesLoaded) {
-      // Sprite-based cooling unit rendering
+      // Sprite-based cooling unit rendering — native blue, tint red when failed
       const coolSprite = this.add.image(cx, cy - 10, 'sprite_cooling')
         .setOrigin(0.5, 0.5)
-        .setScale(0.7)
+        .setScale(0.35)
         .setDepth(baseDepth)
       if (entry.operational) {
-        coolSprite.setTint(colorNum)
         coolSprite.setAlpha(0.85)
       } else {
         coolSprite.setTint(0xff2222)
