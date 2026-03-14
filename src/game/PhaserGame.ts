@@ -28,8 +28,8 @@ const CABINET_ENCLOSURE_DEPTH = BASE_DEPTH
   + MAX_SERVERS_PER_CABINET * (SERVER_DEPTH + SECTION_GAP)
   + (LEAF_DEPTH + SECTION_GAP)
 
-// Light gray cabinet enclosure colors
-const CABINET_COLORS = { top: 0x667788, side: 0x4a5a6a, front: 0x3d4d5d }
+// Dark charcoal cabinet enclosure colors (realistic rack aesthetic)
+const CABINET_COLORS = { top: 0x3a3e48, side: 0x282c34, front: 0x32363e }
 
 // Spine visual dimensions
 const SPINE_W = 50
@@ -922,19 +922,19 @@ class DataCenterScene extends Phaser.Scene {
         if (aisleGridRows.has(r)) {
           const aisleType = aisleGridRows.get(r)!
           if (aisleType === 'cold') {
-            fillColor = (c + r) % 2 === 0 ? 0x061828 : 0x081e30
+            fillColor = (c + r) % 2 === 0 ? 0x384858 : 0x344454
           } else if (aisleType === 'hot') {
-            fillColor = (c + r) % 2 === 0 ? 0x1a0e06 : 0x201208
+            fillColor = (c + r) % 2 === 0 ? 0x483838 : 0x443434
           } else {
-            fillColor = (c + r) % 2 === 0 ? 0x0e1218 : 0x10141a
+            fillColor = (c + r) % 2 === 0 ? 0x3c4048 : 0x383c44
           }
         } else if (corridorGridRows.has(r)) {
-          fillColor = (c + r) % 2 === 0 ? 0x0f1520 : 0x111822
-          alpha = 0.7
+          fillColor = (c + r) % 2 === 0 ? 0x3a4048 : 0x363c44
+          alpha = 0.8
         } else {
-          // Cabinet row — standard dark floor
+          // Cabinet row — medium gray floor tiles
           const isAlternate = (r + c) % 2 === 0
-          fillColor = isAlternate ? 0x0a1520 : 0x0c1825
+          fillColor = isAlternate ? 0x404850 : 0x3c4448
         }
 
         this.floorGraphics.fillStyle(fillColor, alpha)
@@ -948,7 +948,7 @@ class DataCenterScene extends Phaser.Scene {
 
         // Draw subtle aisle lane markings
         if (aisleGridRows.has(r)) {
-          this.floorGraphics.lineStyle(0.5, 0x335533, 0.3)
+          this.floorGraphics.lineStyle(0.5, 0x607080, 0.25)
           this.floorGraphics.lineBetween(
             x - TILE_W / 4, y + TILE_H / 2,
             x + TILE_W / 4, y + TILE_H / 2,
@@ -1096,7 +1096,7 @@ class DataCenterScene extends Phaser.Scene {
 
   private drawGrid() {
     this.gridGraphics = this.add.graphics()
-    this.gridGraphics.lineStyle(1, 0x00ff88, 0.12)
+    this.gridGraphics.lineStyle(1, 0x606870, 0.2)
 
     for (let row = 0; row <= this.cabRows; row++) {
       const start = this.isoToScreen(0, row)
@@ -1110,8 +1110,8 @@ class DataCenterScene extends Phaser.Scene {
       this.gridGraphics.lineBetween(start.x, start.y, end.x, end.y)
     }
 
-    // Outer border glow
-    this.gridGraphics.lineStyle(1.5, 0x00ff88, 0.25)
+    // Outer border
+    this.gridGraphics.lineStyle(1.5, 0x708090, 0.35)
     const tl = this.isoToScreen(0, 0)
     const tr = this.isoToScreen(this.cabCols, 0)
     const br = this.isoToScreen(this.cabCols, this.cabRows)
@@ -1138,7 +1138,7 @@ class DataCenterScene extends Phaser.Scene {
       const hw = SPINE_W / 2 + 4
       const hh = SPINE_H / 2 + 2
 
-      this.spineFloorGraphics.fillStyle(0x0a1520, 0.6)
+      this.spineFloorGraphics.fillStyle(0x363c44, 0.6)
       this.spineFloorGraphics.beginPath()
       this.spineFloorGraphics.moveTo(sx, y - hh + SPINE_H / 2)
       this.spineFloorGraphics.lineTo(sx + hw, y + SPINE_H / 2)
@@ -1149,7 +1149,7 @@ class DataCenterScene extends Phaser.Scene {
     }
 
     // Border around spine area
-    this.spineFloorGraphics.lineStyle(1, 0xff6644, 0.15)
+    this.spineFloorGraphics.lineStyle(1, 0x708090, 0.25)
     const lx = startX - 4
     const rx = startX + totalW + 4
     const ty = y - 4
@@ -1163,10 +1163,10 @@ class DataCenterScene extends Phaser.Scene {
       .text(this.spineOffsetX, y - 16, 'SPINE SWITCHES', {
         fontFamily: 'monospace',
         fontSize: '9px',
-        color: '#ff6644',
+        color: '#8892a0',
       })
       .setOrigin(0.5)
-      .setAlpha(0.5)
+      .setAlpha(0.6)
       .setDepth(1)
   }
 
@@ -1347,7 +1347,7 @@ class DataCenterScene extends Phaser.Scene {
       // Rack rail detail lines on cabinet enclosure
       const hw = CUBE_W / 2
       const hh = CUBE_H / 2
-      g.lineStyle(0.5, 0x8899aa, 0.3 * powerMult)
+      g.lineStyle(0.5, 0x444850, 0.4 * powerMult)
       // Left rail
       g.lineBetween(cx - hw + 4, cy + hh - CABINET_ENCLOSURE_DEPTH + 2, cx - hw + 4, cy + hh)
       // Right rail
@@ -1357,8 +1357,17 @@ class DataCenterScene extends Phaser.Scene {
       for (let u = 0; u < 4; u++) {
         const uy = cy + hh - CABINET_ENCLOSURE_DEPTH + 4 + u * 10
         if (uy < cy + hh) {
-          g.lineStyle(0.5, 0x556677, 0.25 * powerMult)
+          g.lineStyle(0.5, 0x1e2228, 0.4 * powerMult)
           g.lineBetween(cx + 3, uy, cx + hw - 5, uy)
+        }
+      }
+
+      // Green LED indicators per server slot (procedural)
+      for (let u = 0; u < entry.serverCount && u < 4; u++) {
+        const ledY = cy + hh - CABINET_ENCLOSURE_DEPTH + 6 + u * 10
+        if (ledY < cy + hh) {
+          g.fillStyle(0x00cc44, 0.7 * powerMult)
+          g.fillRect(cx + hw - 6, ledY, 2, 2)
         }
       }
 
@@ -1420,7 +1429,7 @@ class DataCenterScene extends Phaser.Scene {
       .text(cx, topY, entry.id.replace('cab-', 'C'), {
         fontFamily: 'monospace',
         fontSize: '7px',
-        color: '#556677',
+        color: '#8892a0',
       })
       .setOrigin(0.5)
       .setAlpha(powerMult * 0.7)
@@ -1444,7 +1453,7 @@ class DataCenterScene extends Phaser.Scene {
     const leafText = entry.hasLeafSwitch ? 'leaf' : 'no leaf'
     const isEmpty = entry.serverCount === 0 && !entry.hasLeafSwitch
     const summaryStr = isEmpty ? 'EMPTY' : `${srvText} · ${leafText}`
-    const summaryColor = isEmpty ? '#665544' : '#556677'
+    const summaryColor = isEmpty ? '#606060' : '#7882a0'
     const summaryLabel = this.add
       .text(cx, topY + 17, summaryStr, {
         fontFamily: 'monospace',
