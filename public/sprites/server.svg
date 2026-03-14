@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="16" viewBox="0 0 48 16">
+  <!-- Isometric server blade - bright base for tinting -->
+  <!-- Left face -->
+  <polygon points="2,8 24,14 24,16 2,10" fill="#88cc99" stroke="#aaffbb" stroke-width="0.3"/>
+  <!-- Right face -->
+  <polygon points="46,8 24,14 24,16 46,10" fill="#99ddaa" stroke="#aaffbb" stroke-width="0.3"/>
+  <!-- Top face -->
+  <polygon points="24,2 46,8 24,14 2,8" fill="#aaeebb" stroke="#bbffcc" stroke-width="0.3"/>
+
+  <!-- Drive bays on right face -->
+  <rect x="28" y="9" width="3" height="2" rx="0.3" fill="#66aa77" stroke="#bbffcc" stroke-width="0.2" opacity="0.7"/>
+  <rect x="32" y="9" width="3" height="2" rx="0.3" fill="#66aa77" stroke="#bbffcc" stroke-width="0.2" opacity="0.7"/>
+  <rect x="36" y="9" width="3" height="2" rx="0.3" fill="#66aa77" stroke="#bbffcc" stroke-width="0.2" opacity="0.7"/>
+  <rect x="40" y="9" width="3" height="2" rx="0.3" fill="#66aa77" stroke="#bbffcc" stroke-width="0.2" opacity="0.7"/>
+
+  <!-- Power LED -->
+  <circle cx="27" cy="10" r="1" fill="#eeffee" opacity="0.95"/>
+  <!-- Activity LED -->
+  <circle cx="29.5" cy="10" r="0.7" fill="#ffffaa" opacity="0.8"/>
+
+  <!-- Heatsink lines on top face -->
+  <line x1="10" y1="6.5" x2="20" y2="10" stroke="#ccffdd" stroke-width="0.3" opacity="0.4"/>
+  <line x1="14" y1="5.5" x2="24" y2="9" stroke="#ccffdd" stroke-width="0.3" opacity="0.4"/>
+  <line x1="18" y1="4.5" x2="28" y2="8" stroke="#ccffdd" stroke-width="0.3" opacity="0.4"/>
+  <line x1="22" y1="3.5" x2="32" y2="7" stroke="#ccffdd" stroke-width="0.3" opacity="0.4"/>
+  <line x1="26" y1="4" x2="36" y2="7.5" stroke="#ccffdd" stroke-width="0.3" opacity="0.4"/>
+  <line x1="30" y1="4.5" x2="40" y2="8" stroke="#ccffdd" stroke-width="0.3" opacity="0.35"/>
+</svg>
