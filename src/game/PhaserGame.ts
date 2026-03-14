@@ -300,8 +300,29 @@ class DataCenterScene extends Phaser.Scene {
   private prevServerCounts: Map<string, number> = new Map()
   private prevLeafSwitches: Map<string, boolean> = new Map()
 
+  // Sprite-based rendering: image objects layered under procedural overlays
+  private cabinetSprites: Map<string, Phaser.GameObjects.Image[]> = new Map()
+  private spineSprites: Map<string, Phaser.GameObjects.Image> = new Map()
+  private pduSprites: Map<string, Phaser.GameObjects.Image> = new Map()
+  private coolingUnitSprites: Map<string, Phaser.GameObjects.Image> = new Map()
+  private spritesLoaded = false
+
   constructor() {
     super({ key: 'DataCenterScene' })
+  }
+
+  /** Load sprite assets */
+  preload() {
+    const base = import.meta.env.BASE_URL ?? '/'
+    this.load.svg('sprite_cabinet', `${base}sprites/cabinet.svg`, { width: 64, height: 96 })
+    this.load.svg('sprite_server', `${base}sprites/server.svg`, { width: 48, height: 16 })
+    this.load.svg('sprite_leaf', `${base}sprites/leaf-switch.svg`, { width: 48, height: 12 })
+    this.load.svg('sprite_spine', `${base}sprites/spine-switch.svg`, { width: 64, height: 32 })
+    this.load.svg('sprite_cooling', `${base}sprites/cooling-unit.svg`, { width: 48, height: 40 })
+    this.load.svg('sprite_pdu', `${base}sprites/pdu.svg`, { width: 40, height: 28 })
+    this.load.on('complete', () => {
+      this.spritesLoaded = true
+    })
   }
 
   /** Compute offsets to center all content (spine area + grid) both horizontally and vertically */
@@ -1253,6 +1274,9 @@ class DataCenterScene extends Phaser.Scene {
     if (oldG) oldG.destroy()
     const oldLabels = this.cabinetLabels.get(entry.id)
     if (oldLabels) oldLabels.forEach((l) => l.destroy())
+    // Clean up old sprites
+    const oldSprites = this.cabinetSprites.get(entry.id)
+    if (oldSprites) oldSprites.forEach((s) => s.destroy())
 
     const { x, y } = this.isoToScreen(entry.col, entry.row)
     const cx = x
@@ -1260,6 +1284,7 @@ class DataCenterScene extends Phaser.Scene {
 
     const g = this.add.graphics()
     const labels: Phaser.GameObjects.Text[] = []
+    const sprites: Phaser.GameObjects.Image[] = []
     const baseDepth = 10 + entry.row * this.cabCols + entry.col
 
     const serverColors: LayerColors = this.layerColors.server ?? COLORS.server
@@ -1270,48 +1295,85 @@ class DataCenterScene extends Phaser.Scene {
     const leafOpacity = this.layerOpacity.leaf_switch
     const powerMult = entry.powerOn ? 1 : 0.2
 
-    // 1. Full-height cabinet enclosure — light gray box (fixed height regardless of contents)
-    const cabinetAlpha = 0.6 * powerMult
-    this.drawIsoCube(g, cx, cy, CUBE_W, CUBE_H, CABINET_ENCLOSURE_DEPTH, CABINET_COLORS, cabinetAlpha)
+    if (this.spritesLoaded) {
+      // ── Sprite-based rendering ──
+      // Cabinet enclosure sprite
+      const cabSprite = this.add.image(cx, cy - CABINET_ENCLOSURE_DEPTH / 2, 'sprite_cabinet')
+        .setOrigin(0.5, 0.7)
+        .setAlpha(0.85 * powerMult)
+        .setDepth(baseDepth - 1)
+      // Environment tint
+      const envTint = ENVIRONMENT_CONFIG[entry.environment].frameColors.top
+      cabSprite.setTint(this.blendTint(0xffffff, envTint, 0.15))
+      sprites.push(cabSprite)
 
-    // Environment accent — thin wireframe tint on the enclosure
-    const envColor = ENVIRONMENT_CONFIG[entry.environment].frameColors.top
-    this.drawIsoWireframe(g, cx, cy, CUBE_W, CUBE_H, CABINET_ENCLOSURE_DEPTH, envColor, 0.5 * powerMult)
+      // Server sprites stacked inside the cabinet
+      let slotY = cy - BASE_DEPTH - SECTION_GAP
+      if (serverVis) {
+        for (let i = 0; i < entry.serverCount; i++) {
+          const srvSprite = this.add.image(cx, slotY - SERVER_DEPTH / 2, 'sprite_server')
+            .setOrigin(0.5, 0.5)
+            .setAlpha(0.9 * serverOpacity * powerMult)
+            .setDepth(baseDepth)
+          // Tint server sprite to match configured color
+          srvSprite.setTint(serverColors.top)
+          sprites.push(srvSprite)
 
-    // 2. Server layers inside the cabinet (smaller, sitting inside the gray shell)
-    let slotY = cy - BASE_DEPTH - SECTION_GAP
-    if (serverVis) {
-      for (let i = 0; i < entry.serverCount; i++) {
-        const alpha = 0.9 * serverOpacity * powerMult
-        this.drawIsoCube(g, cx, slotY, CUBE_W - SERVER_INSET, CUBE_H - SERVER_INSET / 2, SERVER_DEPTH, serverColors, alpha)
-
-        // Server LED
-        if (serverOpacity > 0.3) {
-          const ledColor = `#${serverColors.top.toString(16).padStart(6, '0')}`
-          const led = this.add
-            .text(cx + (CUBE_W - SERVER_INSET) / 2 - 4, slotY - SERVER_DEPTH + 1, '●', {
-              fontFamily: 'monospace',
-              fontSize: '5px',
-              color: ledColor,
-            })
-            .setOrigin(0.5)
-            .setAlpha(entry.powerOn ? 0.9 * serverOpacity : 0.1)
-            .setDepth(baseDepth + 1)
-          labels.push(led)
+          slotY -= SERVER_DEPTH + SECTION_GAP
         }
-
-        slotY -= SERVER_DEPTH + SECTION_GAP
       }
-    }
 
-    // 3. Leaf switch at top of cabinet (also inset, cyan)
-    const leafSlotY = cy - BASE_DEPTH - SECTION_GAP - MAX_SERVERS_PER_CABINET * (SERVER_DEPTH + SECTION_GAP)
-    if (entry.hasLeafSwitch) {
-      if (leafVis) {
+      // Leaf switch sprite at top of cabinet
+      const leafSlotY = cy - BASE_DEPTH - SECTION_GAP - MAX_SERVERS_PER_CABINET * (SERVER_DEPTH + SECTION_GAP)
+      if (entry.hasLeafSwitch && leafVis) {
+        const leafSprite = this.add.image(cx, leafSlotY - LEAF_DEPTH / 2, 'sprite_leaf')
+          .setOrigin(0.5, 0.5)
+          .setAlpha(0.9 * leafOpacity * powerMult)
+          .setDepth(baseDepth)
+        leafSprite.setTint(leafColors.top)
+        sprites.push(leafSprite)
+      }
+    } else {
+      // ── Fallback: procedural rendering ──
+      // 1. Full-height cabinet enclosure
+      const cabinetAlpha = 0.6 * powerMult
+      this.drawIsoCube(g, cx, cy, CUBE_W, CUBE_H, CABINET_ENCLOSURE_DEPTH, CABINET_COLORS, cabinetAlpha)
+
+      // Environment accent wireframe
+      const envColor = ENVIRONMENT_CONFIG[entry.environment].frameColors.top
+      this.drawIsoWireframe(g, cx, cy, CUBE_W, CUBE_H, CABINET_ENCLOSURE_DEPTH, envColor, 0.5 * powerMult)
+
+      // 2. Server layers
+      let slotY = cy - BASE_DEPTH - SECTION_GAP
+      if (serverVis) {
+        for (let i = 0; i < entry.serverCount; i++) {
+          const alpha = 0.9 * serverOpacity * powerMult
+          this.drawIsoCube(g, cx, slotY, CUBE_W - SERVER_INSET, CUBE_H - SERVER_INSET / 2, SERVER_DEPTH, serverColors, alpha)
+
+          if (serverOpacity > 0.3) {
+            const ledColor = `#${serverColors.top.toString(16).padStart(6, '0')}`
+            const led = this.add
+              .text(cx + (CUBE_W - SERVER_INSET) / 2 - 4, slotY - SERVER_DEPTH + 1, '●', {
+                fontFamily: 'monospace',
+                fontSize: '5px',
+                color: ledColor,
+              })
+              .setOrigin(0.5)
+              .setAlpha(entry.powerOn ? 0.9 * serverOpacity : 0.1)
+              .setDepth(baseDepth + 1)
+            labels.push(led)
+          }
+
+          slotY -= SERVER_DEPTH + SECTION_GAP
+        }
+      }
+
+      // 3. Leaf switch
+      const leafSlotY = cy - BASE_DEPTH - SECTION_GAP - MAX_SERVERS_PER_CABINET * (SERVER_DEPTH + SECTION_GAP)
+      if (entry.hasLeafSwitch && leafVis) {
         const alpha = 0.9 * leafOpacity * powerMult
         this.drawIsoCube(g, cx, leafSlotY, CUBE_W - SERVER_INSET, CUBE_H - SERVER_INSET / 2, LEAF_DEPTH, leafColors, alpha)
 
-        // Leaf LED
         if (leafOpacity > 0.3) {
           const ledColor = `#${leafColors.top.toString(16).padStart(6, '0')}`
           const led = this.add
@@ -1544,6 +1606,17 @@ class DataCenterScene extends Phaser.Scene {
     g.setDepth(baseDepth)
     this.cabinetGraphics.set(entry.id, g)
     this.cabinetLabels.set(entry.id, labels)
+    this.cabinetSprites.set(entry.id, sprites)
+  }
+
+  /** Blend two hex colors for tinting: returns a color between base and tint by factor (0-1) */
+  private blendTint(base: number, tint: number, factor: number): number {
+    const br = (base >> 16) & 0xff, bg = (base >> 8) & 0xff, bb = base & 0xff
+    const tr = (tint >> 16) & 0xff, tg = (tint >> 8) & 0xff, tb = tint & 0xff
+    const r = Math.round(br + (tr - br) * factor)
+    const g = Math.round(bg + (tg - bg) * factor)
+    const b = Math.round(bb + (tb - bb) * factor)
+    return (r << 16) | (g << 8) | b
   }
 
   /** Render a spine switch in the elevated spine row */
@@ -1552,10 +1625,13 @@ class DataCenterScene extends Phaser.Scene {
     if (oldG) oldG.destroy()
     const oldLabel = this.spineNodeLabels.get(entry.id)
     if (oldLabel) oldLabel.destroy()
+    const oldSprite = this.spineSprites.get(entry.id)
+    if (oldSprite) oldSprite.destroy()
 
     if (!this.layerVisibility.spine_switch) {
       this.spineGraphics.delete(entry.id)
       this.spineNodeLabels.delete(entry.id)
+      this.spineSprites.delete(entry.id)
       return
     }
 
@@ -1565,8 +1641,20 @@ class DataCenterScene extends Phaser.Scene {
     const powerMult = entry.powerOn ? 1 : 0.2
 
     const g = this.add.graphics()
-    const alpha = 0.9 * opacity * powerMult
-    this.drawIsoCube(g, x, y + SPINE_H / 2, SPINE_W, SPINE_H, SPINE_DEPTH, spineColors, alpha)
+
+    if (this.spritesLoaded) {
+      // Sprite-based spine rendering
+      const spineSprite = this.add.image(x, y + SPINE_H / 2 - SPINE_DEPTH / 2, 'sprite_spine')
+        .setOrigin(0.5, 0.5)
+        .setAlpha(0.9 * opacity * powerMult)
+        .setDepth(5)
+      spineSprite.setTint(spineColors.top)
+      this.spineSprites.set(entry.id, spineSprite)
+    } else {
+      // Fallback: procedural
+      const alpha = 0.9 * opacity * powerMult
+      this.drawIsoCube(g, x, y + SPINE_H / 2, SPINE_W, SPINE_H, SPINE_DEPTH, spineColors, alpha)
+    }
 
     g.setDepth(5)
     this.spineGraphics.set(entry.id, g)
@@ -2676,6 +2764,8 @@ class DataCenterScene extends Phaser.Scene {
     if (oldG) oldG.destroy()
     const oldLabel = this.pduLabels.get(entry.id)
     if (oldLabel) oldLabel.destroy()
+    const oldSprite = this.pduSprites.get(entry.id)
+    if (oldSprite) oldSprite.destroy()
 
     const { x, y } = this.isoToScreen(entry.col, entry.row)
     const cx = x
@@ -2684,11 +2774,21 @@ class DataCenterScene extends Phaser.Scene {
     const g = this.add.graphics()
     const baseDepth = 10 + entry.row * this.cabCols + entry.col
 
-    // PDU is a small yellow/orange box
-    const pduColor = entry.overloaded
-      ? { top: 0xff4444, side: 0xcc2222, front: 0x991111 }
-      : { top: 0xffaa00, side: 0xcc8800, front: 0x996600 }
-    this.drawIsoCube(g, cx, cy, CUBE_W * 0.6, CUBE_H * 0.6, 6, pduColor, 0.8)
+    if (this.spritesLoaded) {
+      // Sprite-based PDU rendering
+      const pduSprite = this.add.image(cx, cy - 6, 'sprite_pdu')
+        .setOrigin(0.5, 0.5)
+        .setAlpha(0.85)
+        .setDepth(baseDepth)
+      pduSprite.setTint(entry.overloaded ? 0xff4444 : 0xffaa00)
+      this.pduSprites.set(entry.id, pduSprite)
+    } else {
+      // Fallback: procedural
+      const pduColor = entry.overloaded
+        ? { top: 0xff4444, side: 0xcc2222, front: 0x991111 }
+        : { top: 0xffaa00, side: 0xcc8800, front: 0x996600 }
+      this.drawIsoCube(g, cx, cy, CUBE_W * 0.6, CUBE_H * 0.6, 6, pduColor, 0.8)
+    }
 
     g.setDepth(baseDepth)
     this.pduGraphics.set(entry.id, g)
@@ -2771,6 +2871,8 @@ class DataCenterScene extends Phaser.Scene {
     if (oldG) oldG.destroy()
     const oldLabel = this.coolingUnitLabels.get(entry.id)
     if (oldLabel) oldLabel.destroy()
+    const oldSprite = this.coolingUnitSprites.get(entry.id)
+    if (oldSprite) oldSprite.destroy()
 
     const cfg = COOLING_UNIT_CONFIG.find((c) => c.type === entry.type)
     if (!cfg) return
@@ -2785,16 +2887,33 @@ class DataCenterScene extends Phaser.Scene {
     // Parse hex color from config
     const hexStr = cfg.color.replace('#', '')
     const colorNum = parseInt(hexStr, 16)
-    const darkerColor = ((colorNum >> 1) & 0x7f7f7f)
-    const darkestColor = ((colorNum >> 2) & 0x3f3f3f)
 
-    if (entry.operational) {
-      this.drawIsoCube(g, cx, cy, CUBE_W * 0.5, CUBE_H * 0.5, 8,
-        { top: colorNum, side: darkerColor, front: darkestColor }, 0.85)
+    if (this.spritesLoaded) {
+      // Sprite-based cooling unit rendering
+      const coolSprite = this.add.image(cx, cy - 10, 'sprite_cooling')
+        .setOrigin(0.5, 0.5)
+        .setScale(0.7)
+        .setDepth(baseDepth)
+      if (entry.operational) {
+        coolSprite.setTint(colorNum)
+        coolSprite.setAlpha(0.85)
+      } else {
+        coolSprite.setTint(0xff2222)
+        coolSprite.setAlpha(0.6)
+      }
+      this.coolingUnitSprites.set(entry.id, coolSprite)
     } else {
-      // Failed unit: red tint, lower alpha
-      this.drawIsoCube(g, cx, cy, CUBE_W * 0.5, CUBE_H * 0.5, 8,
-        { top: 0xff2222, side: 0xaa1111, front: 0x770808 }, 0.6)
+      // Fallback: procedural
+      const darkerColor = ((colorNum >> 1) & 0x7f7f7f)
+      const darkestColor = ((colorNum >> 2) & 0x3f3f3f)
+
+      if (entry.operational) {
+        this.drawIsoCube(g, cx, cy, CUBE_W * 0.5, CUBE_H * 0.5, 8,
+          { top: colorNum, side: darkerColor, front: darkestColor }, 0.85)
+      } else {
+        this.drawIsoCube(g, cx, cy, CUBE_W * 0.5, CUBE_H * 0.5, 8,
+          { top: 0xff2222, side: 0xaa1111, front: 0x770808 }, 0.6)
+      }
     }
 
     // Coverage ring for units with range > 0
@@ -2863,8 +2982,11 @@ class DataCenterScene extends Phaser.Scene {
     if (g) g.destroy()
     const l = this.coolingUnitLabels.get(id)
     if (l) l.destroy()
+    const s = this.coolingUnitSprites.get(id)
+    if (s) s.destroy()
     this.coolingUnitGraphics.delete(id)
     this.coolingUnitLabels.delete(id)
+    this.coolingUnitSprites.delete(id)
     this.coolingUnitEntries.delete(id)
   }
 
@@ -2872,8 +2994,10 @@ class DataCenterScene extends Phaser.Scene {
   clearCoolingUnits() {
     for (const g of this.coolingUnitGraphics.values()) g.destroy()
     for (const l of this.coolingUnitLabels.values()) l.destroy()
+    for (const s of this.coolingUnitSprites.values()) s.destroy()
     this.coolingUnitGraphics.clear()
     this.coolingUnitLabels.clear()
+    this.coolingUnitSprites.clear()
     this.coolingUnitEntries.clear()
   }
 
@@ -3056,19 +3180,23 @@ class DataCenterScene extends Phaser.Scene {
   clearInfrastructure() {
     for (const g of this.pduGraphics.values()) g.destroy()
     for (const l of this.pduLabels.values()) l.destroy()
+    for (const s of this.pduSprites.values()) s.destroy()
     for (const g of this.cableTrayGraphics.values()) g.destroy()
     for (const g of this.coolingUnitGraphics.values()) g.destroy()
     for (const l of this.coolingUnitLabels.values()) l.destroy()
+    for (const s of this.coolingUnitSprites.values()) s.destroy()
     for (const g of this.chillerGraphics.values()) g.destroy()
     for (const l of this.chillerLabels.values()) l.destroy()
     for (const g of this.pipeGraphics.values()) g.destroy()
     this.pduGraphics.clear()
     this.pduLabels.clear()
+    this.pduSprites.clear()
     this.pduEntries.clear()
     this.cableTrayGraphics.clear()
     this.cableTrayEntries.clear()
     this.coolingUnitGraphics.clear()
     this.coolingUnitLabels.clear()
+    this.coolingUnitSprites.clear()
     this.coolingUnitEntries.clear()
     this.chillerGraphics.clear()
     this.chillerLabels.clear()
@@ -3081,8 +3209,10 @@ class DataCenterScene extends Phaser.Scene {
   clearAllCabinets() {
     for (const g of this.cabinetGraphics.values()) g.destroy()
     for (const labels of this.cabinetLabels.values()) labels.forEach(l => l.destroy())
+    for (const sprites of this.cabinetSprites.values()) sprites.forEach(s => s.destroy())
     this.cabinetGraphics.clear()
     this.cabinetLabels.clear()
+    this.cabinetSprites.clear()
     this.occupiedTiles.clear()
     this.clearSelection()
   }
@@ -3091,8 +3221,10 @@ class DataCenterScene extends Phaser.Scene {
   clearAllSpines() {
     for (const g of this.spineGraphics.values()) g.destroy()
     for (const l of this.spineNodeLabels.values()) l.destroy()
+    for (const s of this.spineSprites.values()) s.destroy()
     this.spineGraphics.clear()
     this.spineNodeLabels.clear()
+    this.spineSprites.clear()
     this.spineEntries.clear()
     this.spineCount = 0
     // Clear traffic lines since they reference old spine IDs
