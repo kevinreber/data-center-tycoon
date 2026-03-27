@@ -8,6 +8,7 @@ import { StatusBar } from '@/components/StatusBar'
 import { WelcomeModal } from '@/components/WelcomeModal'
 import { RegionSelectModal } from '@/components/RegionSelectModal'
 import { TutorialOverlay } from '@/components/TutorialOverlay'
+import { SwitchPortDetailModal } from '@/components/SwitchPortDetailModal'
 import { useGameStore } from '@/stores/gameStore'
 import type { GameSpeed } from '@/stores/gameStore'
 import { Zap, DollarSign, Thermometer, Activity, Pause, Play, FastForward, Trophy, X, Flame, Eye, ExternalLink, Globe, ArrowLeft, Skull, RotateCcw } from 'lucide-react'
@@ -358,6 +359,9 @@ function App() {
 
         {/* Tutorial step overlay */}
         <TutorialOverlay />
+
+        {/* Switch port detail modal */}
+        <SwitchPortDetailModal />
 
         {/* Game Over modal */}
         {gameOver && (

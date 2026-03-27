@@ -46,6 +46,7 @@ export type {
   PrestigeBonuses, PrestigeState,
   NaclPolicy, NaclPolicyConfig,
   LayoutMode,
+  SwitchDetailTarget,
 } from './types'
 
 import type {
@@ -77,6 +78,7 @@ import type {
   PrestigeState,
   NaclPolicy,
   LayoutMode,
+  SwitchDetailTarget,
 } from './types'
 
 // ── Re-export constants ────────────────────────────────────────
@@ -295,6 +297,9 @@ interface GameState {
   // Cabinet / spine selection
   selectedCabinetId: string | null            // currently selected cabinet (clicked in canvas)
   selectedSpineId: string | null              // currently selected spine switch (clicked in canvas)
+
+  // Switch port detail modal
+  switchDetailTarget: SwitchDetailTarget | null  // which switch to inspect in port detail modal
 
   // Placement mode
   placementMode: boolean                      // whether user is in placement mode
@@ -569,6 +574,8 @@ interface GameState {
   // Actions
   selectCabinet: (id: string | null) => void
   selectSpine: (id: string | null) => void
+  openSwitchDetail: (target: SwitchDetailTarget) => void
+  closeSwitchDetail: () => void
   addCabinet: (col: number, row: number, environment: CabinetEnvironment, customerType?: CustomerType, facing?: CabinetFacing) => void
   enterPlacementMode: (environment: CabinetEnvironment, customerType: CustomerType, facing?: CabinetFacing) => void
   exitPlacementMode: () => void
@@ -919,6 +926,9 @@ export const useGameStore = create<GameState>((set) => ({
   selectedCabinetId: null,
   selectedSpineId: null,
 
+  // Switch port detail modal
+  switchDetailTarget: null,
+
   // Placement mode
   placementMode: false,
   placementEnvironment: 'production' as CabinetEnvironment,
@@ -1200,6 +1210,12 @@ export const useGameStore = create<GameState>((set) => ({
 
   selectSpine: (id: string | null) =>
     set({ selectedSpineId: id, selectedCabinetId: null }),
+
+  openSwitchDetail: (target: SwitchDetailTarget) =>
+    set({ switchDetailTarget: target }),
+
+  closeSwitchDetail: () =>
+    set({ switchDetailTarget: null }),
 
   // ── Build Actions ───────────────────────────────────────────
 
@@ -4283,6 +4299,7 @@ export const useGameStore = create<GameState>((set) => ({
       dedicatedRowBonusRevenue: 0,
       selectedCabinetId: null,
       selectedSpineId: null,
+      switchDetailTarget: null,
       placementMode: false,
       equipmentPlacementMode: null,
       insurancePolicies: [],
@@ -4612,12 +4629,37 @@ export const useGameStore = create<GameState>((set) => ({
             selectedDef = fallbackDefs[Math.floor(Math.random() * fallbackDefs.length)]
           }
 
+          // Link flap needs active traffic links — pick a random link to flap
+          let affectedLinkKey: string | undefined
+          if (selectedDef.effect === 'link_flap') {
+            const activeCabs = state.cabinets.filter(c => c.hasLeafSwitch && c.powerStatus)
+            const activeSpines = state.spineSwitches.filter(s => s.powerStatus)
+            const alreadyFlapping = new Set(
+              activeIncidents
+                .filter(i => !i.resolved && i.def.effect === 'link_flap' && i.affectedLinkKey)
+                .map(i => i.affectedLinkKey!)
+            )
+            if (activeCabs.length > 0 && activeSpines.length > 0) {
+              const cab = activeCabs[Math.floor(Math.random() * activeCabs.length)]
+              const spine = activeSpines[Math.floor(Math.random() * activeSpines.length)]
+              const key = `${cab.id}:${spine.id}`
+              if (!alreadyFlapping.has(key)) {
+                affectedLinkKey = key
+              }
+            }
+            if (!affectedLinkKey) {
+              const fallbackDefs = INCIDENT_CATALOG.filter(d => d.effect !== 'link_flap' && d.effect !== 'hardware_failure' && d.effect !== 'chiller_failure' && d.effect !== 'pipe_failure')
+              selectedDef = fallbackDefs[Math.floor(Math.random() * fallbackDefs.length)]
+            }
+          }
+
           const incident: ActiveIncident = {
             id: `inc-${nextIncidentId++}`,
             def: selectedDef,
             ticksRemaining: selectedDef.durationTicks,
             resolved: false,
             ...(affectedHwId ? { affectedHardwareId: affectedHwId } : {}),
+            ...(affectedLinkKey ? { affectedLinkKey } : {}),
           }
           activeIncidents.push(incident)
           // Cooling failure incidents disable a random operational cooling unit
@@ -4779,6 +4821,7 @@ export const useGameStore = create<GameState>((set) => ({
           case 'cooling_failure': incidentCoolingMult *= inc.def.effectMagnitude; break
           case 'heat_spike': incidentHeatAdd += inc.def.effectMagnitude; break
           case 'traffic_drop': incidentTrafficMult *= inc.def.effectMagnitude; break
+          case 'link_flap': incidentTrafficMult *= (1 - inc.def.effectMagnitude); break  // partial traffic drop on the flapping link
           case 'chiller_failure': break  // effect handled via disabled chiller plant
           case 'pipe_failure': break     // effect handled via destroyed pipe
         }
@@ -4840,7 +4883,7 @@ export const useGameStore = create<GameState>((set) => ({
         activeIncidents = activeIncidents.map((i) => {
           if (i.resolved) return i
           let staffSpeedBonus = 0
-          if (i.def.effect === 'traffic_drop') staffSpeedBonus = staffTrafficResolution
+          if (i.def.effect === 'traffic_drop' || i.def.effect === 'link_flap') staffSpeedBonus = staffTrafficResolution
           else if (i.def.effect === 'power_surge') staffSpeedBonus = staffPowerResolution
           // Generic small bonus from any staff for other incident types
           else staffSpeedBonus = Math.min(0.3, onShiftStaff.length * 0.05) * shiftCoverage * (1 + opsStaffBonus)
@@ -4858,7 +4901,7 @@ export const useGameStore = create<GameState>((set) => ({
               if (i.def.hardwareTarget === 'spine') restoredSpineIds.add(i.affectedHardwareId)
             }
             // Add fatigue to responding staff
-            const responders = i.def.effect === 'traffic_drop' ? networkEngineers
+            const responders = (i.def.effect === 'traffic_drop' || i.def.effect === 'link_flap') ? networkEngineers
               : i.def.effect === 'power_surge' ? electricians
                 : onShiftStaff.slice(0, 1)
             for (const resp of responders) {
