@@ -3,6 +3,7 @@ import { GameCanvas } from '@/components/GameCanvas'
 import { Sidebar } from '@/components/Sidebar'
 import { LayersPopup } from '@/components/LayersPopup'
 import { CabinetDetailPanel } from '@/components/CabinetDetailPanel'
+import { SpineDetailPanel } from '@/components/SpineDetailPanel'
 import { StatusBar } from '@/components/StatusBar'
 import { WelcomeModal } from '@/components/WelcomeModal'
 import { RegionSelectModal } from '@/components/RegionSelectModal'
@@ -81,6 +82,8 @@ function App() {
           state.exitPlacementMode()
         } else if (state.selectedCabinetId) {
           state.selectCabinet(null)
+        } else if (state.selectedSpineId) {
+          state.selectSpine(null)
         }
       }
     }
@@ -339,6 +342,7 @@ function App() {
               <GameCanvas />
               <LayersPopup />
               <CabinetDetailPanel />
+              <SpineDetailPanel />
             </div>
           </div>
         </main>

@@ -292,8 +292,9 @@ interface GameState {
   dedicatedRows: DedicatedRowInfo[]           // rows with uniform environment (fully filled)
   dedicatedRowBonusRevenue: number            // revenue from dedicated row bonus last tick
 
-  // Cabinet selection
+  // Cabinet / spine selection
   selectedCabinetId: string | null            // currently selected cabinet (clicked in canvas)
+  selectedSpineId: string | null              // currently selected spine switch (clicked in canvas)
 
   // Placement mode
   placementMode: boolean                      // whether user is in placement mode
@@ -567,6 +568,7 @@ interface GameState {
 
   // Actions
   selectCabinet: (id: string | null) => void
+  selectSpine: (id: string | null) => void
   addCabinet: (col: number, row: number, environment: CabinetEnvironment, customerType?: CustomerType, facing?: CabinetFacing) => void
   enterPlacementMode: (environment: CabinetEnvironment, customerType: CustomerType, facing?: CabinetFacing) => void
   exitPlacementMode: () => void
@@ -913,8 +915,9 @@ export const useGameStore = create<GameState>((set) => ({
   dedicatedRows: [],
   dedicatedRowBonusRevenue: 0,
 
-  // Cabinet selection
+  // Cabinet / spine selection
   selectedCabinetId: null,
+  selectedSpineId: null,
 
   // Placement mode
   placementMode: false,
@@ -1193,7 +1196,10 @@ export const useGameStore = create<GameState>((set) => ({
   // ── Cabinet Selection ────────────────────────────────────────
 
   selectCabinet: (id: string | null) =>
-    set({ selectedCabinetId: id }),
+    set({ selectedCabinetId: id, selectedSpineId: null }),
+
+  selectSpine: (id: string | null) =>
+    set({ selectedSpineId: id, selectedCabinetId: null }),
 
   // ── Build Actions ───────────────────────────────────────────
 
@@ -4276,6 +4282,7 @@ export const useGameStore = create<GameState>((set) => ({
       dedicatedRows: [],
       dedicatedRowBonusRevenue: 0,
       selectedCabinetId: null,
+      selectedSpineId: null,
       placementMode: false,
       equipmentPlacementMode: null,
       insurancePolicies: [],

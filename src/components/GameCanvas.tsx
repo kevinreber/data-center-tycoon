@@ -101,9 +101,9 @@ export function GameCanvas() {
     useGameStore.getState().selectCabinet(id)
   }, [])
 
-  // Spine switch click handler — toggles spine power from Phaser click
+  // Spine switch click handler — selects spine to show detail panel
   const handleSpineClick = useCallback((id: string) => {
-    useGameStore.getState().toggleSpinePower(id)
+    useGameStore.getState().selectSpine(id)
   }, [])
 
   // Equipment placement click handler — installs server/leaf on clicked cabinet

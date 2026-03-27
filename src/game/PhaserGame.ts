@@ -459,9 +459,12 @@ class DataCenterScene extends Phaser.Scene {
           // Check for spine switch click
           const foundSpine = this.findSpineAtPoint(wp.x, wp.y)
           if (foundSpine) {
+            // Deselect cabinet when selecting spine
+            this.selectedCabinetId = null
+            this.renderSelection()
             if (this.onSpineClick) this.onSpineClick(foundSpine)
           } else {
-            // Clicked empty space — deselect cabinet
+            // Clicked empty space — deselect everything
             this.selectedCabinetId = null
             this.renderSelection()
             if (this.onCabinetSelect) this.onCabinetSelect(null)
