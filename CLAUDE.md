@@ -4,7 +4,7 @@
 
 **Fabric Tycoon: Data Center Simulator** is a web-based isometric tycoon game where players build and manage a data center. Players place cabinets, install servers and network switches, design a Clos (spine-leaf) network fabric, and balance power, heat, and revenue to scale from a single rack to a global operation.
 
-**Current version:** v0.5.2
+**Current version:** v0.5.3
 
 ## Tech Stack
 
@@ -48,6 +48,8 @@ src/
 │   ├── StatusBar.tsx           # Bottom footer bar (status, nodes, tick, speed, suite tier, version)
 │   ├── TutorialOverlay.tsx     # Guided tutorial step overlay and contextual tip popups
 │   ├── WelcomeModal.tsx        # First-launch welcome modal with tutorial start/skip
+│   ├── LandingPage.tsx         # Animated landing page with isometric data center visualization
+│   ├── RegionSelectModal.tsx   # Region selection modal for choosing starting data center location
 │   ├── ui/                     # shadcn/ui primitives
 │   │   ├── badge.tsx
 │   │   ├── button.tsx
@@ -78,21 +80,21 @@ src/
 │   ├── PhaserGame.ts           # Phaser scene: isometric rendering, traffic visualization, placement mode
 │   └── CLAUDE.md               # Phaser-specific coding rules (see Sub-module Rules below)
 ├── stores/
-│   ├── gameStore.ts            # Single Zustand store (~6800 lines): game state, actions, tick loop
-│   ├── types.ts                # All TypeScript type definitions (~1335 lines)
+│   ├── gameStore.ts            # Single Zustand store (~7300 lines): game state, actions, tick loop
+│   ├── types.ts                # All TypeScript type definitions (~1370 lines)
 │   ├── constants.ts            # Simulation constants (SIM, POWER_DRAW, TRAFFIC, etc.)
 │   ├── calculations.ts         # Pure calculation functions (calcStats, calcCabinetCooling, etc.)
 │   ├── chiller.ts              # Chiller plant connection algorithm (BFS through pipes)
 │   ├── configs/
 │   │   ├── economy.ts          # Loan, depreciation, power market, insurance, valuation configs
 │   │   ├── equipment.ts        # Cooling, server config, PDU, cable tray, aisle configs
-│   │   ├── features.ts         # Row-end slots, aisle widths, raised floor, cable mgmt, workloads, advanced tiers, rack equipment, audio
+│   │   ├── features.ts         # Row-end slots, aisle widths, raised floor, cable mgmt, workloads, advanced tiers, rack equipment, audio, prestige/New Game+
 │   │   ├── infrastructure.ts   # Busway, cross-connect, in-row cooling, spacing, zone configs
 │   │   ├── progression.ts      # Tech tree, achievements (106), incidents (21), contracts, scenarios, tutorial tips (43), guided tutorial steps
 │   │   └── world.ts            # Staff, supply chain, weather, interconnection, peering, competitors, regions, sites, sovereignty, demand
 │   ├── gameStore.test.ts       # Vitest tests for cabinet placement and placement hints
 │   ├── __tests__/
-│   │   └── gameStore.test.ts   # Vitest tests for Phase 5+ systems (~350 tests)
+│   │   └── gameStore.test.ts   # Vitest tests for Phase 5+ systems (~4475 lines)
 │   └── CLAUDE.md               # Store-specific coding rules (see Sub-module Rules below)
 └── lib/
     └── utils.ts                # cn() utility for Tailwind class merging
@@ -192,8 +194,10 @@ All game state lives in a **single Zustand store** (`useGameStore`). The store (
 - **Demand growth configs** (`DEMAND_GROWTH_CONFIG`): Emerging/stable/saturated market dynamics
 - **Competitor regional configs** (`COMPETITOR_REGIONAL_CONFIG`): Competitor expansion into regions
 - **Traffic constants** (`TRAFFIC`): bandwidth per server, link capacity
-- **Pure calculation functions**: `calcStats()`, `calcTraffic()`, `calcTrafficWithCapacity()`, `coolingOverheadFactor()`, `calcManagementBonus()`, `calcAisleBonus()`, `calcCabinetCooling()`, `getPlacementHints()`, and more
-- **Store actions**: build, power, visual, simulation, finance, infrastructure, incidents, contracts, research, staff, supply chain, interconnection, peering, maintenance, operations progression, multi-site expansion, save/load, and more
+- **Prestige configs** (`PRESTIGE_REQUIREMENTS`, `PRESTIGE_BONUSES_PER_LEVEL`, `MAX_PRESTIGE_LEVEL`, `PRESTIGE_POINT_WEIGHTS`): New Game+ system with escalating bonuses up to level 10
+- **Default prestige state** (`DEFAULT_PRESTIGE_STATE`, `DEFAULT_PRESTIGE_BONUSES`): Initial prestige values for fresh games
+- **Pure calculation functions**: `calcStats()`, `calcTraffic()`, `calcTrafficWithCapacity()`, `coolingOverheadFactor()`, `calcManagementBonus()`, `calcAisleBonus()`, `calcCabinetCooling()`, `getPlacementHints()`, `canPrestige()`, `calcPrestigeBonuses()`, `calcPrestigePoints()`, and more
+- **Store actions**: build, power, visual, simulation, finance, infrastructure, incidents, contracts, research, staff, supply chain, interconnection, peering, maintenance, operations progression, multi-site expansion, prestige, save/load, and more
 
 **Pattern for accessing state in components:**
 ```typescript
@@ -217,6 +221,7 @@ Core types:
 - `CustomerType` = `'general' | 'ai_training' | 'streaming' | 'crypto' | 'enterprise'`
 - `CabinetFacing` = `'north' | 'south' | 'east' | 'west'` (only N/S used by row-enforced layout)
 - `SuiteTier` = `'starter' | 'standard' | 'professional' | 'enterprise'`
+- `LayoutMode` = `'auto' | 'custom' | 'guided'`
 
 Progression types:
 - `TechBranch` = `'efficiency' | 'performance' | 'resilience'`
@@ -347,6 +352,12 @@ Event & analytics types:
 - `EventSeverity` = `'info' | 'warning' | 'error' | 'success'`
 - `EventLogEntry`, `HistoryPoint`, `LifetimeStats` interfaces
 
+Prestige & leaderboard types:
+- `PrestigeState` — level, totalPrestigePoints, bonuses, highestTickReached, highestRevenueReached, totalRunsCompleted
+- `PrestigeBonuses` — revenueMultiplier, powerCostReduction, startingMoneyBonus, coolingEfficiency, reputationStartBonus
+- `LeaderboardCategory` = `'revenue' | 'uptime' | 'pue' | 'cabinets' | 'green_energy' | 'net_worth'`
+- `LeaderboardEntry` — id, playerName, category, value, suiteTier, tickCount, timestamp
+
 Other types:
 - `ScenarioDef`, `ScenarioObjective` — challenge scenarios
 - `DrillResult`, `Patent`, `RFPOffer` — DR drills, patents, RFP bidding
@@ -410,11 +421,13 @@ Key interfaces (core):
 | Row Placement | `toggleCustomRowMode`, `placeCustomRow`, `removeCustomRow`, `moveCustomRow`, `resizeCustomRow`, `flipCustomRow`, `autoLayoutRows`, `enterRowPlacementMode`, `exitRowPlacementMode`, `toggleRowPlacementFacing` |
 | Audio | `updateAudioSettings` |
 | Leaderboard | `submitLeaderboardEntry` |
+| Prestige | `doPrestige` |
 | Sandbox/Demo | `toggleSandboxMode`, `loadDemoState`, `exitDemo` |
 | Misc | `dismissAchievement`, `selectCabinet`, `trackPanelOpen` |
 
 #### Exported Functions
 
+- `canPrestige(state)` — checks if player meets prestige requirements (enterprise tier, $500K, 75 rep, 30 cabinets)
 - `getPlacementHints(col, row, cabinets, suiteTier)` — contextual placement strategy hints during cabinet placement (includes row info, aisle/corridor detection, zone adjacency hints)
 - `calcTrafficWithCapacity(cabinets, spines, demandMultiplier, linkCapacity)` — traffic calculation with custom link capacity
 - `calcCabinetCooling(cab, coolingUnits, allCabinets)` — per-cabinet cooling from nearby cooling units with capacity degradation
@@ -509,6 +522,8 @@ The UI uses a **sidebar-driven navigation pattern**:
 - **`HUD.tsx`** — Legacy monolithic control panel (still present, ~2940 lines)
 - **`TutorialOverlay.tsx`** — Guided tutorial step-by-step overlay and contextual tip popups
 - **`WelcomeModal.tsx`** — First-launch welcome modal offering tutorial start or skip
+- **`LandingPage.tsx`** — Animated landing page with procedural isometric data center SVG visualization, feature cards, and play button; shown as the game's entry screen
+- **`RegionSelectModal.tsx`** — Region selection modal presenting 5 curated starter regions (Ashburn, Nordics, Dallas, London, Singapore) with difficulty ratings and region profile stats
 
 ### React-Phaser Bridge — `src/components/GameCanvas.tsx`
 
@@ -776,6 +791,22 @@ A `setInterval` in `App.tsx` calls `tick()` at the rate determined by `gameSpeed
 - **Save/Load System**: 3 save slots with metadata
 - **Sandbox Mode**: Unlimited funds for creative building
 - **Demo Mode**: Pre-populated professional-tier state (URL param `?demo=true`)
+- **Landing Page**: Animated isometric data center visualization with feature cards and play button; shown before game starts
+- **Region Selection**: Modal for choosing starting data center region (5 curated starter regions with difficulty ratings)
+
+**Prestige / New Game+ System:**
+- Endgame progression system allowing players to reset and replay with permanent bonuses
+- **Requirements**: Enterprise suite tier, $500K cash, 75+ reputation, 30+ cabinets
+- **Prestige points**: Calculated from cabinets (10 pts), achievements (25 pts), completed contracts (50 pts), money ($100K = 15 pts), sites (100 pts each)
+- **Bonuses per level** (max level 10): +5% revenue, -3% power cost, +$10K starting money, +4% cooling efficiency, +3 starting reputation
+- **State preserved across prestiges**: level, total points, bonuses, best run stats (highest tick, highest revenue), total runs completed
+- **Prestige data persisted** to localStorage (`PRESTIGE_STORAGE_KEY`) independently of save slots
+- Actions: `doPrestige()` | Exported: `canPrestige(state)`, `calcPrestigeBonuses(level)`, `calcPrestigePoints(state)`
+
+**Leaderboard System:**
+- Local localStorage-based leaderboard tracking across 6 categories: revenue, uptime, PUE, cabinets, green_energy, net_worth
+- Entries include player name, category, value, suite tier, tick count, and timestamp
+- Action: `submitLeaderboardEntry()`
 
 ## Code Conventions
 
