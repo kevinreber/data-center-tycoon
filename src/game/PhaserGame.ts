@@ -270,6 +270,7 @@ class DataCenterScene extends Phaser.Scene {
   private selectedCabinetId: string | null = null
   private selectionGraphics: Phaser.GameObjects.Graphics | null = null
   private onCabinetSelect: ((id: string | null) => void) | null = null
+  private onSpineClick: ((id: string) => void) | null = null
 
   // Equipment placement mode (server/leaf targeting)
   private equipmentPlacementMode: 'server' | 'leaf' | null = null
@@ -444,15 +445,31 @@ class DataCenterScene extends Phaser.Scene {
         this.isPotentialDrag = false
         return
       }
-      // If left-click/touch didn't become a drag, treat as cabinet selection click
+      // If left-click/touch didn't become a drag, treat as cabinet/spine selection click
       if (this.isPotentialDrag && !this.isDragging && !this.placementActive) {
         const wp = this.cameras.main.getWorldPoint(pointer.x, pointer.y)
         // Use visual bounding box hit test so clicking anywhere on the cabinet
         // (servers, leaf switch, labels) selects it — not just the ground tile
         const foundCab = this.findCabinetAtPoint(wp.x, wp.y)
-        this.selectedCabinetId = foundCab
-        this.renderSelection()
-        if (this.onCabinetSelect) this.onCabinetSelect(foundCab)
+        if (foundCab) {
+          this.selectedCabinetId = foundCab
+          this.renderSelection()
+          if (this.onCabinetSelect) this.onCabinetSelect(foundCab)
+        } else {
+          // Check for spine switch click
+          const foundSpine = this.findSpineAtPoint(wp.x, wp.y)
+          if (foundSpine) {
+            // Deselect cabinet when selecting spine
+            this.selectedCabinetId = null
+            this.renderSelection()
+            if (this.onSpineClick) this.onSpineClick(foundSpine)
+          } else {
+            // Clicked empty space — deselect everything
+            this.selectedCabinetId = null
+            this.renderSelection()
+            if (this.onCabinetSelect) this.onCabinetSelect(null)
+          }
+        }
       }
       if (this.isDragging) {
         this.game.canvas.style.cursor = 'default'
@@ -3305,6 +3322,11 @@ class DataCenterScene extends Phaser.Scene {
   /** Set callback for cabinet selection */
   setOnCabinetSelect(cb: (id: string | null) => void) {
     this.onCabinetSelect = cb
+  }
+
+  /** Set callback for spine switch click */
+  setOnSpineClick(cb: (id: string) => void) {
+    this.onSpineClick = cb
   }
 
   /** Deselect all cabinets */
