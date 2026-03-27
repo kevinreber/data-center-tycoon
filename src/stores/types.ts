@@ -888,7 +888,7 @@ export interface IncidentDef {
   description: string
   durationTicks: number
   resolveCost: number
-  effect: 'heat_spike' | 'revenue_penalty' | 'power_surge' | 'traffic_drop' | 'cooling_failure' | 'hardware_failure' | 'chiller_failure' | 'pipe_failure'
+  effect: 'heat_spike' | 'revenue_penalty' | 'power_surge' | 'traffic_drop' | 'cooling_failure' | 'hardware_failure' | 'chiller_failure' | 'pipe_failure' | 'link_flap'
   effectMagnitude: number
   hardwareTarget?: 'spine' | 'leaf'
 }
@@ -899,6 +899,15 @@ export interface ActiveIncident {
   ticksRemaining: number
   resolved: boolean
   affectedHardwareId?: string
+  /** For link_flap incidents: "leafCabinetId:spineId" identifying the affected port */
+  affectedLinkKey?: string
+}
+
+/** Identifies which switch to inspect in the port detail modal */
+export interface SwitchDetailTarget {
+  type: 'leaf' | 'spine'
+  /** For leaf: the cabinet ID; for spine: the spine switch ID */
+  id: string
 }
 
 // ── Contract / Tenant System Types ─────────────────────────────

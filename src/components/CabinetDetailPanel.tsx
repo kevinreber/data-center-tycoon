@@ -36,7 +36,7 @@ function ServerSlot({ index, filled, powerOn }: { index: number; filled: boolean
   )
 }
 
-function LeafSwitchSlot({ installed, powerOn }: { installed: boolean; powerOn: boolean }) {
+function LeafSwitchSlot({ installed, powerOn, onInspect }: { installed: boolean; powerOn: boolean; onInspect?: () => void }) {
   return (
     <div
       className={`h-7 rounded border text-[10px] font-mono flex items-center px-2 gap-1.5 transition-all ${
@@ -49,9 +49,17 @@ function LeafSwitchSlot({ installed, powerOn }: { installed: boolean; powerOn: b
     >
       <Network className="size-3 shrink-0" />
       <span>{installed ? 'Leaf Switch (ToR)' : 'No Leaf Switch'}</span>
-      {installed && powerOn && (
+      {installed && (
         <span className="ml-auto flex items-center gap-1">
-          <span className="inline-block w-1.5 h-1.5 rounded-full bg-neon-cyan animate-pulse" />
+          {powerOn && <span className="inline-block w-1.5 h-1.5 rounded-full bg-neon-cyan animate-pulse" />}
+          {onInspect && (
+            <button
+              onClick={onInspect}
+              className="text-[8px] px-1.5 py-0.5 rounded border border-neon-cyan/30 bg-neon-cyan/10 text-neon-cyan hover:bg-neon-cyan/20 transition-colors ml-1"
+            >
+              Inspect
+            </button>
+          )}
         </span>
       )}
     </div>
@@ -85,7 +93,7 @@ function CabinetDetail({ cabinet }: { cabinet: Cabinet }) {
     toggleCabinetPower, refreshServers, money,
     selectCabinet, coolingType, trafficStats, zones, cabinets, dedicatedRows,
     rackDetails, installRackEquipment, removeRackEquipment,
-    addServerToCabinet, addLeafToCabinet,
+    addServerToCabinet, addLeafToCabinet, openSwitchDetail,
   } = useGameStore()
 
   const envConfig = ENVIRONMENT_CONFIG[cabinet.environment]
@@ -164,7 +172,11 @@ function CabinetDetail({ cabinet }: { cabinet: Cabinet }) {
           <div>
             <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1.5">Hardware</div>
             <div className="flex flex-col gap-1 rounded border border-border/50 bg-black/20 p-2">
-              <LeafSwitchSlot installed={cabinet.hasLeafSwitch} powerOn={cabinet.powerStatus} />
+              <LeafSwitchSlot
+                installed={cabinet.hasLeafSwitch}
+                powerOn={cabinet.powerStatus}
+                onInspect={cabinet.hasLeafSwitch ? () => openSwitchDetail({ type: 'leaf', id: cabinet.id }) : undefined}
+              />
               <div className="w-full h-px bg-border/30 my-0.5" />
               {Array.from({ length: MAX_SERVERS_PER_CABINET }).map((_, i) => (
                 <ServerSlot

@@ -309,6 +309,8 @@ export const INCIDENT_CATALOG: IncidentDef[] = [
   { type: 'refrigerant_leak', label: 'Refrigerant Leak', severity: 'major', description: 'Refrigerant leaking from a cooling unit. Cooling capacity degraded facility-wide.', durationTicks: 16, resolveCost: 8000, effect: 'cooling_failure', effectMagnitude: 0.6 },
   { type: 'chiller_malfunction', label: 'Chiller Plant Malfunction', severity: 'critical', description: 'Central chiller plant offline. Connected cooling units lose efficiency bonus.', durationTicks: 18, resolveCost: 15000, effect: 'chiller_failure', effectMagnitude: 0 },
   { type: 'pipe_burst', label: 'Cooling Pipe Burst', severity: 'minor', description: 'A chilled water pipe has burst. Pipe segment destroyed — must be rebuilt.', durationTicks: 6, resolveCost: 3000, effect: 'pipe_failure', effectMagnitude: 0 },
+  // Network port incidents
+  { type: 'link_flap', label: 'Link Flap', severity: 'minor', description: 'A switch port is flapping — intermittent connectivity causing packet loss. Inspect the switch to identify the failing port.', durationTicks: 12, resolveCost: 2500, effect: 'link_flap', effectMagnitude: 0.15 },
 ]
 
 /** Chance per tick of an incident occurring (when fewer than max active) */

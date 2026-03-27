@@ -37,6 +37,7 @@ export function SpineDetailPanel() {
   const cabinets = useGameStore((s) => s.cabinets)
   const selectSpine = useGameStore((s) => s.selectSpine)
   const toggleSpinePower = useGameStore((s) => s.toggleSpinePower)
+  const openSwitchDetail = useGameStore((s) => s.openSwitchDetail)
 
   if (!selectedSpineId) return null
 
@@ -175,6 +176,22 @@ export function SpineDetailPanel() {
                 {spine.powerStatus
                   ? 'Shut down this spine switch — traffic will redistribute to remaining spines'
                   : 'Power on this spine switch to add backbone capacity'}
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => openSwitchDetail({ type: 'spine', id: spine.id })}
+                  className="flex-1 h-7 text-[10px] gap-1.5 border-neon-orange/30 text-neon-orange hover:bg-neon-orange/10"
+                >
+                  <Network className="size-3" />
+                  Inspect Ports
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                View individual port status and identify failing connections
               </TooltipContent>
             </Tooltip>
           </div>
