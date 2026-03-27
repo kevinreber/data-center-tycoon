@@ -101,6 +101,11 @@ export function GameCanvas() {
     useGameStore.getState().selectCabinet(id)
   }, [])
 
+  // Spine switch click handler — toggles spine power from Phaser click
+  const handleSpineClick = useCallback((id: string) => {
+    useGameStore.getState().toggleSpinePower(id)
+  }, [])
+
   // Equipment placement click handler — installs server/leaf on clicked cabinet
   const handleEquipmentCabinetClick = useCallback((cabinetId: string) => {
     const state = useGameStore.getState()
@@ -145,13 +150,14 @@ export function GameCanvas() {
     scene.setOnTileClick(handleTileClick)
     scene.setOnTileHover(handleTileHover)
     scene.setOnCabinetSelect(handleCabinetSelect)
+    scene.setOnSpineClick(handleSpineClick)
     scene.setPlacementMode(placementMode)
     // Clear cabinet selection when entering placement mode
     if (placementMode) {
       scene.clearSelection()
       useGameStore.getState().selectCabinet(null)
     }
-  }, [placementMode, handleTileClick, handleTileHover, handleCabinetSelect, sceneReady])
+  }, [placementMode, handleTileClick, handleTileHover, handleCabinetSelect, handleSpineClick, sceneReady])
 
   // Sync row placement mode to Phaser
   useEffect(() => {
