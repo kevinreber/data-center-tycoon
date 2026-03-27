@@ -101,6 +101,48 @@ A web-based, 2D isometric Tycoon game (think Roller Coaster Tycoon) where the pl
 - **Sub-Floor View** — See cooling pipes, power conduits, and infrastructure beneath the raised floor.
 - **Sound Effects** — Procedural audio feedback for placement, alerts, achievements, and ambient data center hum with volume controls.
 
+## Getting Started
+
+### Prerequisites
+
+- [Node.js](https://nodejs.org/) >= 18
+- npm >= 9
+
+### Installation
+
+```bash
+git clone https://github.com/kevinreber/data-center-tycoon.git
+cd data-center-tycoon
+npm install
+```
+
+### Running Locally
+
+```bash
+npm run dev
+```
+
+Open `http://localhost:5173/data-center-tycoon/` in your browser.
+
+### Other Commands
+
+```bash
+npm run build     # Type-check + production build
+npm run lint      # Lint with ESLint
+npm run test      # Run test suite
+npm run preview   # Serve production build
+```
+
+### Demo Mode
+
+Add `?demo=true` to the URL to load a pre-populated data center for quick exploration.
+
+## Contributing
+
+We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions, code style guidelines, and the PR process.
+
+Please read our [Code of Conduct](CODE_OF_CONDUCT.md) before participating.
+
 ## 🎲 Incident System
 - **Real-World:** Squirrels chewing cables, fiber cuts, DDoSed tenants, leaking pipes.
 - **Creative:** Sentient AI outbreaks, solar flares, and quantum decoherence.
