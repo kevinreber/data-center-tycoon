@@ -41,7 +41,7 @@ export type {
   WorkloadType, WorkloadStatus, Workload, WorkloadConfig,
   AdvancedTier, AdvancedTierConfig,
   CustomRow, RackEquipmentType, RackSlot, RackEquipmentConfig, RackDetail,
-  LeaderboardCategory, LeaderboardEntry, AudioSettings,
+  LeaderboardCategory, LeaderboardEntry, AudioSettings, GraphicsQuality,
   FloatingTextEvent, CameraEffect, CameraEffectType,
   PrestigeBonuses, PrestigeState,
   NaclPolicy, NaclPolicyConfig,
@@ -72,7 +72,7 @@ import type {
   // New feature types
   ViewMode, RowEndSlotType, RowEndSlot, AisleWidth, RaisedFloorTier,
   CableManagementType, WorkloadType, Workload, AdvancedTier,
-  RackDetail, LeaderboardEntry, LeaderboardCategory, AudioSettings,
+  RackDetail, LeaderboardEntry, LeaderboardCategory, AudioSettings, GraphicsQuality,
   FloatingTextEvent, CameraEffect,
   DataCenterLayout, DataCenterRow,
   PrestigeState,
@@ -551,6 +551,9 @@ interface GameState {
   // Leaderboards (local)
   leaderboardEntries: LeaderboardEntry[]
 
+  // Graphics Quality
+  graphicsQuality: GraphicsQuality
+
   // Audio Settings
   audioSettings: AudioSettings
 
@@ -714,6 +717,7 @@ interface GameState {
   removeRackEquipment: (cabinetId: string, position: number) => void
   submitLeaderboardEntry: (playerName: string, category: LeaderboardCategory) => void
   setAudioSettings: (settings: Partial<AudioSettings>) => void
+  setGraphicsQuality: (quality: GraphicsQuality) => void
   // Tutorial actions
   dismissTip: (tipId: string) => void
   toggleTutorial: () => void
@@ -1182,6 +1186,9 @@ export const useGameStore = create<GameState>((set) => ({
 
   // Leaderboards
   leaderboardEntries: [] as LeaderboardEntry[],
+
+  // Graphics Quality
+  graphicsQuality: 'high' as GraphicsQuality,
 
   // Audio Settings
   audioSettings: { ...DEFAULT_AUDIO_SETTINGS },
@@ -3405,6 +3412,9 @@ export const useGameStore = create<GameState>((set) => ({
       audioSettings: { ...state.audioSettings, ...settings },
     })),
 
+  setGraphicsQuality: (quality: GraphicsQuality) =>
+    set({ graphicsQuality: quality }),
+
   // ── Tutorial Actions ────────────────────────────────────────────
 
   dismissTip: (tipId: string) =>
@@ -4452,6 +4462,7 @@ export const useGameStore = create<GameState>((set) => ({
       gameOver: false,
       bankruptcyTicks: 0,
       rackDetails: {},
+      graphicsQuality: 'high' as GraphicsQuality,
       audioSettings: { ...DEFAULT_AUDIO_SETTINGS },
       pendingFloatingTexts: [],
       pendingCameraEffects: [],
