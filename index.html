@@ -3,82 +3,186 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>Data Center Tycoon: Data Center Simulator — Build & Manage Your Data Center</title>
+    <title>Data Center Tycoon — Free Browser Simulation Game | Build & Manage Server Infrastructure</title>
 
     <!-- SEO Meta Tags -->
-    <meta name="description" content="Build and manage your own data center in this free browser-based tycoon game. Place server racks, design spine-leaf network fabrics, balance power and cooling, and scale from a single cabinet to a global operation." />
-    <meta name="keywords" content="data center simulator, tycoon game, browser game, server management, network simulation, isometric game, data center game, free online game, idle tycoon, infrastructure management" />
+    <meta name="description" content="Play Data Center Tycoon free in your browser. Build server racks, design spine-leaf network fabrics, manage power and cooling, hire staff, handle incidents, and scale from a single cabinet to a global 15-region data center empire. No download required." />
+    <meta name="keywords" content="data center simulator, data center tycoon, tycoon game, browser game, server management game, network simulation, isometric game, data center game, free online game, idle tycoon, infrastructure management, server rack game, cooling management, network fabric simulator, colocation game, free simulation game, no download game, web game, strategy game, management sim" />
     <meta name="author" content="Kevin Reber" />
-    <meta name="robots" content="index, follow" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
     <link rel="canonical" href="https://kevinreber.github.io/data-center-tycoon/" />
     <meta name="theme-color" content="#0a0a0a" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Data Center Tycoon" />
+    <meta name="application-name" content="Data Center Tycoon" />
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://kevinreber.github.io/data-center-tycoon/" />
-    <meta property="og:title" content="Data Center Tycoon: Data Center Simulator" />
-    <meta property="og:description" content="Build and manage your own data center in this free browser-based tycoon game. Design network fabrics, balance power and cooling, and scale to a global operation." />
+    <meta property="og:title" content="Data Center Tycoon — Free Browser Data Center Simulation Game" />
+    <meta property="og:description" content="Build and manage your own data center empire. Place server racks, design network fabrics, balance power and cooling, handle incidents, and scale globally across 15 regions. Free, no download required." />
     <meta property="og:image" content="https://kevinreber.github.io/data-center-tycoon/og-image.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Isometric view of a data center with glowing server racks and network connections in Data Center Tycoon" />
     <meta property="og:site_name" content="Data Center Tycoon" />
     <meta property="og:locale" content="en_US" />
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Data Center Tycoon: Data Center Simulator" />
-    <meta name="twitter:description" content="Build and manage your own data center in this free browser-based tycoon game. Design network fabrics, balance power and cooling, and scale to a global operation." />
+    <meta name="twitter:title" content="Data Center Tycoon — Free Browser Data Center Simulation Game" />
+    <meta name="twitter:description" content="Build and manage your own data center empire. Place server racks, design network fabrics, balance power and cooling, and scale globally. Free, no download." />
     <meta name="twitter:image" content="https://kevinreber.github.io/data-center-tycoon/og-image.png" />
+    <meta name="twitter:image:alt" content="Isometric view of a data center with glowing server racks and network connections in Data Center Tycoon" />
 
-    <!-- Structured Data (JSON-LD) -->
+    <!-- Structured Data: VideoGame (JSON-LD) -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
       "@type": "VideoGame",
-      "name": "Data Center Tycoon: Data Center Simulator",
-      "description": "A free browser-based isometric tycoon game where you build and manage a data center. Place server racks, design spine-leaf network fabrics, manage power and cooling systems, and scale from a single cabinet to a global operation.",
+      "name": "Data Center Tycoon",
+      "alternateName": ["Data Center Simulator", "Fabric Tycoon", "Server Tycoon"],
+      "description": "A free browser-based isometric tycoon game where you build and manage a data center. Place server racks, design spine-leaf network fabrics, manage power and cooling systems, hire staff, handle incidents, and scale from a single cabinet to a global 15-region operation.",
       "url": "https://kevinreber.github.io/data-center-tycoon/",
       "image": "https://kevinreber.github.io/data-center-tycoon/og-image.png",
       "author": {
         "@type": "Person",
-        "name": "Kevin Reber"
+        "name": "Kevin Reber",
+        "url": "https://github.com/kevinreber"
       },
-      "genre": ["Simulation", "Tycoon", "Strategy"],
-      "gamePlatform": "Web Browser",
+      "genre": ["Simulation", "Tycoon", "Strategy", "Management"],
+      "gamePlatform": ["Web Browser", "Desktop", "Mobile"],
       "operatingSystem": "Any",
       "applicationCategory": "Game",
+      "applicationSubCategory": "Simulation Game",
       "offers": {
         "@type": "Offer",
         "price": "0",
-        "priceCurrency": "USD"
+        "priceCurrency": "USD",
+        "availability": "https://schema.org/InStock"
       },
       "inLanguage": "en",
-      "playMode": "SinglePlayer"
+      "playMode": "SinglePlayer",
+      "numberOfPlayers": {
+        "@type": "QuantitativeValue",
+        "value": 1
+      },
+      "gameItem": [
+        "Server Racks",
+        "Network Switches",
+        "Cooling Systems",
+        "Power Distribution Units",
+        "Spine-Leaf Network Fabric"
+      ],
+      "characterAttribute": [
+        "Revenue Management",
+        "Power & Cooling Balance",
+        "Network Design",
+        "Staff Hiring",
+        "Global Expansion"
+      ]
+    }
+    </script>
+
+    <!-- Structured Data: FAQPage (JSON-LD) — helps win FAQ rich snippets -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "What is Data Center Tycoon?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Data Center Tycoon is a free browser-based isometric simulation game where you build and manage a data center. You place server racks, design spine-leaf network fabrics, balance power and cooling, hire staff, handle incidents, and scale from a single cabinet to a global operation spanning 15 regions across 5 continents."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Is Data Center Tycoon free to play?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes, Data Center Tycoon is completely free to play in your web browser. No download, installation, or account is required. Just open the game and start building your data center."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What can you do in Data Center Tycoon?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "You can build server cabinets, install servers and network switches, design Clos network fabrics, manage power distribution and cooling systems, hire and train staff, handle security incidents, earn revenue from contracts, research new technologies, compete against AI rivals, and expand your data center globally across 15 real-world regions."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Does Data Center Tycoon work on mobile?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes, Data Center Tycoon runs in any modern web browser on desktop and mobile devices. The game features an isometric 2D view and responsive UI that adapts to different screen sizes."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How do I save my progress in Data Center Tycoon?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Data Center Tycoon supports 3 save slots stored in your browser's local storage. You can save and load your game at any time from the Settings panel. The game also features a Prestige (New Game+) system for endgame replayability."
+          }
+        }
+      ]
+    }
+    </script>
+
+    <!-- Structured Data: BreadcrumbList (JSON-LD) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Data Center Tycoon",
+          "item": "https://kevinreber.github.io/data-center-tycoon/"
+        }
+      ]
     }
     </script>
 
     <!-- Favicons -->
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png" />
-    <link rel="shortcut icon" href="/favicon.ico" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-    <link rel="manifest" href="/site.webmanifest" />
+    <link rel="icon" type="image/svg+xml" href="/data-center-tycoon/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="96x96" href="/data-center-tycoon/favicon-96x96.png" />
+    <link rel="shortcut icon" href="/data-center-tycoon/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/data-center-tycoon/apple-touch-icon.png" />
+    <link rel="manifest" href="/data-center-tycoon/site.webmanifest" />
   </head>
   <body>
     <div id="root"></div>
     <noscript>
-      <h1>Data Center Tycoon: Data Center Simulator</h1>
-      <p>Data Center Tycoon is a free browser-based isometric tycoon game where you build and manage a data center. Place server racks, install network switches, design a Clos (spine-leaf) network fabric, and balance power, heat, and revenue to scale from a single cabinet to a global operation.</p>
+      <h1>Data Center Tycoon — Free Browser Data Center Simulation Game</h1>
+      <p>Data Center Tycoon is a free browser-based isometric tycoon game where you build and manage a data center. Place server racks, install network switches, design a Clos (spine-leaf) network fabric, and balance power, heat, and revenue to scale from a single cabinet to a global operation across 15 regions and 5 continents.</p>
       <h2>Game Features</h2>
       <ul>
-        <li>Build and manage server cabinets with multiple configurations</li>
+        <li>Build and manage server cabinets with 5 server configurations (balanced, CPU-optimized, GPU-accelerated, storage-dense, memory-optimized)</li>
         <li>Design spine-leaf network topologies with ECMP traffic distribution</li>
-        <li>Balance power consumption, cooling systems, and heat management</li>
-        <li>Manage contracts, staff, supply chains, and finances</li>
-        <li>Handle incidents, security, compliance certifications, and carbon emissions</li>
-        <li>Compete against AI competitors for market share</li>
-        <li>Scale from a starter suite to an enterprise-grade data center</li>
+        <li>Balance power consumption with dynamic power markets, PDUs, and N+1/2N redundancy</li>
+        <li>Manage cooling with air, water, CRAC, CRAH, and immersion pod systems</li>
+        <li>Hire and train staff across 4 roles with shift patterns and certifications</li>
+        <li>Handle 21 incident types from power outages to DDoS attacks</li>
+        <li>Earn revenue from contracts, spot compute, interconnections, and patents</li>
+        <li>Achieve SOC 2, HIPAA, PCI-DSS, and FedRAMP compliance certifications</li>
+        <li>Compete against 5 AI competitor personalities for market share</li>
+        <li>Expand globally across 15 regions (Ashburn, London, Tokyo, Singapore, and more)</li>
+        <li>Progress through 4 suite tiers from starter to enterprise</li>
+        <li>Research technologies across efficiency, performance, and resilience branches</li>
       </ul>
+      <h2>Frequently Asked Questions</h2>
+      <h3>Is Data Center Tycoon free?</h3>
+      <p>Yes, Data Center Tycoon is completely free to play in your browser with no download required.</p>
+      <h3>What is a data center tycoon game?</h3>
+      <p>A data center tycoon game is a simulation where you build and manage server infrastructure, balancing power, cooling, networking, and finances to grow a profitable data center business.</p>
       <p>Please enable JavaScript to play Data Center Tycoon.</p>
     </noscript>
     <script type="module" src="/src/main.tsx"></script>

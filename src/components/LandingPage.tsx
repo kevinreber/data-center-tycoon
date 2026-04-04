@@ -321,12 +321,12 @@ export function LandingPage({ onPlay }: LandingPageProps) {
   }
 
   return (
-    <div className={`fixed inset-0 z-[200] bg-background flex flex-col items-center overflow-y-auto font-mono transition-opacity duration-500 ${exiting ? 'opacity-0' : 'opacity-100'}`}>
+    <main className={`fixed inset-0 z-[200] bg-background flex flex-col items-center overflow-y-auto font-mono transition-opacity duration-500 ${exiting ? 'opacity-0' : 'opacity-100'}`}>
       {/* Scanlines overlay */}
-      <div className="fixed inset-0 pointer-events-none scanlines z-10" />
+      <div className="fixed inset-0 pointer-events-none scanlines z-10" aria-hidden="true" />
 
       {/* Hero section */}
-      <div className="flex flex-col items-center justify-center w-full max-w-4xl px-4 pt-12 md:pt-16 pb-6 relative z-20">
+      <header className="flex flex-col items-center justify-center w-full max-w-4xl px-4 pt-12 md:pt-16 pb-6 relative z-20">
         {/* Version badge */}
         <span className="text-[10px] tracking-widest text-neon-cyan/60 border border-neon-cyan/20 rounded px-2 py-0.5 mb-4 landing-fade-in" style={{ animationDelay: '0.1s' }}>
           v0.5.2
@@ -336,7 +336,7 @@ export function LandingPage({ onPlay }: LandingPageProps) {
         <h1 className="text-4xl md:text-6xl font-bold tracking-[0.2em] text-neon-green text-glow-green landing-title mb-2">
           DATA CENTER TYCOON
         </h1>
-        <p className="text-sm md:text-base text-muted-foreground tracking-widest mb-1 landing-fade-in" style={{ animationDelay: '0.3s' }}>
+        <p className="text-sm md:text-base text-muted-foreground tracking-widest mb-1 landing-fade-in" style={{ animationDelay: '0.3s' }} role="doc-subtitle">
           DATA CENTER SIMULATOR
         </p>
         <div className="flex items-center gap-2 mb-8 landing-fade-in" style={{ animationDelay: '0.5s' }}>
@@ -382,31 +382,32 @@ export function LandingPage({ onPlay }: LandingPageProps) {
             <ExternalLink className="size-3" />
           </Button>
         </div>
-      </div>
+      </header>
 
       {/* Feature grid */}
-      <div className="w-full max-w-4xl px-4 pb-12 relative z-20">
+      <section className="w-full max-w-4xl px-4 pb-12 relative z-20" aria-label="Game features">
+        <h2 className="sr-only">Game Features</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {FEATURES.map((feat, i) => (
-            <div
+            <article
               key={feat.label}
               className="rounded-lg border border-border/50 bg-card/60 p-3 hover:border-neon-green/30 hover:bg-card/80 transition-colors duration-300 landing-fade-in"
               style={{ animationDelay: `${1.2 + i * 0.1}s` }}
             >
-              <feat.icon className={`size-5 ${feat.color} mb-2`} />
-              <p className="text-xs font-bold text-foreground mb-1">{feat.label}</p>
+              <feat.icon className={`size-5 ${feat.color} mb-2`} aria-hidden="true" />
+              <h3 className="text-xs font-bold text-foreground mb-1">{feat.label}</h3>
               <p className="text-[10px] text-muted-foreground leading-relaxed">{feat.desc}</p>
-            </div>
+            </article>
           ))}
         </div>
-      </div>
+      </section>
 
       {/* Footer */}
-      <div className="w-full border-t border-border/30 py-4 text-center relative z-20 landing-fade-in" style={{ animationDelay: '2.2s' }}>
+      <footer className="w-full border-t border-border/30 py-4 text-center relative z-20 landing-fade-in" style={{ animationDelay: '2.2s' }}>
         <p className="text-[10px] text-muted-foreground/50 tracking-wider">
           DC TYCOON v0.5.2 &middot; BUILT WITH REACT + PHASER + ZUSTAND
         </p>
-      </div>
-    </div>
+      </footer>
+    </main>
   )
 }
