@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="40" viewBox="0 0 48 40">
+  <!-- Isometric CRAC/cooling unit - bright blue/teal base for tinting -->
+  <!-- Left face -->
+  <polygon points="4,20 24,30 24,38 4,28" fill="#77aacc" stroke="#88bbdd" stroke-width="0.4"/>
+  <!-- Right face -->
+  <polygon points="44,20 24,30 24,38 44,28" fill="#88bbdd" stroke="#99ccee" stroke-width="0.4"/>
+  <!-- Top face -->
+  <polygon points="24,8 44,20 24,30 4,20" fill="#99ccee" stroke="#aaddff" stroke-width="0.4"/>
+
+  <!-- Fan on top face -->
+  <ellipse cx="24" cy="19" rx="8" ry="4" fill="none" stroke="#bbddff" stroke-width="0.7" opacity="0.7"/>
+  <ellipse cx="24" cy="19" rx="5" ry="2.5" fill="none" stroke="#bbddff" stroke-width="0.4" opacity="0.5"/>
+  <ellipse cx="24" cy="19" rx="2" ry="1" fill="#ccddff" opacity="0.4"/>
+
+  <!-- Fan blades -->
+  <line x1="18" y1="17.5" x2="30" y2="20.5" stroke="#bbddff" stroke-width="0.6" opacity="0.5"/>
+  <line x1="21" y1="21" x2="27" y2="17" stroke="#bbddff" stroke-width="0.6" opacity="0.5"/>
+
+  <!-- Ventilation grille on right face -->
+  <line x1="28" y1="23" x2="40" y2="23" stroke="#6699bb" stroke-width="1" opacity="0.5"/>
+  <line x1="28" y1="25.5" x2="40" y2="25.5" stroke="#6699bb" stroke-width="1" opacity="0.5"/>
+  <line x1="28" y1="28" x2="40" y2="28" stroke="#6699bb" stroke-width="1" opacity="0.5"/>
+  <line x1="28" y1="30.5" x2="40" y2="30.5" stroke="#6699bb" stroke-width="1" opacity="0.45"/>
+
+  <!-- Pipe connections on left face -->
+  <circle cx="10" cy="24" r="1.8" fill="#aaddff" opacity="0.4" stroke="#bbddff" stroke-width="0.3"/>
+  <circle cx="10" cy="27.5" r="1.8" fill="#88bbdd" opacity="0.4" stroke="#99ccee" stroke-width="0.3"/>
+
+  <!-- Status LED -->
+  <circle cx="28" cy="22" r="1" fill="#aaffaa" opacity="0.9"/>
+
+  <!-- Coolant flow indicator -->
+  <path d="M7,25.5 Q12,23 17,25.5" fill="none" stroke="#bbddff" stroke-width="0.4" opacity="0.5"/>
+</svg>
