@@ -3707,46 +3707,112 @@ export const useGameStore = create<GameState>((set) => ({
     // ── Traffic stats (pre-calculated for the demo)
     const demoTrafficStats = calcTraffic(demoCabinets, demoSpines)
 
+    // ── Remote site snapshots (all standard tier: 8 cols, 3 cabinet rows)
+    // Standard layout: Row 0 (gridRow 1, south), Aisle 0 (gridRow 2), Row 1 (gridRow 3, north),
+    //                   Aisle 1 (gridRow 4), Row 2 (gridRow 5, south), Corridor (gridRow 6)
+    const stdLayout = SUITE_TIERS.standard.layout
+    const stdGridRows = stdLayout.cabinetRows.map(r => r.gridRow) // [1, 3, 5]
+    const stdAisleRows = stdLayout.aisles.map(a => a.gridRow) // [2, 4]
+
+    const buildSiteSnapshot = (
+      prefix: string,
+      rowDefs: { env: CabinetEnvironment, cust: CustomerType, count: number, servers: number }[],
+      spineCount: number,
+      cooling: CoolingType,
+    ): SiteSnapshot => {
+      const cabs: Cabinet[] = []
+      let cid = 1
+      for (let r = 0; r < rowDefs.length; r++) {
+        const def = rowDefs[r]
+        const gridRow = stdGridRows[r]
+        const cr = getCabinetRowAtGrid(gridRow, stdLayout)
+        for (let c = 0; c < def.count; c++) {
+          cabs.push({
+            id: `${prefix}-cab-${cid++}`, col: c, row: gridRow,
+            environment: def.env, customerType: def.cust,
+            serverCount: def.servers, hasLeafSwitch: true, powerStatus: true,
+            heatLevel: 35 + c * 2, serverAge: c * 25,
+            facing: cr ? cr.facing : 'south' as CabinetFacing,
+          })
+        }
+      }
+      const spines: SpineSwitch[] = Array.from({ length: spineCount }, (_, i) => ({
+        id: `${prefix}-spine-${i + 1}`, powerStatus: true,
+      }))
+      const pdus: PDU[] = [
+        { id: `${prefix}-pdu-1`, col: 3, row: stdAisleRows[0], maxCapacityKW: 30, label: 'Metered PDU' },
+        { id: `${prefix}-pdu-2`, col: 6, row: stdAisleRows[1], maxCapacityKW: 30, label: 'Metered PDU' },
+      ]
+      const trays: CableTray[] = [
+        { id: `${prefix}-tray-1`, col: 1, row: stdAisleRows[0], capacityUnits: 8 },
+        { id: `${prefix}-tray-2`, col: 5, row: stdAisleRows[1], capacityUnits: 8 },
+      ]
+      const runs: CableRun[] = []
+      for (const cab of cabs.filter(c => c.hasLeafSwitch)) {
+        for (const spine of spines) {
+          runs.push({
+            id: `${prefix}-cable-${cab.id}-${spine.id}`, leafCabinetId: cab.id,
+            spineId: spine.id, length: 3 + cab.row, capacityGbps: 10, usesTrays: true,
+          })
+        }
+      }
+      const units: CoolingUnit[] = [
+        { id: `${prefix}-cu-1`, type: 'crac', col: 2, row: stdAisleRows[0], operational: true },
+        { id: `${prefix}-cu-2`, type: 'fan_tray', col: 6, row: stdAisleRows[0], operational: true },
+      ]
+      const totalSrv = cabs.reduce((s, c) => s + c.serverCount, 0)
+      const totalLeaf = cabs.filter(c => c.hasLeafSwitch).length
+      return {
+        cabinets: cabs, spineSwitches: spines, pdus, cableTrays: trays, cableRuns: runs,
+        coolingUnits: units, chillerPlants: [], coolingPipes: [], busways: [], crossConnects: [],
+        inRowCoolers: [], rowEndSlots: [], aisleContainments: [], aisleWidths: {},
+        raisedFloorTier: 'none' as RaisedFloorTier, cableManagementType: 'none' as CableManagementType,
+        coolingType: cooling, suiteTier: 'standard' as SuiteTier,
+        totalPower: totalSrv * 450 + totalLeaf * 150 + spineCount * 250,
+        avgHeat: cooling === 'water' ? 40 : 45,
+        revenue: totalSrv * 12,
+        expenses: Math.round((totalSrv * 450 + totalLeaf * 150 + spineCount * 250) * 0.0005 * 100) / 100,
+      }
+    }
+
+    // London: streaming-focused edge PoP (6 cabs across 2 rows)
+    const londonSnap = buildSiteSnapshot('ldn', [
+      { env: 'production', cust: 'streaming', count: 4, servers: 3 },
+      { env: 'production', cust: 'streaming', count: 2, servers: 4 },
+    ], 2, 'air')
+
+    // Frankfurt: enterprise colocation (10 cabs across 3 rows)
+    const frankfurtSnap = buildSiteSnapshot('fra', [
+      { env: 'production', cust: 'enterprise', count: 4, servers: 4 },
+      { env: 'production', cust: 'general', count: 4, servers: 4 },
+      { env: 'management', cust: 'general', count: 2, servers: 2 },
+    ], 3, 'water')
+
+    // Singapore: AI-focused network hub (8 cabs across 2 rows)
+    const singaporeSnap = buildSiteSnapshot('sgp', [
+      { env: 'production', cust: 'ai_training', count: 4, servers: 4 },
+      { env: 'production', cust: 'enterprise', count: 4, servers: 3 },
+    ], 2, 'water')
+
     // ── Multi-site expansion: HQ (Ashburn) + 3 expansion sites
     const demoSites: Site[] = [
       {
         id: 'site-1', name: 'London Edge PoP', type: 'edge_pop' as SiteType,
         regionId: 'london' as RegionId, purchasedAtTick: 1800, constructionTicksRemaining: 0,
-        operational: true, cabinets: 6, servers: 20, revenue: 480, expenses: 220, heat: 42,
-        suiteTier: 'standard' as SuiteTier, snapshot: {
-          cabinets: [], spineSwitches: [], pdus: [], cableTrays: [], cableRuns: [],
-          coolingUnits: [], chillerPlants: [], coolingPipes: [], busways: [], crossConnects: [],
-          inRowCoolers: [], rowEndSlots: [], aisleContainments: [], aisleWidths: {},
-          raisedFloorTier: 'none' as RaisedFloorTier, cableManagementType: 'none' as CableManagementType,
-          coolingType: 'air' as CoolingType, suiteTier: 'standard' as SuiteTier,
-          totalPower: 3200, avgHeat: 42, revenue: 480, expenses: 220,
-        },
+        operational: true, cabinets: 6, servers: 20, revenue: londonSnap.revenue, expenses: londonSnap.expenses, heat: 45,
+        suiteTier: 'standard' as SuiteTier, snapshot: londonSnap,
       },
       {
         id: 'site-2', name: 'Frankfurt Colocation', type: 'colocation' as SiteType,
         regionId: 'frankfurt' as RegionId, purchasedAtTick: 2000, constructionTicksRemaining: 0,
-        operational: true, cabinets: 10, servers: 35, revenue: 840, expenses: 380, heat: 45,
-        suiteTier: 'standard' as SuiteTier, snapshot: {
-          cabinets: [], spineSwitches: [], pdus: [], cableTrays: [], cableRuns: [],
-          coolingUnits: [], chillerPlants: [], coolingPipes: [], busways: [], crossConnects: [],
-          inRowCoolers: [], rowEndSlots: [], aisleContainments: [], aisleWidths: {},
-          raisedFloorTier: 'none' as RaisedFloorTier, cableManagementType: 'none' as CableManagementType,
-          coolingType: 'water' as CoolingType, suiteTier: 'standard' as SuiteTier,
-          totalPower: 5800, avgHeat: 45, revenue: 840, expenses: 380,
-        },
+        operational: true, cabinets: 10, servers: 36, revenue: frankfurtSnap.revenue, expenses: frankfurtSnap.expenses, heat: 40,
+        suiteTier: 'standard' as SuiteTier, snapshot: frankfurtSnap,
       },
       {
         id: 'site-3', name: 'Singapore Network Hub', type: 'network_hub' as SiteType,
         regionId: 'singapore' as RegionId, purchasedAtTick: 2200, constructionTicksRemaining: 0,
-        operational: true, cabinets: 8, servers: 28, revenue: 650, expenses: 310, heat: 48,
-        suiteTier: 'standard' as SuiteTier, snapshot: {
-          cabinets: [], spineSwitches: [], pdus: [], cableTrays: [], cableRuns: [],
-          coolingUnits: [], chillerPlants: [], coolingPipes: [], busways: [], crossConnects: [],
-          inRowCoolers: [], rowEndSlots: [], aisleContainments: [], aisleWidths: {},
-          raisedFloorTier: 'none' as RaisedFloorTier, cableManagementType: 'none' as CableManagementType,
-          coolingType: 'water' as CoolingType, suiteTier: 'standard' as SuiteTier,
-          totalPower: 4600, avgHeat: 48, revenue: 650, expenses: 310,
-        },
+        operational: true, cabinets: 8, servers: 28, revenue: singaporeSnap.revenue, expenses: singaporeSnap.expenses, heat: 42,
+        suiteTier: 'standard' as SuiteTier, snapshot: singaporeSnap,
       },
     ]
 
