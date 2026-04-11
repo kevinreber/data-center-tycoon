@@ -3453,49 +3453,68 @@ export const useGameStore = create<GameState>((set) => ({
   // ── Demo Mode ─────────────────────────────────────────────────
 
   loadDemoState: () => {
-    // Build a professional-tier data center with a diverse, fully-operational layout
+    // Build a professional-tier data center with dedicated rows per environment
+    // Organized so each row has a single environment type for dedicated row bonuses
     const demoCabinets: Cabinet[] = []
-    const customerTypes: CustomerType[] = ['general', 'ai_training', 'streaming', 'crypto', 'enterprise']
-    const environments: CabinetEnvironment[] = ['production', 'production', 'production', 'lab', 'management']
     let cabId = 1
 
-    // Professional tier: 10 cols x 4 rows — uses row-based layout grid positions
-    // Professional layout: Row 0 (gridRow=1), Row 1 (gridRow=3), Row 2 (gridRow=5), Row 3 (gridRow=7)
+    // Professional tier: 10 cols x 4 cabinet rows
+    // Layout:  Row 0 (gridRow 1, south) — Production (enterprise mix)
+    //          Row 1 (gridRow 3, north) — Production (AI/streaming mix)
+    //          Row 2 (gridRow 5, south) — Management (general)
+    //          Row 3 (gridRow 7, north) — Lab (R&D/testing)
     const proLayout = SUITE_TIERS.professional.layout
     const gridRows = proLayout.cabinetRows.map(r => r.gridRow) // [1, 3, 5, 7]
-    const positions: [number, number][] = [
-      // Row 0 (gridRow 1) — full (10 cols)
-      [0,gridRows[0]],[1,gridRows[0]],[2,gridRows[0]],[3,gridRows[0]],[4,gridRows[0]],[5,gridRows[0]],[6,gridRows[0]],[7,gridRows[0]],
-      // Row 1 (gridRow 3) — full
-      [0,gridRows[1]],[1,gridRows[1]],[2,gridRows[1]],[3,gridRows[1]],[4,gridRows[1]],[5,gridRows[1]],[6,gridRows[1]],[7,gridRows[1]],
-      // Row 2 (gridRow 5) — partial
-      [0,gridRows[2]],[1,gridRows[2]],[2,gridRows[2]],[3,gridRows[2]],[4,gridRows[2]],
-      // Row 3 (gridRow 7) — partial
-      [0,gridRows[3]],[1,gridRows[3]],[2,gridRows[3]],
-    ]
 
-    for (let i = 0; i < positions.length; i++) {
-      const [col, row] = positions[i]
-      const env = environments[i % environments.length]
-      const cust = env === 'management' ? 'general' : customerTypes[i % customerTypes.length]
-      const serverCount = env === 'management' ? 2 : 4
-      // Determine facing from layout
-      const cabRow = getCabinetRowAtGrid(row, proLayout)
-      const facing = cabRow ? cabRow.facing : 'north' as CabinetFacing
+    // Helper to push a cabinet with row-appropriate facing
+    const addCab = (col: number, gridRow: number, env: CabinetEnvironment, cust: CustomerType, servers: number, leaf: boolean) => {
+      const cabRow = getCabinetRowAtGrid(gridRow, proLayout)
       demoCabinets.push({
         id: `cab-${cabId++}`,
         col,
-        row,
+        row: gridRow,
         environment: env,
-        customerType: cust as CustomerType,
-        serverCount,
-        hasLeafSwitch: env !== 'management' && i < 20,
+        customerType: cust,
+        serverCount: servers,
+        hasLeafSwitch: leaf,
         powerStatus: true,
-        heatLevel: 35 + Math.floor(i * 1.3),
-        serverAge: Math.floor(i * 20),
-        facing,
+        heatLevel: 32 + col * 2 + gridRow,
+        serverAge: Math.floor((col + gridRow) * 15),
+        facing: cabRow ? cabRow.facing : 'south' as CabinetFacing,
       })
     }
+
+    // ── Row 0 (gridRow 1) — Production: enterprise & general customers (8 cabs)
+    addCab(0, gridRows[0], 'production', 'enterprise', 4, true)
+    addCab(1, gridRows[0], 'production', 'enterprise', 4, true)
+    addCab(2, gridRows[0], 'production', 'enterprise', 4, true)
+    addCab(3, gridRows[0], 'production', 'general', 4, true)
+    addCab(4, gridRows[0], 'production', 'general', 4, true)
+    addCab(5, gridRows[0], 'production', 'general', 4, true)
+    addCab(6, gridRows[0], 'production', 'enterprise', 4, true)
+    addCab(7, gridRows[0], 'production', 'enterprise', 4, true)
+
+    // ── Row 1 (gridRow 3) — Production: AI training, streaming & crypto (8 cabs)
+    addCab(0, gridRows[1], 'production', 'ai_training', 4, true)
+    addCab(1, gridRows[1], 'production', 'ai_training', 4, true)
+    addCab(2, gridRows[1], 'production', 'ai_training', 4, true)
+    addCab(3, gridRows[1], 'production', 'streaming', 4, true)
+    addCab(4, gridRows[1], 'production', 'streaming', 4, true)
+    addCab(5, gridRows[1], 'production', 'crypto', 4, true)
+    addCab(6, gridRows[1], 'production', 'crypto', 4, true)
+    addCab(7, gridRows[1], 'production', 'streaming', 4, true)
+
+    // ── Row 2 (gridRow 5) — Management: monitoring & control plane (5 cabs)
+    addCab(0, gridRows[2], 'management', 'general', 2, true)
+    addCab(1, gridRows[2], 'management', 'general', 2, true)
+    addCab(2, gridRows[2], 'management', 'general', 2, true)
+    addCab(3, gridRows[2], 'management', 'general', 2, true)
+    addCab(4, gridRows[2], 'management', 'general', 2, true)
+
+    // ── Row 3 (gridRow 7) — Lab: dev/test environment (3 cabs)
+    addCab(0, gridRows[3], 'lab', 'general', 3, true)
+    addCab(1, gridRows[3], 'lab', 'general', 3, true)
+    addCab(2, gridRows[3], 'lab', 'general', 3, false)
 
     const demoSpines: SpineSwitch[] = [
       { id: 'spine-1', powerStatus: true },
@@ -3520,6 +3539,7 @@ export const useGameStore = create<GameState>((set) => ({
       'water_cooling', 'hundred_k', 'suite_upgrade', 'first_generator',
       'fire_ready', 'first_research', 'survive_incident',
       'twenty_cabinets', 'connected', 'redundant', 'first_staff',
+      'script_kiddie', 'sre', 'dedicated_row', 'no_mixed_penalty',
     ].map((id, i) => ({
       def: ACHIEVEMENT_CATALOG.find((a) => a.id === id)!,
       unlockedAtTick: (i + 1) * 50,
@@ -3637,15 +3657,17 @@ export const useGameStore = create<GameState>((set) => ({
 
     // ── Event log — recent history
     const demoEventLog: EventLogEntry[] = [
+      { tick: 1190, gameHour: 14, category: 'infrastructure', message: 'Management row fully dedicated — +8% cooling bonus active', severity: 'success' },
       { tick: 1180, gameHour: 12, category: 'contract', message: 'StreamFlix SLA met — bonus revenue earned', severity: 'success' },
+      { tick: 1160, gameHour: 11, category: 'infrastructure', message: 'Ops tier upgraded to Basic Automation', severity: 'success' },
       { tick: 1150, gameHour: 10, category: 'incident', message: 'Cooling sensor alarm resolved by Sam Nakamura', severity: 'info' },
       { tick: 1120, gameHour: 8, category: 'finance', message: 'Revenue milestone: $400,000 lifetime earnings', severity: 'success' },
       { tick: 1080, gameHour: 6, category: 'staff', message: 'Alex Chen completed CCNA certification', severity: 'success' },
-      { tick: 1050, gameHour: 4, category: 'infrastructure', message: 'High-Capacity In-Row cooling unit installed', severity: 'info' },
+      { tick: 1050, gameHour: 4, category: 'infrastructure', message: 'Production rows earning +8% dedicated row bonus', severity: 'info' },
       { tick: 1000, gameHour: 22, category: 'incident', message: 'Power fluctuation resolved by Jordan Patel', severity: 'info' },
       { tick: 950, gameHour: 18, category: 'research', message: 'Redundant Cooling technology unlocked', severity: 'success' },
       { tick: 900, gameHour: 14, category: 'contract', message: 'DevForge contract completed — $1,200 bonus', severity: 'success' },
-      { tick: 850, gameHour: 10, category: 'achievement', message: 'Achievement unlocked: Twenty Cabinets', severity: 'success' },
+      { tick: 850, gameHour: 10, category: 'achievement', message: 'Achievement unlocked: Dedicated Row', severity: 'success' },
       { tick: 800, gameHour: 6, category: 'system', message: 'DR drill passed — reputation increased', severity: 'success' },
     ]
 
@@ -3716,6 +3738,10 @@ export const useGameStore = create<GameState>((set) => ({
       stockHistory: Array.from({ length: 50 }, (_, i) => 30 + i + Math.floor(Math.random() * 10)),
       drillsCompleted: 2,
       drillsPassed: 2,
+      // Operations progression
+      opsTier: 'automation' as OpsTier,
+      opsAutoResolvedCount: 5,
+      opsPreventedCount: 3,
       // Infrastructure
       pdus: demoPDUs,
       cableTrays: demoCableTrays,
@@ -3724,6 +3750,11 @@ export const useGameStore = create<GameState>((set) => ({
       crossConnects: demoCrossConnects,
       inRowCoolers: demoInRowCoolers,
       coolingUnits: demoCoolingUnits,
+      // Infrastructure upgrades
+      aisleContainments: [0, 2], // cold aisles 0 and 2 have containment
+      aisleWidths: { 1: 'wide' } as Record<number, AisleWidth>, // hot aisle 1 is wide
+      raisedFloorTier: 'basic' as RaisedFloorTier,
+      cableManagementType: 'overhead' as CableManagementType,
       // Staff
       staff: demoStaff,
       shiftPattern: 'day_night' as ShiftPattern,
@@ -3816,7 +3847,7 @@ export const useGameStore = create<GameState>((set) => ({
       capacityHistory: demoCapacityHistory,
       lifetimeStats: {
         totalRevenueEarned: 412500, totalExpensesPaid: 198300, totalIncidentsSurvived: 8,
-        totalServersDeployed: 82, totalSpinesDeployed: 5, peakTemperatureReached: 78,
+        totalServersDeployed: 85, totalSpinesDeployed: 5, peakTemperatureReached: 78,
         longestUptimeStreak: 350, currentUptimeStreak: 250, totalFiresSurvived: 1,
         totalPowerOutages: 2, totalContractsCompleted: 4, totalContractsTerminated: 0,
         peakRevenueTick: 380, peakCabinetCount: 24, totalMoneyEarned: 487250,
