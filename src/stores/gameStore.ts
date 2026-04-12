@@ -3453,99 +3453,140 @@ export const useGameStore = create<GameState>((set) => ({
   // ── Demo Mode ─────────────────────────────────────────────────
 
   loadDemoState: () => {
-    // Build a professional-tier data center with a diverse, fully-operational layout
+    // Build an enterprise-tier endgame data center with dedicated rows per environment,
+    // multi-site expansion, chiller infrastructure, active workloads, and near-prestige stats
     const demoCabinets: Cabinet[] = []
-    const customerTypes: CustomerType[] = ['general', 'ai_training', 'streaming', 'crypto', 'enterprise']
-    const environments: CabinetEnvironment[] = ['production', 'production', 'production', 'lab', 'management']
     let cabId = 1
 
-    // Professional tier: 10 cols x 4 rows — uses row-based layout grid positions
-    // Professional layout: Row 0 (gridRow=1), Row 1 (gridRow=3), Row 2 (gridRow=5), Row 3 (gridRow=7)
-    const proLayout = SUITE_TIERS.professional.layout
-    const gridRows = proLayout.cabinetRows.map(r => r.gridRow) // [1, 3, 5, 7]
-    const positions: [number, number][] = [
-      // Row 0 (gridRow 1) — full (10 cols)
-      [0,gridRows[0]],[1,gridRows[0]],[2,gridRows[0]],[3,gridRows[0]],[4,gridRows[0]],[5,gridRows[0]],[6,gridRows[0]],[7,gridRows[0]],
-      // Row 1 (gridRow 3) — full
-      [0,gridRows[1]],[1,gridRows[1]],[2,gridRows[1]],[3,gridRows[1]],[4,gridRows[1]],[5,gridRows[1]],[6,gridRows[1]],[7,gridRows[1]],
-      // Row 2 (gridRow 5) — partial
-      [0,gridRows[2]],[1,gridRows[2]],[2,gridRows[2]],[3,gridRows[2]],[4,gridRows[2]],
-      // Row 3 (gridRow 7) — partial
-      [0,gridRows[3]],[1,gridRows[3]],[2,gridRows[3]],
-    ]
+    // Enterprise tier: 14 cols x 5 cabinet rows (max 50 cabinets, 8 spine slots)
+    // Grid layout:
+    //   gridRow 0:  Corridor (top)
+    //   gridRow 1:  Row 0 — Production: enterprise (south ▼)
+    //   gridRow 2:  Cold Aisle 0
+    //   gridRow 3:  Row 1 — Production: AI/streaming/crypto (north ▲)
+    //   gridRow 4:  Hot Aisle 1
+    //   gridRow 5:  Row 2 — Production: mixed high-value (south ▼)
+    //   gridRow 6:  Cold Aisle 2
+    //   gridRow 7:  Row 3 — Management: monitoring & control (north ▲)
+    //   gridRow 8:  Hot Aisle 3
+    //   gridRow 9:  Row 4 — Lab: R&D/testing (south ▼)
+    //   gridRow 10: Corridor (bottom)
+    const entLayout = SUITE_TIERS.enterprise.layout
+    const gridRows = entLayout.cabinetRows.map(r => r.gridRow) // [1, 3, 5, 7, 9]
 
-    for (let i = 0; i < positions.length; i++) {
-      const [col, row] = positions[i]
-      const env = environments[i % environments.length]
-      const cust = env === 'management' ? 'general' : customerTypes[i % customerTypes.length]
-      const serverCount = env === 'management' ? 2 : 4
-      // Determine facing from layout
-      const cabRow = getCabinetRowAtGrid(row, proLayout)
-      const facing = cabRow ? cabRow.facing : 'north' as CabinetFacing
+    // Helper to push a cabinet with row-appropriate facing
+    const addCab = (col: number, gridRow: number, env: CabinetEnvironment, cust: CustomerType, servers: number, leaf: boolean) => {
+      const cabRow = getCabinetRowAtGrid(gridRow, entLayout)
       demoCabinets.push({
         id: `cab-${cabId++}`,
         col,
-        row,
+        row: gridRow,
         environment: env,
-        customerType: cust as CustomerType,
-        serverCount,
-        hasLeafSwitch: env !== 'management' && i < 20,
+        customerType: cust,
+        serverCount: servers,
+        hasLeafSwitch: leaf,
         powerStatus: true,
-        heatLevel: 35 + Math.floor(i * 1.3),
-        serverAge: Math.floor(i * 20),
-        facing,
+        heatLevel: 30 + col * 1.5 + gridRow * 0.8,
+        serverAge: Math.floor((col + gridRow) * 12),
+        facing: cabRow ? cabRow.facing : 'south' as CabinetFacing,
       })
     }
 
-    const demoSpines: SpineSwitch[] = [
-      { id: 'spine-1', powerStatus: true },
-      { id: 'spine-2', powerStatus: true },
-      { id: 'spine-3', powerStatus: true },
-      { id: 'spine-4', powerStatus: true },
-      { id: 'spine-5', powerStatus: true },
-    ]
+    // ── Row 0 (gridRow 1) — Production: enterprise customers (12 cabs)
+    for (let c = 0; c < 12; c++) addCab(c, gridRows[0], 'production', 'enterprise', 4, true)
 
+    // ── Row 1 (gridRow 3) — Production: AI training, streaming & crypto (12 cabs)
+    addCab(0, gridRows[1], 'production', 'ai_training', 4, true)
+    addCab(1, gridRows[1], 'production', 'ai_training', 4, true)
+    addCab(2, gridRows[1], 'production', 'ai_training', 4, true)
+    addCab(3, gridRows[1], 'production', 'ai_training', 4, true)
+    addCab(4, gridRows[1], 'production', 'streaming', 4, true)
+    addCab(5, gridRows[1], 'production', 'streaming', 4, true)
+    addCab(6, gridRows[1], 'production', 'streaming', 4, true)
+    addCab(7, gridRows[1], 'production', 'crypto', 4, true)
+    addCab(8, gridRows[1], 'production', 'crypto', 4, true)
+    addCab(9, gridRows[1], 'production', 'crypto', 4, true)
+    addCab(10, gridRows[1], 'production', 'streaming', 4, true)
+    addCab(11, gridRows[1], 'production', 'ai_training', 4, true)
+
+    // ── Row 2 (gridRow 5) — Production: general & enterprise mix (10 cabs)
+    for (let c = 0; c < 5; c++) addCab(c, gridRows[2], 'production', 'general', 4, true)
+    for (let c = 5; c < 10; c++) addCab(c, gridRows[2], 'production', 'enterprise', 4, true)
+
+    // ── Row 3 (gridRow 7) — Management: monitoring & control plane (6 cabs)
+    for (let c = 0; c < 6; c++) addCab(c, gridRows[3], 'management', 'general', 2, true)
+
+    // ── Row 4 (gridRow 9) — Lab: dev/test environment (4 cabs)
+    for (let c = 0; c < 4; c++) addCab(c, gridRows[4], 'lab', 'general', 3, c < 3)
+
+    // ── Spine switches: 7 of 8 deployed (enterprise max = 8)
+    const demoSpines: SpineSwitch[] = Array.from({ length: 7 }, (_, i) => ({
+      id: `spine-${i + 1}`, powerStatus: true,
+    }))
+
+    // ── Generators: 2 backup generators
     const demoGenerators: Generator[] = [
-      {
-        id: 'gen-1',
-        config: GENERATOR_OPTIONS[1],
-        status: 'standby' as GeneratorStatus,
-        fuelRemaining: 50,
-        ticksUntilReady: 0,
-      },
+      { id: 'gen-1', config: GENERATOR_OPTIONS[1], status: 'standby' as GeneratorStatus, fuelRemaining: 50, ticksUntilReady: 0 },
+      { id: 'gen-2', config: GENERATOR_OPTIONS[2], status: 'standby' as GeneratorStatus, fuelRemaining: 80, ticksUntilReady: 0 },
     ]
 
+    // ── Achievements: extensive endgame collection
     const demoAchievements: Achievement[] = [
       'first_cabinet', 'first_spine', 'full_rack', 'ten_cabinets',
-      'water_cooling', 'hundred_k', 'suite_upgrade', 'first_generator',
-      'fire_ready', 'first_research', 'survive_incident',
-      'twenty_cabinets', 'connected', 'redundant', 'first_staff',
+      'water_cooling', 'hundred_k', 'million', 'suite_upgrade', 'enterprise_suite',
+      'first_generator', 'fire_ready', 'first_research', 'tech_savvy',
+      'survive_incident', 'five_incidents', 'twenty_cabinets',
+      'connected', 'redundant', 'first_staff', 'certified_team',
+      'first_pdu', 'first_cable_tray', 'proper_aisles', 'clean_cabling', 'first_zone',
+      'first_busway', 'first_crossconnect', 'first_inrow',
+      'script_kiddie', 'sre', 'platform_engineer',
+      'dedicated_row', 'no_mixed_penalty',
+      'first_insurance', 'fully_insured', 'drill_passed', 'stock_100',
+      'first_patent', 'rfp_won',
+      'green_power', 'locked_down', 'firewall_admin',
+      'market_leader', 'first_cooling_unit', 'cooling_fleet',
+      'chiller_installed', 'cold_chain',
+      'multi_site_unlocked', 'first_expansion', 'global_network', 'three_continents',
+      'first_link', 'network_architect', 'dark_fiber',
+      'disaster_prepped', 'first_multisite_contract',
+      'first_workload', 'workload_master', 'raised_floor', 'row_end_equipped',
     ].map((id, i) => ({
       def: ACHIEVEMENT_CATALOG.find((a) => a.id === id)!,
-      unlockedAtTick: (i + 1) * 50,
+      unlockedAtTick: (i + 1) * 40,
     })).filter((a) => a.def)
 
-    const demoUnlockedTech = ['hot_aisle', 'variable_fans', 'high_density', 'ups_upgrade', 'redundant_cooling']
+    // ── Tech: all 9 technologies unlocked
+    const demoUnlockedTech = [
+      'hot_aisle', 'variable_fans', 'immersion_cooling',
+      'high_density', 'gpu_clusters', 'optical_interconnect',
+      'ups_upgrade', 'redundant_cooling', 'self_healing',
+    ]
 
-    // ── Infrastructure: PDUs, cable trays, busways, cross-connects, in-row coolers
-    // PDUs placed at aisle rows (between cabinet rows) for realism
-    const aisleRows = proLayout.aisles.map(a => a.gridRow) // [2, 4, 6]
+    // ── Infrastructure: enterprise-scale with 4 aisles
+    const aisleRows = entLayout.aisles.map(a => a.gridRow) // [2, 4, 6, 8]
+
     const demoPDUs: PDU[] = [
-      { id: 'pdu-1', col: 3, row: aisleRows[0], maxCapacityKW: 30, label: 'Metered PDU' },
-      { id: 'pdu-2', col: 6, row: aisleRows[0], maxCapacityKW: 30, label: 'Metered PDU' },
+      { id: 'pdu-1', col: 3, row: aisleRows[0], maxCapacityKW: 80, label: 'Intelligent PDU' },
+      { id: 'pdu-2', col: 8, row: aisleRows[0], maxCapacityKW: 80, label: 'Intelligent PDU' },
       { id: 'pdu-3', col: 2, row: aisleRows[1], maxCapacityKW: 80, label: 'Intelligent PDU' },
-      { id: 'pdu-4', col: 5, row: aisleRows[2], maxCapacityKW: 80, label: 'Intelligent PDU' },
+      { id: 'pdu-4', col: 7, row: aisleRows[1], maxCapacityKW: 80, label: 'Intelligent PDU' },
+      { id: 'pdu-5', col: 4, row: aisleRows[2], maxCapacityKW: 80, label: 'Intelligent PDU' },
+      { id: 'pdu-6', col: 9, row: aisleRows[2], maxCapacityKW: 80, label: 'Intelligent PDU' },
+      { id: 'pdu-7', col: 3, row: aisleRows[3], maxCapacityKW: 30, label: 'Metered PDU' },
     ]
 
     const demoCableTrays: CableTray[] = [
-      { id: 'tray-1', col: 0, row: aisleRows[0], capacityUnits: 8 },
-      { id: 'tray-2', col: 2, row: aisleRows[0], capacityUnits: 8 },
-      { id: 'tray-3', col: 4, row: aisleRows[1], capacityUnits: 16 },
-      { id: 'tray-4', col: 1, row: aisleRows[1], capacityUnits: 8 },
-      { id: 'tray-5', col: 3, row: aisleRows[2], capacityUnits: 16 },
+      { id: 'tray-1', col: 1, row: aisleRows[0], capacityUnits: 16 },
+      { id: 'tray-2', col: 6, row: aisleRows[0], capacityUnits: 16 },
+      { id: 'tray-3', col: 11, row: aisleRows[0], capacityUnits: 16 },
+      { id: 'tray-4', col: 4, row: aisleRows[1], capacityUnits: 16 },
+      { id: 'tray-5', col: 9, row: aisleRows[1], capacityUnits: 16 },
+      { id: 'tray-6', col: 2, row: aisleRows[2], capacityUnits: 16 },
+      { id: 'tray-7', col: 7, row: aisleRows[2], capacityUnits: 16 },
+      { id: 'tray-8', col: 1, row: aisleRows[3], capacityUnits: 8 },
     ]
 
-    // Cable runs connecting leaf cabinets to spines (auto-routed style)
+    // Cable runs connecting leaf cabinets to spines
     const demoCableRuns: CableRun[] = []
     const leafCabs = demoCabinets.filter((c) => c.hasLeafSwitch)
     for (const cab of leafCabs) {
@@ -3562,160 +3603,345 @@ export const useGameStore = create<GameState>((set) => ({
     }
 
     const demoBusways: Busway[] = [
-      { id: 'bus-1', col: 1, row: aisleRows[0], capacityKW: 50, label: 'Medium Busway' },
+      { id: 'bus-1', col: 1, row: aisleRows[0], capacityKW: 120, label: 'Heavy Busway' },
       { id: 'bus-2', col: 5, row: aisleRows[1], capacityKW: 120, label: 'Heavy Busway' },
+      { id: 'bus-3', col: 10, row: aisleRows[2], capacityKW: 50, label: 'Medium Busway' },
     ]
 
     const demoCrossConnects: CrossConnect[] = [
-      { id: 'xc-1', col: 4, row: aisleRows[0], portCount: 24, label: 'Medium Patch Panel' },
-      { id: 'xc-2', col: 7, row: aisleRows[1], portCount: 48, label: 'HD Patch Panel' },
+      { id: 'xc-1', col: 5, row: aisleRows[0], portCount: 48, label: 'HD Patch Panel' },
+      { id: 'xc-2', col: 10, row: aisleRows[1], portCount: 48, label: 'HD Patch Panel' },
+      { id: 'xc-3', col: 5, row: aisleRows[2], portCount: 24, label: 'Medium Patch Panel' },
     ]
 
     const demoInRowCoolers: InRowCooling[] = [
-      { id: 'irc-1', col: 3, row: aisleRows[0], coolingBonus: 2.0, label: 'Standard In-Row Unit' },
-      { id: 'irc-2', col: 6, row: aisleRows[1], coolingBonus: 3.5, label: 'High-Capacity In-Row' },
+      { id: 'irc-1', col: 3, row: aisleRows[0], coolingBonus: 3.5, label: 'High-Capacity In-Row' },
+      { id: 'irc-2', col: 8, row: aisleRows[1], coolingBonus: 3.5, label: 'High-Capacity In-Row' },
+      { id: 'irc-3', col: 3, row: aisleRows[2], coolingBonus: 2.0, label: 'Standard In-Row Unit' },
     ]
 
-    // Cooling units placed in aisles for coverage of adjacent cabinet rows
+    // Cooling units: CRAHs for production rows, CRACs for lower rows
     const demoCoolingUnits: CoolingUnit[] = [
-      { id: 'cu-demo-1', type: 'crac', col: 2, row: aisleRows[0], operational: true },
-      { id: 'cu-demo-2', type: 'crac', col: 7, row: aisleRows[1], operational: true },
-      { id: 'cu-demo-3', type: 'fan_tray', col: 0, row: aisleRows[2], operational: true },
-      { id: 'cu-demo-4', type: 'fan_tray', col: 9, row: aisleRows[0], operational: true },
+      { id: 'cu-demo-1', type: 'crah', col: 2, row: aisleRows[0], operational: true },
+      { id: 'cu-demo-2', type: 'crah', col: 7, row: aisleRows[0], operational: true },
+      { id: 'cu-demo-3', type: 'crah', col: 12, row: aisleRows[0], operational: true },
+      { id: 'cu-demo-4', type: 'crah', col: 3, row: aisleRows[1], operational: true },
+      { id: 'cu-demo-5', type: 'crah', col: 8, row: aisleRows[1], operational: true },
+      { id: 'cu-demo-6', type: 'crac', col: 2, row: aisleRows[2], operational: true },
+      { id: 'cu-demo-7', type: 'crac', col: 8, row: aisleRows[2], operational: true },
+      { id: 'cu-demo-8', type: 'fan_tray', col: 1, row: aisleRows[3], operational: true },
+      { id: 'cu-demo-9', type: 'fan_tray', col: 5, row: aisleRows[3], operational: true },
     ]
 
-    // ── Staff
+    // Chiller plants + cooling pipes (connected to CRAHs)
+    const demoChillerPlants: ChillerPlant[] = [
+      { id: 'chiller-1', col: 13, row: aisleRows[0], tier: 'advanced' as ChillerTier, operational: true },
+      { id: 'chiller-2', col: 13, row: aisleRows[2], tier: 'basic' as ChillerTier, operational: true },
+    ]
+    const demoCoolingPipes: CoolingPipe[] = [
+      { id: 'pipe-1', col: 13, row: aisleRows[1] },
+      { id: 'pipe-2', col: 12, row: aisleRows[1] },
+      { id: 'pipe-3', col: 11, row: aisleRows[1] },
+      { id: 'pipe-4', col: 13, row: aisleRows[3] },
+    ]
+
+    // Row-end infrastructure slots
+    const demoRowEndSlots: RowEndSlot[] = [
+      { id: 'res-1', rowId: 0, side: 'right', type: 'cooling_slot', col: 14, row: gridRows[0] },
+      { id: 'res-2', rowId: 1, side: 'right', type: 'fire_panel', col: 14, row: gridRows[1] },
+      { id: 'res-3', rowId: 2, side: 'right', type: 'network_patch', col: 14, row: gridRows[2] },
+      { id: 'res-4', rowId: 3, side: 'right', type: 'pdu_slot', col: 14, row: gridRows[3] },
+    ]
+
+    // ── Staff: full team with certifications
     const demoStaff: StaffMember[] = [
-      { id: 'staff-1', name: 'Alex Chen', role: 'network_engineer', skillLevel: 2, salaryPerTick: 6, hiredAtTick: 200, onShift: true, certifications: ['ccna'], incidentsResolved: 12, fatigueLevel: 25 },
-      { id: 'staff-2', name: 'Jordan Patel', role: 'electrician', skillLevel: 2, salaryPerTick: 4.2, hiredAtTick: 350, onShift: true, certifications: [], incidentsResolved: 8, fatigueLevel: 15 },
-      { id: 'staff-3', name: 'Sam Nakamura', role: 'cooling_specialist', skillLevel: 1, salaryPerTick: 3, hiredAtTick: 500, onShift: true, certifications: [], incidentsResolved: 5, fatigueLevel: 30 },
-      { id: 'staff-4', name: 'Casey Garcia', role: 'security_officer', skillLevel: 1, salaryPerTick: 5, hiredAtTick: 600, onShift: true, certifications: [], incidentsResolved: 3, fatigueLevel: 10 },
+      { id: 'staff-1', name: 'Alex Chen', role: 'network_engineer', skillLevel: 3, salaryPerTick: 8, hiredAtTick: 200, onShift: true, certifications: ['ccna', 'ccnp'], incidentsResolved: 25, fatigueLevel: 15 },
+      { id: 'staff-2', name: 'Jordan Patel', role: 'electrician', skillLevel: 2, salaryPerTick: 5, hiredAtTick: 350, onShift: true, certifications: ['electrician_cert'], incidentsResolved: 18, fatigueLevel: 20 },
+      { id: 'staff-3', name: 'Sam Nakamura', role: 'cooling_specialist', skillLevel: 2, salaryPerTick: 5, hiredAtTick: 500, onShift: true, certifications: ['hvac_cert'], incidentsResolved: 12, fatigueLevel: 10 },
+      { id: 'staff-4', name: 'Casey Garcia', role: 'security_officer', skillLevel: 2, salaryPerTick: 6, hiredAtTick: 600, onShift: true, certifications: ['cissp'], incidentsResolved: 8, fatigueLevel: 5 },
+      { id: 'staff-5', name: 'Morgan Lee', role: 'network_engineer', skillLevel: 2, salaryPerTick: 6, hiredAtTick: 900, onShift: true, certifications: ['ccna'], incidentsResolved: 6, fatigueLevel: 12 },
+      { id: 'staff-6', name: 'Riley Kim', role: 'cooling_specialist', skillLevel: 1, salaryPerTick: 3.5, hiredAtTick: 1200, onShift: true, certifications: [], incidentsResolved: 3, fatigueLevel: 8 },
     ]
     const demoStaffCost = demoStaff.reduce((sum, s) => sum + s.salaryPerTick, 0)
 
-    // ── Contracts (2 active)
+    // ── Contracts (3 active, including a gold tier)
     const demoActiveContracts: ActiveContract[] = [
       {
         id: 'contract-1',
         def: CONTRACT_CATALOG[3], // streaming_cdn (silver)
-        ticksRemaining: 120,
-        consecutiveViolations: 0,
-        totalViolationTicks: 0,
-        totalEarned: 2000,
-        totalPenalties: 0,
-        status: 'active',
+        ticksRemaining: 120, consecutiveViolations: 0, totalViolationTicks: 0,
+        totalEarned: 4500, totalPenalties: 0, status: 'active',
       },
       {
         id: 'contract-2',
         def: CONTRACT_CATALOG[5], // saas_platform (silver)
-        ticksRemaining: 180,
-        consecutiveViolations: 0,
-        totalViolationTicks: 0,
-        totalEarned: 1500,
-        totalPenalties: 0,
-        status: 'active',
+        ticksRemaining: 80, consecutiveViolations: 0, totalViolationTicks: 0,
+        totalEarned: 3200, totalPenalties: 0, status: 'active',
+      },
+      {
+        id: 'contract-3',
+        def: CONTRACT_CATALOG[7], // gold tier contract
+        ticksRemaining: 250, consecutiveViolations: 0, totalViolationTicks: 0,
+        totalEarned: 6800, totalPenalties: 0, status: 'active',
       },
     ]
 
-    // ── Interconnection: meet-me room with ports
+    // ── Interconnection: meet-me room tier 2 with many ports
     const demoInterconnectPorts: InterconnectPort[] = [
       { id: 'port-1', tenantName: 'CloudFlare', portType: 'fiber_10g', revenuePerTick: 10, installedAtTick: 400 },
       { id: 'port-2', tenantName: 'AWS Direct', portType: 'fiber_10g', revenuePerTick: 10, installedAtTick: 500 },
       { id: 'port-3', tenantName: 'Netflix OCA', portType: 'fiber_100g', revenuePerTick: 35, installedAtTick: 700 },
-      { id: 'port-4', tenantName: 'Akamai', portType: 'copper_1g', revenuePerTick: 3, installedAtTick: 800 },
-      { id: 'port-5', tenantName: 'Google Cloud', portType: 'fiber_10g', revenuePerTick: 10, installedAtTick: 900 },
+      { id: 'port-4', tenantName: 'Akamai', portType: 'fiber_10g', revenuePerTick: 10, installedAtTick: 800 },
+      { id: 'port-5', tenantName: 'Google Cloud', portType: 'fiber_100g', revenuePerTick: 35, installedAtTick: 900 },
+      { id: 'port-6', tenantName: 'Microsoft Azure', portType: 'fiber_100g', revenuePerTick: 35, installedAtTick: 1100 },
+      { id: 'port-7', tenantName: 'Meta Infra', portType: 'fiber_10g', revenuePerTick: 10, installedAtTick: 1400 },
     ]
 
-    // ── Peering agreements (2 active)
+    // ── Peering agreements (3 active)
     const demoPeeringAgreements: PeeringAgreement[] = [
       { id: 'peering-1', provider: 'FastPipe Inc', type: 'premium_transit', bandwidthGbps: 10, costPerTick: 15, latencyMs: 8, installedAtTick: 300 },
       { id: 'peering-2', provider: 'Metro IX', type: 'public_peering', bandwidthGbps: 20, costPerTick: 8, latencyMs: 5, installedAtTick: 600 },
+      { id: 'peering-3', provider: 'NTT Transit', type: 'private_peering', bandwidthGbps: 40, costPerTick: 20, latencyMs: 3, installedAtTick: 1200 },
     ]
 
     // ── Traffic stats (pre-calculated for the demo)
     const demoTrafficStats = calcTraffic(demoCabinets, demoSpines)
 
-    // ── Event log — recent history
-    const demoEventLog: EventLogEntry[] = [
-      { tick: 1180, gameHour: 12, category: 'contract', message: 'StreamFlix SLA met — bonus revenue earned', severity: 'success' },
-      { tick: 1150, gameHour: 10, category: 'incident', message: 'Cooling sensor alarm resolved by Sam Nakamura', severity: 'info' },
-      { tick: 1120, gameHour: 8, category: 'finance', message: 'Revenue milestone: $400,000 lifetime earnings', severity: 'success' },
-      { tick: 1080, gameHour: 6, category: 'staff', message: 'Alex Chen completed CCNA certification', severity: 'success' },
-      { tick: 1050, gameHour: 4, category: 'infrastructure', message: 'High-Capacity In-Row cooling unit installed', severity: 'info' },
-      { tick: 1000, gameHour: 22, category: 'incident', message: 'Power fluctuation resolved by Jordan Patel', severity: 'info' },
-      { tick: 950, gameHour: 18, category: 'research', message: 'Redundant Cooling technology unlocked', severity: 'success' },
-      { tick: 900, gameHour: 14, category: 'contract', message: 'DevForge contract completed — $1,200 bonus', severity: 'success' },
-      { tick: 850, gameHour: 10, category: 'achievement', message: 'Achievement unlocked: Twenty Cabinets', severity: 'success' },
-      { tick: 800, gameHour: 6, category: 'system', message: 'DR drill passed — reputation increased', severity: 'success' },
+    // ── Remote site snapshots (all standard tier: 8 cols, 3 cabinet rows)
+    // Standard layout: Row 0 (gridRow 1, south), Aisle 0 (gridRow 2), Row 1 (gridRow 3, north),
+    //                   Aisle 1 (gridRow 4), Row 2 (gridRow 5, south), Corridor (gridRow 6)
+    const stdLayout = SUITE_TIERS.standard.layout
+    const stdGridRows = stdLayout.cabinetRows.map(r => r.gridRow) // [1, 3, 5]
+    const stdAisleRows = stdLayout.aisles.map(a => a.gridRow) // [2, 4]
+
+    const buildSiteSnapshot = (
+      prefix: string,
+      rowDefs: { env: CabinetEnvironment, cust: CustomerType, count: number, servers: number }[],
+      spineCount: number,
+      cooling: CoolingType,
+    ): SiteSnapshot => {
+      const cabs: Cabinet[] = []
+      let cid = 1
+      for (let r = 0; r < rowDefs.length; r++) {
+        const def = rowDefs[r]
+        const gridRow = stdGridRows[r]
+        const cr = getCabinetRowAtGrid(gridRow, stdLayout)
+        for (let c = 0; c < def.count; c++) {
+          cabs.push({
+            id: `${prefix}-cab-${cid++}`, col: c, row: gridRow,
+            environment: def.env, customerType: def.cust,
+            serverCount: def.servers, hasLeafSwitch: true, powerStatus: true,
+            heatLevel: 35 + c * 2, serverAge: c * 25,
+            facing: cr ? cr.facing : 'south' as CabinetFacing,
+          })
+        }
+      }
+      const spines: SpineSwitch[] = Array.from({ length: spineCount }, (_, i) => ({
+        id: `${prefix}-spine-${i + 1}`, powerStatus: true,
+      }))
+      const pdus: PDU[] = [
+        { id: `${prefix}-pdu-1`, col: 3, row: stdAisleRows[0], maxCapacityKW: 30, label: 'Metered PDU' },
+        { id: `${prefix}-pdu-2`, col: 6, row: stdAisleRows[1], maxCapacityKW: 30, label: 'Metered PDU' },
+      ]
+      const trays: CableTray[] = [
+        { id: `${prefix}-tray-1`, col: 1, row: stdAisleRows[0], capacityUnits: 8 },
+        { id: `${prefix}-tray-2`, col: 5, row: stdAisleRows[1], capacityUnits: 8 },
+      ]
+      const runs: CableRun[] = []
+      for (const cab of cabs.filter(c => c.hasLeafSwitch)) {
+        for (const spine of spines) {
+          runs.push({
+            id: `${prefix}-cable-${cab.id}-${spine.id}`, leafCabinetId: cab.id,
+            spineId: spine.id, length: 3 + cab.row, capacityGbps: 10, usesTrays: true,
+          })
+        }
+      }
+      const units: CoolingUnit[] = [
+        { id: `${prefix}-cu-1`, type: 'crac', col: 2, row: stdAisleRows[0], operational: true },
+        { id: `${prefix}-cu-2`, type: 'fan_tray', col: 6, row: stdAisleRows[0], operational: true },
+      ]
+      const totalSrv = cabs.reduce((s, c) => s + c.serverCount, 0)
+      const totalLeaf = cabs.filter(c => c.hasLeafSwitch).length
+      return {
+        cabinets: cabs, spineSwitches: spines, pdus, cableTrays: trays, cableRuns: runs,
+        coolingUnits: units, chillerPlants: [], coolingPipes: [], busways: [], crossConnects: [],
+        inRowCoolers: [], rowEndSlots: [], aisleContainments: [], aisleWidths: {},
+        raisedFloorTier: 'none' as RaisedFloorTier, cableManagementType: 'none' as CableManagementType,
+        coolingType: cooling, suiteTier: 'standard' as SuiteTier,
+        totalPower: totalSrv * 450 + totalLeaf * 150 + spineCount * 250,
+        avgHeat: cooling === 'water' ? 40 : 45,
+        revenue: totalSrv * 12,
+        expenses: Math.round((totalSrv * 450 + totalLeaf * 150 + spineCount * 250) * 0.0005 * 100) / 100,
+      }
+    }
+
+    // London: streaming-focused edge PoP (6 cabs across 2 rows)
+    const londonSnap = buildSiteSnapshot('ldn', [
+      { env: 'production', cust: 'streaming', count: 4, servers: 3 },
+      { env: 'production', cust: 'streaming', count: 2, servers: 4 },
+    ], 2, 'air')
+
+    // Frankfurt: enterprise colocation (10 cabs across 3 rows)
+    const frankfurtSnap = buildSiteSnapshot('fra', [
+      { env: 'production', cust: 'enterprise', count: 4, servers: 4 },
+      { env: 'production', cust: 'general', count: 4, servers: 4 },
+      { env: 'management', cust: 'general', count: 2, servers: 2 },
+    ], 3, 'water')
+
+    // Singapore: AI-focused network hub (8 cabs across 2 rows)
+    const singaporeSnap = buildSiteSnapshot('sgp', [
+      { env: 'production', cust: 'ai_training', count: 4, servers: 4 },
+      { env: 'production', cust: 'enterprise', count: 4, servers: 3 },
+    ], 2, 'water')
+
+    // ── Multi-site expansion: HQ (Ashburn) + 3 expansion sites
+    const demoSites: Site[] = [
+      {
+        id: 'site-1', name: 'London Edge PoP', type: 'edge_pop' as SiteType,
+        regionId: 'london' as RegionId, purchasedAtTick: 1800, constructionTicksRemaining: 0,
+        operational: true, cabinets: 6, servers: 20, revenue: londonSnap.revenue, expenses: londonSnap.expenses, heat: 45,
+        suiteTier: 'standard' as SuiteTier, snapshot: londonSnap,
+      },
+      {
+        id: 'site-2', name: 'Frankfurt Colocation', type: 'colocation' as SiteType,
+        regionId: 'frankfurt' as RegionId, purchasedAtTick: 2000, constructionTicksRemaining: 0,
+        operational: true, cabinets: 10, servers: 36, revenue: frankfurtSnap.revenue, expenses: frankfurtSnap.expenses, heat: 40,
+        suiteTier: 'standard' as SuiteTier, snapshot: frankfurtSnap,
+      },
+      {
+        id: 'site-3', name: 'Singapore Network Hub', type: 'network_hub' as SiteType,
+        regionId: 'singapore' as RegionId, purchasedAtTick: 2200, constructionTicksRemaining: 0,
+        operational: true, cabinets: 8, servers: 28, revenue: singaporeSnap.revenue, expenses: singaporeSnap.expenses, heat: 42,
+        suiteTier: 'standard' as SuiteTier, snapshot: singaporeSnap,
+      },
     ]
 
-    // ── Capacity history — recent snapshots for graphs
-    const demoCapacityHistory: HistoryPoint[] = Array.from({ length: 80 }, (_, i) => {
-      const tick = 400 + i * 10
-      const cabCount = Math.min(24, 8 + Math.floor(i / 5))
+    const demoInterSiteLinks: InterSiteLink[] = [
+      { id: 'link-1', type: 'dark_fiber' as InterSiteLinkType, siteAId: null, siteBId: 'site-1', bandwidthGbps: 100, latencyMs: 38, costPerTick: 25, installedAtTick: 1900, utilization: 0.55, operational: true },
+      { id: 'link-2', type: 'leased_wavelength' as InterSiteLinkType, siteAId: 'site-1', siteBId: 'site-2', bandwidthGbps: 40, latencyMs: 12, costPerTick: 15, installedAtTick: 2050, utilization: 0.40, operational: true },
+      { id: 'link-3', type: 'submarine_cable' as InterSiteLinkType, siteAId: null, siteBId: 'site-3', bandwidthGbps: 50, latencyMs: 180, costPerTick: 40, installedAtTick: 2250, utilization: 0.35, operational: true },
+    ]
+
+    const demoSiteDisasterPreps: SiteDisasterPrep[] = [
+      { siteId: 'site-1', type: 'flood_barriers' as DisasterPrepType, installedAtTick: 2100 },
+      { siteId: 'site-3', type: 'elevated_equipment' as DisasterPrepType, installedAtTick: 2300 },
+    ]
+
+    const demoMultiSiteContracts: ActiveMultiSiteContract[] = [
+      {
+        id: 'msc-1', def: MULTI_SITE_CONTRACT_CATALOG[0], // Global CDN — requires ashburn, london, singapore
+        acceptedAtTick: 2400, ticksRemaining: 200,
+        totalEarned: 36000, totalPenalties: 0, consecutiveViolations: 0, status: 'active',
+      },
+    ]
+
+    const demoCompetitorRegionalPresence: CompetitorRegionalPresence[] = [
+      { competitorId: 'comp-1', regionId: 'frankfurt' as RegionId, strength: 0.35, establishedAtTick: 1500 },
+      { competitorId: 'comp-2', regionId: 'london' as RegionId, strength: 0.45, establishedAtTick: 1800 },
+      { competitorId: 'comp-3', regionId: 'singapore' as RegionId, strength: 0.30, establishedAtTick: 2000 },
+    ]
+
+    // ── Active workloads
+    const demoWorkloads: Workload[] = [
+      { id: 'wl-1', type: 'ai_training' as WorkloadType, cabinetId: 'cab-1', serversRequired: 3, ticksTotal: 100, ticksRemaining: 25, status: 'running' as const, heatMultiplier: 2.0, payoutOnComplete: 500, startedAtTick: 2575 },
+      { id: 'wl-2', type: 'batch_processing' as WorkloadType, cabinetId: 'cab-14', serversRequired: 2, ticksTotal: 60, ticksRemaining: 40, status: 'running' as const, heatMultiplier: 1.5, payoutOnComplete: 300, startedAtTick: 2560 },
+    ]
+
+    // ── Patents (2 technologies patented)
+    const demoPatents: Patent[] = [
+      { techId: 'hot_aisle', label: 'Hot Aisle Containment', incomePerTick: 8, grantedAtTick: 800 },
+      { techId: 'gpu_clusters', label: 'GPU Cluster Support', incomePerTick: 12, grantedAtTick: 1600 },
+    ]
+
+    // ── Event log — endgame history
+    const demoEventLog: EventLogEntry[] = [
+      { tick: 2590, gameHour: 16, category: 'contract', message: 'StreamVault Global CDN contract — $120/tick revenue flowing from 3 continents', severity: 'success' },
+      { tick: 2570, gameHour: 14, category: 'infrastructure', message: 'Singapore Network Hub fully operational — inter-site submarine cable live', severity: 'success' },
+      { tick: 2550, gameHour: 12, category: 'achievement', message: 'Achievement unlocked: Three Continents — sites on NA, Europe, Asia-Pacific', severity: 'success' },
+      { tick: 2520, gameHour: 10, category: 'finance', message: 'Revenue milestone: $1,000,000 lifetime earnings', severity: 'success' },
+      { tick: 2480, gameHour: 8, category: 'infrastructure', message: 'Management row fully dedicated — +8% cooling bonus active', severity: 'success' },
+      { tick: 2450, gameHour: 6, category: 'infrastructure', message: 'Ops tier upgraded to Full Orchestration', severity: 'success' },
+      { tick: 2400, gameHour: 4, category: 'contract', message: 'Global CDN Distribution contract accepted — $120/tick from 3 regions', severity: 'success' },
+      { tick: 2300, gameHour: 2, category: 'incident', message: 'Regional flooding near London — flood barriers mitigated all damage', severity: 'info' },
+      { tick: 2200, gameHour: 22, category: 'infrastructure', message: 'Advanced chiller plant installed — CRAH efficiency boosted', severity: 'success' },
+      { tick: 2100, gameHour: 18, category: 'research', message: 'Self-Healing Networks technology unlocked — all 9 techs complete', severity: 'success' },
+      { tick: 2000, gameHour: 14, category: 'achievement', message: 'Achievement unlocked: Global Network — 3+ operational sites', severity: 'success' },
+      { tick: 1800, gameHour: 10, category: 'system', message: 'Enterprise suite tier unlocked — maximum capacity reached', severity: 'success' },
+    ]
+
+    // ── Capacity history — endgame growth curve
+    const demoCapacityHistory: HistoryPoint[] = Array.from({ length: 100 }, (_, i) => {
+      const tick = 600 + i * 20
+      const cabCount = Math.min(44, 8 + Math.floor(i / 2.5))
       return {
         tick,
-        power: 8000 + cabCount * 200 + Math.floor(Math.random() * 500),
-        heat: 35 + Math.floor(Math.random() * 15),
-        revenue: 80 + cabCount * 8 + Math.floor(Math.random() * 20),
+        power: 12000 + cabCount * 250 + Math.floor(Math.random() * 800),
+        heat: 32 + Math.floor(Math.random() * 12),
+        revenue: 150 + cabCount * 12 + Math.floor(Math.random() * 40),
         cabinets: cabCount,
-        money: 100000 + i * 4800 + Math.floor(Math.random() * 5000),
+        money: 200000 + i * 8500 + Math.floor(Math.random() * 10000),
       }
     })
 
-    // ── Competitors (2 active)
+    // ── Competitors (3 active — endgame has more competition)
     const demoCompetitors: Competitor[] = [
-      { id: 'comp-1', name: 'BudgetHost', personality: 'budget', strength: 45, specialization: 'general', reputationScore: 40, securityTier: 'basic', greenCert: null, aggression: 0.3, techLevel: 1, marketShare: 18 },
-      { id: 'comp-2', name: 'GreenCloud Co', personality: 'green', strength: 55, specialization: 'enterprise', reputationScore: 60, securityTier: 'enhanced', greenCert: 'leed_silver', aggression: 0.2, techLevel: 2, marketShare: 14 },
+      { id: 'comp-1', name: 'BudgetHost', personality: 'budget', strength: 55, specialization: 'general', reputationScore: 50, securityTier: 'enhanced', greenCert: null, aggression: 0.3, techLevel: 2, marketShare: 14 },
+      { id: 'comp-2', name: 'GreenCloud Co', personality: 'green', strength: 65, specialization: 'enterprise', reputationScore: 65, securityTier: 'high_security', greenCert: 'leed_gold', aggression: 0.2, techLevel: 3, marketShare: 12 },
+      { id: 'comp-3', name: 'HyperScale Inc', personality: 'aggressive', strength: 70, specialization: 'ai_training', reputationScore: 58, securityTier: 'enhanced', greenCert: 'energy_star', aggression: 0.5, techLevel: 2, marketShare: 10 },
     ]
 
     // Set module-level ID counters
     nextCabId = cabId
-    nextSpineId = 6
+    nextSpineId = 8
     nextLoanId = 1
     nextIncidentId = 1
-    nextContractId = 3
-    nextGeneratorId = 2
-    nextStaffId = 5
+    nextContractId = 4
+    nextGeneratorId = 3
+    nextStaffId = 7
 
     set({
       isDemo: true,
       cabinets: demoCabinets,
       spineSwitches: demoSpines,
-      money: 487250,
-      tickCount: 1200,
+      money: 1285000,
+      tickCount: 2600,
       gameHour: 14,
       gameSpeed: 0 as GameSpeed,  // start paused so user can explore
       coolingType: 'water' as CoolingType,
-      suiteTier: 'professional' as SuiteTier,
+      suiteTier: 'enterprise' as SuiteTier,
       generators: demoGenerators,
       suppressionType: 'gas_suppression' as SuppressionType,
       unlockedTech: demoUnlockedTech,
       activeResearch: null,
-      rdSpent: 75000,
-      reputationScore: 72,
-      uptimeTicks: 950,
-      totalOperatingTicks: 1200,
-      totalRefreshes: 3,
+      rdSpent: 210000,
+      reputationScore: 88,
+      uptimeTicks: 2100,
+      totalOperatingTicks: 2600,
+      totalRefreshes: 6,
       achievements: demoAchievements,
       newAchievement: null,
       loans: [],
       loanPayments: 0,
       activeIncidents: [],
-      incidentLog: ['Cooling sensor alarm cleared', 'Power fluctuation resolved', 'Network loop detected and resolved'],
-      resolvedCount: 8,
+      incidentLog: ['Cooling sensor alarm cleared', 'Power fluctuation resolved', 'Network loop detected and resolved', 'DDoS attack blocked by NACLs', 'Regional flood mitigated at London site'],
+      resolvedCount: 22,
       contractOffers: [],
       activeContracts: demoActiveContracts,
-      contractLog: ['DevForge contract completed', 'StartupCo contract completed', 'PixelDream contract completed', 'ShopEngine contract completed'],
-      contractRevenue: 3500,
+      contractLog: ['DevForge contract completed', 'StartupCo contract completed', 'PixelDream contract completed', 'ShopEngine contract completed', 'CloudBurst contract completed', 'SecureVault contract completed', 'DataStream contract completed'],
+      contractRevenue: 14500,
       contractPenalties: 0,
-      completedContracts: 4,
-      insurancePolicies: ['fire_insurance' as InsurancePolicyType, 'power_insurance' as InsurancePolicyType, 'cyber_insurance' as InsurancePolicyType],
-      insurancePayouts: 15000,
-      stockPrice: 85,
-      stockHistory: Array.from({ length: 50 }, (_, i) => 30 + i + Math.floor(Math.random() * 10)),
-      drillsCompleted: 2,
-      drillsPassed: 2,
+      completedContracts: 7,
+      insurancePolicies: ['fire_insurance' as InsurancePolicyType, 'power_insurance' as InsurancePolicyType, 'cyber_insurance' as InsurancePolicyType, 'equipment_insurance' as InsurancePolicyType],
+      insurancePayouts: 35000,
+      stockPrice: 280,
+      stockHistory: Array.from({ length: 80 }, (_, i) => 30 + Math.floor(i * 3.2) + Math.floor(Math.random() * 15)),
+      drillsCompleted: 5,
+      drillsPassed: 4,
+      lastDrillResult: { passed: true, score: 92, findings: ['All systems responded within SLA', 'Backup generators activated in 2 ticks'], tick: 2400 },
+      // Operations progression — max tier
+      opsTier: 'orchestration' as OpsTier,
+      opsAutoResolvedCount: 15,
+      opsPreventedCount: 8,
       // Infrastructure
       pdus: demoPDUs,
       cableTrays: demoCableTrays,
@@ -3724,105 +3950,165 @@ export const useGameStore = create<GameState>((set) => ({
       crossConnects: demoCrossConnects,
       inRowCoolers: demoInRowCoolers,
       coolingUnits: demoCoolingUnits,
+      chillerPlants: demoChillerPlants,
+      coolingPipes: demoCoolingPipes,
+      rowEndSlots: demoRowEndSlots,
+      // Infrastructure upgrades
+      aisleContainments: [0, 2], // cold aisles have containment
+      aisleWidths: { 1: 'wide', 3: 'wide' } as Record<number, AisleWidth>, // hot aisles are wide
+      raisedFloorTier: 'advanced' as RaisedFloorTier,
+      cableManagementType: 'underfloor' as CableManagementType,
       // Staff
       staff: demoStaff,
-      shiftPattern: 'day_night' as ShiftPattern,
+      shiftPattern: 'round_the_clock' as ShiftPattern,
       trainingQueue: [],
       staffCostPerTick: demoStaffCost,
-      staffIncidentsResolved: 28,
-      staffBurnouts: 0,
+      staffIncidentsResolved: 72,
+      staffBurnouts: 1,
       // Traffic
       trafficStats: demoTrafficStats,
       trafficVisible: true,
       // Meet-me room & interconnects
-      meetMeRoomTier: 1, // Standard tier (24 ports)
+      meetMeRoomTier: 2, // Premium tier (48 ports)
       interconnectPorts: demoInterconnectPorts,
-      meetMeRevenue: 68,
-      meetMeMaintenanceCost: 12,
+      meetMeRevenue: 145,
+      meetMeMaintenanceCost: 20,
       // Peering
       peeringAgreements: demoPeeringAgreements,
-      peeringCostPerTick: 23,
-      avgLatencyMs: 7,
+      peeringCostPerTick: 43,
+      avgLatencyMs: 4,
       // Power redundancy
-      powerRedundancy: 'N+1' as PowerRedundancy,
-      powerRedundancyCost: 15,
+      powerRedundancy: '2N' as PowerRedundancy,
+      powerRedundancyCost: 35,
       // Noise management
-      noiseLevel: 45,
-      communityRelations: 70,
-      noiseComplaints: 2,
-      noiseFinesAccumulated: 500,
-      soundBarriersInstalled: 1,
+      noiseLevel: 55,
+      communityRelations: 75,
+      noiseComplaints: 4,
+      noiseFinesAccumulated: 1200,
+      soundBarriersInstalled: 3,
       zoningRestricted: false,
       // Spot compute
-      spotPriceMultiplier: 1.1,
-      spotCapacityAllocated: 4,
-      spotRevenue: 8,
-      spotDemand: 0.65,
-      spotHistoryPrices: Array.from({ length: 30 }, (_, i) => 0.8 + (i % 10) * 0.05 + Math.random() * 0.1),
+      spotPriceMultiplier: 1.2,
+      spotCapacityAllocated: 8,
+      spotRevenue: 18,
+      spotDemand: 0.75,
+      spotHistoryPrices: Array.from({ length: 50 }, (_, i) => 0.8 + (i % 12) * 0.06 + Math.random() * 0.15),
       // Supply chain
       pendingOrders: [],
-      inventory: { server: 3, leaf_switch: 1, spine_switch: 0, cabinet: 2 },
+      inventory: { server: 6, leaf_switch: 3, spine_switch: 1, cabinet: 4 },
       supplyShortageActive: false,
       shortagePriceMultiplier: 1.0,
       shortageTicksRemaining: 0,
       // Weather
-      currentSeason: 'summer' as Season,
-      currentCondition: 'clear' as WeatherCondition,
-      weatherAmbientModifier: 5,
-      weatherConditionTicksRemaining: 8,
-      seasonTickCounter: 40,
-      seasonsExperienced: ['spring', 'summer'] as Season[],
+      currentSeason: 'autumn' as Season,
+      currentCondition: 'cloudy' as WeatherCondition,
+      weatherAmbientModifier: 2,
+      weatherConditionTicksRemaining: 12,
+      seasonTickCounter: 60,
+      seasonsExperienced: ['spring', 'summer', 'autumn', 'winter'] as Season[],
       // Server config
-      defaultServerConfig: 'balanced' as ServerConfig,
+      defaultServerConfig: 'gpu_accelerated' as ServerConfig,
       // Maintenance
       maintenanceWindows: [],
-      maintenanceCompletedCount: 6,
+      maintenanceCompletedCount: 14,
       maintenanceCoolingBoostTicks: 0,
       // Carbon & environmental
-      energySource: 'grid_green' as EnergySource,
-      carbonEmissionsPerTick: 3.5,
-      lifetimeCarbonEmissions: 4200,
-      carbonTaxRate: 2,
-      carbonTaxPerTick: 7,
-      greenCertifications: ['energy_star'] as GreenCert[],
-      greenCertEligibleTicks: 50,
-      waterUsagePerTick: 48,
-      waterCostPerTick: 4.8,
-      eWasteStockpile: 3,
-      eWasteDisposed: 9,
+      energySource: 'onsite_solar' as EnergySource,
+      carbonEmissionsPerTick: 1.2,
+      lifetimeCarbonEmissions: 5800,
+      carbonTaxRate: 5,
+      carbonTaxPerTick: 6,
+      greenCertifications: ['energy_star', 'leed_silver', 'leed_gold'] as GreenCert[],
+      greenCertEligibleTicks: 200,
+      waterUsagePerTick: 88,
+      waterCostPerTick: 8.8,
+      eWasteStockpile: 2,
+      eWasteDisposed: 24,
       droughtActive: false,
       // Security & compliance
-      securityTier: 'enhanced' as SecurityTier,
-      installedSecurityFeatures: ['badge_access', 'cctv', 'biometric'] as SecurityFeatureId[],
-      complianceCerts: [{ certId: 'soc2_type1' as ComplianceCertId, grantedAtTick: 800, expiresAtTick: 2000, auditInProgress: false, auditStartedTick: 0 }],
-      securityMaintenanceCost: 18,
-      intrusionsBlocked: 4,
+      securityTier: 'high_security' as SecurityTier,
+      installedSecurityFeatures: ['badge_access', 'cctv', 'biometric', 'mantrap', 'cage_isolation', 'encrypted_network'] as SecurityFeatureId[],
+      complianceCerts: [
+        { certId: 'soc2_type1' as ComplianceCertId, grantedAtTick: 800, expiresAtTick: 3500, auditInProgress: false, auditStartedTick: 0 },
+        { certId: 'soc2_type2' as ComplianceCertId, grantedAtTick: 1400, expiresAtTick: 3600, auditInProgress: false, auditStartedTick: 0 },
+        { certId: 'hipaa' as ComplianceCertId, grantedAtTick: 1800, expiresAtTick: 3800, auditInProgress: false, auditStartedTick: 0 },
+      ],
+      securityMaintenanceCost: 42,
+      intrusionsBlocked: 12,
       auditCooldown: 0,
-      naclPolicy: 'standard' as NaclPolicy,
-      networkAttacksBlocked: 2,
+      naclPolicy: 'strict' as NaclPolicy,
+      networkAttacksBlocked: 8,
       // Competitor AI
       competitors: demoCompetitors,
       competitorBids: [],
-      playerMarketShare: 68,
-      competitorContractsWon: 3,
-      competitorContractsLost: 1,
-      competitorOutperformTicks: 0,
+      playerMarketShare: 64,
+      competitorContractsWon: 8,
+      competitorContractsLost: 3,
+      competitorOutperformTicks: 120,
       priceWarActive: false,
       priceWarTicksRemaining: 0,
       poachTarget: null,
+      // Patents & RFPs
+      patents: demoPatents,
+      patentIncome: 20,
+      rfpOffers: [],
+      rfpsWon: 5,
+      rfpsLost: 2,
+      valuationMilestonesReached: ['ipo', 'growth', 'blue_chip'],
+      // Workloads
+      activeWorkloads: demoWorkloads,
+      completedWorkloads: 18,
+      failedWorkloads: 2,
+      workloadRevenue: 12,
+      // Multi-site expansion
+      multiSiteUnlocked: true,
+      worldMapOpen: false,
+      sites: demoSites,
+      activeSiteId: null,
+      hqSnapshot: null,
+      researchedRegions: ['ashburn', 'london', 'frankfurt', 'singapore', 'tokyo', 'nordics'] as RegionId[],
+      totalSiteRevenue: 1970, // aggregate from 3 background sites
+      totalSiteExpenses: 910,
+      // Inter-site networking
+      interSiteLinks: demoInterSiteLinks,
+      interSiteLinkCost: 80,
+      edgePopCDNRevenue: 50, // London edge PoP CDN revenue
+      // Regional incidents & disaster prep
+      siteDisasterPreps: demoSiteDisasterPreps,
+      regionalIncidentCount: 5,
+      disasterPrepMaintenanceCost: 12,
+      regionalIncidentsBlocked: 3,
+      // Global strategy
+      demandGrowthMultipliers: {},
+      multiSiteContracts: demoMultiSiteContracts,
+      multiSiteContractRevenue: 120,
+      staffTransfers: [],
+      staffTransfersCompleted: 3,
+      competitorRegionalPresence: demoCompetitorRegionalPresence,
+      // Prestige (not yet prestiged, but near-ready)
+      prestige: {
+        level: 0,
+        totalPrestigePoints: 0,
+        bonuses: { revenueMultiplier: 0, powerCostReduction: 0, startingMoneyBonus: 0, coolingEfficiency: 0, reputationStartBonus: 0 },
+        highestTickReached: 2600,
+        highestRevenueReached: 850,
+        totalRunsCompleted: 0,
+      },
       // Event log & history
       eventLog: demoEventLog,
       eventLogFilterCategory: null,
       capacityHistory: demoCapacityHistory,
       lifetimeStats: {
-        totalRevenueEarned: 412500, totalExpensesPaid: 198300, totalIncidentsSurvived: 8,
-        totalServersDeployed: 82, totalSpinesDeployed: 5, peakTemperatureReached: 78,
-        longestUptimeStreak: 350, currentUptimeStreak: 250, totalFiresSurvived: 1,
-        totalPowerOutages: 2, totalContractsCompleted: 4, totalContractsTerminated: 0,
-        peakRevenueTick: 380, peakCabinetCount: 24, totalMoneyEarned: 487250,
+        totalRevenueEarned: 1285000, totalExpensesPaid: 620000, totalIncidentsSurvived: 22,
+        totalServersDeployed: 180, totalSpinesDeployed: 7, peakTemperatureReached: 82,
+        longestUptimeStreak: 800, currentUptimeStreak: 500, totalFiresSurvived: 2,
+        totalPowerOutages: 3, totalContractsCompleted: 7, totalContractsTerminated: 0,
+        peakRevenueTick: 850, peakCabinetCount: 44, totalMoneyEarned: 1285000,
       },
-      // Tutorial (seen some tips already)
-      seenTips: ['tip_first_cabinet', 'tip_first_server', 'tip_leaf_switch', 'tip_spine', 'tip_cooling', 'tip_heat', 'tip_contracts', 'tip_staff'],
+      // Tutorial (completed, all tips seen)
+      seenTips: ['tip_first_cabinet', 'tip_first_server', 'tip_leaf_switch', 'tip_spine', 'tip_cooling', 'tip_heat', 'tip_contracts', 'tip_staff',
+        'tip_carbon_tax_rising', 'tip_security_upgrade', 'tip_competitor_appeared', 'tip_ops_upgrade_available', 'tip_cooling_units_hint',
+        'tip_multi_site_unlocked', 'tip_first_link_hint', 'tip_multisite_contracts_hint'],
       activeTip: null,
       tutorialEnabled: true,
       showWelcomeModal: false,
@@ -3837,7 +4123,7 @@ export const useGameStore = create<GameState>((set) => ({
       fireDamageTaken: 0,
       powerOutage: false,
       outageTicksRemaining: 0,
-      powerPriceMultiplier: 1.05,
+      powerPriceMultiplier: 1.08,
       powerPriceSpikeActive: false,
       powerPriceSpikeTicks: 0,
       placementMode: false,
