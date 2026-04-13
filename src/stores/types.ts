@@ -1332,6 +1332,9 @@ export interface LeaderboardEntry {
   timestamp: number
 }
 
+// ── Graphics Quality Types ────────────────────────────────────
+export type GraphicsQuality = 'high' | 'low'
+
 // ── Audio Settings Types ─────────────────────────────────────
 export interface AudioSettings {
   masterVolume: number
