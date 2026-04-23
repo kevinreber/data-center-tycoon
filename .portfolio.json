@@ -1,0 +1,9 @@
+{
+  "displayName": "Fabric Tycoon",
+  "description": "2D isometric tycoon game where you build and manage a data center empire. Scale from a single rack to a global AI powerhouse with infrastructure management, Clos fabric networking, and real-world incident handling.",
+  "tech": ["React", "TypeScript", "Phaser 3", "Zustand", "Tailwind", "Vite"],
+  "thumbnail": "docs/images/thumbnail.png",
+  "demo": "docs/images/demo.gif",
+  "liveUrl": "https://data-center-tycoon.vercel.app",
+  "order": 3
+}
