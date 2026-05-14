@@ -43,6 +43,7 @@ export function GameCanvas() {
   const viewMode = useGameStore((s) => s.viewMode)
   const rowEndSlots = useGameStore((s) => s.rowEndSlots)
   const audioSettings = useGameStore((s) => s.audioSettings)
+  const graphicsQuality = useGameStore((s) => s.graphicsQuality)
   const activeSiteId = useGameStore((s) => s.activeSiteId)
   const customLayout = useGameStore((s) => s.customLayout)
   const rowPlacementMode = useGameStore((s) => s.rowPlacementMode)
@@ -457,6 +458,14 @@ export function GameCanvas() {
     scene.initAudio()
     scene.setAudioSettings(audioSettings.muted, audioSettings.masterVolume, audioSettings.sfxVolume, audioSettings.ambientVolume)
   }, [audioSettings, sceneReady])
+
+  // Sync graphics quality to Phaser
+  useEffect(() => {
+    if (!gameRef.current) return
+    const scene = getScene(gameRef.current)
+    if (!scene) return
+    scene.setGraphicsQuality(graphicsQuality)
+  }, [graphicsQuality, sceneReady])
 
   // Dispatch floating text events from store to Phaser each tick
   const tickCount = useGameStore((s) => s.tickCount)

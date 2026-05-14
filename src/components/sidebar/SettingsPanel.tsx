@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useGameStore, MAX_SAVE_SLOTS, SUITE_TIERS, TUTORIAL_STEPS } from '@/stores/gameStore'
-import type { SaveSlotMeta, LeaderboardCategory } from '@/stores/gameStore'
+import type { SaveSlotMeta, LeaderboardCategory, GraphicsQuality } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
-import { Save, Upload, RotateCw, Play, Trash2, Plus, AlertTriangle, Volume2, VolumeX, Trophy, BookOpen } from 'lucide-react'
+import { Save, Upload, RotateCw, Play, Trash2, Plus, AlertTriangle, Volume2, VolumeX, Trophy, BookOpen, Monitor } from 'lucide-react'
 
 function formatMoney(n: number): string {
   if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`
@@ -99,6 +99,7 @@ export function SettingsPanel() {
     sandboxMode, toggleSandboxMode,
     saveGame, loadGame, deleteGame, resetGame,
     activeSlotId, saveSlots,
+    graphicsQuality, setGraphicsQuality,
     audioSettings, setAudioSettings,
     leaderboardEntries, submitLeaderboardEntry,
     tutorialEnabled, toggleTutorial, restartTutorial,
@@ -235,6 +236,30 @@ export function SettingsPanel() {
         </div>
         <p className="text-[10px] text-muted-foreground mt-1.5">
           Toggle contextual tips and guided walkthrough.
+        </p>
+      </div>
+
+      {/* Graphics Settings */}
+      <div className="border-t border-border pt-3">
+        <div className="flex items-center gap-2 mb-2">
+          <Monitor className="size-3 text-neon-cyan" />
+          <span className="text-xs font-bold text-neon-cyan tracking-widest">GRAPHICS</span>
+        </div>
+        <div className="flex gap-1.5">
+          {(['high', 'low'] as GraphicsQuality[]).map((q) => (
+            <Button
+              key={q}
+              variant={graphicsQuality === q ? 'default' : 'outline'}
+              size="xs"
+              className={`text-[9px] flex-1 ${graphicsQuality === q ? 'bg-neon-cyan/20 text-neon-cyan border-neon-cyan/30' : ''}`}
+              onClick={() => setGraphicsQuality(q)}
+            >
+              {q === 'high' ? 'High (Sprites)' : 'Low (Procedural)'}
+            </Button>
+          ))}
+        </div>
+        <p className="text-[10px] text-muted-foreground mt-1.5">
+          High uses pixel art sprites. Low uses enhanced procedural rendering for better performance.
         </p>
       </div>
 

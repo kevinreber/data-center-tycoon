@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="40" height="28" viewBox="0 0 40 28">
+  <!-- Isometric PDU - bright yellow/amber base for tinting -->
+  <!-- Left face -->
+  <polygon points="4,14 20,22 20,26 4,18" fill="#ccaa66" stroke="#ddbb77" stroke-width="0.3"/>
+  <!-- Right face -->
+  <polygon points="36,14 20,22 20,26 36,18" fill="#ddbb77" stroke="#eecc88" stroke-width="0.3"/>
+  <!-- Top face -->
+  <polygon points="20,4 36,14 20,22 4,14" fill="#eecc88" stroke="#ffdd99" stroke-width="0.4"/>
+
+  <!-- Circuit breaker toggles on right face -->
+  <rect x="22" y="16" width="2.5" height="2" rx="0.3" fill="#ffdd99" opacity="0.7"/>
+  <rect x="25.5" y="16" width="2.5" height="2" rx="0.3" fill="#ffdd99" opacity="0.7"/>
+  <rect x="29" y="16" width="2.5" height="2" rx="0.3" fill="#ffdd99" opacity="0.6"/>
+  <rect x="32.5" y="16" width="2.5" height="2" rx="0.3" fill="#eebb77" opacity="0.6"/>
+
+  <!-- Amperage display -->
+  <rect x="22" y="18.5" width="10" height="2.5" rx="0.5" fill="#aa8844" stroke="#ddbb77" stroke-width="0.2" opacity="0.6"/>
+
+  <!-- Power cables on left face -->
+  <line x1="8" y1="15.5" x2="8" y2="18.5" stroke="#ffdd99" stroke-width="0.6" opacity="0.5"/>
+  <line x1="12" y1="16.5" x2="12" y2="19.5" stroke="#ffdd99" stroke-width="0.6" opacity="0.5"/>
+  <line x1="16" y1="17.5" x2="16" y2="20.5" stroke="#ffdd99" stroke-width="0.6" opacity="0.5"/>
+
+  <!-- Status LED -->
+  <circle cx="22" cy="15.5" r="0.8" fill="#aaffaa" opacity="0.9"/>
+
+  <!-- Warning triangle on top -->
+  <polygon points="20,9 22.5,14 17.5,14" fill="none" stroke="#ffdd99" stroke-width="0.5" opacity="0.5"/>
+  <line x1="20" y1="10" x2="20" y2="13" stroke="#ffdd99" stroke-width="0.4" opacity="0.5"/>
+</svg>
