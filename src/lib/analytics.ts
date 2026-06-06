@@ -7,7 +7,7 @@ declare global {
 
 const DEFAULT_MEASUREMENT_ID = 'G-M4NL7V305J'
 const envId = import.meta.env.VITE_GA_MEASUREMENT_ID as string | undefined
-const measurementId = envId ?? DEFAULT_MEASUREMENT_ID
+const measurementId = envId && envId.length > 0 ? envId : DEFAULT_MEASUREMENT_ID
 
 const hasValidId = (id: string | undefined): id is string =>
   typeof id === 'string' && id.startsWith('G-') && id.length > 2
