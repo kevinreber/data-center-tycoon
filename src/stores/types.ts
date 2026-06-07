@@ -134,6 +134,9 @@ export interface SiteSnapshot {
   infiniBandFabrics: InfiniBandFabric[]
   ibSwitches: IBSwitch[]
   ibLinks: IBLink[]
+  // Phase 8C: in-flight NOC repairs follow the site so they keep ticking when
+  // the operator switches away. selectedNocLinkId is session-only and not saved.
+  ibLinkRepairs?: IBLinkRepair[]
   aisleContainments: number[]
   aisleWidths: Record<number, AisleWidth>
   raisedFloorTier: RaisedFloorTier
@@ -1062,6 +1065,9 @@ export interface IBSwitch {
   portsUsed: number
   errorRate: number             // 0–1, accumulates with age and incidents
   operational: boolean
+  /** Phase 8C: last tick when an operator reset this switch. Gates the 5-tick
+   *  cooldown on resetSwitch(). -1 = never reset. */
+  lastResetTick?: number
 }
 
 export interface IBLink {
@@ -1075,6 +1081,24 @@ export interface IBLink {
   errorCount: number
   status: IBLinkStatus
   lastErrorTick: number
+  /** Phase 8C: NOC operator state. */
+  /** Rolling utilizationPct samples (one per tick, capped at 50). Drives the drawer sparkline. */
+  utilizationHistory?: number[]
+  /** Ticks remaining of a `drainPort` action. While >0, utilization is forced to 0
+   *  so a flapping link can be safely worked on. */
+  drainTicksRemaining?: number
+  /** Last tick a fresh optic was installed. While (tickCount - lastReplaceTick) <
+   *  50, error accumulation is suppressed (the 50-tick post-replace health boost). */
+  lastReplaceTick?: number
+}
+
+/** Phase 8C: an in-progress repair dispatched to an electrician. */
+export interface IBLinkRepair {
+  id: string
+  linkId: string
+  ticksRemaining: number
+  dispatchedAtTick: number
+  staffId: string | null        // null if no eligible electrician was on-shift; repair still runs
 }
 
 export interface InfiniBandFabric {

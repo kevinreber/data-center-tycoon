@@ -51,6 +51,8 @@ export type {
   GPUPod, GPUPodSize, GPUPodConfig, CabinetDensity, LiquidCoolingType, LiquidCoolingConfig,
   // Phase 8B: InfiniBand backend fabric
   InfiniBandFabric, IBSwitch, IBLink, IBSwitchType, IBSwitchConfig, IBLinkBandwidth, IBLinkStatus, IBFabricHealth,
+  // Phase 8C: NOC operator state
+  IBLinkRepair,
 } from './types'
 
 import type {
@@ -84,7 +86,7 @@ import type {
   LayoutMode,
   SwitchDetailTarget,
   GPUPod, GPUPodSize, LiquidCoolingType,
-  InfiniBandFabric, IBSwitch, IBLink,
+  InfiniBandFabric, IBSwitch, IBLink, IBLinkRepair, IBLinkStatus,
 } from './types'
 
 // ── Re-export constants ────────────────────────────────────────
@@ -357,6 +359,11 @@ interface GameState {
   infiniBandFabrics: InfiniBandFabric[]
   ibSwitches: IBSwitch[]
   ibLinks: IBLink[]
+
+  // NOC / Traffic Triage (Phase 8C)
+  ibLinkRepairs: IBLinkRepair[]              // active electrician dispatches
+  selectedNocLinkId: string | null           // open link in the NOC detail drawer
+  pendingPanelOpen: string | null            // scene → sidebar handoff (e.g. NOC drawer from Phaser click)
 
   // Sandbox Mode
   sandboxMode: boolean
@@ -644,6 +651,13 @@ interface GameState {
   createGPUPod: (size: GPUPodSize, col: number, row: number, customerType?: CustomerType) => void
   removeGPUPod: (id: string) => void
   installLiquidCooling: (cabinetId: string, type: LiquidCoolingType) => void
+  // NOC / Traffic Triage (Phase 8C)
+  drainPort: (linkId: string) => void
+  resetSwitch: (switchId: string) => void
+  replaceOptic: (linkId: string) => void
+  dispatchElectrician: (linkId: string) => void
+  openNocDrawer: (linkId: string | null) => void
+  clearPendingPanel: () => void
   placeChillerPlant: (tier: ChillerTier, col: number, row: number) => void
   removeChillerPlant: (id: string) => void
   placeCoolingPipe: (col: number, row: number) => void
@@ -764,6 +778,7 @@ let nextPodId = 1
 let nextIBFabricId = 1
 let nextIBSwitchId = 1
 let nextIBLinkId = 1
+let nextIBRepairId = 1
 let nextIncidentId = 1
 let nextContractId = 1
 let nextGeneratorId = 1
@@ -1110,6 +1125,11 @@ export const useGameStore = create<GameState>((set) => ({
   infiniBandFabrics: [],
   ibSwitches: [],
   ibLinks: [],
+
+  // NOC / Traffic Triage (Phase 8C)
+  ibLinkRepairs: [],
+  selectedNocLinkId: null,
+  pendingPanelOpen: null,
 
   // Sandbox Mode
   sandboxMode: false,
@@ -2234,10 +2254,18 @@ export const useGameStore = create<GameState>((set) => ({
       const removedSwitchIds = new Set(fabric ? [...fabric.leafSwitchIds, ...fabric.spineSwitchIds] : [])
       const remainingFabrics = state.infiniBandFabrics.filter((f) => !fabricIds.has(f.id))
       const remainingSwitches = state.ibSwitches.filter((s) => !removedSwitchIds.has(s.id))
+      const removedLinkIds = new Set(state.ibLinks.filter((l) => fabricIds.has(l.fabricId)).map((l) => l.id))
       const remainingLinks = state.ibLinks.filter((l) => !fabricIds.has(l.fabricId))
 
       // Phase 4B: decommissioned pod servers become e-waste (same path as refreshServers).
       const wasteAdded = removedCabs.reduce((sum, c) => sum + c.serverCount, 0)
+
+      // Phase 8C: drop in-flight NOC repairs for links that no longer exist,
+      // and close the drawer if it was looking at one of them.
+      const remainingRepairs = state.ibLinkRepairs.filter((r) => !removedLinkIds.has(r.linkId))
+      const selectedNocLinkId = state.selectedNocLinkId && removedLinkIds.has(state.selectedNocLinkId)
+        ? null
+        : state.selectedNocLinkId
 
       return {
         cabinets: remainingCabs,
@@ -2245,6 +2273,8 @@ export const useGameStore = create<GameState>((set) => ({
         infiniBandFabrics: remainingFabrics,
         ibSwitches: remainingSwitches,
         ibLinks: remainingLinks,
+        ibLinkRepairs: remainingRepairs,
+        selectedNocLinkId,
         aisleBonus: newAisleBonus,
         zones: newZones,
         eWasteStockpile: state.eWasteStockpile + wasteAdded,
@@ -2270,6 +2300,101 @@ export const useGameStore = create<GameState>((set) => ({
         ...calcStats(updatedCabinets, state.spineSwitches),
       }
     }),
+
+  // ── NOC / Traffic Triage Actions (Phase 8C) ────────────────────
+  // Drain forces utilization to 0 for 20 ticks so the operator can work on a
+  // flapping link without traffic flying through it. No cost, no cooldown —
+  // it's a safety reflex.
+  drainPort: (linkId: string) =>
+    set((state) => {
+      const link = state.ibLinks.find((l) => l.id === linkId)
+      if (!link || link.status === 'down') return state
+      return {
+        ibLinks: state.ibLinks.map((l) =>
+          l.id === linkId
+            ? { ...l, drainTicksRemaining: 20, utilizationPct: 0 }
+            : l
+        ),
+      }
+    }),
+
+  // Reset a switch clears errorCount on every link attached to it. 5-tick
+  // cooldown prevents spamming.
+  resetSwitch: (switchId: string) =>
+    set((state) => {
+      const sw = state.ibSwitches.find((s) => s.id === switchId)
+      if (!sw || !sw.operational) return state
+      const lastReset = sw.lastResetTick ?? -1000
+      if (state.tickCount - lastReset < 5) return state   // cooldown
+      return {
+        ibSwitches: state.ibSwitches.map((s) =>
+          s.id === switchId ? { ...s, lastResetTick: state.tickCount } : s
+        ),
+        ibLinks: state.ibLinks.map((l) =>
+          l.fromSwitchId === switchId || l.toSwitchId === switchId
+            ? {
+                ...l,
+                errorCount: 0,
+                status: l.status === 'down' ? 'down' : 'healthy',  // down links need an optic, not a reset
+              }
+            : l
+        ),
+      }
+    }),
+
+  // Replace optic: $2K, instantly resets the link and grants a 50-tick window
+  // where error accumulation is suppressed (the "fresh optic" health boost).
+  replaceOptic: (linkId: string) =>
+    set((state) => {
+      const link = state.ibLinks.find((l) => l.id === linkId)
+      if (!link) return state
+      const cost = 2000
+      if (!state.sandboxMode && state.money < cost) return state
+      return {
+        money: state.sandboxMode ? state.money : state.money - cost,
+        ibLinks: state.ibLinks.map((l) =>
+          l.id === linkId
+            ? {
+                ...l,
+                errorCount: 0,
+                status: 'healthy',
+                lastReplaceTick: state.tickCount,
+                drainTicksRemaining: 0,
+              }
+            : l
+        ),
+      }
+    }),
+
+  // Dispatch an electrician: requires at least one on-shift electrician;
+  // creates a 10-tick repair entry; tick loop clears errors + restores healthy
+  // status when the repair completes.
+  dispatchElectrician: (linkId: string) =>
+    set((state) => {
+      const link = state.ibLinks.find((l) => l.id === linkId)
+      if (!link) return state
+      if (state.ibLinkRepairs.some((r) => r.linkId === linkId)) return state  // already in progress
+      const electrician = state.staff.find((s) => s.role === 'electrician' && s.onShift)
+      if (!electrician) return state
+      const repair: IBLinkRepair = {
+        id: `ibrep-${nextIBRepairId++}`,
+        linkId,
+        ticksRemaining: 10,
+        dispatchedAtTick: state.tickCount,
+        staffId: electrician.id,
+      }
+      return { ibLinkRepairs: [...state.ibLinkRepairs, repair] }
+    }),
+
+  openNocDrawer: (linkId: string | null) =>
+    set((state) => ({
+      selectedNocLinkId: linkId,
+      // Hand off to Sidebar so the NOC panel auto-opens when called from the scene
+      // (or from anywhere else without sidebar context).
+      pendingPanelOpen: linkId != null && state.pendingPanelOpen !== 'noc' ? 'noc' : state.pendingPanelOpen,
+    })),
+
+  clearPendingPanel: () => set({ pendingPanelOpen: null }),
 
   placeChillerPlant: (tier: ChillerTier, col: number, row: number) =>
     set((state) => {
@@ -2855,6 +2980,7 @@ export const useGameStore = create<GameState>((set) => ({
         infiniBandFabrics: state.infiniBandFabrics,
         ibSwitches: state.ibSwitches,
         ibLinks: state.ibLinks,
+        ibLinkRepairs: state.ibLinkRepairs,
         aisleContainments: state.aisleContainments,
         aisleWidths: state.aisleWidths,
         raisedFloorTier: state.raisedFloorTier,
@@ -2911,6 +3037,8 @@ export const useGameStore = create<GameState>((set) => ({
           infiniBandFabrics: hq.infiniBandFabrics ?? [],
           ibSwitches: hq.ibSwitches ?? [],
           ibLinks: hq.ibLinks ?? [],
+          ibLinkRepairs: hq.ibLinkRepairs ?? [],
+          selectedNocLinkId: null,
           aisleContainments: hq.aisleContainments,
           aisleWidths: hq.aisleWidths,
           raisedFloorTier: hq.raisedFloorTier,
@@ -2950,6 +3078,8 @@ export const useGameStore = create<GameState>((set) => ({
           infiniBandFabrics: snap.infiniBandFabrics ?? [],
           ibSwitches: snap.ibSwitches ?? [],
           ibLinks: snap.ibLinks ?? [],
+          ibLinkRepairs: snap.ibLinkRepairs ?? [],
+          selectedNocLinkId: null,
           aisleContainments: snap.aisleContainments,
           aisleWidths: snap.aisleWidths,
           raisedFloorTier: snap.raisedFloorTier,
@@ -4224,6 +4354,8 @@ export const useGameStore = create<GameState>((set) => ({
       infiniBandFabrics: [],
       ibSwitches: [],
       ibLinks: [],
+      ibLinkRepairs: [],
+      selectedNocLinkId: null,
       money: 1285000,
       tickCount: 2600,
       gameHour: 14,
@@ -4552,6 +4684,8 @@ export const useGameStore = create<GameState>((set) => ({
       infiniBandFabrics: [],
       ibSwitches: [],
       ibLinks: [],
+      ibLinkRepairs: [],
+      selectedNocLinkId: null,
       sandboxMode: false,
       activeScenario: null,
       scenarioProgress: {},
@@ -4698,6 +4832,7 @@ export const useGameStore = create<GameState>((set) => ({
         infiniBandFabrics: state.infiniBandFabrics,
         ibSwitches: state.ibSwitches,
         ibLinks: state.ibLinks,
+        ibLinkRepairs: state.ibLinkRepairs,
         sandboxMode: state.sandboxMode,
         aisleContainments: state.aisleContainments,
         customRowMode: state.customRowMode,
@@ -4766,6 +4901,8 @@ export const useGameStore = create<GameState>((set) => ({
         infiniBandFabrics: data.infiniBandFabrics ?? [],
         ibSwitches: data.ibSwitches ?? [],
         ibLinks: data.ibLinks ?? [],
+        ibLinkRepairs: data.ibLinkRepairs ?? [],
+        selectedNocLinkId: null,
         money: data.money ?? state.money,
         tickCount: data.tickCount ?? state.tickCount,
         gameHour: data.gameHour ?? state.gameHour,
@@ -4948,6 +5085,8 @@ export const useGameStore = create<GameState>((set) => ({
       infiniBandFabrics: [],
       ibSwitches: [],
       ibLinks: [],
+      ibLinkRepairs: [],
+      selectedNocLinkId: null,
       sandboxMode: false,
       activeScenario: null,
       scenarioProgress: {},
@@ -7794,30 +7933,88 @@ export const useGameStore = create<GameState>((set) => ({
         bankruptcyTicks = 0
       }
 
-      // ── Phase 8B: InfiniBand fabric tick — link health + fabric activity ──
+      // ── Phase 8B/8C: InfiniBand fabric tick — link health, utilization history, NOC repairs ──
       let tickedIBLinks = state.ibLinks
       let tickedIBFabrics = state.infiniBandFabrics
+      let tickedIBRepairs = state.ibLinkRepairs
       if (state.infiniBandFabrics.length > 0) {
-        let dirty = false
+        // Pre-compute next activity level for each fabric so per-link utilization
+        // can derive from it in the same pass.
+        const fabricActivity: Record<string, number> = {}
+        for (const fabric of state.infiniBandFabrics) {
+          const podCabs = newCabinets.filter((c) => c.podId === fabric.podId)
+          const podActive = podCabs.some((c) => c.powerStatus)
+          const targetActivity = podActive ? 0.7 : 0
+          fabricActivity[fabric.id] = fabric.activityLevel + (targetActivity - fabric.activityLevel) * 0.1
+        }
+
+        // Phase 8C: drive electrician repairs forward. Links whose repair completes
+        // this tick are flagged so the link map below can reset them in one pass.
+        const completedRepairLinkIds = new Set<string>()
+        tickedIBRepairs = state.ibLinkRepairs
+          .map((r) => ({ ...r, ticksRemaining: r.ticksRemaining - 1 }))
+          .filter((r) => {
+            if (r.ticksRemaining <= 0) {
+              completedRepairLinkIds.add(r.linkId)
+              return false
+            }
+            return true
+          })
+
         tickedIBLinks = state.ibLinks.map((link) => {
-          // Healthy links accumulate occasional errors. Once enough errors pile up,
-          // status degrades: healthy → flapping → down. Recovery is manual via the
-          // (future) NOC panel — for now, no auto-recovery.
-          if (link.status === 'down') return link
-          if (Math.random() < IB_BASE_LINK_ERROR_RATE) {
-            const newErrorCount = link.errorCount + 1
-            let newStatus: 'healthy' | 'flapping' | 'down' = link.status
-            if (newErrorCount > 30 && link.status === 'flapping') newStatus = 'down'
-            else if (newErrorCount > 10 && link.status === 'healthy') newStatus = 'flapping'
-            if (newStatus !== link.status || newErrorCount !== link.errorCount) dirty = true
-            return { ...link, errorCount: newErrorCount, status: newStatus, lastErrorTick: newTickCount }
+          let next: IBLink = { ...link }
+
+          // Repair completion overrides everything else this tick.
+          if (completedRepairLinkIds.has(link.id)) {
+            next = {
+              ...next,
+              errorCount: 0,
+              status: 'healthy',
+              drainTicksRemaining: 0,
+              lastReplaceTick: state.tickCount,
+            }
           }
-          return link
+
+          // Drain countdown — keep the link traffic-free while the operator works on it.
+          if (next.drainTicksRemaining && next.drainTicksRemaining > 0) {
+            next.drainTicksRemaining -= 1
+          }
+
+          // Utilization sample. Drained / down links read 0; healthy links scale
+          // the fabric's activity level with a small per-link noise band so the
+          // NOC sparklines show realistic variance.
+          let nextUtil = 0
+          const drained = (next.drainTicksRemaining ?? 0) > 0
+          if (next.status !== 'down' && !drained) {
+            const activity = fabricActivity[next.fabricId] ?? 0
+            const noise = 0.85 + Math.random() * 0.3
+            nextUtil = Math.min(100, Math.max(0, activity * 100 * noise))
+          }
+          next.utilizationPct = +nextUtil.toFixed(1)
+
+          // Append to history, cap at 50 samples.
+          const history = next.utilizationHistory ?? []
+          next.utilizationHistory = [...history, next.utilizationPct].slice(-50)
+
+          // Error accumulation — same shape as before but suppressed during the
+          // 50-tick post-replace boost window (fresh optics don't flap).
+          if (next.status !== 'down') {
+            const inBoost = next.lastReplaceTick != null && state.tickCount - next.lastReplaceTick < 50
+            if (!inBoost && Math.random() < IB_BASE_LINK_ERROR_RATE) {
+              const newErrorCount = next.errorCount + 1
+              let newStatus: IBLinkStatus = next.status
+              if (newErrorCount > 30 && next.status === 'flapping') newStatus = 'down'
+              else if (newErrorCount > 10 && next.status === 'healthy') newStatus = 'flapping'
+              next.errorCount = newErrorCount
+              next.status = newStatus
+              next.lastErrorTick = newTickCount
+            }
+          }
+
+          return next
         })
 
-        // Update each fabric's health + activityLevel. Activity ramps toward 0.7
-        // when the pod is operational (proxy: at least one cabinet powered on);
-        // future Phase 8E training jobs will drive this directly.
+        // Update each fabric's health + activityLevel from the (now updated) links.
         tickedIBFabrics = state.infiniBandFabrics.map((fabric) => {
           const fabricLinks = tickedIBLinks.filter((l) => l.fabricId === fabric.id)
           const downCount = fabricLinks.filter((l) => l.status === 'down').length
@@ -7826,19 +8023,8 @@ export const useGameStore = create<GameState>((set) => ({
           let health: typeof fabric.health = 'healthy'
           if (downCount / total > 0.2) health = 'critical'
           else if ((downCount + flappingCount) / total > 0.1) health = 'degraded'
-
-          const podCabs = newCabinets.filter((c) => c.podId === fabric.podId)
-          const podActive = podCabs.some((c) => c.powerStatus)
-          const targetActivity = podActive ? 0.7 : 0
-          const newActivity = fabric.activityLevel + (targetActivity - fabric.activityLevel) * 0.1
-          if (health !== fabric.health || Math.abs(newActivity - fabric.activityLevel) > 0.01) dirty = true
-          return { ...fabric, health, activityLevel: newActivity }
+          return { ...fabric, health, activityLevel: fabricActivity[fabric.id] }
         })
-
-        if (!dirty) {
-          tickedIBLinks = state.ibLinks
-          tickedIBFabrics = state.infiniBandFabrics
-        }
       }
 
       return {
@@ -7846,6 +8032,7 @@ export const useGameStore = create<GameState>((set) => ({
         spineSwitches,
         ibLinks: tickedIBLinks,
         infiniBandFabrics: tickedIBFabrics,
+        ibLinkRepairs: tickedIBRepairs,
         tickCount: newTickCount,
         revenue: +revenue.toFixed(2),
         expenses,

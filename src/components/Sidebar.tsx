@@ -4,7 +4,7 @@ import {
   Cpu, Server, DollarSign, Radio, Zap, Plug,
   FlaskConical, FileText, Siren, Building, Trophy,
   Save, X, HelpCircle, Leaf, Shield, TrendingUp, Newspaper, BarChart3, Globe, Target,
-  Menu,
+  Menu, Activity,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -35,8 +35,9 @@ import { BuildLogsPanel } from '@/components/sidebar/BuildLogsPanel'
 import { CapacityPanel } from '@/components/sidebar/CapacityPanel'
 import { WorldMapPanel } from '@/components/sidebar/WorldMapPanel'
 import { ScenarioPanel } from '@/components/sidebar/ScenarioPanel'
+import { NocPanel } from '@/components/sidebar/NocPanel'
 
-type PanelId = 'guide' | 'build' | 'equipment' | 'finance' | 'network' | 'operations' | 'infrastructure' | 'research' | 'contracts' | 'incidents' | 'facility' | 'carbon' | 'security' | 'market' | 'capacity' | 'world_map' | 'progress' | 'scenarios' | 'settings' | 'build_logs'
+type PanelId = 'guide' | 'build' | 'equipment' | 'finance' | 'network' | 'noc' | 'operations' | 'infrastructure' | 'research' | 'contracts' | 'incidents' | 'facility' | 'carbon' | 'security' | 'market' | 'capacity' | 'world_map' | 'progress' | 'scenarios' | 'settings' | 'build_logs'
 
 interface SidebarItem {
   id: PanelId
@@ -52,6 +53,7 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
   { id: 'equipment', icon: Server, label: 'Equipment', color: '#00ff88', section: 'top' },
   { id: 'finance', icon: DollarSign, label: 'Finance', color: '#ffaa00', section: 'top' },
   { id: 'network', icon: Radio, label: 'Network', color: '#00aaff', section: 'top' },
+  { id: 'noc', icon: Activity, label: 'NOC', color: '#aa44ff', section: 'middle' },
   { id: 'operations', icon: Zap, label: 'Operations', color: '#ff6644', section: 'middle' },
   { id: 'infrastructure', icon: Plug, label: 'Infrastructure', color: '#aa44ff', section: 'middle' },
   { id: 'research', icon: FlaskConical, label: 'Research', color: '#00aaff', section: 'middle' },
@@ -75,6 +77,7 @@ const PANEL_TITLES: Record<PanelId, string> = {
   equipment: 'EQUIPMENT',
   finance: 'FINANCE',
   network: 'NETWORK',
+  noc: 'NOC — TRAFFIC TRIAGE',
   operations: 'OPERATIONS',
   infrastructure: 'INFRASTRUCTURE',
   research: 'R&D LAB',
@@ -99,6 +102,7 @@ function PanelContent({ panelId }: { panelId: PanelId }) {
     case 'equipment': return <EquipmentPanel />
     case 'finance': return <FinancePanel />
     case 'network': return <NetworkPanel />
+    case 'noc': return <NocPanel />
     case 'operations': return <OperationsPanel />
     case 'infrastructure': return <InfrastructurePanel />
     case 'research': return <ResearchPanel />
@@ -154,6 +158,30 @@ export function Sidebar() {
       setIsOpen(false)
     }
   }
+
+  // Phase 8C: scene → sidebar handoff. We subscribe to the store directly
+  // (rather than selecting `pendingPanelOpen` into a render-driven effect) so
+  // the panel-open side-effects fire from an external-system callback, which
+  // is the React-19-blessed escape hatch for cross-cutting UI signals.
+  useEffect(() => {
+    const unsubscribe = useGameStore.subscribe((state, prev) => {
+      const pending = state.pendingPanelOpen
+      if (!pending || pending === prev.pendingPanelOpen) return
+      const valid = SIDEBAR_ITEMS.some((i) => i.id === pending)
+      if (!valid) {
+        state.clearPendingPanel()
+        return
+      }
+      const id = pending as PanelId
+      setActivePanel(id)
+      setRenderedPanel(id)
+      trackPanelOpen(id)
+      if (isMobile) setMobileRailOpen(true)
+      requestAnimationFrame(() => setIsOpen(true))
+      state.clearPendingPanel()
+    })
+    return unsubscribe
+  }, [trackPanelOpen, isMobile])
 
   const closePanel = () => {
     setActivePanel(null)

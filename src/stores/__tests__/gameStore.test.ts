@@ -4900,3 +4900,295 @@ describe('InfiniBand Backend Fabric (Phase 8B)', () => {
   })
 })
 
+// ============================================================================
+// NOC / Traffic Triage (Phase 8C)
+// ============================================================================
+describe('NOC / Traffic Triage (Phase 8C)', () => {
+  beforeEach(() => {
+    setState({
+      sandboxMode: false,
+      money: 5_000_000,
+      suiteTier: 'standard',
+      unlockedTech: ['ai_infrastructure', 'immersion_cooling'],
+      tickCount: 100,
+      ibLinkRepairs: [],
+      selectedNocLinkId: null,
+      pendingPanelOpen: null,
+    })
+    // Standing pod we can poke at.
+    getState().createGPUPod('small', 0, STD_ROW_0)
+  })
+
+  // ── openNocDrawer ──────────────────────────────────────────────
+  it('openNocDrawer sets selectedNocLinkId AND flags the panel to open', () => {
+    const link = getState().ibLinks[0]
+    getState().openNocDrawer(link.id)
+    expect(getState().selectedNocLinkId).toBe(link.id)
+    expect(getState().pendingPanelOpen).toBe('noc')
+  })
+
+  it('openNocDrawer(null) clears the selection without flagging a panel open', () => {
+    getState().openNocDrawer(getState().ibLinks[0].id)
+    getState().clearPendingPanel()
+    getState().openNocDrawer(null)
+    expect(getState().selectedNocLinkId).toBeNull()
+    expect(getState().pendingPanelOpen).toBeNull()
+  })
+
+  // ── drainPort ──────────────────────────────────────────────────
+  it('drainPort sets utilizationPct to 0 and drainTicksRemaining to 20', () => {
+    const link = getState().ibLinks[0]
+    // Force a non-zero util so we can verify the reset.
+    setState({ ibLinks: getState().ibLinks.map((l) => l.id === link.id ? { ...l, utilizationPct: 67 } : l) })
+    getState().drainPort(link.id)
+    const after = getState().ibLinks.find((l) => l.id === link.id)!
+    expect(after.utilizationPct).toBe(0)
+    expect(after.drainTicksRemaining).toBe(20)
+  })
+
+  it('drainPort decrements via tick() and stops forcing util after 20 ticks', () => {
+    setState({ sandboxMode: true })
+    const linkId = getState().ibLinks[0].id
+    getState().drainPort(linkId)
+    expect(getState().ibLinks.find((l) => l.id === linkId)!.drainTicksRemaining).toBe(20)
+
+    for (let i = 0; i < 20; i++) getState().tick()
+    const after = getState().ibLinks.find((l) => l.id === linkId)!
+    // After 20 ticks the drain counter has reached 0.
+    expect(after.drainTicksRemaining ?? 0).toBe(0)
+  })
+
+  it('drainPort is a no-op on a down link', () => {
+    const link = getState().ibLinks[0]
+    setState({ ibLinks: getState().ibLinks.map((l) => l.id === link.id ? { ...l, status: 'down' as const, utilizationPct: 0 } : l) })
+    getState().drainPort(link.id)
+    const after = getState().ibLinks.find((l) => l.id === link.id)!
+    expect(after.drainTicksRemaining).toBeUndefined()
+  })
+
+  // ── resetSwitch ────────────────────────────────────────────────
+  it('resetSwitch clears errorCount on every link touching the switch', () => {
+    const sw = getState().ibSwitches.find((s) => s.type === 'ib_leaf')!
+    // Inject errors on the leaf's links + an unrelated link.
+    setState({
+      ibLinks: getState().ibLinks.map((l) =>
+        l.fromSwitchId === sw.id || l.toSwitchId === sw.id
+          ? { ...l, errorCount: 15, status: 'flapping' as const }
+          : { ...l, errorCount: 8 }
+      ),
+    })
+    getState().resetSwitch(sw.id)
+    const links = getState().ibLinks
+    for (const l of links) {
+      if (l.fromSwitchId === sw.id || l.toSwitchId === sw.id) {
+        expect(l.errorCount).toBe(0)
+        expect(l.status).toBe('healthy')
+      } else {
+        // Unrelated links retain their errors.
+        expect(l.errorCount).toBe(8)
+      }
+    }
+  })
+
+  it('resetSwitch respects the 5-tick cooldown', () => {
+    const sw = getState().ibSwitches[0]
+    setState({ ibLinks: getState().ibLinks.map((l) => ({ ...l, errorCount: 5 })) })
+
+    getState().resetSwitch(sw.id)
+    const firstReset = getState().ibSwitches.find((s) => s.id === sw.id)!.lastResetTick
+    expect(firstReset).toBe(100)
+
+    // Re-arm some errors and try to reset 3 ticks later — should be blocked.
+    setState({
+      tickCount: 103,
+      ibLinks: getState().ibLinks.map((l) => ({ ...l, errorCount: 9 })),
+    })
+    getState().resetSwitch(sw.id)
+    expect(getState().ibLinks.some((l) => (l.fromSwitchId === sw.id || l.toSwitchId === sw.id) && l.errorCount === 9)).toBe(true)
+    expect(getState().ibSwitches.find((s) => s.id === sw.id)!.lastResetTick).toBe(100) // unchanged
+
+    // Once the cooldown elapses, reset works again.
+    setState({ tickCount: 106 })
+    getState().resetSwitch(sw.id)
+    expect(getState().ibSwitches.find((s) => s.id === sw.id)!.lastResetTick).toBe(106)
+  })
+
+  it('resetSwitch will NOT auto-recover a down link (operator must replace the optic)', () => {
+    const sw = getState().ibSwitches[0]
+    setState({
+      ibLinks: getState().ibLinks.map((l) =>
+        l.fromSwitchId === sw.id ? { ...l, errorCount: 40, status: 'down' as const } : l
+      ),
+    })
+    getState().resetSwitch(sw.id)
+    const downLink = getState().ibLinks.find((l) => l.fromSwitchId === sw.id)!
+    expect(downLink.status).toBe('down')
+    expect(downLink.errorCount).toBe(0) // errors clear, but the link is still dead
+  })
+
+  // ── replaceOptic ───────────────────────────────────────────────
+  it('replaceOptic deducts $2K, resets the link, and stamps lastReplaceTick', () => {
+    const link = getState().ibLinks[0]
+    setState({ ibLinks: getState().ibLinks.map((l) => l.id === link.id ? { ...l, errorCount: 35, status: 'down' as const } : l) })
+    const moneyBefore = getState().money
+
+    getState().replaceOptic(link.id)
+    const after = getState().ibLinks.find((l) => l.id === link.id)!
+    expect(after.errorCount).toBe(0)
+    expect(after.status).toBe('healthy')
+    expect(after.lastReplaceTick).toBe(100)
+    expect(getState().money).toBe(moneyBefore - 2000)
+  })
+
+  it('replaceOptic blocks when player cannot afford it (non-sandbox)', () => {
+    setState({ money: 500 })
+    const link = getState().ibLinks[0]
+    setState({ ibLinks: getState().ibLinks.map((l) => l.id === link.id ? { ...l, errorCount: 25 } : l) })
+
+    getState().replaceOptic(link.id)
+    const after = getState().ibLinks.find((l) => l.id === link.id)!
+    expect(after.errorCount).toBe(25) // unchanged
+    expect(getState().money).toBe(500) // unchanged
+  })
+
+  it('replaceOptic suppresses error growth for ~50 ticks via lastReplaceTick boost', () => {
+    setState({ sandboxMode: true })
+    const linkId = getState().ibLinks[0].id
+    getState().replaceOptic(linkId)
+    const baselineErrors = getState().ibLinks.find((l) => l.id === linkId)!.errorCount
+
+    // Tick 40 times — still inside the 50-tick boost window — errors stay at baseline.
+    for (let i = 0; i < 40; i++) getState().tick()
+    const midBoost = getState().ibLinks.find((l) => l.id === linkId)!.errorCount
+    expect(midBoost).toBe(baselineErrors)
+  })
+
+  // ── dispatchElectrician ────────────────────────────────────────
+  function addOnShiftElectrician() {
+    const electrician: StaffMember = {
+      id: 'staff-test-1',
+      name: 'Test Electrician',
+      role: 'electrician',
+      skillLevel: 2,
+      salaryPerTick: 5,
+      hiredAtTick: 0,
+      onShift: true,
+      certifications: [],
+      incidentsResolved: 0,
+      fatigueLevel: 0,
+    }
+    setState({ staff: [electrician] })
+  }
+
+  it('dispatchElectrician needs an on-shift electrician, otherwise no-op', () => {
+    // No staff.
+    const link = getState().ibLinks[0]
+    getState().dispatchElectrician(link.id)
+    expect(getState().ibLinkRepairs).toHaveLength(0)
+
+    // Off-shift electrician → still no repair.
+    setState({ staff: [{
+      id: 'off',
+      name: 'Off shift',
+      role: 'electrician',
+      skillLevel: 1,
+      salaryPerTick: 5,
+      hiredAtTick: 0,
+      onShift: false,
+      certifications: [],
+      incidentsResolved: 0,
+      fatigueLevel: 0,
+    }] })
+    getState().dispatchElectrician(link.id)
+    expect(getState().ibLinkRepairs).toHaveLength(0)
+  })
+
+  it('dispatchElectrician creates a 10-tick repair entry', () => {
+    addOnShiftElectrician()
+    const link = getState().ibLinks[0]
+    getState().dispatchElectrician(link.id)
+    expect(getState().ibLinkRepairs).toHaveLength(1)
+    expect(getState().ibLinkRepairs[0].linkId).toBe(link.id)
+    expect(getState().ibLinkRepairs[0].ticksRemaining).toBe(10)
+  })
+
+  it('dispatchElectrician is idempotent — second call while one is in progress is a no-op', () => {
+    addOnShiftElectrician()
+    const link = getState().ibLinks[0]
+    getState().dispatchElectrician(link.id)
+    getState().dispatchElectrician(link.id)
+    expect(getState().ibLinkRepairs).toHaveLength(1)
+  })
+
+  it('electrician repair completes after 10 ticks and restores the link to healthy', () => {
+    setState({ sandboxMode: true })
+    addOnShiftElectrician()
+    const linkId = getState().ibLinks[0].id
+    setState({
+      ibLinks: getState().ibLinks.map((l) =>
+        l.id === linkId ? { ...l, errorCount: 40, status: 'down' as const } : l
+      ),
+    })
+
+    getState().dispatchElectrician(linkId)
+    for (let i = 0; i < 10; i++) getState().tick()
+
+    expect(getState().ibLinkRepairs.find((r) => r.linkId === linkId)).toBeUndefined()
+    const repaired = getState().ibLinks.find((l) => l.id === linkId)!
+    expect(repaired.status).toBe('healthy')
+    expect(repaired.errorCount).toBe(0)
+  })
+
+  // ── utilization history ────────────────────────────────────────
+  it('tick appends to utilizationHistory and caps at 50 samples', () => {
+    setState({ sandboxMode: true })
+    const linkId = getState().ibLinks[0].id
+
+    for (let i = 0; i < 75; i++) getState().tick()
+    const history = getState().ibLinks.find((l) => l.id === linkId)!.utilizationHistory ?? []
+    expect(history.length).toBe(50)
+    // Each sample is in [0, 100]
+    for (const v of history) {
+      expect(v).toBeGreaterThanOrEqual(0)
+      expect(v).toBeLessThanOrEqual(100)
+    }
+  })
+
+  // ── per-pod health summary math ───────────────────────────────
+  it('per-pod health summary correctly counts healthy/flapping/down per fabric', () => {
+    // Force a specific mix of link statuses on the standing fabric.
+    const fabric = getState().infiniBandFabrics[0]
+    setState({
+      ibLinks: getState().ibLinks.map((l, i) => {
+        if (l.fabricId !== fabric.id) return l
+        if (i === 0) return { ...l, status: 'down' as const, errorCount: 40 }
+        if (i === 1 || i === 2) return { ...l, status: 'flapping' as const, errorCount: 15 }
+        return { ...l, status: 'healthy' as const }
+      }),
+    })
+    const links = getState().ibLinks.filter((l) => l.fabricId === fabric.id)
+    expect(links.filter((l) => l.status === 'down')).toHaveLength(1)
+    expect(links.filter((l) => l.status === 'flapping')).toHaveLength(2)
+    expect(links.filter((l) => l.status === 'healthy')).toHaveLength(17) // 20 - 1 - 2
+
+    // Fabric health derivation runs in tick().
+    getState().tick()
+    // 1 down out of 20 = 5%, (1+2)/20 = 15% → degraded
+    expect(getState().infiniBandFabrics[0].health).toBe('degraded')
+  })
+
+  // ── pod removal cleanup ────────────────────────────────────────
+  it('removeGPUPod drops repairs and clears the drawer if it pointed at a removed link', () => {
+    addOnShiftElectrician()
+    const linkId = getState().ibLinks[0].id
+    getState().dispatchElectrician(linkId)
+    getState().openNocDrawer(linkId)
+    expect(getState().ibLinkRepairs).toHaveLength(1)
+    expect(getState().selectedNocLinkId).toBe(linkId)
+
+    getState().removeGPUPod(getState().gpuPods[0].id)
+    expect(getState().ibLinkRepairs).toHaveLength(0)
+    expect(getState().selectedNocLinkId).toBeNull()
+  })
+})
+
