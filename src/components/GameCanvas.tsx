@@ -24,6 +24,7 @@ export function GameCanvas() {
   const layerColors = useGameStore((s) => s.layerColors)
   const trafficStats = useGameStore((s) => s.trafficStats)
   const trafficVisible = useGameStore((s) => s.trafficVisible)
+  const backendFabricVisible = useGameStore((s) => s.backendFabricVisible)
   const suiteTier = useGameStore((s) => s.suiteTier)
   const placementMode = useGameStore((s) => s.placementMode)
   const placementFacing = useGameStore((s) => s.placementFacing)
@@ -434,6 +435,14 @@ export function GameCanvas() {
     if (!scene) return
     scene.setTrafficVisible(trafficVisible)
   }, [trafficVisible, sceneReady])
+
+  // Sync backend fabric (Phase 8B InfiniBand) visibility to Phaser
+  useEffect(() => {
+    if (!gameRef.current) return
+    const scene = getScene(gameRef.current)
+    if (!scene) return
+    scene.setBackendFabricVisible(backendFabricVisible)
+  }, [backendFabricVisible, sceneReady])
 
   // Sync heat map visibility to Phaser (re-render when cabinets change to update temperatures)
   useEffect(() => {

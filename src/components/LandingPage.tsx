@@ -329,7 +329,7 @@ export function LandingPage({ onPlay }: LandingPageProps) {
       <header className="flex flex-col items-center justify-center w-full max-w-4xl px-4 pt-12 md:pt-16 pb-6 relative z-20">
         {/* Version badge */}
         <span className="text-[10px] tracking-widest text-neon-cyan/60 border border-neon-cyan/20 rounded px-2 py-0.5 mb-4 landing-fade-in" style={{ animationDelay: '0.1s' }}>
-          v0.5.2
+          v0.6.0
         </span>
 
         {/* Title */}
@@ -405,7 +405,7 @@ export function LandingPage({ onPlay }: LandingPageProps) {
       {/* Footer */}
       <footer className="w-full border-t border-border/30 py-4 text-center relative z-20 landing-fade-in" style={{ animationDelay: '2.2s' }}>
         <p className="text-[10px] text-muted-foreground/50 tracking-wider">
-          DC TYCOON v0.5.2 &middot; BUILT WITH REACT + PHASER + ZUSTAND
+          DC TYCOON v0.6.0 &middot; BUILT WITH REACT + PHASER + ZUSTAND
         </p>
       </footer>
     </main>

@@ -16,6 +16,26 @@ interface VersionEntry {
 
 const CHANGELOG: VersionEntry[] = [
   {
+    version: 'v0.6.0',
+    date: 'Jun 2026',
+    title: 'The AI Infrastructure Era',
+    highlights: 'The GPU age arrives. Deploy high-density GPU pods cooled by rear-door heat exchangers or direct-to-chip liquid loops, wired together by a violet InfiniBand backend fabric with per-rail isolation and AllReduce ring pulse visualization.',
+    changes: [
+      { text: 'GPU pods — multi-cabinet training clusters in two sizes: Small (64 GPU, 4 cabinets, $200K) and Medium (128 GPU, 8 cabinets, $450K)', type: 'new' },
+      { text: 'High-density cabinets — new `high_density` (30–35kW class) and `extreme_density` (45–50kW class) cabinet tiers with compounding power and heat multipliers', type: 'new' },
+      { text: 'Liquid cooling tiers — rear-door heat exchangers ($30K/cab, ≤35kW), direct-to-chip cold plates ($80K/cab, ≤50kW), and single-phase immersion ($150K/cab, ≤100kW)', type: 'new' },
+      { text: 'AI Lab customer type — 4× revenue multiplier, 2.5× power and heat, frontier training-lab tenant demanding liquid cooling', type: 'new' },
+      { text: 'AI Infrastructure research — unlocks the entire GPU pod tier; immersion cooling tech gates the eventual hyperpod', type: 'new' },
+      { text: 'InfiniBand backend fabric — violet rail-optimized fat-tree network auto-built per pod with IB leaf switches (32× 400G NDR ports, $30K) and non-blocking IB spines (64-port, $80K)', type: 'new' },
+      { text: 'Per-rail isolation — 4 parallel rails on small/medium pods (8 on hyperpods); a single rail failure leaves the others intact for graceful AllReduce degradation', type: 'new' },
+      { text: 'AllReduce ring pulse — animated packet dots travel around each pod\'s cabinets, one per rail at staggered phases, while a training job is active', type: 'new' },
+      { text: 'Backend fabric layer toggle — show/hide IB switches, cables, and ring pulse from the Layers popup (auto-disabled until the first pod is built)', type: 'new' },
+      { text: 'Pod removal now adds decommissioned servers to the e-waste stockpile, sharing the same dispose-or-pay-reputation path as server refreshes', type: 'improved' },
+      { text: 'GPU pod tooltips show real compounded power (per-cabinet at install and at full server load, plus pod totals) instead of the misleading nominal datasheet kW', type: 'improved' },
+      { text: 'Status bar version chip now reflects the live release', type: 'improved' },
+    ],
+  },
+  {
     version: 'v0.5.3',
     date: 'Feb 2026',
     title: 'The Network Security Update',
