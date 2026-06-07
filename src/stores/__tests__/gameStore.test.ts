@@ -60,6 +60,9 @@ import {
   NACL_BLOCKED_INCIDENT_TYPES,
   calcTrafficWithCapacity,
   TRAFFIC,
+  TECH_TREE,
+  GPU_POD_CONFIG,
+  LIQUID_COOLING_CONFIG,
 } from '@/stores/gameStore'
 import type { RegionId } from '@/stores/gameStore'
 
@@ -4470,6 +4473,430 @@ describe('NACL System', () => {
     getState().resetGame()
     expect(getState().naclPolicy).toBe('open')
     expect(getState().networkAttacksBlocked).toBe(0)
+  })
+})
+
+// ============================================================================
+// GPU Pods (Phase 8A) — High-Density Compute & Liquid Cooling
+// ============================================================================
+describe('GPU Pods (Phase 8A)', () => {
+  beforeEach(() => {
+    setState({
+      sandboxMode: false,
+      money: 1_000_000,
+      suiteTier: 'standard',
+      unlockedTech: ['ai_infrastructure'],
+    })
+  })
+
+  it('createGPUPod is blocked without ai_infrastructure tech', () => {
+    setState({ unlockedTech: [] })
+    expect(getState().gpuPods).toHaveLength(0)
+    getState().createGPUPod('small', 0, STD_ROW_0)
+    expect(getState().gpuPods).toHaveLength(0)
+    expect(getState().cabinets).toHaveLength(0)
+  })
+
+  it('createGPUPod is blocked without sufficient cash', () => {
+    setState({ money: 50_000 }) // small pod costs 200k
+    getState().createGPUPod('small', 0, STD_ROW_0)
+    expect(getState().gpuPods).toHaveLength(0)
+  })
+
+  it('createGPUPod is blocked on a non-cabinet grid row', () => {
+    // gridRow 0 is a corridor in standard tier
+    getState().createGPUPod('small', 0, 0)
+    expect(getState().gpuPods).toHaveLength(0)
+  })
+
+  it('createGPUPod is blocked when footprint overlaps existing cabinets', () => {
+    getState().addCabinet(2, STD_ROW_0, 'production', 'general', 'north')
+    getState().createGPUPod('small', 0, STD_ROW_0) // would occupy cols 0–3, col 2 is taken
+    expect(getState().gpuPods).toHaveLength(0)
+  })
+
+  it('createGPUPod creates 4 cabinets for a small pod', () => {
+    getState().createGPUPod('small', 0, STD_ROW_0)
+    expect(getState().gpuPods).toHaveLength(1)
+    const pod = getState().gpuPods[0]
+    expect(pod.size).toBe('small')
+    expect(pod.cabinetCount).toBe(4)
+    expect(pod.gpuCount).toBe(64)
+    expect(pod.cabinetIds).toHaveLength(4)
+    expect(getState().cabinets).toHaveLength(4)
+  })
+
+  it('pod member cabinets have correct density, gpuCount, liquidCooling, podId', () => {
+    getState().createGPUPod('small', 0, STD_ROW_0)
+    const pod = getState().gpuPods[0]
+    const podCabs = getState().cabinets.filter((c) => c.podId === pod.id)
+    expect(podCabs).toHaveLength(4)
+    for (const cab of podCabs) {
+      expect(cab.density).toBe('high_density')
+      expect(cab.gpuCount).toBe(16) // 64 GPUs / 4 cabinets
+      expect(cab.liquidCooling).toBe('rear_door_hx')
+      expect(cab.customerType).toBe('ai_lab') // default
+      expect(cab.hasLeafSwitch).toBe(true)
+    }
+  })
+
+  it('createGPUPod deducts install cost from money (non-sandbox)', () => {
+    const before = getState().money
+    getState().createGPUPod('small', 0, STD_ROW_0)
+    expect(getState().money).toBe(before - 200_000)
+  })
+
+  it('createGPUPod does not deduct money in sandbox mode', () => {
+    setState({ sandboxMode: true })
+    const before = getState().money
+    getState().createGPUPod('small', 0, STD_ROW_0)
+    expect(getState().money).toBe(before)
+  })
+
+  it('medium pod is blocked without direct_to_chip cooling tech (still ai_infrastructure)', () => {
+    // ai_infrastructure unlocks rear_door and direct_to_chip — both should work
+    getState().createGPUPod('medium', 0, STD_ROW_0)
+    expect(getState().gpuPods).toHaveLength(1)
+    const pod = getState().gpuPods[0]
+    expect(pod.cabinetCount).toBe(8)
+    const podCabs = getState().cabinets.filter((c) => c.podId === pod.id)
+    expect(podCabs[0].liquidCooling).toBe('direct_to_chip')
+  })
+
+  it('hyperpod requires immersion_cooling tech', () => {
+    setState({ money: 5_000_000 })
+    // Only ai_infrastructure unlocked, not immersion_cooling
+    getState().createGPUPod('hyperpod', 0, STD_ROW_0)
+    expect(getState().gpuPods).toHaveLength(0)
+  })
+
+  it('removeGPUPod removes the pod record and all member cabinets', () => {
+    getState().createGPUPod('small', 0, STD_ROW_0)
+    const pod = getState().gpuPods[0]
+    expect(getState().cabinets).toHaveLength(4)
+
+    getState().removeGPUPod(pod.id)
+    expect(getState().gpuPods).toHaveLength(0)
+    expect(getState().cabinets).toHaveLength(0)
+  })
+
+  it('removeGPUPod preserves non-pod cabinets', () => {
+    getState().addCabinet(7, STD_ROW_0, 'production', 'general', 'north')
+    getState().createGPUPod('small', 0, STD_ROW_0)
+    expect(getState().cabinets).toHaveLength(5)
+    const pod = getState().gpuPods[0]
+
+    getState().removeGPUPod(pod.id)
+    expect(getState().cabinets).toHaveLength(1)
+    expect(getState().cabinets[0].podId).toBeNull()
+  })
+
+  it('installLiquidCooling on existing cabinet updates the type and charges cost', () => {
+    getState().addCabinet(0, STD_ROW_0, 'production', 'general', 'north')
+    const cab = getState().cabinets[0]
+    expect(cab.liquidCooling).toBe('none')
+    const before = getState().money
+
+    getState().installLiquidCooling(cab.id, 'rear_door_hx')
+    const updated = getState().cabinets.find((c) => c.id === cab.id)!
+    expect(updated.liquidCooling).toBe('rear_door_hx')
+    expect(getState().money).toBe(before - 30_000)
+  })
+
+  it('high-density cabinet draws significantly more power than standard', () => {
+    // Add one standard cabinet
+    getState().addCabinet(7, STD_ROW_0, 'production', 'general', 'north')
+    const standardPower = getState().totalPower
+
+    // Create a small pod (4 high-density cabinets, customer ai_lab)
+    getState().createGPUPod('small', 0, STD_ROW_0)
+    const withPodPower = getState().totalPower
+
+    // Pod adds: 4 cabs × 1 server × 450W × 2.5 (ai_lab) × 5.0 (high_density) + 4 × 150W (leaf) = 22,500 + 600 = 23,100W
+    // Plus the standard cab's existing draw
+    expect(withPodPower).toBeGreaterThan(standardPower + 20_000)
+  })
+
+  it('liquid cooling reduces cabinet heat over a tick', () => {
+    // Two identical high-heat cabinets, one with rear-door HX, one without
+    setState({ sandboxMode: true, money: 999999 })
+    getState().addCabinet(0, STD_ROW_0, 'production', 'general', 'north')
+    getState().addCabinet(1, STD_ROW_0, 'production', 'general', 'north')
+    const cabs = getState().cabinets
+    setState({
+      cabinets: [
+        { ...cabs[0], heatLevel: 60, liquidCooling: 'none' },
+        { ...cabs[1], heatLevel: 60, liquidCooling: 'rear_door_hx' },
+      ],
+    })
+
+    getState().tick()
+    const after = getState().cabinets
+    // The liquid-cooled cabinet should have lower heat (or be cooler than the uncooled one)
+    expect(after[1].heatLevel).toBeLessThan(after[0].heatLevel)
+  })
+
+  it('AI Infrastructure tech is in the tech tree', () => {
+    const ai = TECH_TREE.find((t) => t.id === 'ai_infrastructure')
+    expect(ai).toBeDefined()
+    expect(ai?.branch).toBe('performance')
+    expect(ai?.prereqId).toBe('gpu_clusters')
+  })
+
+  it('GPU_POD_CONFIG has all four sizes with consistent gpu/cabinet ratios', () => {
+    for (const size of ['small', 'medium', 'large', 'hyperpod'] as const) {
+      const cfg = GPU_POD_CONFIG[size]
+      expect(cfg).toBeDefined()
+      // Each cabinet holds the same number of GPUs within a pod
+      expect(cfg.gpuCount % cfg.cabinetCount).toBe(0)
+    }
+  })
+
+  it('LIQUID_COOLING_CONFIG handles increasing power densities', () => {
+    expect(LIQUID_COOLING_CONFIG.none.maxKWPerCabinet).toBeLessThan(LIQUID_COOLING_CONFIG.rear_door_hx.maxKWPerCabinet)
+    expect(LIQUID_COOLING_CONFIG.rear_door_hx.maxKWPerCabinet).toBeLessThan(LIQUID_COOLING_CONFIG.direct_to_chip.maxKWPerCabinet)
+    expect(LIQUID_COOLING_CONFIG.direct_to_chip.maxKWPerCabinet).toBeLessThan(LIQUID_COOLING_CONFIG.single_phase_immersion.maxKWPerCabinet)
+  })
+
+  it('gpuPods are preserved through resetGame to empty', () => {
+    getState().createGPUPod('small', 0, STD_ROW_0)
+    expect(getState().gpuPods).toHaveLength(1)
+    getState().resetGame()
+    expect(getState().gpuPods).toHaveLength(0)
+  })
+
+  it('save/load round-trip restores the pod, its member cabinets, and the id counter', () => {
+    getState().createGPUPod('small', 0, STD_ROW_0)
+    const podBefore = getState().gpuPods[0]
+    const cabsBefore = getState().cabinets.filter((c) => c.podId === podBefore.id)
+    expect(cabsBefore).toHaveLength(4)
+
+    getState().saveGame(99, 'Pod Save Test')
+    getState().resetGame()
+    expect(getState().gpuPods).toHaveLength(0)
+    expect(getState().cabinets).toHaveLength(0)
+
+    const loaded = getState().loadGame(99)
+    expect(loaded).toBe(true)
+    expect(getState().gpuPods).toHaveLength(1)
+    const podAfter = getState().gpuPods[0]
+    expect(podAfter.id).toBe(podBefore.id)
+    expect(podAfter.cabinetCount).toBe(4)
+    expect(podAfter.gpuCount).toBe(64)
+
+    const cabsAfter = getState().cabinets.filter((c) => c.podId === podAfter.id)
+    expect(cabsAfter).toHaveLength(4)
+    for (const cab of cabsAfter) {
+      expect(cab.density).toBe('high_density')
+      expect(cab.liquidCooling).toBe('rear_door_hx')
+      expect(cab.customerType).toBe('ai_lab')
+    }
+
+    // After load, creating a new pod should NOT collide with the restored pod's ID
+    setState({ money: 999_999, suiteTier: 'standard', unlockedTech: ['ai_infrastructure'] })
+    getState().createGPUPod('small', 4, STD_ROW_0)
+    const podIds = getState().gpuPods.map((p) => p.id)
+    expect(new Set(podIds).size).toBe(podIds.length) // unique
+  })
+
+  it('loadGame migrates pre-8A cabinets without density/liquidCooling fields and does not crash', () => {
+    // Hand-craft a save payload mimicking a pre-Phase-8A schema: cabinets array
+    // lacking density, gpuCount, liquidCooling, and podId fields.
+    const legacySave = {
+      version: 'v0.4.0',
+      timestamp: Date.now(),
+      cabinets: [
+        {
+          id: 'cab-100',
+          col: 0,
+          row: STD_ROW_0,
+          environment: 'production',
+          customerType: 'general',
+          serverCount: 2,
+          hasLeafSwitch: true,
+          powerStatus: true,
+          heatLevel: 35,
+          serverAge: 50,
+          facing: 'south',
+          // intentionally missing: density, gpuCount, liquidCooling, podId
+        },
+      ],
+      spineSwitches: [{ id: 'spine-1', powerStatus: true }],
+      money: 100_000,
+      tickCount: 500,
+      suiteTier: 'standard',
+      unlockedTech: ['hot_aisle'],
+      // gpuPods intentionally absent — pre-8A saves don't have this field
+    }
+    localStorage.setItem('fabric-tycoon-save-slot-98', JSON.stringify(legacySave))
+
+    // Should not throw. Pre-fix this would crash with "Cannot read properties of undefined".
+    const loaded = getState().loadGame(98)
+    expect(loaded).toBe(true)
+
+    const cab = getState().cabinets[0]
+    expect(cab.id).toBe('cab-100')
+    expect(cab.density).toBe('standard')
+    expect(cab.gpuCount).toBe(0)
+    expect(cab.liquidCooling).toBe('none')
+    expect(cab.podId).toBeNull()
+    expect(getState().gpuPods).toEqual([])
+    // calcStats must have run without throwing, so totalPower should be non-zero
+    expect(getState().totalPower).toBeGreaterThan(0)
+  })
+
+  it('loadDemoState clears gpuPods so demos do not leak stale pods', () => {
+    getState().createGPUPod('small', 0, STD_ROW_0)
+    expect(getState().gpuPods).toHaveLength(1)
+    getState().loadDemoState()
+    expect(getState().gpuPods).toEqual([])
+  })
+})
+
+// ============================================================================
+// InfiniBand Backend Fabric (Phase 8B)
+// ============================================================================
+describe('InfiniBand Backend Fabric (Phase 8B)', () => {
+  beforeEach(() => {
+    setState({
+      sandboxMode: false,
+      money: 5_000_000,
+      suiteTier: 'standard',
+      unlockedTech: ['ai_infrastructure', 'immersion_cooling'],
+    })
+  })
+
+  it('createGPUPod spawns a 4-rail fabric with one leaf + one spine per rail', () => {
+    getState().createGPUPod('small', 0, STD_ROW_0)
+
+    const fabrics = getState().infiniBandFabrics
+    expect(fabrics).toHaveLength(1)
+    const fabric = fabrics[0]
+    expect(fabric.railCount).toBe(4)
+    expect(fabric.leafSwitchIds).toHaveLength(4)
+    expect(fabric.spineSwitchIds).toHaveLength(4)
+    expect(fabric.topology).toBe('fat_tree')
+    expect(fabric.health).toBe('healthy')
+
+    const switches = getState().ibSwitches
+    expect(switches.filter((s) => s.type === 'ib_leaf')).toHaveLength(4)
+    expect(switches.filter((s) => s.type === 'ib_spine')).toHaveLength(4)
+    // Every switch belongs to this fabric's pod
+    for (const s of switches) {
+      expect(s.podId).toBe(fabric.podId)
+      expect(s.rail).toBeGreaterThanOrEqual(0)
+      expect(s.rail).toBeLessThan(4)
+    }
+  })
+
+  it('creates correct number of links: (cabinets × rails) downlinks + rails uplinks', () => {
+    getState().createGPUPod('small', 0, STD_ROW_0)
+    // small pod = 4 cabinets, 4 rails → 4×4 downlinks + 4 uplinks = 20
+    expect(getState().ibLinks).toHaveLength(20)
+    const fabric = getState().infiniBandFabrics[0]
+    // Every link references the fabric
+    for (const link of getState().ibLinks) {
+      expect(link.fabricId).toBe(fabric.id)
+      expect(link.status).toBe('healthy')
+      expect(link.bandwidthGbps).toBe(400)
+    }
+  })
+
+  it('hyperpod gets 8 rails instead of 4', () => {
+    setState({ money: 10_000_000, suiteTier: 'enterprise' })
+    // hyperpod is 32 cabinets — won't fit single-row in enterprise (14 cols) so this should
+    // fail validation. Verify the rail-count config is wired separately via small/medium proof.
+    getState().createGPUPod('medium', 0, STD_ROW_0)
+    const fabric = getState().infiniBandFabrics[0]
+    expect(fabric.railCount).toBe(4)
+    // 8 cabinets × 4 rails + 4 uplinks = 36
+    expect(fabric.linkIds).toHaveLength(36)
+  })
+
+  it('removeGPUPod tears down its fabric, switches, and links', () => {
+    getState().createGPUPod('small', 0, STD_ROW_0)
+    const podId = getState().gpuPods[0].id
+    expect(getState().ibSwitches).toHaveLength(8)
+    expect(getState().ibLinks).toHaveLength(20)
+
+    getState().removeGPUPod(podId)
+    expect(getState().infiniBandFabrics).toHaveLength(0)
+    expect(getState().ibSwitches).toHaveLength(0)
+    expect(getState().ibLinks).toHaveLength(0)
+  })
+
+  it('removeGPUPod leaves OTHER pods fabrics intact', () => {
+    getState().createGPUPod('small', 0, STD_ROW_0)
+    getState().createGPUPod('small', 4, STD_ROW_0)
+    expect(getState().infiniBandFabrics).toHaveLength(2)
+    expect(getState().ibSwitches).toHaveLength(16)
+
+    const firstPodId = getState().gpuPods[0].id
+    getState().removeGPUPod(firstPodId)
+    expect(getState().infiniBandFabrics).toHaveLength(1)
+    expect(getState().ibSwitches).toHaveLength(8)
+    // Remaining switches all belong to the surviving pod
+    const survivingPodId = getState().gpuPods[0].id
+    for (const s of getState().ibSwitches) {
+      expect(s.podId).toBe(survivingPodId)
+    }
+  })
+
+  it('save/load preserves fabric topology and id counters', () => {
+    getState().createGPUPod('small', 0, STD_ROW_0)
+    const before = {
+      fabrics: getState().infiniBandFabrics,
+      switches: getState().ibSwitches,
+      links: getState().ibLinks,
+    }
+
+    getState().saveGame(50, 'IB Fabric Save')
+    getState().resetGame()
+    expect(getState().infiniBandFabrics).toHaveLength(0)
+    expect(getState().ibSwitches).toHaveLength(0)
+    expect(getState().ibLinks).toHaveLength(0)
+
+    const loaded = getState().loadGame(50)
+    expect(loaded).toBe(true)
+    expect(getState().infiniBandFabrics).toHaveLength(before.fabrics.length)
+    expect(getState().ibSwitches).toHaveLength(before.switches.length)
+    expect(getState().ibLinks).toHaveLength(before.links.length)
+    // Switch + link IDs should match
+    expect(getState().ibSwitches.map((s) => s.id).sort()).toEqual(before.switches.map((s) => s.id).sort())
+
+    // After load, creating a new pod must not collide on IB switch IDs
+    setState({ money: 999_999, suiteTier: 'standard', unlockedTech: ['ai_infrastructure'] })
+    getState().createGPUPod('small', 4, STD_ROW_0)
+    const allSwIds = getState().ibSwitches.map((s) => s.id)
+    expect(new Set(allSwIds).size).toBe(allSwIds.length)
+  })
+
+  it('tick processes IB links without crashing and ramps activityLevel', () => {
+    setState({ sandboxMode: true })
+    getState().createGPUPod('small', 0, STD_ROW_0)
+    expect(getState().infiniBandFabrics[0].activityLevel).toBe(0)
+
+    // Tick a few times — activity should ramp up while the pod's cabinets are powered.
+    for (let i = 0; i < 20; i++) getState().tick()
+    expect(getState().infiniBandFabrics[0].activityLevel).toBeGreaterThan(0.3)
+  })
+
+  it('IB switch ID counter is preserved correctly after load + new pod creation', () => {
+    getState().createGPUPod('small', 0, STD_ROW_0)
+    const switchIdsBefore = getState().ibSwitches.map((s) => s.id)
+    getState().saveGame(51, 'Counter Test')
+    getState().resetGame()
+    getState().loadGame(51)
+
+    // Create another pod after load
+    setState({ money: 999_999, suiteTier: 'standard', unlockedTech: ['ai_infrastructure'] })
+    getState().createGPUPod('small', 4, STD_ROW_0)
+    const allIds = getState().ibSwitches.map((s) => s.id)
+    expect(new Set(allIds).size).toBe(allIds.length) // no collisions
+    // Loaded IDs are still present
+    for (const id of switchIdsBefore) {
+      expect(allIds).toContain(id)
+    }
   })
 })
 

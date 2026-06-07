@@ -616,4 +616,56 @@ Ideas for further encouraging organized cabinet layouts. Zone Adjacency Bonus (w
 
 **Implemented features:** 260+ items across Phases 1–6, rendering, UX, capacity planning, operations progression, cooling infrastructure (placeable units + chiller plants + pipes), cabinet organization incentives (zones, dedicated rows, mixed-env penalties), sub-floor view, 42U rack model, advanced scaling tiers (Nuclear/Fusion), workload simulation, sound effects (procedural Web Audio synthesis with per-event sounds), placement animations with Phaser tweens, enhanced build animations (server install pulse, leaf switch flash, equipment removal), camera juice effects (shake/zoom pulse/zoom reveal/smooth pan/bankruptcy zoom), ambient animations (LED pulses, fan rotation, spine glow), weather particle overlays (rain, snow, heat shimmer), day/night ambient light cycle, particle effects for events (fire, sparks, cooling mist, heat shimmer, sparkle bursts, warning pulses, achievement showers, construction dust), worker sprites with pathfinding and role-colored uniforms, scenario presentation with star ratings and progression, sidebar slide transitions, leaderboards, row-end slots, aisle width upgrades, raised floor, cable management, floating world-space text, visual state differentiation, multi-site expansion (15 regions, 6 site types, inter-site networking, regional incidents, disaster prep), global strategy layer (demand growth, data sovereignty, multi-site contracts, staff transfers, competitor regional expansion), NACL policies, prestige/new game+, player-built rows with custom row mode, and guided/structured layout mode.
 
-**Remaining features:** All planned features through Phase 6 are implemented. See BRAINSTORM.md for Phase 7 ideas.
+**Remaining features:** All planned features through Phase 6 are implemented. See BRAINSTORM.md for Phase 7 and Phase 8 ideas.
+
+---
+
+## Phase 8 — AI Infrastructure Era 🚧
+
+The AI boom changed what data centers look like. Phase 8 introduces high-density GPU compute, InfiniBand backend fabric, and a new operational triage layer (NOC panel). Full design in BRAINSTORM.md Phase 8.
+
+### 8A. GPU Pods & High-Density Cabinets 🚧 (in progress)
+- [ ] `CabinetDensity` type (standard / high_density / extreme_density)
+- [ ] `GPUPod` entity grouping 4–16 cabinets as a unit
+- [ ] 4 pod sizes (64 / 128 / 256 / 512 GPUs)
+- [ ] Liquid cooling tiers: rear-door HX, direct-to-chip, single-phase immersion
+- [ ] `ai_lab` customer type with premium per-GPU rates
+- [ ] "AI Infrastructure" research tech gate
+- [ ] Power/heat scaling for 30–50kW cabinets
+- [ ] BuildPanel section for GPU pod placement
+- [ ] Phaser rendering: high-density cabinet visual signature + pod boundary outline
+- [ ] Tests for pod creation, liquid cooling install, density power/heat calc
+
+### 8B. InfiniBand Backend Fabric
+- [ ] `InfiniBandFabric` entity with rail-optimized fat-tree topology
+- [ ] `IBSwitch` types: `ib_leaf` ($30K), `ib_spine` ($80K)
+- [ ] `IBLink` with bandwidth (200/400/800 Gbps), error rate, status
+- [ ] AllReduce, AllToAll, pipeline-parallel traffic patterns
+- [ ] Phaser layer: violet IB cables vs cyan ECMP, per-rail tint, AllReduce ring pulse
+- [ ] Tests for fabric construction, rail isolation, link health
+
+### 8C. NOC Panel — Traffic Triage
+- [ ] New sidebar panel with fabric health summary
+- [ ] Sortable/filterable link list (utilization, error count, status)
+- [ ] Link detail drawer with utilization sparkline + actions (drain, reset, replace optic)
+- [ ] Job health tab showing active training jobs and value at risk
+- [ ] Scene ↔ panel linking (click link in Phaser, opens drawer)
+
+### 8D. AI-Specific Incidents
+- [ ] IB link flap, NCCL collective hang, silent data corruption, optic failure, PFC storm, thermal runaway, GPU memory ECC fault
+- [ ] Integration with existing incident system + NACL-style mitigations
+
+### 8E. Training Jobs & AI Revenue
+- [ ] `TrainingJob` entity with progress, restarts, value-at-risk
+- [ ] 4 job types (pretraining / fine-tuning / inference batch / RL training)
+- [ ] Lump-sum payout on completion; partial on early termination
+- [ ] Inference fill between training jobs
+- [ ] Job tracker UI
+
+### Phase 8 Adjacent Backlog (deferred)
+See BRAINSTORM.md sections 8F–8J for full designs:
+- 8F. Failure cascades / blast radius modeling
+- 8G. Customer personas / named tenants (overlaps with 7F)
+- 8H. Power arbitrage with battery storage
+- 8I. Enhanced M&A (extends 7A)
+- 8J. Submarine cable investment

@@ -30,6 +30,11 @@ const CABINET_ENCLOSURE_DEPTH = BASE_DEPTH
 // Light gray cabinet enclosure colors
 const CABINET_COLORS = { top: 0x667788, side: 0x4a5a6a, front: 0x3d4d5d }
 
+// Phase 8A: magenta cube palette for GPU server units inside high-density pod cabinets.
+// Replaces the green server cubes so pod cabinets are unmistakably distinct.
+const GPU_SERVER_COLORS = { top: 0xff44ff, side: 0xcc33cc, front: 0x991a99 }
+const GPU_CABINET_COLORS = { top: 0x5a3a5a, side: 0x442844, front: 0x2e1a2e }
+
 // Spine visual dimensions
 const SPINE_W = 50
 const SPINE_H = 25
@@ -96,6 +101,40 @@ interface CabinetEntry {
   inMaintenance: boolean   // currently under maintenance
   serverAge: number        // server age in ticks (for depreciation tint)
   recentlyPlaced: number   // timestamp (ms) when placed, 0 = not recent
+  // Phase 8A: GPU pod fields
+  density: 'standard' | 'high_density' | 'extreme_density'
+  podId: string | null
+}
+
+interface GPUPodEntry {
+  id: string
+  cabinetIds: string[]
+  // computed bounding box (in tile coords)
+  minCol: number
+  maxCol: number
+  minRow: number
+  maxRow: number
+}
+
+// Phase 8B: InfiniBand fabric entities tracked by the scene
+interface IBSwitchEntry {
+  id: string
+  type: 'ib_leaf' | 'ib_spine'
+  podId: string
+  rail: number
+  // Computed screen position for cable drawing + click hit-test
+  col: number       // fractional grid col
+  row: number       // fractional grid row
+  operational: boolean
+}
+
+interface IBLinkEntry {
+  id: string
+  fromSwitchId: string
+  toSwitchId: string  // ib_spine id, OR a cabinet id for leaf↔cabinet downlinks
+  fabricId: string
+  rail: number
+  status: 'healthy' | 'flapping' | 'down'
 }
 
 interface PDUEntry {
@@ -151,6 +190,19 @@ class DataCenterScene extends Phaser.Scene {
   private spineNodeLabels: Map<string, Phaser.GameObjects.Text> = new Map()
   private cabEntries: Map<string, CabinetEntry> = new Map()
   private spineEntries: Map<string, SpineEntry> = new Map()
+  // Phase 8A: GPU pods
+  private gpuPodEntries: Map<string, GPUPodEntry> = new Map()
+  private gpuPodGraphics: Phaser.GameObjects.Graphics | null = null
+  // Phase 8B: InfiniBand backend fabric
+  private ibSwitchEntries: Map<string, IBSwitchEntry> = new Map()
+  private ibLinkEntries: Map<string, IBLinkEntry> = new Map()
+  private ibSwitchGraphics: Phaser.GameObjects.Graphics | null = null
+  private ibLinkGraphics: Phaser.GameObjects.Graphics | null = null
+  private ibSwitchLabels: Phaser.GameObjects.Text[] = []
+  private backendFabricVisible = true
+  // Phase 8B: AllReduce ring pulse animation state
+  private allReduceGraphics: Phaser.GameObjects.Graphics | null = null
+  private allReducePhase = 0    // 0..1, advances over time and wraps
   private cabCount = 0
   private spineCount = 0
   private offsetX = 0
@@ -1279,7 +1331,10 @@ class DataCenterScene extends Phaser.Scene {
     const labels: Phaser.GameObjects.Text[] = []
     const baseDepth = 10 + entry.row * this.cabCols + entry.col
 
-    const serverColors: LayerColors = this.layerColors.server ?? COLORS.server
+    // Phase 8A: GPU pod cabinets render with magenta cubes instead of the default green.
+    const serverColors: LayerColors = entry.density !== 'standard'
+      ? GPU_SERVER_COLORS
+      : (this.layerColors.server ?? COLORS.server)
     const leafColors: LayerColors = this.layerColors.leaf_switch ?? COLORS.leaf_switch
     const serverVis = this.layerVisibility.server
     const leafVis = this.layerVisibility.leaf_switch
@@ -1287,9 +1342,10 @@ class DataCenterScene extends Phaser.Scene {
     const leafOpacity = this.layerOpacity.leaf_switch
     const powerMult = entry.powerOn ? 1 : 0.2
 
-    // 1. Full-height cabinet enclosure — light gray box (fixed height regardless of contents)
+    // 1. Full-height cabinet enclosure — light gray normally, dark magenta for GPU pods
     const cabinetAlpha = 0.6 * powerMult
-    this.drawIsoCube(g, cx, cy, CUBE_W, CUBE_H, CABINET_ENCLOSURE_DEPTH, CABINET_COLORS, cabinetAlpha)
+    const enclosureColors = entry.density !== 'standard' ? GPU_CABINET_COLORS : CABINET_COLORS
+    this.drawIsoCube(g, cx, cy, CUBE_W, CUBE_H, CABINET_ENCLOSURE_DEPTH, enclosureColors, cabinetAlpha)
 
     // Environment accent — thin wireframe tint on the enclosure
     const envColor = ENVIRONMENT_CONFIG[entry.environment].frameColors.top
@@ -1370,6 +1426,36 @@ class DataCenterScene extends Phaser.Scene {
       .setAlpha(powerMult * 0.5)
       .setDepth(baseDepth + 1)
     labels.push(envLabel)
+
+    // Phase 8A: GPU density badge — magenta accent for high-density cabinets
+    if (entry.density !== 'standard') {
+      const densityLabel = entry.density === 'extreme_density' ? '⚡ XGPU' : '⚡ GPU'
+      const gpuLabel = this.add
+        .text(cx, topY - 8, densityLabel, {
+          fontFamily: 'monospace',
+          fontSize: '6px',
+          color: '#ff66ff',
+          fontStyle: 'bold',
+        })
+        .setOrigin(0.5)
+        .setAlpha(powerMult)
+        .setDepth(baseDepth + 2)
+      labels.push(gpuLabel)
+      // Magenta top-edge glow — thick bright stripe + thinner outer halo for prominence
+      g.lineStyle(3, 0xff44ff, 0.95 * powerMult)
+      g.beginPath()
+      g.moveTo(cx - CUBE_W / 2, cy + CUBE_H / 2 - CABINET_ENCLOSURE_DEPTH)
+      g.lineTo(cx, cy - CABINET_ENCLOSURE_DEPTH)
+      g.lineTo(cx + CUBE_W / 2, cy + CUBE_H / 2 - CABINET_ENCLOSURE_DEPTH)
+      g.strokePath()
+      // Outer halo for glow
+      g.lineStyle(6, 0xff44ff, 0.25 * powerMult)
+      g.beginPath()
+      g.moveTo(cx - CUBE_W / 2, cy + CUBE_H / 2 - CABINET_ENCLOSURE_DEPTH)
+      g.lineTo(cx, cy - CABINET_ENCLOSURE_DEPTH)
+      g.lineTo(cx + CUBE_W / 2, cy + CUBE_H / 2 - CABINET_ENCLOSURE_DEPTH)
+      g.strokePath()
+    }
 
     // Content summary label — shows slot fill state so players know what's inside
     const srvText = `${entry.serverCount}/${MAX_SERVERS_PER_CABINET}`
@@ -1622,6 +1708,12 @@ class DataCenterScene extends Phaser.Scene {
     if (this.trafficVisible && this.trafficLinks.length > 0) {
       this.packetTime += dt
       this.renderPackets()
+    }
+
+    // Phase 8B: AllReduce ring pulse along each pod's cabinets
+    if (this.backendFabricVisible && this.gpuPodEntries.size > 0) {
+      this.allReducePhase = (this.allReducePhase + dt * 0.7) % 1
+      this.renderAllReducePulses()
     }
 
     // Ambient LED and activity indicators (runs every frame)
@@ -2435,10 +2527,10 @@ class DataCenterScene extends Phaser.Scene {
 
   // ── Public API ──────────────────────────────────────────
 
-  addCabinetToScene(id: string, col: number, row: number, serverCount: number, hasLeafSwitch: boolean, environment: CabinetEnvironment = 'production', facing: CabinetFacing = 'north') {
+  addCabinetToScene(id: string, col: number, row: number, serverCount: number, hasLeafSwitch: boolean, environment: CabinetEnvironment = 'production', facing: CabinetFacing = 'north', density: 'standard' | 'high_density' | 'extreme_density' = 'standard', podId: string | null = null) {
     this.cabCount++
 
-    const entry: CabinetEntry = { id, col, row, serverCount, hasLeafSwitch, powerOn: true, environment, facing, heatLevel: 22, isThrottled: false, isOnFire: false, hasIncident: false, inMaintenance: false, serverAge: 0, recentlyPlaced: Date.now() }
+    const entry: CabinetEntry = { id, col, row, serverCount, hasLeafSwitch, powerOn: true, environment, facing, heatLevel: 22, isThrottled: false, isOnFire: false, hasIncident: false, inMaintenance: false, serverAge: 0, recentlyPlaced: Date.now(), density, podId }
     this.cabEntries.set(id, entry)
     this.occupiedTiles.add(`${col},${row}`)
     this.renderCabinet(entry)
@@ -2457,7 +2549,7 @@ class DataCenterScene extends Phaser.Scene {
     this.cameraPanTo(col, row, 300)
   }
 
-  updateCabinet(id: string, serverCount: number, hasLeafSwitch: boolean, powerOn: boolean, environment: CabinetEnvironment = 'production', facing: CabinetFacing = 'north', visualState?: { heatLevel: number; isThrottled: boolean; isOnFire: boolean; hasIncident: boolean; inMaintenance: boolean; serverAge: number }) {
+  updateCabinet(id: string, serverCount: number, hasLeafSwitch: boolean, powerOn: boolean, environment: CabinetEnvironment = 'production', facing: CabinetFacing = 'north', visualState?: { heatLevel: number; isThrottled: boolean; isOnFire: boolean; hasIncident: boolean; inMaintenance: boolean; serverAge: number }, density: 'standard' | 'high_density' | 'extreme_density' = 'standard', podId: string | null = null) {
     const entry = this.cabEntries.get(id)
     if (!entry) return
 
@@ -2485,6 +2577,8 @@ class DataCenterScene extends Phaser.Scene {
     entry.powerOn = powerOn
     entry.environment = environment
     entry.facing = facing
+    entry.density = density
+    entry.podId = podId
     if (visualState) {
       entry.heatLevel = visualState.heatLevel
       entry.isThrottled = visualState.isThrottled
@@ -2494,6 +2588,293 @@ class DataCenterScene extends Phaser.Scene {
       entry.serverAge = visualState.serverAge
     }
     this.renderCabinet(entry)
+  }
+
+  // Phase 8A: Sync GPU pod boundaries — call when pods are added/removed.
+  // Draws a dashed magenta outline around each pod's bounding box.
+  setGPUPods(pods: Array<{ id: string; cabinetIds: string[] }>) {
+    // Init lazy graphics layer
+    if (!this.gpuPodGraphics) {
+      this.gpuPodGraphics = this.add.graphics()
+      this.gpuPodGraphics.setDepth(50) // above floor, below cabinets
+    }
+    this.gpuPodGraphics.clear()
+    this.gpuPodEntries.clear()
+
+    for (const pod of pods) {
+      // Find member cabinets, compute bounding box
+      const members = pod.cabinetIds
+        .map((cid) => this.cabEntries.get(cid))
+        .filter((c): c is CabinetEntry => !!c)
+      if (members.length === 0) continue
+      const cols = members.map((c) => c.col)
+      const rows = members.map((c) => c.row)
+      const entry: GPUPodEntry = {
+        id: pod.id,
+        cabinetIds: pod.cabinetIds,
+        minCol: Math.min(...cols),
+        maxCol: Math.max(...cols),
+        minRow: Math.min(...rows),
+        maxRow: Math.max(...rows),
+      }
+      this.gpuPodEntries.set(pod.id, entry)
+      this.drawPodOutline(entry)
+    }
+  }
+
+  private drawPodOutline(pod: GPUPodEntry) {
+    const g = this.gpuPodGraphics
+    if (!g) return
+    // Convert footprint corners to isometric screen coords. Pad by half-tile on each side.
+    const corners = [
+      this.isoToScreen(pod.minCol - 0.5, pod.minRow - 0.5),
+      this.isoToScreen(pod.maxCol + 0.5, pod.minRow - 0.5),
+      this.isoToScreen(pod.maxCol + 0.5, pod.maxRow + 0.5),
+      this.isoToScreen(pod.minCol - 0.5, pod.maxRow + 0.5),
+    ]
+    g.lineStyle(2, 0xff44ff, 0.85)
+    // Dashed polygon: draw segment / skip pattern manually
+    for (let i = 0; i < corners.length; i++) {
+      const a = corners[i]
+      const b = corners[(i + 1) % corners.length]
+      this.drawDashedLine(g, a.x, a.y, b.x, b.y, 8, 5)
+    }
+  }
+
+  // Phase 8B: Sync the InfiniBand backend fabric — call when fabrics, switches,
+  // or links change. Draws IB leaves and spines around each pod and the
+  // per-rail violet cables connecting cabinets → leaf → spine.
+  setInfiniBandFabrics(
+    fabrics: Array<{ id: string; podId: string; railCount: number; leafSwitchIds: string[]; spineSwitchIds: string[]; linkIds: string[] }>,
+    switches: Array<{ id: string; type: 'ib_leaf' | 'ib_spine'; podId: string; rail: number; operational: boolean }>,
+    links: Array<{ id: string; fromSwitchId: string; toSwitchId: string; fabricId: string; rail: number; status: 'healthy' | 'flapping' | 'down' }>,
+  ) {
+    if (!this.ibSwitchGraphics) {
+      this.ibSwitchGraphics = this.add.graphics()
+      this.ibSwitchGraphics.setDepth(120) // above cabinets but below interactive overlays
+    }
+    if (!this.ibLinkGraphics) {
+      this.ibLinkGraphics = this.add.graphics()
+      this.ibLinkGraphics.setDepth(45) // above floor, below cabinets
+    }
+    this.ibSwitchGraphics.clear()
+    this.ibLinkGraphics.clear()
+    this.ibSwitchEntries.clear()
+    this.ibLinkEntries.clear()
+    for (const t of this.ibSwitchLabels) t.destroy()
+    this.ibSwitchLabels = []
+
+    if (!this.backendFabricVisible) return
+
+    // For each fabric, compute switch positions based on the pod's footprint.
+    for (const fabric of fabrics) {
+      const pod = this.gpuPodEntries.get(fabric.podId)
+      if (!pod) continue
+      const railCount = fabric.railCount
+      const podCols = pod.maxCol - pod.minCol + 1
+
+      // Place IB leaf switches in a row above the pod (toward the spine row).
+      // Spread `railCount` leaves evenly across the pod's column span.
+      const leafIds = fabric.leafSwitchIds
+      const spineIds = fabric.spineSwitchIds
+      const leafRow = pod.minRow - 0.85
+      const spineRow = pod.minRow - 1.55
+
+      for (let r = 0; r < railCount; r++) {
+        const fraction = railCount > 1 ? r / (railCount - 1) : 0.5
+        const col = pod.minCol + (podCols - 1) * fraction
+        // Leaf for this rail
+        const leafId = leafIds[r]
+        if (leafId) {
+          const sw = switches.find((s) => s.id === leafId)
+          this.ibSwitchEntries.set(leafId, {
+            id: leafId,
+            type: 'ib_leaf',
+            podId: fabric.podId,
+            rail: r,
+            col,
+            row: leafRow,
+            operational: sw?.operational ?? true,
+          })
+        }
+        // Spine for this rail
+        const spineId = spineIds[r]
+        if (spineId) {
+          const sw = switches.find((s) => s.id === spineId)
+          this.ibSwitchEntries.set(spineId, {
+            id: spineId,
+            type: 'ib_spine',
+            podId: fabric.podId,
+            rail: r,
+            col,
+            row: spineRow,
+            operational: sw?.operational ?? true,
+          })
+        }
+      }
+    }
+
+    // Track link metadata for later (animation, error overlays)
+    for (const link of links) {
+      this.ibLinkEntries.set(link.id, {
+        id: link.id,
+        fromSwitchId: link.fromSwitchId,
+        toSwitchId: link.toSwitchId,
+        fabricId: link.fabricId,
+        rail: link.rail,
+        status: link.status,
+      })
+    }
+
+    // Draw cables first (so switches render on top)
+    this.drawIBLinks(links)
+    // Then draw switches
+    this.drawIBSwitches()
+  }
+
+  private drawIBLinks(links: Array<{ id: string; fromSwitchId: string; toSwitchId: string; fabricId: string; rail: number; status: 'healthy' | 'flapping' | 'down' }>) {
+    const g = this.ibLinkGraphics
+    if (!g) return
+    // Rail-tinted violet palette (4 rails common case)
+    const railColors = [0xaa44ff, 0xbb55ff, 0xcc66ff, 0xdd77ff, 0xee44dd, 0xff55cc, 0xff66aa, 0xff7788]
+
+    for (const link of links) {
+      const color = railColors[link.rail % railColors.length]
+      const alpha = link.status === 'down' ? 0.2 : link.status === 'flapping' ? 0.5 : 0.75
+      const lineWidth = 1
+      const from = this.ibSwitchEntries.get(link.fromSwitchId)
+      if (!from) continue
+
+      // Resolve endpoint: another IB switch (uplink), or a cabinet (downlink)
+      const toIbSwitch = this.ibSwitchEntries.get(link.toSwitchId)
+      let to: { col: number; row: number } | null = null
+      if (toIbSwitch) {
+        to = { col: toIbSwitch.col, row: toIbSwitch.row }
+      } else {
+        const cab = this.cabEntries.get(link.toSwitchId)
+        if (cab) to = { col: cab.col, row: cab.row }
+      }
+      if (!to) continue
+
+      const a = this.isoToScreen(from.col, from.row)
+      const b = this.isoToScreen(to.col, to.row)
+      g.lineStyle(lineWidth, color, alpha)
+      g.beginPath()
+      g.moveTo(a.x, a.y)
+      g.lineTo(b.x, b.y)
+      g.strokePath()
+    }
+  }
+
+  private drawIBSwitches() {
+    const g = this.ibSwitchGraphics
+    if (!g) return
+    const switchW = 14
+    const switchH = 7
+    const switchDepth = 5
+
+    for (const sw of this.ibSwitchEntries.values()) {
+      const pos = this.isoToScreen(sw.col, sw.row)
+      const isLeaf = sw.type === 'ib_leaf'
+      const color = isLeaf
+        ? { top: 0xaa44ff, side: 0x7733cc, front: 0x551a99 }
+        : { top: 0xdd66ff, side: 0xaa55cc, front: 0x771a99 }
+      const alpha = sw.operational ? 0.9 : 0.4
+      this.drawIsoCube(g, pos.x, pos.y, switchW, switchH, switchDepth, color, alpha)
+
+      // Small label
+      const label = this.add
+        .text(pos.x, pos.y - switchDepth - 6, isLeaf ? `L${sw.rail}` : `S${sw.rail}`, {
+          fontFamily: 'monospace',
+          fontSize: '5px',
+          color: isLeaf ? '#cc88ff' : '#ee99ff',
+        })
+        .setOrigin(0.5)
+        .setDepth(125)
+        .setAlpha(0.9)
+      this.ibSwitchLabels.push(label)
+    }
+  }
+
+  /** Toggle backend fabric visibility (drives the IB switch + cable layer). */
+  setBackendFabricVisible(visible: boolean) {
+    this.backendFabricVisible = visible
+    if (this.ibSwitchGraphics) this.ibSwitchGraphics.setVisible(visible)
+    if (this.ibLinkGraphics) this.ibLinkGraphics.setVisible(visible)
+    if (this.allReduceGraphics) this.allReduceGraphics.setVisible(visible)
+    for (const label of this.ibSwitchLabels) label.setVisible(visible)
+  }
+
+  /** Draw AllReduce ring-style packet dots traveling around each pod's cabinets.
+   *  Each rail gets one dot at a different phase so the cluster appears to
+   *  pulse with synchronized gradient traffic — what AllReduce actually does. */
+  private renderAllReducePulses() {
+    if (!this.allReduceGraphics) {
+      this.allReduceGraphics = this.add.graphics()
+      this.allReduceGraphics.setDepth(130)
+    }
+    const g = this.allReduceGraphics
+    g.clear()
+    const railColors = [0xff44ff, 0xff77ff, 0xcc44ff, 0xaa77ff, 0xff66cc, 0xff99dd, 0xcc55ff, 0xaa66ff]
+
+    for (const pod of this.gpuPodEntries.values()) {
+      // Walk along the pod's cabinet sequence in row order.
+      const members = pod.cabinetIds
+        .map((cid) => this.cabEntries.get(cid))
+        .filter((c): c is CabinetEntry => !!c)
+        .sort((a, b) => a.col - b.col)
+      if (members.length < 2) continue
+
+      // Determine rail count by looking up any switch belonging to this pod.
+      const podSwitches = [...this.ibSwitchEntries.values()].filter((s) => s.podId === pod.id)
+      const railCount = Math.max(1, new Set(podSwitches.map((s) => s.rail)).size)
+
+      for (let rail = 0; rail < railCount; rail++) {
+        // Each rail is offset in phase so dots are staggered around the "ring"
+        const phase = (this.allReducePhase + rail / railCount) % 1
+        const segCount = members.length
+        const segFloat = phase * segCount
+        const segIdx = Math.floor(segFloat) % segCount
+        const segT = segFloat - Math.floor(segFloat)
+        const a = members[segIdx]
+        const b = members[(segIdx + 1) % segCount]
+        const aPos = this.isoToScreen(a.col, a.row)
+        const bPos = this.isoToScreen(b.col, b.row)
+        // Lift slightly so the dot rides above the cabinets, not on the floor.
+        const lift = 18
+        const x = aPos.x + (bPos.x - aPos.x) * segT
+        const y = (aPos.y - lift) + ((bPos.y - lift) - (aPos.y - lift)) * segT
+        const color = railColors[rail % railColors.length]
+        // Glow + core
+        g.fillStyle(color, 0.25)
+        g.fillCircle(x, y, 5)
+        g.fillStyle(color, 0.9)
+        g.fillCircle(x, y, 2.2)
+      }
+    }
+  }
+
+  private drawDashedLine(g: Phaser.GameObjects.Graphics, x1: number, y1: number, x2: number, y2: number, dashLen: number, gapLen: number) {
+    const dx = x2 - x1
+    const dy = y2 - y1
+    const total = Math.sqrt(dx * dx + dy * dy)
+    if (total === 0) return
+    const ux = dx / total
+    const uy = dy / total
+    let traveled = 0
+    let drawing = true
+    while (traveled < total) {
+      const segLen = drawing ? dashLen : gapLen
+      const next = Math.min(traveled + segLen, total)
+      if (drawing) {
+        g.beginPath()
+        g.moveTo(x1 + ux * traveled, y1 + uy * traveled)
+        g.lineTo(x1 + ux * next, y1 + uy * next)
+        g.strokePath()
+      }
+      traveled = next
+      drawing = !drawing
+    }
   }
 
   addSpineToScene(id: string) {

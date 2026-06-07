@@ -14,48 +14,79 @@ import {
   Network, ArrowUpDown, Cpu, Zap, DollarSign, LayoutGrid, AlertTriangle,
 } from 'lucide-react'
 
-function ServerSlot({ index, filled, powerOn }: { index: number; filled: boolean; powerOn: boolean }) {
+function ServerSlot({ index, filled, powerOn, isGPU, gpusPerServer }: { index: number; filled: boolean; powerOn: boolean; isGPU?: boolean; gpusPerServer?: number }) {
+  const themeClasses = isGPU
+    ? filled
+      ? powerOn
+        ? 'border-neon-pink/40 bg-neon-pink/10 text-neon-pink'
+        : 'border-muted-foreground/30 bg-muted/30 text-muted-foreground'
+      : 'border-dashed border-border/40 bg-transparent text-muted-foreground/30'
+    : filled
+      ? powerOn
+        ? 'border-neon-green/40 bg-neon-green/10 text-neon-green'
+        : 'border-muted-foreground/30 bg-muted/30 text-muted-foreground'
+      : 'border-dashed border-border/40 bg-transparent text-muted-foreground/30'
+
+  const filledLabel = isGPU
+    ? gpusPerServer
+      ? `GPU Server ${index + 1} · ${gpusPerServer}× GPU`
+      : `GPU Server ${index + 1}`
+    : `Server ${index + 1}`
+
+  const indicatorColor = isGPU ? 'bg-neon-pink' : 'bg-neon-green'
+
   return (
     <div
-      className={`h-7 rounded border text-[10px] font-mono flex items-center px-2 gap-1.5 transition-all ${
-        filled
-          ? powerOn
-            ? 'border-neon-green/40 bg-neon-green/10 text-neon-green'
-            : 'border-muted-foreground/30 bg-muted/30 text-muted-foreground'
-          : 'border-dashed border-border/40 bg-transparent text-muted-foreground/30'
-      }`}
+      className={`h-7 rounded border text-[10px] font-mono flex items-center px-2 gap-1.5 transition-all ${themeClasses}`}
     >
       <Cpu className="size-3 shrink-0" />
-      <span>{filled ? `Server ${index + 1}` : 'Empty Slot'}</span>
+      <span>{filled ? filledLabel : 'Empty Slot'}</span>
       {filled && powerOn && (
         <span className="ml-auto flex items-center gap-1">
-          <span className="inline-block w-1.5 h-1.5 rounded-full bg-neon-green animate-pulse" />
+          <span className={`inline-block w-1.5 h-1.5 rounded-full ${indicatorColor} animate-pulse`} />
         </span>
       )}
     </div>
   )
 }
 
-function LeafSwitchSlot({ installed, powerOn, onInspect }: { installed: boolean; powerOn: boolean; onInspect?: () => void }) {
+function LeafSwitchSlot({ installed, powerOn, onInspect, isIB, railCount }: { installed: boolean; powerOn: boolean; onInspect?: () => void; isIB?: boolean; railCount?: number }) {
+  const themeClasses = isIB
+    ? installed
+      ? powerOn
+        ? 'border-neon-purple/40 bg-neon-purple/10 text-neon-purple'
+        : 'border-muted-foreground/30 bg-muted/30 text-muted-foreground'
+      : 'border-dashed border-border/40 bg-transparent text-muted-foreground/30'
+    : installed
+      ? powerOn
+        ? 'border-neon-cyan/40 bg-neon-cyan/10 text-neon-cyan'
+        : 'border-muted-foreground/30 bg-muted/30 text-muted-foreground'
+      : 'border-dashed border-border/40 bg-transparent text-muted-foreground/30'
+
+  const installedLabel = isIB
+    ? railCount
+      ? `IB Leaf · ${railCount} rails · NDR 400G`
+      : 'IB Leaf (NDR 400G)'
+    : 'Leaf Switch (ToR)'
+
+  const pulseColor = isIB ? 'bg-neon-purple' : 'bg-neon-cyan'
+  const buttonClasses = isIB
+    ? 'border-neon-purple/30 bg-neon-purple/10 text-neon-purple hover:bg-neon-purple/20'
+    : 'border-neon-cyan/30 bg-neon-cyan/10 text-neon-cyan hover:bg-neon-cyan/20'
+
   return (
     <div
-      className={`h-7 rounded border text-[10px] font-mono flex items-center px-2 gap-1.5 transition-all ${
-        installed
-          ? powerOn
-            ? 'border-neon-cyan/40 bg-neon-cyan/10 text-neon-cyan'
-            : 'border-muted-foreground/30 bg-muted/30 text-muted-foreground'
-          : 'border-dashed border-border/40 bg-transparent text-muted-foreground/30'
-      }`}
+      className={`h-7 rounded border text-[10px] font-mono flex items-center px-2 gap-1.5 transition-all ${themeClasses}`}
     >
       <Network className="size-3 shrink-0" />
-      <span>{installed ? 'Leaf Switch (ToR)' : 'No Leaf Switch'}</span>
+      <span>{installed ? installedLabel : 'No Leaf Switch'}</span>
       {installed && (
         <span className="ml-auto flex items-center gap-1">
-          {powerOn && <span className="inline-block w-1.5 h-1.5 rounded-full bg-neon-cyan animate-pulse" />}
+          {powerOn && <span className={`inline-block w-1.5 h-1.5 rounded-full ${pulseColor} animate-pulse`} />}
           {onInspect && (
             <button
               onClick={onInspect}
-              className="text-[8px] px-1.5 py-0.5 rounded border border-neon-cyan/30 bg-neon-cyan/10 text-neon-cyan hover:bg-neon-cyan/20 transition-colors ml-1"
+              className={`text-[8px] px-1.5 py-0.5 rounded border transition-colors ml-1 ${buttonClasses}`}
             >
               Inspect
             </button>
@@ -94,6 +125,7 @@ function CabinetDetail({ cabinet }: { cabinet: Cabinet }) {
     selectCabinet, coolingType, trafficStats, zones, cabinets, dedicatedRows,
     rackDetails, installRackEquipment, removeRackEquipment,
     addServerToCabinet, addLeafToCabinet, openSwitchDetail,
+    infiniBandFabrics,
   } = useGameStore()
 
   const envConfig = ENVIRONMENT_CONFIG[cabinet.environment]
@@ -176,6 +208,10 @@ function CabinetDetail({ cabinet }: { cabinet: Cabinet }) {
                 installed={cabinet.hasLeafSwitch}
                 powerOn={cabinet.powerStatus}
                 onInspect={cabinet.hasLeafSwitch ? () => openSwitchDetail({ type: 'leaf', id: cabinet.id }) : undefined}
+                isIB={cabinet.density !== 'standard' && cabinet.podId !== null}
+                railCount={cabinet.podId
+                  ? infiniBandFabrics.find((f) => f.podId === cabinet.podId)?.railCount
+                  : undefined}
               />
               <div className="w-full h-px bg-border/30 my-0.5" />
               {Array.from({ length: MAX_SERVERS_PER_CABINET }).map((_, i) => (
@@ -184,6 +220,8 @@ function CabinetDetail({ cabinet }: { cabinet: Cabinet }) {
                   index={i}
                   filled={i < cabinet.serverCount}
                   powerOn={cabinet.powerStatus}
+                  isGPU={cabinet.density !== 'standard'}
+                  gpusPerServer={cabinet.serverCount > 0 ? Math.round(cabinet.gpuCount / cabinet.serverCount) : 0}
                 />
               ))}
             </div>

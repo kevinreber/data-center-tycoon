@@ -2169,3 +2169,310 @@ Phases 1–6 deliver a complete tycoon game from single rack to global empire. P
 **Quick wins (medium impact, low effort):** Colorblind modes, speed controls, alert thresholds, exit strategy.
 
 **The big ones (high impact, high effort):** Dynamic event chains, automation policy engine, acquisition system.
+
+---
+
+## Phase 8 — AI Infrastructure Era (the GPU age)
+
+The AI boom changed what data centers look like. Power density jumped 5–10x, InfiniBand replaced Ethernet for backend traffic, and a single training job is worth more than a year of normal hosting. Phase 8 adds AI infrastructure as a distinct subsystem alongside the existing Ethernet/CPU world — players can ignore it and stay in the classic tycoon loop, or invest heavily and unlock a new economic tier with new failure modes and a deeper operational view.
+
+---
+
+### 8A. GPU Pods & High-Density Cabinets
+
+**Goal:** Introduce a new cabinet class that breaks the existing 6kW/4-server assumptions. GPU pods are sold as multi-cabinet units, require liquid cooling, and serve a new customer segment.
+
+#### Data Models
+
+```typescript
+type CabinetDensity = 'standard' | 'high_density' | 'extreme_density'
+
+interface GPUPod {
+  id: string
+  name: string                       // procedurally generated, e.g. "Pod-Helios-01"
+  cabinetIds: string[]               // 4–16 grouped cabinets
+  podSize: 64 | 128 | 256 | 512      // GPU count
+  powerDrawKW: number                // 30–50 kW per cabinet
+  coolingType: 'rear_door_hx' | 'direct_to_chip' | 'immersion'
+  fabricId: string                   // backend InfiniBand fabric this pod belongs to
+  installedAtTick: number
+  activeJobId: string | null         // currently running training job
+}
+
+interface HighDensityCabinet {
+  // extends existing Cabinet
+  density: CabinetDensity            // standard (6kW) / high_density (30kW) / extreme (50kW+)
+  gpuCount: number                   // 0–8 GPUs per cabinet
+  liquidCoolingConnected: boolean
+  podId: string | null               // which GPU pod this belongs to
+}
+```
+
+#### Pod Configs
+
+| Pod Size | GPUs | Cabinets | Install Cost | Power Draw | Required Cooling |
+|----------|------|----------|--------------|-----------|------------------|
+| Small    | 64   | 4        | $200K        | 120 kW    | Rear-door HX     |
+| Medium   | 128  | 8        | $450K        | 240 kW    | Direct-to-chip   |
+| Large    | 256  | 16       | $1.2M        | 480 kW    | Direct-to-chip   |
+| Hyperpod | 512  | 32       | $3.0M        | 960 kW    | Immersion        |
+
+#### Liquid Cooling Tiers (new)
+
+- **Rear-door heat exchanger**: $30K/cabinet, handles up to 35kW
+- **Direct-to-chip (CDU + manifolds)**: $80K/cabinet, handles 50kW+, requires raised floor
+- **Single-phase immersion**: $150K/cabinet, handles 100kW+, requires immersion pod infrastructure (already in the game)
+
+#### Gameplay Integration
+
+- Gated behind: Standard suite tier + new "AI Infrastructure" research + $300K cash
+- Pods sold as units in a new BuildPanel section — player picks pod size, places the footprint, then the pod auto-configures cabinets
+- New `ai_lab` customer type with premium per-GPU rates and low SLA tolerance
+- Power redundancy requirements stricter (2N effectively required for hyperpods)
+
+---
+
+### 8B. InfiniBand Backend Fabric
+
+**Goal:** A second network fabric, parallel to the existing Ethernet Clos, with different topology, traffic patterns, and failure modes.
+
+#### Topology: Rail-Optimized Fat Tree
+
+- Each GPU has N NICs, each connected to a separate "rail" — 4 rails standard, 8 for hyperpods
+- Per-rail spine layer, rail-to-rail isolation (a rail-3 failure can't take down rail-1 traffic)
+- Switches: `ib_leaf` ($30K, 32 ports), `ib_spine` ($80K, 64 ports, non-blocking)
+- Cabling: short DAC copper in-rack, fiber for cross-row, much higher cable density than Ethernet
+
+#### Data Models
+
+```typescript
+interface InfiniBandFabric {
+  id: string
+  podId: string                       // 1:1 with GPU pod
+  railCount: 4 | 8
+  leafSwitches: IBSwitch[]
+  spineSwitches: IBSwitch[]
+  links: IBLink[]
+  topology: 'fat_tree' | 'dragonfly'  // dragonfly = future tier
+  health: 'healthy' | 'degraded' | 'critical'
+}
+
+interface IBSwitch {
+  id: string
+  type: 'ib_leaf' | 'ib_spine'
+  rail: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7
+  portsTotal: number
+  portsUsed: number
+  errorRate: number                   // 0–1, ticks up with age/incident
+  operational: boolean
+}
+
+interface IBLink {
+  id: string
+  fromSwitchId: string
+  toSwitchId: string
+  bandwidthGbps: 200 | 400 | 800      // NDR / XDR / GDR
+  utilizationPct: number              // 0–100
+  errorCount: number                  // crc errors, congestion drops
+  status: 'healthy' | 'flapping' | 'down'
+  lastErrorTick: number
+}
+```
+
+#### Traffic Patterns (different from existing ECMP)
+
+- **AllReduce**: ring or tree pattern around the pod during training; visualized as pulses traveling between cabinets in sequence
+- **AllToAll**: every GPU talks to every other GPU during MoE/expert routing; visualized as a mesh burst
+- **Pipeline parallel**: linear chain of stages with backpressure visible as queued utilization
+
+#### Phaser Rendering
+
+- New "backend fabric" layer toggle (separate from existing ECMP traffic layer)
+- IB cables drawn in violet (`0xaa44ff`) vs existing cyan ECMP
+- Per-rail color tint to make rail isolation visible
+- AllReduce pulse animation traveling ring-style during active training jobs
+- Errored links flicker white/red; down links go dashed gray
+
+---
+
+### 8C. NOC Panel — Traffic Triage View
+
+**Goal:** A new sidebar panel that turns "the network is fine" into something operational. Click a link, see its health. Triage a misbehaving rail. Replace a failing optic before it kills a job.
+
+#### Panel Layout
+
+- **Top section**: fabric health summary (per-pod IB fabric + Ethernet Clos), counts of degraded/down links
+- **Link list**: sortable table — link ID, fabric, utilization %, error count, status, attached endpoints. Filter by fabric/pod/severity.
+- **Detail drawer** (on link click): utilization sparkline (last 50 ticks), error counter timeline, attached switches, current job using this link, action buttons (drain port, reset, dispatch electrician, replace optic — costs $2K)
+- **Job health tab**: list of active training jobs with progress %, value at risk, AllReduce ring status, ETA, pod health
+
+#### Integration with Phaser
+
+- Errored links flash in the scene; clicking them in-scene opens the NOC drawer for that link
+- "NOC view" toggle puts a heat-map style overlay on all switches based on error rate
+
+---
+
+### 8D. AI-Specific Incidents
+
+**Goal:** New failure modes that matter *because* a single failure mid-job can torch a $2M contract.
+
+| Incident | Severity | Effect | Mitigation |
+|----------|----------|--------|------------|
+| IB link flap | Minor | Single port intermittent; job slows 30%; if 3+ flaps in 50 ticks, job restarts | Replace optic, drain port |
+| NCCL collective hang | Major | AllReduce stalls, whole pod idle burning power; auto-recovers in 20 ticks or manual restart | Cooling specialist + manual restart |
+| Silent data corruption | Critical | Undetected for 50 ticks; training accuracy drops; customer reduces payout 40% | Detected by checksum monitoring (research) |
+| Optic failure | Minor | Link goes down; rail capacity reduced 25%; replaced in 5 ticks | Stockpile spare optics ($2K each) |
+| PFC storm (RoCE only) | Critical | Congestion collapse; entire fabric drops to 10% throughput for 20 ticks | Don't use RoCE; or upgrade to lossless tier |
+| Thermal runaway (high density) | Critical | Direct-to-chip cooling loop fails; pod must shut down within 3 ticks or hardware damage | Liquid cooling redundancy upgrade |
+| GPU memory ECC fault | Major | Single GPU fails; reduces pod GPU count by 1 until replaced ($15K) | Preventive maintenance reduces chance |
+
+---
+
+### 8E. Training Jobs & AI Revenue Model
+
+**Goal:** A new economic model where revenue is lumpy (huge payouts on completion) and risk is concentrated.
+
+#### Data Models
+
+```typescript
+interface TrainingJob {
+  id: string
+  customerName: string                // e.g. "Helios AI Labs"
+  podId: string
+  jobType: 'pretraining' | 'fine_tuning' | 'inference_batch' | 'rl_training'
+  durationTicks: number               // 50–200 typical
+  ticksRemaining: number
+  basePayout: number                  // $500K–$5M
+  progressPct: number                 // 0–100
+  slaRequirements: {
+    maxRestarts: number               // 0–2; restart penalty deducts from payout
+    minThroughputPct: number          // 80–95
+    maxIncidents: number
+  }
+  status: 'queued' | 'running' | 'restarting' | 'completed' | 'failed'
+  valueAtRisk: number                 // current payout if job completes now
+}
+```
+
+#### Job Type Configs
+
+| Type | Duration | Base Payout | SLA Restarts | Notes |
+|------|----------|-------------|--------------|-------|
+| Pretraining | 150–200 ticks | $2M–$5M | 0 | The whale. Single restart loses everything. |
+| Fine-tuning | 50–80 ticks | $500K–$1M | 1 | Mid-tier. Common. |
+| Inference batch | 30 ticks | $200K | 2 | Steady fill between training runs. |
+| RL training | 100 ticks | $1M | 1 | Bursty traffic, harder on fabric. |
+
+#### Revenue Loop
+
+- Training jobs pay lump sum on completion (or partial on early termination)
+- Inference jobs pay per-token at steady rate when GPUs are idle between training
+- Player decision: chase whales (1–2 mega-contracts) vs. fleet utilization (steady inference)
+
+---
+
+### Phase 8 — Recommended Implementation Order
+
+1. **8A — GPU pods + liquid cooling** (~1 week): foundational. New cabinet density, pod entity, liquid cooling tiers. Reuses existing cabinet/cooling rendering with new visual signature.
+2. **8B — InfiniBand fabric + switches** (~1 week): new switch types, rail-optimized topology, IB link entity. New Phaser layer for backend fabric.
+3. **8C — NOC panel + traffic triage** (~1 week): new sidebar panel, link detail drawer, scene-to-panel linking.
+4. **8D — AI incidents** (~3 days): new incident types in catalog, plug into existing incident system.
+5. **8E — Training jobs + AI revenue** (~4 days): new job/contract type, payout-on-completion logic, `ai_lab` customer type, AllReduce visualization.
+
+Total: ~3–4 weeks if built sequentially. Each phase ships standalone value.
+
+### Phase 8 — Estimated Effort Summary
+
+| Feature | New Types | New Constants | Store Fields | Tick Logic | UI | Achievements |
+|---------|-----------|--------------|-------------|------------|-----|-------------|
+| 8A: GPU Pods | 3 | 3 configs | ~6 fields, 4 actions | Pod power/heat scaling | BuildPanel section, pod manager | 4 |
+| 8B: InfiniBand | 4 | 2 configs | ~5 fields, 3 actions | Per-rail traffic, link health | Phaser layer toggle | 3 |
+| 8C: NOC Panel | 2 | 0 | ~3 fields, 5 actions | Error rate tracking | NOC sidebar panel | 2 |
+| 8D: AI Incidents | 0 | 1 catalog (7 types) | — | Plug into existing incidents | Incident UI extension | 3 |
+| 8E: Training Jobs | 2 | 1 catalog | ~4 fields, 4 actions | Job progression, payout | Job tracker UI, contract type | 4 |
+
+---
+
+## Phase 8 — Adjacent Ideas Backlog
+
+These are the other directions surfaced during Phase 8 brainstorming. Not committed; revisit after AI infrastructure ships.
+
+### 8F. Failure Cascades / Blast Radius Modeling
+
+**Goal:** Incidents currently fail in isolation. Real DCs fail in chains. Model dependency graphs so a PDU failure cascades through downstream cabinets, leaves, and spines.
+
+| Feature | Impact | Effort | Notes |
+|---------|--------|--------|-------|
+| Dependency graph between PDUs, cabinets, switches, fabric | High | Medium | Already implicit in placement; needs to become explicit |
+| Cascading incident chains: PDU fail → cabinets dark → leaf isolated → spine degraded → contract SLA breached | High | Medium | Reuses existing incident system; new "cascade" incident type |
+| Visual chain animation in scene + chain summary in incident UI | Medium | Low | Highlights affected entities sequentially |
+| Blast radius preview when planning placement (hover a PDU to see what it powers) | Medium | Low | Defensive UI for power-conscious players |
+
+**Why it's compelling:** Adds depth to existing systems without new entities. Makes power redundancy and rack-level thinking actually matter.
+
+---
+
+### 8G. Customer Personas (Named Recurring Tenants)
+
+**Goal:** Replace anonymous customer types with named tenants who have personalities, predictable traffic patterns, and relationship histories.
+
+| Feature | Impact | Effort | Notes |
+|---------|--------|--------|-------|
+| Named tenant pool (e.g., "StreamForge", "QuantumTrade HFT", "BlockMint Crypto") with personality profiles | High | Medium | Procedural generation from name/industry pools |
+| Per-tenant traffic patterns: diurnal spikes, weekly cycles, surge events | Medium | Medium | Ties into existing day/night demand curves |
+| Tenant satisfaction scoring (uptime, latency, incident history) → renewal vs. churn | High | Medium | Softer than SLA binary; creates relationship arc |
+| Tenant-driven incidents: "QuantumTrade will leave in 50 ticks if you don't fix latency" | Medium | Low | Narrative pressure on infrastructure decisions |
+| Anchor tenants: long-term customers whose churn would be devastating | Medium | Low | Emotional stakes |
+
+**Overlap with Phase 7F (CRM):** This is essentially the same idea. Could merge into 7F when picked up.
+
+---
+
+### 8H. Power Arbitrage with Battery Storage
+
+**Goal:** Add grid-scale batteries that charge during cheap power and discharge during peaks. Pairs with existing spot power market.
+
+| Feature | Impact | Effort | Notes |
+|---------|--------|--------|-------|
+| Battery storage units placed on grid (3 tiers: 100kWh, 500kWh, 2MWh) | Medium | Medium | New placeable infrastructure |
+| Charge/discharge logic based on power market spot price | Medium | Low | Reuses existing spot market |
+| Sell back to grid during heatwave price spikes for arbitrage profit | Medium | Low | Revenue stream |
+| Battery degradation over time (cycle count, capacity loss) | Low | Low | Realism layer |
+| Grid services revenue: frequency regulation, demand response | Medium | Medium | Real DC revenue stream |
+
+**Why it's compelling:** Connects existing systems (spot pricing, green certs, weather) into a new strategic layer.
+
+---
+
+### 8I. M&A and Hostile Takeovers (extends Phase 7A)
+
+Already covered in Phase 7A but worth elevating — when player has dominant market share, acquiring competitors becomes the natural late-game power fantasy. Add buyout calculator UI showing competitor valuation, acquisition cost, and combined market projection.
+
+---
+
+### 8J. Submarine Cable Investment
+
+**Goal:** Buy fractional ownership of submarine cables connecting continents. Earn passive transit revenue. Hooks into existing multi-site system.
+
+| Feature | Impact | Effort | Notes |
+|---------|--------|--------|-------|
+| Cable consortium investments ($5M–$50M for 5–25% stake) | Medium | Medium | New endgame capital sink |
+| Passive transit revenue based on % stake × cable utilization | Medium | Low | Predictable income stream |
+| Cable cuts (already an incident type) directly hit cable revenue | Medium | Low | Risk dimension |
+| Geographic strategic value: cable ownership unlocks routing preferences | Medium | Medium | Ties into multi-site latency |
+| Cable repair operations: $10M+ to dispatch repair ship | Low | Low | Flavor + cost decision |
+
+**Why it's compelling:** Hooks directly into multi-site (Phase 6) and gives late-game players a meaningful capital deployment beyond just buying more sites.
+
+---
+
+### Phase 8 Adjacent — Priority Ordering
+
+Once Phase 8 AI infrastructure (8A–8E) ships, the ordering for these adjacent ideas:
+
+1. **8F — Failure Cascades**: cheapest, deepest impact on *existing* systems. Strong ROI.
+2. **8G — Customer Personas**: high engagement, medium effort. Merges with 7F.
+3. **8H — Power Arbitrage**: ties spot market + weather + green certs together.
+4. **8J — Submarine Cables**: endgame multi-site sink.
+5. **8I — Enhanced M&A**: subsumed by Phase 7A.

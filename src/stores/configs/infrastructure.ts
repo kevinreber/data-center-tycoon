@@ -311,6 +311,7 @@ export const ZONE_BONUS_CONFIG = {
     streaming: { revenueBonus: 0.07, heatReduction: 0, label: 'Streaming Zone', description: '+7% revenue from CDN co-location' },
     crypto: { revenueBonus: 0.06, heatReduction: 0, label: 'Crypto Zone', description: '+6% revenue from shared mining pools' },
     enterprise: { revenueBonus: 0.08, heatReduction: 0, label: 'Enterprise Zone', description: '+8% revenue from dedicated SLA infrastructure' },
+    ai_lab: { revenueBonus: 0.15, heatReduction: 0, label: 'AI Lab Zone', description: '+15% revenue from optimized AllReduce fabric and shared liquid cooling' },
   } as Record<CustomerType, { revenueBonus: number; heatReduction: number; label: string; description: string }>,
 }
 

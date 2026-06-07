@@ -47,6 +47,10 @@ export function GameCanvas() {
   const customLayout = useGameStore((s) => s.customLayout)
   const rowPlacementMode = useGameStore((s) => s.rowPlacementMode)
   const equipmentPlacementMode = useGameStore((s) => s.equipmentPlacementMode)
+  const gpuPods = useGameStore((s) => s.gpuPods)
+  const infiniBandFabrics = useGameStore((s) => s.infiniBandFabrics)
+  const ibSwitches = useGameStore((s) => s.ibSwitches)
+  const ibLinks = useGameStore((s) => s.ibLinks)
 
   // ── Detect site switch and trigger full Phaser re-render ─────────
   useEffect(() => {
@@ -257,11 +261,11 @@ export function GameCanvas() {
     // Add new cabinets (with explicit positions)
     for (let i = prevCabCount.current; i < cabinets.length; i++) {
       const cab = cabinets[i]
-      scene.addCabinetToScene(cab.id, cab.col, cab.row, cab.serverCount, cab.hasLeafSwitch, cab.environment, cab.facing)
+      scene.addCabinetToScene(cab.id, cab.col, cab.row, cab.serverCount, cab.hasLeafSwitch, cab.environment, cab.facing, cab.density, cab.podId)
     }
     prevCabCount.current = cabinets.length
 
-    // Update all existing cabinets (server count, leaf switch, power, environment, facing, visual state)
+    // Update all existing cabinets (server count, leaf switch, power, environment, facing, visual state, density, pod membership)
     for (const cab of cabinets) {
       scene.updateCabinet(cab.id, cab.serverCount, cab.hasLeafSwitch, cab.powerStatus, cab.environment, cab.facing, {
         heatLevel: cab.heatLevel,
@@ -270,7 +274,7 @@ export function GameCanvas() {
         hasIncident: incidentCabIds.has(cab.id),
         inMaintenance: maintCabIds.has(cab.id),
         serverAge: cab.serverAge,
-      })
+      }, cab.density, cab.podId)
     }
 
     // Sync occupied tiles
@@ -295,6 +299,46 @@ export function GameCanvas() {
       scene.updateSpine(spine.id, spine.powerStatus)
     }
   }, [spineSwitches, sceneReady])
+
+  // Phase 8A: Sync GPU pod boundaries (dashed magenta outlines)
+  useEffect(() => {
+    if (!gameRef.current) return
+    const scene = getScene(gameRef.current)
+    if (!scene) return
+    scene.setGPUPods(gpuPods.map((p) => ({ id: p.id, cabinetIds: p.cabinetIds })))
+  }, [gpuPods, cabinets, sceneReady])
+
+  // Phase 8B: Sync the InfiniBand backend fabric (violet IB leaves/spines + cables)
+  useEffect(() => {
+    if (!gameRef.current) return
+    const scene = getScene(gameRef.current)
+    if (!scene) return
+    scene.setInfiniBandFabrics(
+      infiniBandFabrics.map((f) => ({
+        id: f.id,
+        podId: f.podId,
+        railCount: f.railCount,
+        leafSwitchIds: f.leafSwitchIds,
+        spineSwitchIds: f.spineSwitchIds,
+        linkIds: f.linkIds,
+      })),
+      ibSwitches.map((s) => ({
+        id: s.id,
+        type: s.type,
+        podId: s.podId,
+        rail: s.rail,
+        operational: s.operational,
+      })),
+      ibLinks.map((l) => ({
+        id: l.id,
+        fromSwitchId: l.fromSwitchId,
+        toSwitchId: l.toSwitchId,
+        fabricId: l.fabricId,
+        rail: l.rail,
+        status: l.status,
+      })),
+    )
+  }, [infiniBandFabrics, ibSwitches, ibLinks, gpuPods, cabinets, sceneReady])
 
   // Sync layer visibility to Phaser
   useEffect(() => {

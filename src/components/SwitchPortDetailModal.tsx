@@ -1,5 +1,5 @@
 import { useGameStore, TRAFFIC } from '@/stores/gameStore'
-import type { TrafficLink, ActiveIncident } from '@/stores/gameStore'
+import type { TrafficLink, ActiveIncident, Cabinet, InfiniBandFabric, IBSwitch, IBLink } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
 import {
   Tooltip,
@@ -251,6 +251,278 @@ function PortRow({ label, ports }: { label: string; ports: PortInfo[] }) {
   )
 }
 
+// ── Phase 8B: InfiniBand fabric inspector ─────────────────────
+
+function railColor(status: 'healthy' | 'flapping' | 'down'): string {
+  if (status === 'down') return '#ff4444'
+  if (status === 'flapping') return '#ffaa00'
+  return '#aa44ff' // healthy = violet (matches the canvas)
+}
+
+function railBgFor(status: 'healthy' | 'flapping' | 'down'): string {
+  if (status === 'down') return '#ff444415'
+  if (status === 'flapping') return '#ffaa0015'
+  return '#aa44ff10'
+}
+
+/** Per-rail card showing the rail's leaf health, downlink ports to this cabinet's
+ *  servers, and the uplink to the rail's spine. */
+function RailCard({
+  rail,
+  leafStatus,
+  downlinkPorts,
+  uplinkStatus,
+  leafLabel,
+  spineLabel,
+}: {
+  rail: number
+  leafStatus: 'healthy' | 'flapping' | 'down'
+  downlinkPorts: Array<{ status: 'healthy' | 'flapping' | 'down'; errorCount: number }>
+  uplinkStatus: 'healthy' | 'flapping' | 'down'
+  leafLabel: string
+  spineLabel: string
+}) {
+  const color = railColor(leafStatus)
+  const bg = railBgFor(leafStatus)
+  return (
+    <div
+      className="rounded border p-2 flex flex-col gap-1.5 transition-all"
+      style={{ borderColor: `${color}40`, backgroundColor: bg }}
+    >
+      {/* Rail header */}
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] font-mono font-bold" style={{ color }}>
+          RAIL {rail}
+        </span>
+        <Badge
+          className="text-[8px] px-1 py-0 h-3.5 border"
+          style={{ backgroundColor: bg, color, borderColor: `${color}60` }}
+        >
+          {leafStatus.toUpperCase()}
+        </Badge>
+      </div>
+
+      {/* Leaf switch label */}
+      <div className="text-[9px] font-mono text-muted-foreground">
+        Leaf <span style={{ color }}>{leafLabel}</span> · NDR 400G
+      </div>
+
+      {/* Downlink ports to this cabinet's servers (one per server) */}
+      <div className="flex gap-0.5 mt-0.5">
+        {downlinkPorts.map((port, i) => (
+          <Tooltip key={i}>
+            <TooltipTrigger asChild>
+              <span
+                className="w-2.5 h-2.5 rounded-sm cursor-help"
+                style={{
+                  backgroundColor: port.status === 'down' ? '#444' : railColor(port.status),
+                  boxShadow: port.status === 'healthy' ? `0 0 4px ${color}` : undefined,
+                }}
+              />
+            </TooltipTrigger>
+            <TooltipContent>
+              <div className="text-[10px] font-mono">
+                Port {i + 1} · {port.status}
+                {port.errorCount > 0 && <span className="text-red-400"> · {port.errorCount} errors</span>}
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        ))}
+      </div>
+
+      {/* Uplink arrow + spine label */}
+      <div className="flex items-center justify-between text-[9px] font-mono mt-0.5">
+        <span className="text-muted-foreground">↑ uplink</span>
+        <span style={{ color: railColor(uplinkStatus) }}>{spineLabel}</span>
+      </div>
+    </div>
+  )
+}
+
+function IBFabricInspector({
+  cabinet,
+  fabric,
+  ibSwitches,
+  ibLinks,
+  onClose,
+  podCabinetCount,
+}: {
+  cabinet: Cabinet
+  fabric: InfiniBandFabric
+  ibSwitches: IBSwitch[]
+  ibLinks: IBLink[]
+  onClose: () => void
+  podCabinetCount: number
+}) {
+  // Per-rail breakdown: for each rail, find the leaf, the spine, the downlink to
+  // THIS cabinet, and the leaf↔spine uplink.
+  const railCards = []
+  const railTotals = { healthy: 0, flapping: 0, down: 0 }
+
+  for (let rail = 0; rail < fabric.railCount; rail++) {
+    const leaf = ibSwitches.find(s => s.podId === fabric.podId && s.type === 'ib_leaf' && s.rail === rail)
+    const spine = ibSwitches.find(s => s.podId === fabric.podId && s.type === 'ib_spine' && s.rail === rail)
+    if (!leaf || !spine) continue
+
+    // Downlink: leaf → this cabinet. We model the cabinet's GPU servers as 4
+    // ports on this rail (1 NIC per server per rail in a typical HGX layout).
+    const downlink = ibLinks.find(l => l.fromSwitchId === leaf.id && l.toSwitchId === cabinet.id)
+    const uplink = ibLinks.find(l => l.fromSwitchId === leaf.id && l.toSwitchId === spine.id)
+    const downStatus = downlink?.status ?? 'healthy'
+    const upStatus = uplink?.status ?? 'healthy'
+
+    railTotals[downStatus]++
+
+    // One indicator per server port on this rail (4 servers per cabinet).
+    const downlinkPorts = Array.from({ length: 4 }, () => ({
+      status: downStatus,
+      errorCount: downlink?.errorCount ?? 0,
+    }))
+
+    const leafLabel = `L${rail}-${leaf.id.replace('ibsw-', '#')}`
+    const spineLabel = `S${rail}`
+
+    railCards.push(
+      <RailCard
+        key={rail}
+        rail={rail}
+        leafStatus={downStatus}
+        uplinkStatus={upStatus}
+        downlinkPorts={downlinkPorts}
+        leafLabel={leafLabel}
+        spineLabel={spineLabel}
+      />
+    )
+  }
+
+  const fabricColor = fabric.health === 'critical' ? '#ff4444' : fabric.health === 'degraded' ? '#ffaa00' : '#aa44ff'
+  const totalErrors = ibLinks.filter(l => l.fabricId === fabric.id).reduce((acc, l) => acc + l.errorCount, 0)
+  const activeServers = cabinet.powerStatus ? cabinet.serverCount : 0
+  const gpusPerServer = cabinet.serverCount > 0 ? Math.round(cabinet.gpuCount / cabinet.serverCount) : 0
+
+  return (
+    <TooltipProvider>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
+        <div
+          className="mx-4 w-full max-w-2xl rounded-xl border bg-card shadow-2xl"
+          style={{ borderColor: `${fabricColor}50` }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+            <div className="flex items-center gap-2">
+              <Network className="size-4" style={{ color: fabricColor }} />
+              <span className="text-sm font-bold tracking-widest" style={{ color: fabricColor }}>
+                INFINIBAND LEAF
+              </span>
+              <Badge
+                className="text-[9px] px-1.5 py-0 h-4 border"
+                style={{ backgroundColor: `${fabricColor}15`, color: fabricColor, borderColor: `${fabricColor}40` }}
+              >
+                {fabric.health.toUpperCase()}
+              </Badge>
+              <span className="text-[10px] text-muted-foreground font-mono">
+                {cabinet.id.replace('cab-', 'Cabinet #')} · Pod-{fabric.podId.replace('pod-', '')}
+              </span>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onClose}
+              className="text-muted-foreground hover:text-foreground p-1 h-auto"
+            >
+              <X className="size-4" />
+            </Button>
+          </div>
+
+          <div className="p-4 flex flex-col gap-4">
+            {/* Fabric overview */}
+            <div className="rounded-lg border border-border/50 bg-black/40 p-3">
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                  <Zap className="size-3" />
+                  RAIL-OPTIMIZED FAT TREE
+                </div>
+                <div className="text-[9px] font-mono text-muted-foreground">
+                  ConnectX-7 NDR 400G · {fabric.railCount} rails · 1 leaf per rail
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-3 text-[10px] font-mono">
+                <div>
+                  <div className="text-muted-foreground">Pod size</div>
+                  <div style={{ color: fabricColor }}>{podCabinetCount} cabinets</div>
+                </div>
+                <div>
+                  <div className="text-muted-foreground">Active servers (this cab)</div>
+                  <div style={{ color: fabricColor }}>{activeServers}/{cabinet.serverCount}</div>
+                </div>
+                <div>
+                  <div className="text-muted-foreground">Activity</div>
+                  <div style={{ color: fabricColor }}>{Math.round(fabric.activityLevel * 100)}%</div>
+                </div>
+                <div>
+                  <div className="text-muted-foreground">GPUs / server</div>
+                  <div style={{ color: fabricColor }}>{gpusPerServer}</div>
+                </div>
+                <div>
+                  <div className="text-muted-foreground">Fabric errors</div>
+                  <div style={{ color: totalErrors > 0 ? '#ffaa00' : fabricColor }}>{totalErrors}</div>
+                </div>
+                <div>
+                  <div className="text-muted-foreground">Rail isolation</div>
+                  <div style={{ color: fabricColor }}>active</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Per-rail cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              {railCards}
+            </div>
+
+            {/* Health summary banner */}
+            {(railTotals.flapping > 0 || railTotals.down > 0) && (
+              <div
+                className="rounded-lg border p-3 flex items-center gap-2"
+                style={{
+                  borderColor: railTotals.down > 0 ? '#ff444450' : '#ffaa0050',
+                  backgroundColor: railTotals.down > 0 ? '#ff444410' : '#ffaa0010',
+                }}
+              >
+                <AlertTriangle className="size-3.5" style={{ color: railTotals.down > 0 ? '#ff4444' : '#ffaa00' }} />
+                <div className="text-[10px] font-mono">
+                  {railTotals.down > 0 && (
+                    <span className="text-red-400">{railTotals.down} rail(s) down — AllReduce capacity reduced by {Math.round((railTotals.down / fabric.railCount) * 100)}%. </span>
+                  )}
+                  {railTotals.flapping > 0 && (
+                    <span className="text-yellow-400">{railTotals.flapping} rail(s) flapping — training jobs at risk.</span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Legend */}
+            <div className="flex flex-wrap gap-3 text-[9px] font-mono text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#aa44ff' }} /> Healthy
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#ffaa00' }} /> Flapping
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#ff4444' }} /> Down
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: '#444' }} /> Empty
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </TooltipProvider>
+  )
+}
+
 // ── Main modal component ──────────────────────────────────────
 
 export function SwitchPortDetailModal() {
@@ -260,6 +532,10 @@ export function SwitchPortDetailModal() {
   const spineSwitches = useGameStore((s) => s.spineSwitches)
   const trafficStats = useGameStore((s) => s.trafficStats)
   const activeIncidents = useGameStore((s) => s.activeIncidents)
+  // Phase 8B: InfiniBand fabric data for pod cabinets
+  const infiniBandFabrics = useGameStore((s) => s.infiniBandFabrics)
+  const ibSwitches = useGameStore((s) => s.ibSwitches)
+  const ibLinks = useGameStore((s) => s.ibLinks)
 
   if (!switchDetailTarget) return null
 
@@ -285,6 +561,24 @@ export function SwitchPortDetailModal() {
   if (isLeaf) {
     const cabinet = cabinets.find(c => c.id === switchDetailTarget.id)
     if (!cabinet || !cabinet.hasLeafSwitch) return null
+
+    // Phase 8B: For GPU pod cabinets, render the InfiniBand fabric inspector
+    // instead of the standard Ethernet ToR leaf view.
+    if (cabinet.podId) {
+      const fabric = infiniBandFabrics.find(f => f.podId === cabinet.podId)
+      if (fabric) {
+        return (
+          <IBFabricInspector
+            cabinet={cabinet}
+            fabric={fabric}
+            ibSwitches={ibSwitches}
+            ibLinks={ibLinks}
+            onClose={closeSwitchDetail}
+            podCabinetCount={cabinets.filter(c => c.podId === cabinet.podId).length}
+          />
+        )
+      }
+    }
 
     const { uplinks, downlinks } = getLeafPorts(
       cabinet.id,
