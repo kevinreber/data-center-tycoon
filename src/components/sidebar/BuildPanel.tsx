@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { useGameStore, RACK_COST, MAX_SERVERS_PER_CABINET, ENVIRONMENT_CONFIG, CUSTOMER_TYPE_CONFIG, SUITE_TIERS, getSuiteLimits, DEDICATED_ROW_BONUS_CONFIG, MIXED_ENV_PENALTY_CONFIG, FLOOR_PLAN_CONFIG } from '@/stores/gameStore'
-import type { CabinetEnvironment, CustomerType, LayoutMode } from '@/stores/gameStore'
+import { useGameStore, RACK_COST, MAX_SERVERS_PER_CABINET, ENVIRONMENT_CONFIG, CUSTOMER_TYPE_CONFIG, SUITE_TIERS, getSuiteLimits, DEDICATED_ROW_BONUS_CONFIG, MIXED_ENV_PENALTY_CONFIG, FLOOR_PLAN_CONFIG, GPU_POD_CONFIG, LIQUID_COOLING_CONFIG } from '@/stores/gameStore'
+import type { CabinetEnvironment, CustomerType, LayoutMode, GPUPodSize } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
-import { Server, Network, Plus, MousePointer, Rows3, Trash2, Wand2, ArrowUp, ArrowDown, FlipVertical, Minus } from 'lucide-react'
+import { Server, Network, Plus, MousePointer, Rows3, Trash2, Wand2, ArrowUp, ArrowDown, FlipVertical, Minus, Cpu } from 'lucide-react'
 import {
   Tooltip,
   TooltipContent,
@@ -21,6 +21,7 @@ export function BuildPanel() {
     setLayoutMode, removeCustomRow, moveCustomRow, resizeCustomRow, flipCustomRow, autoLayoutRows,
     enterRowPlacementMode, exitRowPlacementMode, toggleRowPlacementFacing,
     rowPlacementFacing,
+    gpuPods, createGPUPod, removeGPUPod, unlockedTech,
   } = useGameStore()
 
   const [selectedEnv, setSelectedEnv] = useState<CabinetEnvironment>('production')
@@ -29,6 +30,27 @@ export function BuildPanel() {
   const suiteLimits = getSuiteLimits(suiteTier)
   const canUpgrade = cabinets.some((c) => c.serverCount < MAX_SERVERS_PER_CABINET)
   const canAddLeaf = cabinets.some((c) => !c.hasLeafSwitch)
+
+  // Find first valid placement for a pod of `needed` cabinets: scan each cabinet row
+  // for a contiguous run of empty cols of the required length.
+  const findFirstPodFit = (needed: number): { col: number; row: number } | null => {
+    const activeLayout = customLayout ?? SUITE_TIERS[suiteTier].layout
+    for (const cabRow of activeLayout.cabinetRows) {
+      if (cabRow.slots < needed) continue
+      // Build occupancy bitmap for this gridRow
+      const occupied = new Set(
+        cabinets.filter((c) => c.row === cabRow.gridRow).map((c) => c.col)
+      )
+      for (let startCol = 0; startCol + needed <= cabRow.slots; startCol++) {
+        let fits = true
+        for (let i = 0; i < needed; i++) {
+          if (occupied.has(startCol + i)) { fits = false; break }
+        }
+        if (fits) return { col: startCol, row: cabRow.gridRow }
+      }
+    }
+    return null
+  }
 
   const envEntries = Object.entries(ENVIRONMENT_CONFIG) as [CabinetEnvironment, typeof ENVIRONMENT_CONFIG['production']][]
 
@@ -469,6 +491,86 @@ export function BuildPanel() {
             Backbone switch ({spineSwitches.length}/{suiteLimits.maxSpines}, 250W)
           </TooltipContent>
         </Tooltip>
+      </div>
+
+      {/* GPU Pods (Phase 8A) */}
+      <div className="border-t border-border/50 pt-2">
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-[10px] font-bold text-muted-foreground flex items-center gap-1">
+            <Cpu className="size-3 text-neon-pink" />
+            GPU PODS
+          </span>
+          <span className="text-[9px] text-muted-foreground font-mono">
+            {gpuPods.length} active
+          </span>
+        </div>
+        {!unlockedTech.includes('ai_infrastructure') ? (
+          <div className="text-[10px] text-muted-foreground italic px-1">
+            Research <span className="text-neon-cyan">AI Infrastructure</span> to unlock GPU pod deployment.
+          </div>
+        ) : (
+          <div className="flex flex-col gap-1">
+            {(['small', 'medium'] as GPUPodSize[]).map((size) => {
+              const cfg = GPU_POD_CONFIG[size]
+              const cooling = LIQUID_COOLING_CONFIG[cfg.requiredLiquidCooling]
+              const techMissing = cooling.requiresTech && !unlockedTech.includes(cooling.requiresTech)
+              const cantAfford = money < cfg.installCost
+              const noRoom = !findFirstPodFit(cfg.cabinetCount)
+              const disabled = techMissing || cantAfford || noRoom
+              const reason = techMissing ? `Needs ${cooling.label}` : cantAfford ? 'Insufficient cash' : noRoom ? 'No empty row with contiguous space' : null
+              return (
+                <Tooltip key={size}>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={disabled}
+                      onClick={() => {
+                        const spot = findFirstPodFit(cfg.cabinetCount)
+                        if (spot) createGPUPod(size, spot.col, spot.row)
+                      }}
+                      className="justify-between font-mono text-xs border-neon-pink/20 hover:border-neon-pink/50 hover:bg-neon-pink/10 hover:text-neon-pink transition-all"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <Cpu className="size-3" />
+                        {cfg.label}
+                      </span>
+                      <span className="text-muted-foreground">${(cfg.installCost / 1000).toFixed(0)}K</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right" className="max-w-64">
+                    <p className="text-xs">{cfg.description}</p>
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      {cfg.cabinetCount} cabinets · {cfg.gpuCount} GPUs · {cfg.powerDrawKW}kW/cab · {cooling.label}
+                    </p>
+                    {reason && <p className="text-[10px] text-neon-red mt-1">{reason}</p>}
+                  </TooltipContent>
+                </Tooltip>
+              )
+            })}
+            <div className="text-[9px] text-muted-foreground italic px-1 mt-0.5">
+              Large/Hyperpod (multi-row footprint) coming in Phase 8B.
+            </div>
+          </div>
+        )}
+        {gpuPods.length > 0 && (
+          <div className="mt-2 flex flex-col gap-0.5">
+            {gpuPods.map((pod) => (
+              <div key={pod.id} className="flex items-center justify-between text-[10px] px-1 py-0.5 rounded bg-neon-pink/5">
+                <span className="font-mono text-neon-pink">{pod.name}</span>
+                <span className="text-muted-foreground">{pod.gpuCount} GPU</span>
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  onClick={() => removeGPUPod(pod.id)}
+                  className="h-4 px-1 text-muted-foreground hover:text-neon-red"
+                >
+                  <Trash2 className="size-3" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Organization Status */}

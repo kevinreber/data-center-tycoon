@@ -47,6 +47,10 @@ export type {
   NaclPolicy, NaclPolicyConfig,
   LayoutMode,
   SwitchDetailTarget,
+  // Phase 8A: GPU pods
+  GPUPod, GPUPodSize, GPUPodConfig, CabinetDensity, LiquidCoolingType, LiquidCoolingConfig,
+  // Phase 8B: InfiniBand backend fabric
+  InfiniBandFabric, IBSwitch, IBLink, IBSwitchType, IBSwitchConfig, IBLinkBandwidth, IBLinkStatus, IBFabricHealth,
 } from './types'
 
 import type {
@@ -79,6 +83,8 @@ import type {
   NaclPolicy,
   LayoutMode,
   SwitchDetailTarget,
+  GPUPod, GPUPodSize, LiquidCoolingType,
+  InfiniBandFabric, IBSwitch, IBLink,
 } from './types'
 
 // ── Re-export constants ────────────────────────────────────────
@@ -86,8 +92,8 @@ export { SIM, POWER_DRAW, RACK_COST, TRAFFIC, MAX_SERVERS_PER_CABINET, MAX_CABIN
 import { SIM, POWER_DRAW, COSTS, TRAFFIC, MAX_SERVERS_PER_CABINET, MINUTES_PER_TICK } from './constants'
 
 // ── Re-export configs ──────────────────────────────────────────
-export { CUSTOMER_TYPE_CONFIG, GENERATOR_OPTIONS, SUPPRESSION_CONFIG, COOLING_CONFIG, COOLING_UNIT_CONFIG, CHILLER_PLANT_CONFIG, COOLING_PIPE_CONFIG, ENVIRONMENT_CONFIG, SERVER_CONFIG_OPTIONS, BASE_AMBIENT_DISSIPATION, UNCONNECTED_CRAH_PENALTY, MAX_CHILLER_PLANTS } from './configs/equipment'
-import { CUSTOMER_TYPE_CONFIG, GENERATOR_OPTIONS, SUPPRESSION_CONFIG, COOLING_CONFIG, COOLING_UNIT_CONFIG, CHILLER_PLANT_CONFIG, COOLING_PIPE_CONFIG, ENVIRONMENT_CONFIG, MAX_CHILLER_PLANTS } from './configs/equipment'
+export { CUSTOMER_TYPE_CONFIG, GENERATOR_OPTIONS, SUPPRESSION_CONFIG, COOLING_CONFIG, COOLING_UNIT_CONFIG, CHILLER_PLANT_CONFIG, COOLING_PIPE_CONFIG, ENVIRONMENT_CONFIG, SERVER_CONFIG_OPTIONS, BASE_AMBIENT_DISSIPATION, UNCONNECTED_CRAH_PENALTY, MAX_CHILLER_PLANTS, GPU_POD_CONFIG, LIQUID_COOLING_CONFIG, DENSITY_SCALING, IB_SWITCH_CONFIG, RAIL_COUNT_BY_POD_SIZE, IB_DEFAULT_BANDWIDTH_GBPS, IB_BASE_LINK_ERROR_RATE } from './configs/equipment'
+import { CUSTOMER_TYPE_CONFIG, GENERATOR_OPTIONS, SUPPRESSION_CONFIG, COOLING_CONFIG, COOLING_UNIT_CONFIG, CHILLER_PLANT_CONFIG, COOLING_PIPE_CONFIG, ENVIRONMENT_CONFIG, MAX_CHILLER_PLANTS, GPU_POD_CONFIG, LIQUID_COOLING_CONFIG, DENSITY_SCALING, IB_SWITCH_CONFIG, RAIL_COUNT_BY_POD_SIZE, IB_DEFAULT_BANDWIDTH_GBPS, IB_BASE_LINK_ERROR_RATE } from './configs/equipment'
 
 export { PDU_OPTIONS, CABLE_TRAY_OPTIONS, AISLE_CONFIG, AISLE_CONTAINMENT_CONFIG, SPACING_CONFIG, generateLayout, SUITE_TIERS, SUITE_TIER_ORDER, BUSWAY_OPTIONS, CROSSCONNECT_OPTIONS, INROW_COOLING_OPTIONS, NOISE_CONFIG, POWER_REDUNDANCY_CONFIG, ZONE_BONUS_CONFIG, MIXED_ENV_PENALTY_CONFIG, DEDICATED_ROW_BONUS_CONFIG, FLOOR_PLAN_CONFIG, WIDE_AISLE_COOLING_BONUS, MIN_ROW_GAP, buildLayoutFromRows } from './configs/infrastructure'
 import { PDU_OPTIONS, CABLE_TRAY_OPTIONS, AISLE_CONFIG, AISLE_CONTAINMENT_CONFIG, SPACING_CONFIG, SUITE_TIERS, SUITE_TIER_ORDER, BUSWAY_OPTIONS, CROSSCONNECT_OPTIONS, INROW_COOLING_OPTIONS, NOISE_CONFIG, POWER_REDUNDANCY_CONFIG, ZONE_BONUS_CONFIG, MIXED_ENV_PENALTY_CONFIG, DEDICATED_ROW_BONUS_CONFIG, FLOOR_PLAN_CONFIG, MIN_ROW_GAP, buildLayoutFromRows } from './configs/infrastructure'
@@ -342,6 +348,14 @@ interface GameState {
   coolingUnits: CoolingUnit[]
   chillerPlants: ChillerPlant[]
   coolingPipes: CoolingPipe[]
+
+  // GPU Pods (Phase 8A)
+  gpuPods: GPUPod[]
+
+  // InfiniBand Backend Fabric (Phase 8B)
+  infiniBandFabrics: InfiniBandFabric[]
+  ibSwitches: IBSwitch[]
+  ibLinks: IBLink[]
 
   // Sandbox Mode
   sandboxMode: boolean
@@ -625,6 +639,9 @@ interface GameState {
   placeInRowCooling: (col: number, row: number, optionIndex: number) => void
   placeCoolingUnit: (type: CoolingUnitType, col: number, row: number) => void
   removeCoolingUnit: (id: string) => void
+  createGPUPod: (size: GPUPodSize, col: number, row: number, customerType?: CustomerType) => void
+  removeGPUPod: (id: string) => void
+  installLiquidCooling: (cabinetId: string, type: LiquidCoolingType) => void
   placeChillerPlant: (tier: ChillerTier, col: number, row: number) => void
   removeChillerPlant: (id: string) => void
   placeCoolingPipe: (col: number, row: number) => void
@@ -741,6 +758,10 @@ interface GameState {
 let nextCabId = 1
 let nextSpineId = 1
 let nextLoanId = 1
+let nextPodId = 1
+let nextIBFabricId = 1
+let nextIBSwitchId = 1
+let nextIBLinkId = 1
 let nextIncidentId = 1
 let nextContractId = 1
 let nextGeneratorId = 1
@@ -763,12 +784,122 @@ function restoreIdCounters(data: Record<string, unknown>) {
   const spines = (data.spineSwitches ?? []) as { id: string }[]
   const loans = (data.loans ?? []) as { id: string }[]
   const generators = (data.generators ?? []) as { id: string }[]
+  const gpuPods = (data.gpuPods ?? []) as { id: string }[]
+  const fabrics = (data.infiniBandFabrics ?? []) as { id: string }[]
+  const ibSwitches = (data.ibSwitches ?? []) as { id: string }[]
+  const ibLinks = (data.ibLinks ?? []) as { id: string }[]
   nextCabId = maxIdNum(cabinets, 'cab-') + 1
   nextSpineId = maxIdNum(spines, 'spine-') + 1
   nextLoanId = maxIdNum(loans, 'loan-') + 1
   nextGeneratorId = maxIdNum(generators, 'gen-') + 1
+  nextPodId = maxIdNum(gpuPods, 'pod-') + 1
+  nextIBFabricId = maxIdNum(fabrics, 'ibf-') + 1
+  nextIBSwitchId = maxIdNum(ibSwitches, 'ibsw-') + 1
+  nextIBLinkId = maxIdNum(ibLinks, 'iblnk-') + 1
   nextIncidentId = 1
   nextContractId = 1
+}
+
+// Phase 8B: build a rail-optimized fat-tree InfiniBand fabric for a freshly
+// created GPU pod. Each rail gets 1 leaf switch + 1 spine switch. Each cabinet
+// connects via 1 link to each rail's leaf; each leaf connects to its rail's
+// spine. Rail isolation: a failure in rail K only degrades capacity by 1/N.
+function buildIBFabricForPod(podId: string, podSize: GPUPodSize, cabinetIds: string[]): {
+  fabric: InfiniBandFabric
+  switches: IBSwitch[]
+  links: IBLink[]
+} {
+  const railCount = RAIL_COUNT_BY_POD_SIZE[podSize]
+  const fabricId = `ibf-${nextIBFabricId++}`
+  const switches: IBSwitch[] = []
+  const links: IBLink[] = []
+  const leafIds: string[] = []
+  const spineIds: string[] = []
+
+  for (let rail = 0; rail < railCount; rail++) {
+    const leaf: IBSwitch = {
+      id: `ibsw-${nextIBSwitchId++}`,
+      type: 'ib_leaf',
+      podId,
+      rail,
+      portsTotal: IB_SWITCH_CONFIG.ib_leaf.portsTotal,
+      portsUsed: cabinetIds.length + 1,   // N cabinets + 1 uplink to spine
+      errorRate: 0,
+      operational: true,
+    }
+    switches.push(leaf)
+    leafIds.push(leaf.id)
+
+    const spine: IBSwitch = {
+      id: `ibsw-${nextIBSwitchId++}`,
+      type: 'ib_spine',
+      podId,
+      rail,
+      portsTotal: IB_SWITCH_CONFIG.ib_spine.portsTotal,
+      portsUsed: 1,                       // 1 downlink to the leaf in this rail
+      errorRate: 0,
+      operational: true,
+    }
+    switches.push(spine)
+    spineIds.push(spine.id)
+
+    // Per-cabinet downlinks from this rail's leaf
+    for (const cabId of cabinetIds) {
+      links.push({
+        id: `iblnk-${nextIBLinkId++}`,
+        fromSwitchId: leaf.id,
+        toSwitchId: cabId,
+        fabricId,
+        rail,
+        bandwidthGbps: IB_DEFAULT_BANDWIDTH_GBPS,
+        utilizationPct: 0,
+        errorCount: 0,
+        status: 'healthy',
+        lastErrorTick: -1,
+      })
+    }
+
+    // Leaf → spine uplink for this rail
+    links.push({
+      id: `iblnk-${nextIBLinkId++}`,
+      fromSwitchId: leaf.id,
+      toSwitchId: spine.id,
+      fabricId,
+      rail,
+      bandwidthGbps: IB_DEFAULT_BANDWIDTH_GBPS,
+      utilizationPct: 0,
+      errorCount: 0,
+      status: 'healthy',
+      lastErrorTick: -1,
+    })
+  }
+
+  const fabric: InfiniBandFabric = {
+    id: fabricId,
+    podId,
+    railCount,
+    leafSwitchIds: leafIds,
+    spineSwitchIds: spineIds,
+    linkIds: links.map((l) => l.id),
+    topology: 'fat_tree',
+    health: 'healthy',
+    activityLevel: 0,
+  }
+  return { fabric, switches, links }
+}
+
+// Migrate legacy cabinet records (pre-Phase 8A) by injecting default values for
+// the GPU-pod-related fields. Without this, calcStats/getPDULoad/tick crash on
+// DENSITY_SCALING[undefined] and LIQUID_COOLING_CONFIG[undefined].
+function migrateCabinets(raw: unknown): Cabinet[] {
+  if (!Array.isArray(raw)) return []
+  return raw.map((c: Record<string, unknown>) => ({
+    density: 'standard' as const,
+    gpuCount: 0,
+    liquidCooling: 'none' as const,
+    podId: null,
+    ...c,
+  })) as Cabinet[]
 }
 
 // ── Prestige persistence helpers ──────────────────────────────
@@ -968,6 +1099,14 @@ export const useGameStore = create<GameState>((set) => ({
   coolingUnits: [],
   chillerPlants: [],
   coolingPipes: [],
+
+  // GPU Pods (Phase 8A)
+  gpuPods: [],
+
+  // InfiniBand Backend Fabric (Phase 8B)
+  infiniBandFabrics: [],
+  ibSwitches: [],
+  ibLinks: [],
 
   // Sandbox Mode
   sandboxMode: false,
@@ -1251,6 +1390,10 @@ export const useGameStore = create<GameState>((set) => ({
         heatLevel: SIM.ambientTemp,
         serverAge: 0,
         facing: enforcedFacing,
+        density: 'standard',
+        gpuCount: 0,
+        liquidCooling: 'none',
+        podId: null,
       }
       const newCabinets = [...state.cabinets, cab]
       const activeLayout = state.customLayout ?? suiteLimits.layout
@@ -1975,6 +2118,148 @@ export const useGameStore = create<GameState>((set) => ({
       coolingUnits: state.coolingUnits.filter((u) => u.id !== id),
     })),
 
+  // ── GPU Pod Actions (Phase 8A) ─────────────────────────────────
+  createGPUPod: (size: GPUPodSize, col: number, row: number, customerType: CustomerType = 'ai_lab') =>
+    set((state) => {
+      const podConfig = GPU_POD_CONFIG[size]
+      if (!podConfig) return state
+
+      // Gate: must have AI Infrastructure research (immersion tech for hyperpod via liquid cooling check below)
+      if (!state.unlockedTech.includes('ai_infrastructure')) return state
+
+      // Cash check
+      if (!state.sandboxMode && state.money < podConfig.installCost) return state
+
+      // For Phase 8A: support single-row footprint only (small=4, medium=8 cabinets).
+      // Multi-row footprints (large/hyperpod) require future layout work — fail validation here.
+      const suiteLimits = getSuiteLimits(state.suiteTier)
+      const layout = state.customLayout ?? suiteLimits.layout
+      const cabinetRow = getCabinetRowAtGrid(row, layout)
+      if (!cabinetRow) return state
+
+      const cabinetsNeeded = podConfig.cabinetCount
+      if (col < 0 || col + cabinetsNeeded > cabinetRow.slots) return state
+
+      // All footprint tiles must be empty
+      for (let i = 0; i < cabinetsNeeded; i++) {
+        if (state.cabinets.some((c) => c.col === col + i && c.row === row)) return state
+      }
+
+      // Cabinet count cap
+      if (state.cabinets.length + cabinetsNeeded > suiteLimits.maxCabinets) return state
+
+      // Required liquid cooling tech must be available
+      const coolingConfig = LIQUID_COOLING_CONFIG[podConfig.requiredLiquidCooling]
+      if (coolingConfig.requiresTech && !state.unlockedTech.includes(coolingConfig.requiresTech)) return state
+
+      // Create pod cabinets
+      const podId = `pod-${nextPodId++}`
+      const gpusPerCabinet = podConfig.gpuCount / podConfig.cabinetCount
+      const newCabs: Cabinet[] = []
+      for (let i = 0; i < cabinetsNeeded; i++) {
+        newCabs.push({
+          id: `cab-${nextCabId++}`,
+          col: col + i,
+          row,
+          environment: 'production',
+          customerType,
+          serverCount: 1,
+          hasLeafSwitch: true,         // pods auto-include leaf switches for IB connectivity
+          powerStatus: true,
+          heatLevel: SIM.ambientTemp,
+          serverAge: 0,
+          facing: cabinetRow.facing,
+          density: podConfig.density,
+          gpuCount: gpusPerCabinet,
+          liquidCooling: podConfig.requiredLiquidCooling,
+          podId,
+        })
+      }
+
+      const pod: GPUPod = {
+        id: podId,
+        name: `Pod-${podId.slice(4)}`,
+        size,
+        cabinetIds: newCabs.map((c) => c.id),
+        anchorCol: col,
+        anchorRow: row,
+        cabinetCount: podConfig.cabinetCount,
+        gpuCount: podConfig.gpuCount,
+        installedAtTick: state.tickCount,
+      }
+
+      const allCabinets = [...state.cabinets, ...newCabs]
+      const activeLayout = state.customLayout ?? suiteLimits.layout
+      const newAisleBonus = calcAisleBonus(allCabinets, state.suiteTier, state.aisleContainments, activeLayout)
+      const newZones = calcZones(allCabinets)
+
+      // Phase 8B: auto-build the rail-optimized InfiniBand fabric for this pod.
+      const cabinetIds = newCabs.map((c) => c.id)
+      const { fabric, switches: ibSw, links: ibLn } = buildIBFabricForPod(podId, size, cabinetIds)
+
+      return {
+        cabinets: allCabinets,
+        gpuPods: [...state.gpuPods, pod],
+        infiniBandFabrics: [...state.infiniBandFabrics, fabric],
+        ibSwitches: [...state.ibSwitches, ...ibSw],
+        ibLinks: [...state.ibLinks, ...ibLn],
+        money: state.sandboxMode ? state.money : state.money - podConfig.installCost,
+        aisleBonus: newAisleBonus,
+        zones: newZones,
+        ...calcStats(allCabinets, state.spineSwitches),
+      }
+    }),
+
+  removeGPUPod: (id: string) =>
+    set((state) => {
+      const pod = state.gpuPods.find((p) => p.id === id)
+      if (!pod) return state
+
+      const remainingCabs = state.cabinets.filter((c) => c.podId !== id)
+      const suiteLimits = getSuiteLimits(state.suiteTier)
+      const activeLayout = state.customLayout ?? suiteLimits.layout
+      const newAisleBonus = calcAisleBonus(remainingCabs, state.suiteTier, state.aisleContainments, activeLayout)
+      const newZones = calcZones(remainingCabs)
+
+      // Phase 8B: tear down the pod's IB fabric, switches, and links.
+      const fabric = state.infiniBandFabrics.find((f) => f.podId === id)
+      const fabricIds = fabric ? new Set([fabric.id]) : new Set<string>()
+      const removedSwitchIds = new Set(fabric ? [...fabric.leafSwitchIds, ...fabric.spineSwitchIds] : [])
+      const remainingFabrics = state.infiniBandFabrics.filter((f) => !fabricIds.has(f.id))
+      const remainingSwitches = state.ibSwitches.filter((s) => !removedSwitchIds.has(s.id))
+      const remainingLinks = state.ibLinks.filter((l) => !fabricIds.has(l.fabricId))
+
+      return {
+        cabinets: remainingCabs,
+        gpuPods: state.gpuPods.filter((p) => p.id !== id),
+        infiniBandFabrics: remainingFabrics,
+        ibSwitches: remainingSwitches,
+        ibLinks: remainingLinks,
+        aisleBonus: newAisleBonus,
+        zones: newZones,
+        ...calcStats(remainingCabs, state.spineSwitches),
+      }
+    }),
+
+  installLiquidCooling: (cabinetId: string, type: LiquidCoolingType) =>
+    set((state) => {
+      const cab = state.cabinets.find((c) => c.id === cabinetId)
+      if (!cab) return state
+      const config = LIQUID_COOLING_CONFIG[type]
+      if (!config) return state
+      if (!state.sandboxMode && state.money < config.costPerCabinet) return state
+      if (config.requiresTech && !state.unlockedTech.includes(config.requiresTech)) return state
+
+      const updatedCabinets = state.cabinets.map((c) =>
+        c.id === cabinetId ? { ...c, liquidCooling: type } : c
+      )
+      return {
+        cabinets: updatedCabinets,
+        money: state.sandboxMode ? state.money : state.money - config.costPerCabinet,
+        ...calcStats(updatedCabinets, state.spineSwitches),
+      }
+    }),
+
   placeChillerPlant: (tier: ChillerTier, col: number, row: number) =>
     set((state) => {
       const config = CHILLER_PLANT_CONFIG.find((c) => c.tier === tier)
@@ -2555,6 +2840,10 @@ export const useGameStore = create<GameState>((set) => ({
         crossConnects: state.crossConnects,
         inRowCoolers: state.inRowCoolers,
         rowEndSlots: state.rowEndSlots,
+        gpuPods: state.gpuPods,
+        infiniBandFabrics: state.infiniBandFabrics,
+        ibSwitches: state.ibSwitches,
+        ibLinks: state.ibLinks,
         aisleContainments: state.aisleContainments,
         aisleWidths: state.aisleWidths,
         raisedFloorTier: state.raisedFloorTier,
@@ -2607,6 +2896,10 @@ export const useGameStore = create<GameState>((set) => ({
           crossConnects: hq.crossConnects,
           inRowCoolers: hq.inRowCoolers,
           rowEndSlots: hq.rowEndSlots,
+          gpuPods: hq.gpuPods ?? [],
+          infiniBandFabrics: hq.infiniBandFabrics ?? [],
+          ibSwitches: hq.ibSwitches ?? [],
+          ibLinks: hq.ibLinks ?? [],
           aisleContainments: hq.aisleContainments,
           aisleWidths: hq.aisleWidths,
           raisedFloorTier: hq.raisedFloorTier,
@@ -2642,6 +2935,10 @@ export const useGameStore = create<GameState>((set) => ({
           crossConnects: snap.crossConnects,
           inRowCoolers: snap.inRowCoolers,
           rowEndSlots: snap.rowEndSlots,
+          gpuPods: snap.gpuPods ?? [],
+          infiniBandFabrics: snap.infiniBandFabrics ?? [],
+          ibSwitches: snap.ibSwitches ?? [],
+          ibLinks: snap.ibLinks ?? [],
           aisleContainments: snap.aisleContainments,
           aisleWidths: snap.aisleWidths,
           raisedFloorTier: snap.raisedFloorTier,
@@ -2670,6 +2967,10 @@ export const useGameStore = create<GameState>((set) => ({
         crossConnects: [],
         inRowCoolers: [],
         rowEndSlots: [],
+        gpuPods: [],
+        infiniBandFabrics: [],
+        ibSwitches: [],
+        ibLinks: [],
         aisleContainments: [],
         aisleWidths: {},
         raisedFloorTier: 'none' as RaisedFloorTier,
@@ -3489,6 +3790,10 @@ export const useGameStore = create<GameState>((set) => ({
         heatLevel: 30 + col * 1.5 + gridRow * 0.8,
         serverAge: Math.floor((col + gridRow) * 12),
         facing: cabRow ? cabRow.facing : 'south' as CabinetFacing,
+        density: 'standard',
+        gpuCount: 0,
+        liquidCooling: 'none',
+        podId: null,
       })
     }
 
@@ -3733,6 +4038,7 @@ export const useGameStore = create<GameState>((set) => ({
             serverCount: def.servers, hasLeafSwitch: true, powerStatus: true,
             heatLevel: 35 + c * 2, serverAge: c * 25,
             facing: cr ? cr.facing : 'south' as CabinetFacing,
+            density: 'standard', gpuCount: 0, liquidCooling: 'none', podId: null,
           })
         }
       }
@@ -3765,7 +4071,7 @@ export const useGameStore = create<GameState>((set) => ({
       return {
         cabinets: cabs, spineSwitches: spines, pdus, cableTrays: trays, cableRuns: runs,
         coolingUnits: units, chillerPlants: [], coolingPipes: [], busways: [], crossConnects: [],
-        inRowCoolers: [], rowEndSlots: [], aisleContainments: [], aisleWidths: {},
+        inRowCoolers: [], rowEndSlots: [], gpuPods: [], infiniBandFabrics: [], ibSwitches: [], ibLinks: [], aisleContainments: [], aisleWidths: {},
         raisedFloorTier: 'none' as RaisedFloorTier, cableManagementType: 'none' as CableManagementType,
         coolingType: cooling, suiteTier: 'standard' as SuiteTier,
         totalPower: totalSrv * 450 + totalLeaf * 150 + spineCount * 250,
@@ -3903,6 +4209,10 @@ export const useGameStore = create<GameState>((set) => ({
       isDemo: true,
       cabinets: demoCabinets,
       spineSwitches: demoSpines,
+      gpuPods: [],
+      infiniBandFabrics: [],
+      ibSwitches: [],
+      ibLinks: [],
       money: 1285000,
       tickCount: 2600,
       gameHour: 14,
@@ -4226,6 +4536,10 @@ export const useGameStore = create<GameState>((set) => ({
       coolingUnits: [],
       chillerPlants: [],
       coolingPipes: [],
+      gpuPods: [],
+      infiniBandFabrics: [],
+      ibSwitches: [],
+      ibLinks: [],
       sandboxMode: false,
       activeScenario: null,
       scenarioProgress: {},
@@ -4368,6 +4682,10 @@ export const useGameStore = create<GameState>((set) => ({
         coolingUnits: state.coolingUnits,
         chillerPlants: state.chillerPlants,
         coolingPipes: state.coolingPipes,
+        gpuPods: state.gpuPods,
+        infiniBandFabrics: state.infiniBandFabrics,
+        ibSwitches: state.ibSwitches,
+        ibLinks: state.ibLinks,
         sandboxMode: state.sandboxMode,
         aisleContainments: state.aisleContainments,
         customRowMode: state.customRowMode,
@@ -4427,10 +4745,15 @@ export const useGameStore = create<GameState>((set) => ({
       if (!raw) return false
       const data = JSON.parse(raw)
       restoreIdCounters(data)
+      const migratedCabinets = data.cabinets ? migrateCabinets(data.cabinets) : null
       set((state) => ({
         ...state,
-        cabinets: data.cabinets ?? state.cabinets,
+        cabinets: migratedCabinets ?? state.cabinets,
         spineSwitches: data.spineSwitches ?? state.spineSwitches,
+        gpuPods: data.gpuPods ?? [],
+        infiniBandFabrics: data.infiniBandFabrics ?? [],
+        ibSwitches: data.ibSwitches ?? [],
+        ibLinks: data.ibLinks ?? [],
         money: data.money ?? state.money,
         tickCount: data.tickCount ?? state.tickCount,
         gameHour: data.gameHour ?? state.gameHour,
@@ -4493,7 +4816,7 @@ export const useGameStore = create<GameState>((set) => ({
         hqRegionId: (data.hqRegionId as RegionId) ?? state.hqRegionId,
         activeSlotId: slotId,
         hasSaved: true,
-        ...calcStats(data.cabinets ?? state.cabinets, data.spineSwitches ?? state.spineSwitches),
+        ...calcStats(migratedCabinets ?? state.cabinets, data.spineSwitches ?? state.spineSwitches),
       }))
       return true
     } catch {
@@ -4609,6 +4932,10 @@ export const useGameStore = create<GameState>((set) => ({
       coolingUnits: [],
       chillerPlants: [],
       coolingPipes: [],
+      gpuPods: [],
+      infiniBandFabrics: [],
+      ibSwitches: [],
+      ibLinks: [],
       sandboxMode: false,
       activeScenario: null,
       scenarioProgress: {},
@@ -5427,7 +5754,7 @@ export const useGameStore = create<GameState>((set) => ({
                 cabinets: [], spineSwitches: [], pdus: [], cableTrays: [], cableRuns: [],
                 coolingUnits: [], chillerPlants: [], coolingPipes: [],
                 busways: [], crossConnects: [], inRowCoolers: [],
-                rowEndSlots: [], aisleContainments: [], aisleWidths: {},
+                rowEndSlots: [], gpuPods: [], infiniBandFabrics: [], ibSwitches: [], ibLinks: [], aisleContainments: [], aisleWidths: {},
                 raisedFloorTier: 'none', cableManagementType: 'none',
                 coolingType: 'air', suiteTier: 'starter' as SuiteTier,
                 totalPower: 0, avgHeat: SIM.ambientTemp, revenue: 0, expenses: 0,
@@ -5662,8 +5989,9 @@ export const useGameStore = create<GameState>((set) => ({
         const custConfig = CUSTOMER_TYPE_CONFIG[cab.customerType]
 
         if (cab.powerStatus) {
-          // Heat generation scaled by environment AND customer type
-          heat += cab.serverCount * SIM.heatPerServer * envConfig.heatMultiplier * custConfig.heatMultiplier
+          // Heat generation scaled by environment, customer type, and density tier
+          const densityHeatMult = DENSITY_SCALING[cab.density].heatMultiplier
+          heat += cab.serverCount * SIM.heatPerServer * envConfig.heatMultiplier * custConfig.heatMultiplier * densityHeatMult
           if (cab.hasLeafSwitch) heat += SIM.heatPerLeaf
 
           // Aisle violation penalty: mixed facings in a row add extra heat
@@ -5724,7 +6052,9 @@ export const useGameStore = create<GameState>((set) => ({
         const baseCooling = state.coolingUnits.length > 0 ? unitCooling : coolingConfig.coolingRate
         const infraCooling = facilityRowEndCooling + facilityAisleWidthCooling + facilityRaisedFloorCooling + facilityCableMessReduction
         const prestigeCoolingBoost = state.prestige.level > 0 ? (1 + state.prestige.bonuses.coolingEfficiency) : 1
-        heat -= (baseCooling + techCoolingBonus + aisleCoolingBoost + inRowBonus + staffCoolingBonus + zoneHeatBoost + dedicatedRowCoolingBonus + infraCooling) * incidentCoolingMult * prestigeCoolingBoost
+        // Liquid cooling per-cabinet bonus (Phase 8A): rear-door HX / direct-to-chip / immersion remove heat at the source
+        const liquidCoolingBonus = LIQUID_COOLING_CONFIG[cab.liquidCooling].heatDissipationBonus
+        heat -= (baseCooling + techCoolingBonus + aisleCoolingBoost + inRowBonus + staffCoolingBonus + zoneHeatBoost + dedicatedRowCoolingBonus + infraCooling + liquidCoolingBonus) * incidentCoolingMult * prestigeCoolingBoost
 
         // Incident heat spike
         heat += incidentHeatAdd
@@ -7119,7 +7449,7 @@ export const useGameStore = create<GameState>((set) => ({
               cabinets: [], spineSwitches: [], pdus: [], cableTrays: [], cableRuns: [],
               coolingUnits: [], chillerPlants: [], coolingPipes: [],
               busways: [], crossConnects: [], inRowCoolers: [],
-              rowEndSlots: [], aisleContainments: [], aisleWidths: {},
+              rowEndSlots: [], gpuPods: [], infiniBandFabrics: [], ibSwitches: [], ibLinks: [], aisleContainments: [], aisleWidths: {},
               raisedFloorTier: 'none', cableManagementType: 'none',
               coolingType: 'air', suiteTier: 'starter' as SuiteTier,
               totalPower: 0, avgHeat: SIM.ambientTemp, revenue: 0, expenses: 0,
@@ -7452,9 +7782,58 @@ export const useGameStore = create<GameState>((set) => ({
         bankruptcyTicks = 0
       }
 
+      // ── Phase 8B: InfiniBand fabric tick — link health + fabric activity ──
+      let tickedIBLinks = state.ibLinks
+      let tickedIBFabrics = state.infiniBandFabrics
+      if (state.infiniBandFabrics.length > 0) {
+        let dirty = false
+        tickedIBLinks = state.ibLinks.map((link) => {
+          // Healthy links accumulate occasional errors. Once enough errors pile up,
+          // status degrades: healthy → flapping → down. Recovery is manual via the
+          // (future) NOC panel — for now, no auto-recovery.
+          if (link.status === 'down') return link
+          if (Math.random() < IB_BASE_LINK_ERROR_RATE) {
+            const newErrorCount = link.errorCount + 1
+            let newStatus: 'healthy' | 'flapping' | 'down' = link.status
+            if (newErrorCount > 30 && link.status === 'flapping') newStatus = 'down'
+            else if (newErrorCount > 10 && link.status === 'healthy') newStatus = 'flapping'
+            if (newStatus !== link.status || newErrorCount !== link.errorCount) dirty = true
+            return { ...link, errorCount: newErrorCount, status: newStatus, lastErrorTick: newTickCount }
+          }
+          return link
+        })
+
+        // Update each fabric's health + activityLevel. Activity ramps toward 0.7
+        // when the pod is operational (proxy: at least one cabinet powered on);
+        // future Phase 8E training jobs will drive this directly.
+        tickedIBFabrics = state.infiniBandFabrics.map((fabric) => {
+          const fabricLinks = tickedIBLinks.filter((l) => l.fabricId === fabric.id)
+          const downCount = fabricLinks.filter((l) => l.status === 'down').length
+          const flappingCount = fabricLinks.filter((l) => l.status === 'flapping').length
+          const total = fabricLinks.length || 1
+          let health: typeof fabric.health = 'healthy'
+          if (downCount / total > 0.2) health = 'critical'
+          else if ((downCount + flappingCount) / total > 0.1) health = 'degraded'
+
+          const podCabs = newCabinets.filter((c) => c.podId === fabric.podId)
+          const podActive = podCabs.some((c) => c.powerStatus)
+          const targetActivity = podActive ? 0.7 : 0
+          const newActivity = fabric.activityLevel + (targetActivity - fabric.activityLevel) * 0.1
+          if (health !== fabric.health || Math.abs(newActivity - fabric.activityLevel) > 0.01) dirty = true
+          return { ...fabric, health, activityLevel: newActivity }
+        })
+
+        if (!dirty) {
+          tickedIBLinks = state.ibLinks
+          tickedIBFabrics = state.infiniBandFabrics
+        }
+      }
+
       return {
         cabinets: newCabinets,
         spineSwitches,
+        ibLinks: tickedIBLinks,
+        infiniBandFabrics: tickedIBFabrics,
         tickCount: newTickCount,
         revenue: +revenue.toFixed(2),
         expenses,

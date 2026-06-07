@@ -4,7 +4,18 @@ export type GameSpeed = 0 | 1 | 2 | 3
 export type CabinetEnvironment = 'production' | 'lab' | 'management'
 export type CoolingType = 'air' | 'water'
 export type CoolingUnitType = 'fan_tray' | 'crac' | 'crah' | 'immersion_pod'
-export type CustomerType = 'general' | 'ai_training' | 'streaming' | 'crypto' | 'enterprise'
+export type CustomerType = 'general' | 'ai_training' | 'streaming' | 'crypto' | 'enterprise' | 'ai_lab'
+
+// ── GPU Pods & High-Density Compute (Phase 8A) ─────────────────
+export type CabinetDensity = 'standard' | 'high_density' | 'extreme_density'
+export type LiquidCoolingType = 'none' | 'rear_door_hx' | 'direct_to_chip' | 'single_phase_immersion'
+export type GPUPodSize = 'small' | 'medium' | 'large' | 'hyperpod'
+
+// ── InfiniBand Backend Fabric (Phase 8B) ───────────────────────
+export type IBSwitchType = 'ib_leaf' | 'ib_spine'
+export type IBLinkBandwidth = 200 | 400 | 800   // Gbps — NDR / XDR / GDR
+export type IBLinkStatus = 'healthy' | 'flapping' | 'down'
+export type IBFabricHealth = 'healthy' | 'degraded' | 'critical'
 export type GeneratorStatus = 'standby' | 'running' | 'cooldown'
 export type SuppressionType = 'none' | 'water_suppression' | 'gas_suppression'
 export type TechBranch = 'efficiency' | 'performance' | 'resilience'
@@ -118,6 +129,11 @@ export interface SiteSnapshot {
   crossConnects: CrossConnect[]
   inRowCoolers: InRowCooling[]
   rowEndSlots: RowEndSlot[]
+  gpuPods: GPUPod[]
+  // Phase 8B: InfiniBand backend fabrics (one per pod)
+  infiniBandFabrics: InfiniBandFabric[]
+  ibSwitches: IBSwitch[]
+  ibLinks: IBLink[]
   aisleContainments: number[]
   aisleWidths: Record<number, AisleWidth>
   raisedFloorTier: RaisedFloorTier
@@ -976,6 +992,11 @@ export interface Cabinet {
   heatLevel: number
   serverAge: number
   facing: CabinetFacing
+  // Phase 8A: High-density / GPU pod fields. Existing cabinets default to standard density.
+  density: CabinetDensity
+  gpuCount: number              // 0 for standard, 8 per high-density cabinet, 8 per extreme cabinet
+  liquidCooling: LiquidCoolingType
+  podId: string | null          // membership in a GPUPod, null for standalone
 }
 
 export interface PlacementHint {
@@ -986,6 +1007,98 @@ export interface PlacementHint {
 export interface SpineSwitch {
   id: string
   powerStatus: boolean
+}
+
+// ── GPU Pod (Phase 8A) ─────────────────────────────────────────
+export interface GPUPod {
+  id: string
+  name: string                  // procedurally generated, e.g. "Pod-Helios-01"
+  size: GPUPodSize
+  cabinetIds: string[]          // 4–32 grouped cabinets in row-contiguous footprint
+  anchorCol: number             // top-left of footprint
+  anchorRow: number             // top-left of footprint
+  cabinetCount: number          // 4, 8, 16, or 32
+  gpuCount: number              // 64, 128, 256, or 512
+  installedAtTick: number
+}
+
+export interface GPUPodConfig {
+  size: GPUPodSize
+  label: string
+  description: string
+  cabinetCount: number          // total cabinets in pod
+  gpuCount: number              // total GPUs
+  installCost: number           // up-front cost (includes cabinets + GPUs)
+  powerDrawKW: number           // per-cabinet kW at full utilization
+  requiredLiquidCooling: LiquidCoolingType  // minimum cooling needed
+  density: CabinetDensity       // density tier applied to member cabinets
+  color: string
+}
+
+export interface LiquidCoolingConfig {
+  type: LiquidCoolingType
+  label: string
+  description: string
+  costPerCabinet: number        // install cost per cabinet
+  maxKWPerCabinet: number       // max thermal load handled
+  heatDissipationBonus: number  // °C/tick removed beyond baseline cooling
+  maintenanceCostPerTick: number  // per-cabinet ongoing cost
+  requiresTech: string | null   // tech tree gate
+  color: string
+}
+
+// ── InfiniBand Backend Fabric (Phase 8B) ───────────────────────
+// A rail-optimized fat-tree fabric attached to each GPU pod. Each rail is a
+// parallel spine plane; cabinets connect to one leaf per rail. Rail-to-rail
+// isolation means a single rail failure degrades capacity by 1/N rails
+// rather than taking down the pod.
+
+export interface IBSwitch {
+  id: string
+  type: IBSwitchType
+  podId: string                 // which pod this switch belongs to
+  rail: number                  // 0–7; for ib_spine this is the rail it serves
+  portsTotal: number
+  portsUsed: number
+  errorRate: number             // 0–1, accumulates with age and incidents
+  operational: boolean
+}
+
+export interface IBLink {
+  id: string
+  fromSwitchId: string          // ib_leaf id (for leaf↔cabinet uses cabinet id with 'cab-' prefix)
+  toSwitchId: string            // ib_spine id, OR a cabinet id when this is a leaf↔cabinet downlink
+  fabricId: string
+  rail: number                  // 0–7
+  bandwidthGbps: IBLinkBandwidth
+  utilizationPct: number        // 0–100
+  errorCount: number
+  status: IBLinkStatus
+  lastErrorTick: number
+}
+
+export interface InfiniBandFabric {
+  id: string
+  podId: string                 // 1:1 with a GPU pod
+  railCount: 4 | 8
+  leafSwitchIds: string[]       // length = railCount × leaves-per-rail; for now 1 leaf per rail
+  spineSwitchIds: string[]      // length = railCount; one spine per rail
+  linkIds: string[]
+  topology: 'fat_tree'          // future: dragonfly
+  health: IBFabricHealth
+  // AllReduce simulation — drives the ring pulse animation
+  activityLevel: number         // 0–1; ramps up while pod is running a training workload
+}
+
+export interface IBSwitchConfig {
+  type: IBSwitchType
+  label: string
+  description: string
+  cost: number
+  portsTotal: number
+  powerDraw: number             // watts
+  bandwidthPerPortGbps: IBLinkBandwidth
+  color: string
 }
 
 // ── Traffic / Network Types ────────────────────────────────────

@@ -22,7 +22,7 @@ import type {
 } from './types'
 
 import { SIM, POWER_DRAW, TRAFFIC } from './constants'
-import { CUSTOMER_TYPE_CONFIG, COOLING_UNIT_CONFIG, ENVIRONMENT_CONFIG, BASE_AMBIENT_DISSIPATION, UNCONNECTED_CRAH_PENALTY } from './configs/equipment'
+import { CUSTOMER_TYPE_CONFIG, COOLING_UNIT_CONFIG, ENVIRONMENT_CONFIG, BASE_AMBIENT_DISSIPATION, UNCONNECTED_CRAH_PENALTY, DENSITY_SCALING } from './configs/equipment'
 import { SUITE_TIERS, SPACING_CONFIG, ZONE_BONUS_CONFIG, AISLE_CONTAINMENT_CONFIG, WIDE_AISLE_COOLING_BONUS } from './configs/infrastructure'
 import { REPUTATION_TIERS, getReputationTier } from './configs/progression'
 import { getChillerConnection } from './chiller'
@@ -67,7 +67,8 @@ export function calcStats(cabinets: Cabinet[], spines: SpineSwitch[]) {
   for (const cab of cabinets) {
     if (cab.powerStatus) {
       const custConfig = CUSTOMER_TYPE_CONFIG[cab.customerType]
-      itPower += cab.serverCount * POWER_DRAW.server * custConfig.powerMultiplier
+      const densityMult = DENSITY_SCALING[cab.density].powerMultiplier
+      itPower += cab.serverCount * POWER_DRAW.server * custConfig.powerMultiplier * densityMult
       if (cab.hasLeafSwitch) itPower += POWER_DRAW.leaf_switch
       heatSum += cab.heatLevel
       activeCabs++
@@ -269,7 +270,8 @@ export function getPDULoad(pdu: PDU, cabinets: Cabinet[], pduConfig: PDUConfig):
   for (const cab of served) {
     if (!cab.powerStatus) continue
     const custConfig = CUSTOMER_TYPE_CONFIG[cab.customerType]
-    loadW += cab.serverCount * POWER_DRAW.server * custConfig.powerMultiplier
+    const densityMult = DENSITY_SCALING[cab.density].powerMultiplier
+    loadW += cab.serverCount * POWER_DRAW.server * custConfig.powerMultiplier * densityMult
     if (cab.hasLeafSwitch) loadW += POWER_DRAW.leaf_switch
   }
   return loadW / 1000

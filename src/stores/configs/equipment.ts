@@ -7,6 +7,12 @@ import type {
   CustomerTypeConfig,
   EnvironmentConfig,
   GeneratorConfig,
+  GPUPodConfig,
+  GPUPodSize,
+  IBSwitchConfig,
+  IBSwitchType,
+  LiquidCoolingConfig,
+  LiquidCoolingType,
   ServerConfigDef,
   SuppressionConfig,
   SuppressionType,
@@ -59,6 +65,15 @@ export const CUSTOMER_TYPE_CONFIG: Record<CustomerType, CustomerTypeConfig> = {
     heatMultiplier: 1.0,
     revenueMultiplier: 1.8,
     bandwidthMultiplier: 1.2,
+  },
+  ai_lab: {
+    label: 'AI Lab',
+    description: 'Frontier AI training labs. Massive GPU pods, extreme power and heat, premium per-GPU payouts. Demands liquid cooling.',
+    color: '#cc44ff',
+    powerMultiplier: 2.5,
+    heatMultiplier: 2.5,
+    revenueMultiplier: 4.0,
+    bandwidthMultiplier: 0.5,
   },
 }
 
@@ -255,3 +270,158 @@ export const UNCONNECTED_CRAH_PENALTY = 0.6
 
 /** Max chiller plants allowed per facility */
 export const MAX_CHILLER_PLANTS = 2
+
+// ── GPU Pods & Liquid Cooling (Phase 8A) ──────────────────────
+
+export const GPU_POD_CONFIG: Record<GPUPodSize, GPUPodConfig> = {
+  small: {
+    size: 'small',
+    label: 'Small Pod (64 GPU)',
+    description: '4-cabinet training cluster with 64 GPUs. Entry-level AI infrastructure.',
+    cabinetCount: 4,
+    gpuCount: 64,
+    installCost: 200_000,
+    powerDrawKW: 30,
+    requiredLiquidCooling: 'rear_door_hx',
+    density: 'high_density',
+    color: '#cc66ff',
+  },
+  medium: {
+    size: 'medium',
+    label: 'Medium Pod (128 GPU)',
+    description: '8-cabinet cluster with 128 GPUs. Direct-to-chip cooling required.',
+    cabinetCount: 8,
+    gpuCount: 128,
+    installCost: 450_000,
+    powerDrawKW: 35,
+    requiredLiquidCooling: 'direct_to_chip',
+    density: 'high_density',
+    color: '#dd44ff',
+  },
+  large: {
+    size: 'large',
+    label: 'Large Pod (256 GPU)',
+    description: '16-cabinet cluster with 256 GPUs. Production-scale frontier training.',
+    cabinetCount: 16,
+    gpuCount: 256,
+    installCost: 1_200_000,
+    powerDrawKW: 45,
+    requiredLiquidCooling: 'direct_to_chip',
+    density: 'extreme_density',
+    color: '#ee44ff',
+  },
+  hyperpod: {
+    size: 'hyperpod',
+    label: 'Hyperpod (512 GPU)',
+    description: '32-cabinet immersion-cooled hyperscale cluster. The whale. Reserved for frontier AI labs.',
+    cabinetCount: 32,
+    gpuCount: 512,
+    installCost: 3_000_000,
+    powerDrawKW: 50,
+    requiredLiquidCooling: 'single_phase_immersion',
+    density: 'extreme_density',
+    color: '#ff44ff',
+  },
+}
+
+export const LIQUID_COOLING_CONFIG: Record<LiquidCoolingType, LiquidCoolingConfig> = {
+  none: {
+    type: 'none',
+    label: 'None',
+    description: 'No liquid cooling. Standard air cooling only.',
+    costPerCabinet: 0,
+    maxKWPerCabinet: 6,
+    heatDissipationBonus: 0,
+    maintenanceCostPerTick: 0,
+    requiresTech: null,
+    color: '#888888',
+  },
+  rear_door_hx: {
+    type: 'rear_door_hx',
+    label: 'Rear-Door Heat Exchanger',
+    description: 'Chilled water coil in the rear door extracts heat at the cabinet. Handles up to 35kW.',
+    costPerCabinet: 30_000,
+    maxKWPerCabinet: 35,
+    heatDissipationBonus: 4.0,
+    maintenanceCostPerTick: 1.0,
+    requiresTech: 'ai_infrastructure',
+    color: '#44aaff',
+  },
+  direct_to_chip: {
+    type: 'direct_to_chip',
+    label: 'Direct-to-Chip',
+    description: 'Cold plates bolted directly to CPU/GPU dies. CDU + manifolds. Handles up to 50kW.',
+    costPerCabinet: 80_000,
+    maxKWPerCabinet: 50,
+    heatDissipationBonus: 7.0,
+    maintenanceCostPerTick: 2.5,
+    requiresTech: 'ai_infrastructure',
+    color: '#00ccff',
+  },
+  single_phase_immersion: {
+    type: 'single_phase_immersion',
+    label: 'Single-Phase Immersion',
+    description: 'Entire cabinet submerged in dielectric fluid. Handles 100kW+. Requires existing immersion tech.',
+    costPerCabinet: 150_000,
+    maxKWPerCabinet: 100,
+    heatDissipationBonus: 12.0,
+    maintenanceCostPerTick: 4.0,
+    requiresTech: 'immersion_cooling',
+    color: '#cc66ff',
+  },
+}
+
+// ── InfiniBand Backend Fabric (Phase 8B) ──────────────────────
+
+export const IB_SWITCH_CONFIG: Record<IBSwitchType, IBSwitchConfig> = {
+  ib_leaf: {
+    type: 'ib_leaf',
+    label: 'IB Leaf (NDR 400G)',
+    description: 'InfiniBand top-of-rack leaf switch. 32× 400Gb NDR ports. One leaf per rail per pod.',
+    cost: 30_000,
+    portsTotal: 32,
+    powerDraw: 350,
+    bandwidthPerPortGbps: 400,
+    color: '#aa44ff',
+  },
+  ib_spine: {
+    type: 'ib_spine',
+    label: 'IB Spine (NDR 400G)',
+    description: 'Non-blocking 64-port spine switch. One spine per rail; cross-pod rails stay isolated.',
+    cost: 80_000,
+    portsTotal: 64,
+    powerDraw: 600,
+    bandwidthPerPortGbps: 400,
+    color: '#cc44ff',
+  },
+}
+
+/** Number of parallel rails per pod size. More rails = better AllReduce throughput
+ *  and graceful degradation when a single rail fails. */
+export const RAIL_COUNT_BY_POD_SIZE: Record<GPUPodSize, 4 | 8> = {
+  small: 4,
+  medium: 4,
+  large: 4,
+  hyperpod: 8,
+}
+
+/** Default link bandwidth between IB switches and IB endpoints (Gbps). */
+export const IB_DEFAULT_BANDWIDTH_GBPS = 400 as const
+
+/** Base error rate accumulation per tick per active link (chance of an error event).
+ *  Errors at this rate accumulate slowly; an incident or aging fabric raises them. */
+export const IB_BASE_LINK_ERROR_RATE = 0.0002
+
+// ── Cabinet Density Scaling (Phase 8A) ────────────────────────
+
+/** Multipliers applied to per-cabinet power draw and heat based on density tier */
+export const DENSITY_SCALING: Record<'standard' | 'high_density' | 'extreme_density', {
+  powerMultiplier: number     // multiplier on base server power draw
+  heatMultiplier: number      // multiplier on base heat generation
+  maxServers: number          // max servers per cabinet at this density
+  label: string
+}> = {
+  standard: { powerMultiplier: 1.0, heatMultiplier: 1.0, maxServers: 4, label: 'Standard 6kW' },
+  high_density: { powerMultiplier: 5.0, heatMultiplier: 4.5, maxServers: 8, label: 'High Density 30-35kW' },
+  extreme_density: { powerMultiplier: 8.0, heatMultiplier: 7.0, maxServers: 8, label: 'Extreme 45-50kW' },
+}
