@@ -658,6 +658,7 @@ interface GameState {
   dispatchElectrician: (linkId: string) => void
   openNocDrawer: (linkId: string | null) => void
   clearPendingPanel: () => void
+  refreshGpu: (cabinetId: string) => void
   placeChillerPlant: (tier: ChillerTier, col: number, row: number) => void
   removeChillerPlant: (id: string) => void
   placeCoolingPipe: (col: number, row: number) => void
@@ -2395,6 +2396,23 @@ export const useGameStore = create<GameState>((set) => ({
     })),
 
   clearPendingPanel: () => set({ pendingPanelOpen: null }),
+
+  // Phase 8D: $15K to swap an ECC-faulted GPU. Clears the cabinet's
+  // eccFaultedGpus counter back to 0 so the full GPU count returns to service.
+  refreshGpu: (cabinetId: string) =>
+    set((state) => {
+      const cab = state.cabinets.find((c) => c.id === cabinetId)
+      if (!cab) return state
+      if ((cab.eccFaultedGpus ?? 0) <= 0) return state
+      const cost = 15000
+      if (!state.sandboxMode && state.money < cost) return state
+      return {
+        money: state.sandboxMode ? state.money : state.money - cost,
+        cabinets: state.cabinets.map((c) =>
+          c.id === cabinetId ? { ...c, eccFaultedGpus: 0 } : c
+        ),
+      }
+    }),
 
   placeChillerPlant: (tier: ChillerTier, col: number, row: number) =>
     set((state) => {
@@ -5307,6 +5325,14 @@ export const useGameStore = create<GameState>((set) => ({
       let coolingUnits = [...state.coolingUnits]
       let chillerPlants = [...state.chillerPlants]
       let coolingPipes = [...state.coolingPipes]
+      // Phase 8D: queues that the IB tick block + heat update consume so the
+      // incident spawn block doesn't have to mutate state directly.
+      const pendingOpticFailures = new Set<string>()
+      const pendingEccFaults: string[] = []
+      // Phase 8D: cabinets whose thermal_runaway expired unresolved this tick —
+      // they auto-power-off to prevent hardware damage. Populated in the incident
+      // decrement block, consumed in the cabinet heat update block.
+      const thermalRunawayShutoffCabIds = new Set<string>()
       // Clean up resolved incidents and track hardware that needs restoration
       const justResolved = activeIncidents.filter((i) => i.resolved)
       activeIncidents = activeIncidents.filter((i) => !i.resolved)
@@ -5417,6 +5443,85 @@ export const useGameStore = create<GameState>((set) => ({
             }
           }
 
+          // ── Phase 8D — AI fabric/cabinet incident gating ─────────
+          // Each AI incident type has its own precondition. If unmet, fall back to
+          // a non-AI catalog entry so the spawn slot doesn't go to waste.
+          let affectedPodId: string | undefined
+          let affectedIbLinkId: string | undefined
+          let affectedCabinetId: string | undefined
+          if (selectedDef.effect === 'ai_fabric' || selectedDef.effect === 'ai_cabinet') {
+            const fabrics = state.infiniBandFabrics
+            const liveLinks = state.ibLinks.filter((l) => l.status !== 'down')
+            const poweredPodFabrics = fabrics.filter((f) => state.cabinets.some((c) => c.podId === f.podId && c.powerStatus))
+            const podLinkUtilSummary = new Map<string, number>()
+            for (const f of fabrics) {
+              const fl = state.ibLinks.filter((l) => l.fabricId === f.id)
+              const avg = fl.length === 0 ? 0 : fl.reduce((s, l) => s + l.utilizationPct, 0) / fl.length
+              podLinkUtilSummary.set(f.id, avg)
+            }
+
+            const pickRandom = <T>(arr: T[]): T | undefined => arr.length === 0 ? undefined : arr[Math.floor(Math.random() * arr.length)]
+
+            let ok = false
+            switch (selectedDef.type) {
+              case 'ib_link_flap': {
+                const link = pickRandom(liveLinks)
+                if (link) { affectedIbLinkId = link.id; affectedPodId = fabrics.find((f) => f.id === link.fabricId)?.podId; ok = true }
+                break
+              }
+              case 'nccl_collective_hang':
+              case 'silent_data_corruption': {
+                const fab = pickRandom(poweredPodFabrics)
+                if (fab) { affectedPodId = fab.podId; ok = true }
+                break
+              }
+              case 'optic_failure': {
+                const link = pickRandom(liveLinks)
+                if (link) { affectedIbLinkId = link.id; affectedPodId = fabrics.find((f) => f.id === link.fabricId)?.podId; ok = true }
+                break
+              }
+              case 'pfc_storm': {
+                // Real PFC storms only happen on saturated fabrics. Anything below
+                // 90% avg link utilization is too quiet for the storm to form.
+                const saturated = poweredPodFabrics.filter((f) => (podLinkUtilSummary.get(f.id) ?? 0) > 90)
+                const fab = pickRandom(saturated)
+                if (fab) { affectedPodId = fab.podId; ok = true }
+                break
+              }
+              case 'thermal_runaway': {
+                // Only on high-density cabinets with sub-spec cooling. Direct-to-chip
+                // and immersion can shed the heat, so they're immune.
+                const vulnerable = state.cabinets.filter((c) =>
+                  c.podId != null &&
+                  c.powerStatus &&
+                  (c.density === 'high_density' || c.density === 'extreme_density') &&
+                  c.liquidCooling !== 'direct_to_chip' &&
+                  c.liquidCooling !== 'single_phase_immersion'
+                )
+                const cab = pickRandom(vulnerable)
+                if (cab) { affectedCabinetId = cab.id; affectedPodId = cab.podId ?? undefined; ok = true }
+                break
+              }
+              case 'gpu_ecc_fault': {
+                const candidates = state.cabinets.filter((c) => c.podId != null && c.gpuCount > 0 && (c.eccFaultedGpus ?? 0) < c.gpuCount)
+                const cab = pickRandom(candidates)
+                if (cab) { affectedCabinetId = cab.id; affectedPodId = cab.podId ?? undefined; ok = true }
+                break
+              }
+            }
+            if (!ok) {
+              // Precondition unmet — fall back to a non-AI, non-hardware-specific incident.
+              const fallbackDefs = INCIDENT_CATALOG.filter((d) =>
+                d.effect !== 'ai_fabric' && d.effect !== 'ai_cabinet' &&
+                d.effect !== 'hardware_failure' && d.effect !== 'chiller_failure' && d.effect !== 'pipe_failure' && d.effect !== 'link_flap'
+              )
+              selectedDef = fallbackDefs[Math.floor(Math.random() * fallbackDefs.length)]
+              affectedPodId = undefined
+              affectedIbLinkId = undefined
+              affectedCabinetId = undefined
+            }
+          }
+
           const incident: ActiveIncident = {
             id: `inc-${nextIncidentId++}`,
             def: selectedDef,
@@ -5424,8 +5529,21 @@ export const useGameStore = create<GameState>((set) => ({
             resolved: false,
             ...(affectedHwId ? { affectedHardwareId: affectedHwId } : {}),
             ...(affectedLinkKey ? { affectedLinkKey } : {}),
+            ...(affectedPodId ? { affectedPodId } : {}),
+            ...(affectedIbLinkId ? { affectedIbLinkId } : {}),
+            ...(affectedCabinetId ? { affectedCabinetId } : {}),
           }
           activeIncidents.push(incident)
+
+          // ── Phase 8D — collect at-spawn effects (applied below) ──────
+          // We can't mutate state here, so we record what to do and the IB tick
+          // block + cabinet update block consume these queues.
+          if (selectedDef.type === 'optic_failure' && affectedIbLinkId) {
+            pendingOpticFailures.add(affectedIbLinkId)
+          }
+          if (selectedDef.type === 'gpu_ecc_fault' && affectedCabinetId) {
+            pendingEccFaults.push(affectedCabinetId)
+          }
           // Cooling failure incidents disable a random operational cooling unit
           if (selectedDef.effect === 'cooling_failure' && coolingUnits.length > 0) {
             const operational = coolingUnits.filter((u) => u.operational)
@@ -5711,6 +5829,11 @@ export const useGameStore = create<GameState>((set) => ({
           if (i.def.effect === 'hardware_failure' && i.affectedHardwareId) {
             if (i.def.hardwareTarget === 'leaf') restoredLeafCabIds.add(i.affectedHardwareId)
             if (i.def.hardwareTarget === 'spine') restoredSpineIds.add(i.affectedHardwareId)
+          }
+          // Phase 8D: thermal_runaway expiring unresolved → auto-shut the cabinet
+          // so hardware doesn't melt. Resolved-early incidents skip this branch.
+          if (i.def.type === 'thermal_runaway' && i.affectedCabinetId) {
+            thermalRunawayShutoffCabIds.add(i.affectedCabinetId)
           }
           return { ...i, ticksRemaining: 0, resolved: true }
         }
@@ -6133,6 +6256,15 @@ export const useGameStore = create<GameState>((set) => ({
       const regionalAmbientOffset = activeSiteRegion ? activeSiteRegion.profile.coolingEfficiency : 0
       const effectiveAmbientTemp = SIM.ambientTemp + regionalAmbientOffset
 
+      // Phase 8D: precompute the set of cabinets currently in thermal runaway
+      // so we can layer a big heat add inside the per-cabinet map below.
+      const thermalRunawayCabIds = new Set(
+        activeIncidents
+          .filter((i) => !i.resolved && i.def.type === 'thermal_runaway' && i.affectedCabinetId)
+          .map((i) => i.affectedCabinetId!)
+      )
+      const pendingEccFaultSet = new Set(pendingEccFaults)
+
       // 1. Update heat per cabinet (with customer type, spacing, and tech modifiers)
       const newCabinets = state.cabinets.map((cab) => {
         let heat = cab.heatLevel
@@ -6222,7 +6354,24 @@ export const useGameStore = create<GameState>((set) => ({
         // Disable leaf switch if affected by hardware failure incident, restore if just resolved
         const leafFailed = failedLeafCabIds.has(cab.id)
         const leafRestored = restoredLeafCabIds.has(cab.id)
-        return { ...cab, heatLevel: Math.round(heat * 10) / 10, serverAge: newAge, ...(leafFailed ? { hasLeafSwitch: false } : leafRestored ? { hasLeafSwitch: true } : {}) }
+        // Phase 8D: thermal_runaway active → dump huge heat in. If it expired
+        // unresolved this tick → force-power-off so the hardware doesn't cook.
+        if (thermalRunawayCabIds.has(cab.id)) heat += 12
+        const forceShutoff = thermalRunawayShutoffCabIds.has(cab.id)
+        // Phase 8D: gpu_ecc_fault spawned this tick on this cabinet → bump the
+        // out-of-service GPU counter (capped at gpuCount).
+        const eccBump = pendingEccFaultSet.has(cab.id)
+        const newEccFaulted = eccBump
+          ? Math.min(cab.gpuCount, (cab.eccFaultedGpus ?? 0) + 1)
+          : cab.eccFaultedGpus
+        return {
+          ...cab,
+          heatLevel: Math.round(heat * 10) / 10,
+          serverAge: newAge,
+          ...(leafFailed ? { hasLeafSwitch: false } : leafRestored ? { hasLeafSwitch: true } : {}),
+          ...(forceShutoff ? { powerStatus: false } : {}),
+          ...(newEccFaulted !== cab.eccFaultedGpus ? { eccFaultedGpus: newEccFaulted } : {}),
+        }
       })
 
       // Floating text: temperature warnings for hot cabinets (every 8 ticks, limit to 3)
@@ -7933,19 +8082,51 @@ export const useGameStore = create<GameState>((set) => ({
         bankruptcyTicks = 0
       }
 
-      // ── Phase 8B/8C: InfiniBand fabric tick — link health, utilization history, NOC repairs ──
+      // ── Phase 8B/8C/8D: InfiniBand fabric tick — link health, utilization history, NOC repairs, AI incidents ──
       let tickedIBLinks = state.ibLinks
       let tickedIBFabrics = state.infiniBandFabrics
       let tickedIBRepairs = state.ibLinkRepairs
       if (state.infiniBandFabrics.length > 0) {
+        // Phase 8D: collect active AI fabric incidents indexed by pod / link so
+        // each fabric / link only checks the relevant subset.
+        type ActiveAi = { type: string; affectedPodId?: string; affectedIbLinkId?: string; magnitude: number }
+        const activeAiByPod = new Map<string, ActiveAi[]>()
+        const activeIbLinkFlapByLink = new Map<string, ActiveAi>()
+        for (const inc of activeIncidents) {
+          if (inc.resolved) continue
+          if (inc.def.effect !== 'ai_fabric') continue
+          const ai: ActiveAi = {
+            type: inc.def.type,
+            affectedPodId: inc.affectedPodId,
+            affectedIbLinkId: inc.affectedIbLinkId,
+            magnitude: inc.def.effectMagnitude,
+          }
+          if (inc.affectedPodId) {
+            const list = activeAiByPod.get(inc.affectedPodId) ?? []
+            list.push(ai)
+            activeAiByPod.set(inc.affectedPodId, list)
+          }
+          if (inc.def.type === 'ib_link_flap' && inc.affectedIbLinkId) {
+            activeIbLinkFlapByLink.set(inc.affectedIbLinkId, ai)
+          }
+        }
+
         // Pre-compute next activity level for each fabric so per-link utilization
-        // can derive from it in the same pass.
+        // can derive from it in the same pass. AI incidents that target a pod
+        // override or clamp the natural activity here.
         const fabricActivity: Record<string, number> = {}
         for (const fabric of state.infiniBandFabrics) {
           const podCabs = newCabinets.filter((c) => c.podId === fabric.podId)
           const podActive = podCabs.some((c) => c.powerStatus)
           const targetActivity = podActive ? 0.7 : 0
-          fabricActivity[fabric.id] = fabric.activityLevel + (targetActivity - fabric.activityLevel) * 0.1
+          let activity = fabric.activityLevel + (targetActivity - fabric.activityLevel) * 0.1
+          const ais = activeAiByPod.get(fabric.podId) ?? []
+          for (const ai of ais) {
+            if (ai.type === 'nccl_collective_hang') activity = 0                       // hard pause
+            else if (ai.type === 'pfc_storm') activity = Math.min(activity, 0.1)       // congestion collapse → 10%
+            else if (ai.type === 'silent_data_corruption') activity = activity * (ai.magnitude || 0.5)
+          }
+          fabricActivity[fabric.id] = activity
         }
 
         // Phase 8C: drive electrician repairs forward. Links whose repair completes
@@ -7975,6 +8156,14 @@ export const useGameStore = create<GameState>((set) => ({
             }
           }
 
+          // Phase 8D: optic_failure spawn → hard-down the link immediately so the
+          // operator can't ignore it. Repair requires replaceOptic.
+          if (pendingOpticFailures.has(link.id)) {
+            next.status = 'down'
+            next.errorCount = Math.max(next.errorCount, 31)
+            next.lastErrorTick = newTickCount
+          }
+
           // Drain countdown — keep the link traffic-free while the operator works on it.
           if (next.drainTicksRemaining && next.drainTicksRemaining > 0) {
             next.drainTicksRemaining -= 1
@@ -7996,18 +8185,25 @@ export const useGameStore = create<GameState>((set) => ({
           const history = next.utilizationHistory ?? []
           next.utilizationHistory = [...history, next.utilizationPct].slice(-50)
 
-          // Error accumulation — same shape as before but suppressed during the
-          // 50-tick post-replace boost window (fresh optics don't flap).
+          // Error accumulation — base rate + Phase 8D ib_link_flap escalation.
+          // Both are suppressed during the 50-tick post-replace boost window.
           if (next.status !== 'down') {
             const inBoost = next.lastReplaceTick != null && state.tickCount - next.lastReplaceTick < 50
-            if (!inBoost && Math.random() < IB_BASE_LINK_ERROR_RATE) {
-              const newErrorCount = next.errorCount + 1
-              let newStatus: IBLinkStatus = next.status
-              if (newErrorCount > 30 && next.status === 'flapping') newStatus = 'down'
-              else if (newErrorCount > 10 && next.status === 'healthy') newStatus = 'flapping'
-              next.errorCount = newErrorCount
-              next.status = newStatus
-              next.lastErrorTick = newTickCount
+            if (!inBoost) {
+              let errorAdd = 0
+              if (Math.random() < IB_BASE_LINK_ERROR_RATE) errorAdd += 1
+              // Phase 8D: ib_link_flap pumps errors fast on the target link.
+              const flap = activeIbLinkFlapByLink.get(link.id)
+              if (flap) errorAdd += flap.magnitude
+              if (errorAdd > 0) {
+                const newErrorCount = next.errorCount + errorAdd
+                let newStatus: IBLinkStatus = next.status
+                if (newErrorCount > 30 && (next.status === 'flapping' || next.status === 'healthy')) newStatus = 'down'
+                else if (newErrorCount > 10 && next.status === 'healthy') newStatus = 'flapping'
+                next.errorCount = newErrorCount
+                next.status = newStatus
+                next.lastErrorTick = newTickCount
+              }
             }
           }
 

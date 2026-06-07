@@ -358,6 +358,12 @@ NOC / Traffic Triage types (Phase 8C):
 - `IBLinkRepair` — id, linkId, ticksRemaining, dispatchedAtTick, staffId (electrician assigned). Created by `dispatchElectrician`; ticked down in `tick()`; on completion the link resets to healthy + errorCount 0.
 - State: `ibLinkRepairs: IBLinkRepair[]`, `selectedNocLinkId: string | null` (open drawer), `pendingPanelOpen: string | null` (one-shot scene → sidebar handoff signal — Sidebar subscribes via `useGameStore.subscribe` and clears it after opening the matching panel).
 
+AI Incident types (Phase 8D):
+- `IncidentDef.effect` extends with `'ai_fabric' | 'ai_cabinet'`.
+- `ActiveIncident` adds `affectedPodId?`, `affectedIbLinkId?`, `affectedCabinetId?` for AI incident targeting.
+- `Cabinet.eccFaultedGpus?: number` — count of GPUs out of service from `gpu_ecc_fault`, cleared by `refreshGpu($15K)`.
+- 7 new incidents in `INCIDENT_CATALOG`: `ib_link_flap` (minor; bumps target link errorCount by 4/tick), `nccl_collective_hang` (major; pod activity → 0 for 20t), `silent_data_corruption` (critical; activity ×0.5 for 50t, silent — only visible in NOC), `optic_failure` (minor; hard-downs the link, recovery via `replaceOptic`), `pfc_storm` (critical; only spawns when fabric avg util >90%, caps activity at 0.1 for 20t), `thermal_runaway` (critical; only spawns on `high_density`/`extreme_density` cabinets without `direct_to_chip`/`single_phase_immersion` cooling — auto-shuts the cabinet if not resolved within 3t), `gpu_ecc_fault` (major; bumps `eccFaultedGpus`, requires `refreshGpu`).
+
 42U rack types:
 - `RackEquipmentType` = `'1u_server' | '2u_server' | '4u_storage' | '1u_switch' | '2u_patch_panel' | '1u_pdu' | '3u_ups' | '2u_cable_mgmt'`
 - `RackSlot` — u position, equipment type, equipment label
@@ -413,6 +419,7 @@ Key interfaces (core):
 | GPU Pods (Phase 8A) | `createGPUPod`, `removeGPUPod` (decommissioned servers route to `eWasteStockpile`; in-flight NOC repairs are dropped), `installLiquidCooling` |
 | Backend Fabric (Phase 8B) | `toggleBackendFabricVisible` (drives the IB switches, cables, and AllReduce ring pulse layer; auto-disabled until the first pod is built) |
 | NOC / Traffic Triage (Phase 8C) | `drainPort` (20-tick utilization freeze, free), `resetSwitch` (clears errorCount on attached links, 5-tick cooldown, won't auto-recover down links), `replaceOptic` ($2K, instant reset + 50-tick error-suppression boost), `dispatchElectrician` (needs on-shift electrician, 10-tick repair), `openNocDrawer(linkId)` (sets `selectedNocLinkId` + flags `pendingPanelOpen: 'noc'`), `clearPendingPanel` |
+| AI Incidents (Phase 8D) | `refreshGpu(cabinetId)` ($15K, clears `eccFaultedGpus` from `gpu_ecc_fault` incidents). 7 new incident types spawn via the existing `INCIDENT_CATALOG` pipeline — see "AI Incident types" above. |
 | Incidents | `resolveIncident`, `buyGenerator`, `activateGenerator`, `upgradeSuppression` |
 | Operations Progression | `upgradeOpsTier` |
 | Contracts | `acceptContract` |

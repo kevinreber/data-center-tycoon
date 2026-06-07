@@ -126,6 +126,8 @@ function CabinetDetail({ cabinet }: { cabinet: Cabinet }) {
     rackDetails, installRackEquipment, removeRackEquipment,
     addServerToCabinet, addLeafToCabinet, openSwitchDetail,
     infiniBandFabrics,
+    // Phase 8D: AI incident state on this cabinet
+    activeIncidents, refreshGpu, sandboxMode,
   } = useGameStore()
 
   const envConfig = ENVIRONMENT_CONFIG[cabinet.environment]
@@ -322,6 +324,57 @@ function CabinetDetail({ cabinet }: { cabinet: Cabinet }) {
               />
             )}
           </div>
+
+          {/* Phase 8D — AI cabinet alerts ──────────────────────────── */}
+          {(() => {
+            const eccFaulted = cabinet.eccFaultedGpus ?? 0
+            const thermalIncident = activeIncidents.find(
+              (i) => !i.resolved && i.def.type === 'thermal_runaway' && i.affectedCabinetId === cabinet.id
+            )
+            if (eccFaulted === 0 && !thermalIncident) return null
+            return (
+              <div className="flex flex-col gap-1.5">
+                <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">AI Alerts</div>
+                {thermalIncident && (
+                  <div className="rounded border border-neon-red/40 bg-neon-red/10 p-2 text-[10px] font-mono">
+                    <div className="flex items-center justify-between mb-0.5">
+                      <span className="text-neon-red font-bold flex items-center gap-1">
+                        <AlertTriangle className="size-3" /> THERMAL RUNAWAY
+                      </span>
+                      <span className="text-neon-red tabular-nums">{thermalIncident.ticksRemaining}t to auto-shut</span>
+                    </div>
+                    <p className="text-muted-foreground leading-snug">
+                      Pod hardware in danger. Resolve from the Incidents panel or accept the auto-shutdown.
+                    </p>
+                  </div>
+                )}
+                {eccFaulted > 0 && (
+                  <div className="rounded border border-neon-orange/40 bg-neon-orange/10 p-2 flex items-center justify-between gap-2">
+                    <div className="text-[10px] font-mono flex-1 min-w-0">
+                      <div className="text-neon-orange font-bold flex items-center gap-1">
+                        <AlertTriangle className="size-3" /> GPU ECC FAULT
+                      </div>
+                      <div className="text-muted-foreground">{eccFaulted}/{cabinet.gpuCount} GPUs offline</div>
+                    </div>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="xs"
+                          onClick={() => refreshGpu(cabinet.id)}
+                          disabled={!sandboxMode && money < 15000}
+                          className="text-[10px] border-neon-orange/30 text-neon-orange hover:bg-neon-orange/10"
+                        >
+                          <RefreshCw className="size-3 mr-1" /> $15K
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="left" className="max-w-52">Replace the failed GPU and bring it back online.</TooltipContent>
+                    </Tooltip>
+                  </div>
+                )}
+              </div>
+            )
+          })()}
 
           {/* Actions */}
           <div className="flex flex-col gap-1.5">

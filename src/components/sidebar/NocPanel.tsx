@@ -65,6 +65,8 @@ export function NocPanel() {
   const tickCount = useGameStore((s) => s.tickCount)
   const money = useGameStore((s) => s.money)
   const staff = useGameStore((s) => s.staff)
+  // Phase 8D: filter active fabric/cabinet incidents to show in the NOC.
+  const activeIncidents = useGameStore((s) => s.activeIncidents)
 
   const [tab, setTab] = useState<NocTab>('links')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
@@ -164,6 +166,44 @@ export function NocPanel() {
 
       {tab === 'links' && (
         <>
+          {/* Phase 8D: active fabric / cabinet AI incidents */}
+          {(() => {
+            const aiIncidents = activeIncidents.filter(
+              (i) => !i.resolved && (i.def.effect === 'ai_fabric' || i.def.effect === 'ai_cabinet')
+            )
+            if (aiIncidents.length === 0) return null
+            return (
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[10px] font-bold text-muted-foreground tracking-widest">ACTIVE FABRIC INCIDENTS</span>
+                {aiIncidents.map((inc) => {
+                  const sevColor =
+                    inc.def.severity === 'critical' ? 'border-neon-red/40 bg-neon-red/10 text-neon-red'
+                    : inc.def.severity === 'major' ? 'border-neon-orange/40 bg-neon-orange/10 text-neon-orange'
+                    : 'border-neon-yellow/40 bg-neon-yellow/10 text-neon-yellow'
+                  return (
+                    <div key={inc.id} className={`rounded border p-2 text-[11px] font-mono ${sevColor}`}>
+                      <div className="flex items-center justify-between mb-0.5">
+                        <span className="font-bold flex items-center gap-1">
+                          <AlertTriangle className="size-3" /> {inc.def.label}
+                        </span>
+                        <span className="text-[10px] tabular-nums">{inc.ticksRemaining}t</span>
+                      </div>
+                      <p className="text-muted-foreground leading-snug text-[10px]">{inc.def.description}</p>
+                      {inc.affectedIbLinkId && (
+                        <button
+                          onClick={() => openNocDrawer(inc.affectedIbLinkId!)}
+                          className="mt-1 text-[10px] underline hover:no-underline"
+                        >
+                          Inspect {inc.affectedIbLinkId} →
+                        </button>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          })()}
+
           {/* Fabric health summary */}
           <div className="flex flex-col gap-1.5">
             <span className="text-[10px] font-bold text-muted-foreground tracking-widest">FABRIC HEALTH</span>

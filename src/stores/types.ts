@@ -907,7 +907,7 @@ export interface IncidentDef {
   description: string
   durationTicks: number
   resolveCost: number
-  effect: 'heat_spike' | 'revenue_penalty' | 'power_surge' | 'traffic_drop' | 'cooling_failure' | 'hardware_failure' | 'chiller_failure' | 'pipe_failure' | 'link_flap'
+  effect: 'heat_spike' | 'revenue_penalty' | 'power_surge' | 'traffic_drop' | 'cooling_failure' | 'hardware_failure' | 'chiller_failure' | 'pipe_failure' | 'link_flap' | 'ai_fabric' | 'ai_cabinet'
   effectMagnitude: number
   hardwareTarget?: 'spine' | 'leaf'
 }
@@ -920,6 +920,10 @@ export interface ActiveIncident {
   affectedHardwareId?: string
   /** For link_flap incidents: "leafCabinetId:spineId" identifying the affected port */
   affectedLinkKey?: string
+  /** Phase 8D: AI-fabric incidents target a pod or a specific cabinet/IB link. */
+  affectedPodId?: string
+  affectedIbLinkId?: string
+  affectedCabinetId?: string
 }
 
 /** Identifies which switch to inspect in the port detail modal */
@@ -1000,6 +1004,10 @@ export interface Cabinet {
   gpuCount: number              // 0 for standard, 8 per high-density cabinet, 8 per extreme cabinet
   liquidCooling: LiquidCoolingType
   podId: string | null          // membership in a GPUPod, null for standalone
+  /** Phase 8D: count of GPUs that have failed ECC and are out of service. Capped
+   *  at gpuCount; cleared by refreshGpu($15K). Reduces the effective GPU count
+   *  used in workload / revenue calculations once Phase 8E lands. */
+  eccFaultedGpus?: number
 }
 
 export interface PlacementHint {

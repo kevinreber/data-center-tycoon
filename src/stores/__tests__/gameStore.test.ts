@@ -5192,3 +5192,156 @@ describe('NOC / Traffic Triage (Phase 8C)', () => {
   })
 })
 
+// ============================================================================
+// AI-Specific Incidents (Phase 8D)
+// ============================================================================
+describe('AI-Specific Incidents (Phase 8D)', () => {
+  beforeEach(() => {
+    setState({
+      sandboxMode: true,
+      money: 5_000_000,
+      suiteTier: 'standard',
+      unlockedTech: ['ai_infrastructure', 'immersion_cooling'],
+      tickCount: 100,
+      activeIncidents: [],
+    })
+    getState().createGPUPod('small', 0, STD_ROW_0)
+  })
+
+  // Helpers — directly inject an active AI incident so tests don't depend on
+  // Math.random spawn gating. The tick effect handlers are what we care about.
+  function injectAi(type: string, opts: { affectedPodId?: string; affectedIbLinkId?: string; affectedCabinetId?: string; ticksRemaining?: number } = {}) {
+    const def = INCIDENT_CATALOG.find((d) => d.type === type)!
+    const incident: ActiveIncident = {
+      id: `inc-test-${type}-${Math.random().toString(36).slice(2, 8)}`,
+      def,
+      ticksRemaining: opts.ticksRemaining ?? def.durationTicks,
+      resolved: false,
+      ...(opts.affectedPodId ? { affectedPodId: opts.affectedPodId } : {}),
+      ...(opts.affectedIbLinkId ? { affectedIbLinkId: opts.affectedIbLinkId } : {}),
+      ...(opts.affectedCabinetId ? { affectedCabinetId: opts.affectedCabinetId } : {}),
+    }
+    setState({ activeIncidents: [...getState().activeIncidents, incident] })
+  }
+
+  // ── Catalog presence ──────────────────────────────────────────
+  it('catalog includes all 7 Phase 8D incident types', () => {
+    const required = ['ib_link_flap', 'nccl_collective_hang', 'silent_data_corruption', 'optic_failure', 'pfc_storm', 'thermal_runaway', 'gpu_ecc_fault']
+    for (const type of required) {
+      expect(INCIDENT_CATALOG.find((d) => d.type === type)).toBeDefined()
+    }
+  })
+
+  // ── nccl_collective_hang: zeros fabric activity ──────────────
+  it('nccl_collective_hang drives fabric.activityLevel to 0 while active', () => {
+    const pod = getState().gpuPods[0]
+    // Ramp activity first
+    for (let i = 0; i < 15; i++) getState().tick()
+    expect(getState().infiniBandFabrics[0].activityLevel).toBeGreaterThan(0.3)
+
+    injectAi('nccl_collective_hang', { affectedPodId: pod.id })
+    getState().tick()
+    expect(getState().infiniBandFabrics[0].activityLevel).toBe(0)
+  })
+
+  // ── silent_data_corruption: halves activity ──────────────────
+  it('silent_data_corruption multiplies fabric.activityLevel by ~0.5', () => {
+    const pod = getState().gpuPods[0]
+    for (let i = 0; i < 20; i++) getState().tick()
+    const baseline = getState().infiniBandFabrics[0].activityLevel
+    expect(baseline).toBeGreaterThan(0.4)
+
+    injectAi('silent_data_corruption', { affectedPodId: pod.id })
+    getState().tick()
+    const after = getState().infiniBandFabrics[0].activityLevel
+    expect(after).toBeLessThan(baseline * 0.7)
+  })
+
+  // ── pfc_storm: caps activity at 0.1 ──────────────────────────
+  it('pfc_storm clamps fabric.activityLevel to 0.1 max', () => {
+    const pod = getState().gpuPods[0]
+    for (let i = 0; i < 20; i++) getState().tick()
+    expect(getState().infiniBandFabrics[0].activityLevel).toBeGreaterThan(0.3)
+
+    injectAi('pfc_storm', { affectedPodId: pod.id })
+    getState().tick()
+    expect(getState().infiniBandFabrics[0].activityLevel).toBeLessThanOrEqual(0.1)
+  })
+
+  // ── ib_link_flap: pumps errors fast ──────────────────────────
+  it('ib_link_flap bumps errorCount on its target link by 4/tick', () => {
+    const link = getState().ibLinks[0]
+    injectAi('ib_link_flap', { affectedIbLinkId: link.id, affectedPodId: getState().gpuPods[0].id })
+    const startErrors = link.errorCount
+    getState().tick()
+    getState().tick()
+    getState().tick()
+    const after = getState().ibLinks.find((l) => l.id === link.id)!
+    // 3 ticks × 4 errors per tick (the effectMagnitude) + maybe 1 base accrual
+    expect(after.errorCount).toBeGreaterThanOrEqual(startErrors + 12)
+  })
+
+  it('ib_link_flap escalates a healthy link to flapping and then down', () => {
+    const link = getState().ibLinks[0]
+    injectAi('ib_link_flap', { affectedIbLinkId: link.id, affectedPodId: getState().gpuPods[0].id, ticksRemaining: 999 })
+    for (let i = 0; i < 10; i++) getState().tick()  // ~40 errors injected
+    const after = getState().ibLinks.find((l) => l.id === link.id)!
+    expect(after.status).toBe('down')
+  })
+
+  // ── thermal_runaway: heat dump + auto-shutoff on expiry ──────
+  it('thermal_runaway adds heat to its target cabinet each tick while active', () => {
+    const pod = getState().gpuPods[0]
+    const cab = getState().cabinets.find((c) => c.podId === pod.id)!
+    // Start at low heat to make the bump easy to see.
+    setState({ cabinets: getState().cabinets.map((c) => c.id === cab.id ? { ...c, heatLevel: 25 } : c) })
+    injectAi('thermal_runaway', { affectedCabinetId: cab.id, affectedPodId: pod.id, ticksRemaining: 999 })
+    const before = getState().cabinets.find((c) => c.id === cab.id)!.heatLevel
+    getState().tick()
+    const after = getState().cabinets.find((c) => c.id === cab.id)!.heatLevel
+    // +12°C heat from the incident, minus normal cooling — net increase expected.
+    expect(after).toBeGreaterThan(before + 5)
+  })
+
+  it('thermal_runaway auto-shuts its cabinet when it expires unresolved', () => {
+    const pod = getState().gpuPods[0]
+    const cab = getState().cabinets.find((c) => c.podId === pod.id)!
+    expect(cab.powerStatus).toBe(true)
+
+    // Spawn with 1 tick left → expires this tick → triggers auto-shutoff path.
+    injectAi('thermal_runaway', { affectedCabinetId: cab.id, affectedPodId: pod.id, ticksRemaining: 1 })
+    getState().tick()
+    const afterCab = getState().cabinets.find((c) => c.id === cab.id)!
+    expect(afterCab.powerStatus).toBe(false)
+  })
+
+  // ── gpu_ecc_fault + refreshGpu ──────────────────────────────
+  it('refreshGpu costs $15K and clears eccFaultedGpus', () => {
+    setState({ sandboxMode: false, money: 100_000 })
+    const cab = getState().cabinets.find((c) => c.podId === getState().gpuPods[0].id)!
+    setState({ cabinets: getState().cabinets.map((c) => c.id === cab.id ? { ...c, eccFaultedGpus: 2 } : c) })
+
+    getState().refreshGpu(cab.id)
+    expect(getState().money).toBe(85_000)
+    expect(getState().cabinets.find((c) => c.id === cab.id)!.eccFaultedGpus).toBe(0)
+  })
+
+  it('refreshGpu is a no-op when the cabinet has no ECC faults', () => {
+    setState({ sandboxMode: false, money: 100_000 })
+    const cab = getState().cabinets.find((c) => c.podId === getState().gpuPods[0].id)!
+    expect(cab.eccFaultedGpus ?? 0).toBe(0)
+    getState().refreshGpu(cab.id)
+    expect(getState().money).toBe(100_000)
+  })
+
+  it('refreshGpu is blocked when the player cannot afford it (non-sandbox)', () => {
+    setState({ sandboxMode: false, money: 500 })
+    const cab = getState().cabinets.find((c) => c.podId === getState().gpuPods[0].id)!
+    setState({ cabinets: getState().cabinets.map((c) => c.id === cab.id ? { ...c, eccFaultedGpus: 1 } : c) })
+
+    getState().refreshGpu(cab.id)
+    expect(getState().money).toBe(500)
+    expect(getState().cabinets.find((c) => c.id === cab.id)!.eccFaultedGpus).toBe(1)
+  })
+})
+
