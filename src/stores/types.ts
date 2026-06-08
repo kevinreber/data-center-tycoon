@@ -1031,6 +1031,67 @@ export interface GPUPod {
   cabinetCount: number          // 4, 8, 16, or 32
   gpuCount: number              // 64, 128, 256, or 512
   installedAtTick: number
+  /** Phase 8E: id of the TrainingJob currently bound to this pod, or null when idle. */
+  activeJobId?: string | null
+}
+
+// ── Phase 8E — Training Jobs & AI Revenue ─────────────────────
+// AI tenants buy time on pods for one of four workload shapes. Revenue is
+// lumpy — base AI Lab rate ticks while idle, but the real money lands as a
+// lump-sum payout when a training job completes within its SLA budget.
+
+export type TrainingJobType = 'pretraining' | 'fine_tuning' | 'inference_batch' | 'rl_training'
+
+export type TrainingJobStatus = 'running' | 'restarting' | 'completed' | 'failed'
+
+export interface TrainingJobSLA {
+  maxRestarts: number            // 0 for pretraining (the whale), 1 for fine-tune/RL, 2 for inference
+  minThroughputPct: number       // pod must average ≥ this much fabric activity (0–100)
+  maxIncidents: number           // soft cap on AI fabric incidents during the run (informational)
+}
+
+export interface TrainingJob {
+  id: string
+  customerName: string           // procedural — e.g. "Helios AI Labs", "QuantStack Research"
+  podId: string
+  jobType: TrainingJobType
+  durationTicks: number          // total ticks at full fabric activity to complete
+  ticksRemaining: number         // remaining work units (decremented by activity per tick)
+  basePayout: number             // dollars on full completion within SLA
+  progressPct: number            // 0–100
+  status: TrainingJobStatus
+  valueAtRisk: number            // current expected payout if job were to terminate now
+  restartCount: number
+  startedAtTick: number
+  slaRequirements: TrainingJobSLA
+  /** Phase 8E: number of AI fabric incidents that hit this pod while the job
+   *  has been running. Drives soft reputation feedback but doesn't auto-fail. */
+  incidentsSeen: number
+}
+
+export interface TrainingJobOffer {
+  id: string
+  jobType: TrainingJobType
+  customerName: string
+  durationTicks: number          // rolled within the type's range
+  basePayout: number             // rolled within the type's range
+  slaRequirements: TrainingJobSLA
+  expiresAtTick: number
+}
+
+export interface TrainingJobConfig {
+  type: TrainingJobType
+  label: string
+  description: string
+  minDuration: number
+  maxDuration: number
+  minPayout: number
+  maxPayout: number
+  maxRestarts: number
+  minThroughputPct: number
+  /** Per-tick fabric activity target while this job is running (0–1). */
+  fabricLoadTarget: number
+  color: string
 }
 
 export interface GPUPodConfig {

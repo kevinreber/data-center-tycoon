@@ -53,6 +53,8 @@ export type {
   InfiniBandFabric, IBSwitch, IBLink, IBSwitchType, IBSwitchConfig, IBLinkBandwidth, IBLinkStatus, IBFabricHealth,
   // Phase 8C: NOC operator state
   IBLinkRepair,
+  // Phase 8E: Training jobs
+  TrainingJob, TrainingJobOffer, TrainingJobType, TrainingJobStatus, TrainingJobSLA, TrainingJobConfig,
 } from './types'
 
 import type {
@@ -87,6 +89,7 @@ import type {
   SwitchDetailTarget,
   GPUPod, GPUPodSize, LiquidCoolingType,
   InfiniBandFabric, IBSwitch, IBLink, IBLinkRepair, IBLinkStatus,
+  TrainingJob, TrainingJobOffer, TrainingJobType, TrainingJobStatus,
 } from './types'
 
 // ── Re-export constants ────────────────────────────────────────
@@ -94,8 +97,8 @@ export { SIM, POWER_DRAW, RACK_COST, TRAFFIC, MAX_SERVERS_PER_CABINET, MAX_CABIN
 import { SIM, POWER_DRAW, COSTS, TRAFFIC, MAX_SERVERS_PER_CABINET, MINUTES_PER_TICK } from './constants'
 
 // ── Re-export configs ──────────────────────────────────────────
-export { CUSTOMER_TYPE_CONFIG, GENERATOR_OPTIONS, SUPPRESSION_CONFIG, COOLING_CONFIG, COOLING_UNIT_CONFIG, CHILLER_PLANT_CONFIG, COOLING_PIPE_CONFIG, ENVIRONMENT_CONFIG, SERVER_CONFIG_OPTIONS, BASE_AMBIENT_DISSIPATION, UNCONNECTED_CRAH_PENALTY, MAX_CHILLER_PLANTS, GPU_POD_CONFIG, LIQUID_COOLING_CONFIG, DENSITY_SCALING, IB_SWITCH_CONFIG, RAIL_COUNT_BY_POD_SIZE, IB_DEFAULT_BANDWIDTH_GBPS, IB_BASE_LINK_ERROR_RATE } from './configs/equipment'
-import { CUSTOMER_TYPE_CONFIG, GENERATOR_OPTIONS, SUPPRESSION_CONFIG, COOLING_CONFIG, COOLING_UNIT_CONFIG, CHILLER_PLANT_CONFIG, COOLING_PIPE_CONFIG, ENVIRONMENT_CONFIG, MAX_CHILLER_PLANTS, GPU_POD_CONFIG, LIQUID_COOLING_CONFIG, DENSITY_SCALING, IB_SWITCH_CONFIG, RAIL_COUNT_BY_POD_SIZE, IB_DEFAULT_BANDWIDTH_GBPS, IB_BASE_LINK_ERROR_RATE } from './configs/equipment'
+export { CUSTOMER_TYPE_CONFIG, GENERATOR_OPTIONS, SUPPRESSION_CONFIG, COOLING_CONFIG, COOLING_UNIT_CONFIG, CHILLER_PLANT_CONFIG, COOLING_PIPE_CONFIG, ENVIRONMENT_CONFIG, SERVER_CONFIG_OPTIONS, BASE_AMBIENT_DISSIPATION, UNCONNECTED_CRAH_PENALTY, MAX_CHILLER_PLANTS, GPU_POD_CONFIG, LIQUID_COOLING_CONFIG, DENSITY_SCALING, IB_SWITCH_CONFIG, RAIL_COUNT_BY_POD_SIZE, IB_DEFAULT_BANDWIDTH_GBPS, IB_BASE_LINK_ERROR_RATE, TRAINING_JOB_CONFIG, TRAINING_JOB_OFFER_INTERVAL, TRAINING_JOB_OFFER_POOL_SIZE, TRAINING_JOB_OFFER_TTL, TRAINING_JOB_CUSTOMERS, TRAINING_JOB_REPUTATION, TRAINING_JOB_FAIL_REPUTATION } from './configs/equipment'
+import { CUSTOMER_TYPE_CONFIG, GENERATOR_OPTIONS, SUPPRESSION_CONFIG, COOLING_CONFIG, COOLING_UNIT_CONFIG, CHILLER_PLANT_CONFIG, COOLING_PIPE_CONFIG, ENVIRONMENT_CONFIG, MAX_CHILLER_PLANTS, GPU_POD_CONFIG, LIQUID_COOLING_CONFIG, DENSITY_SCALING, IB_SWITCH_CONFIG, RAIL_COUNT_BY_POD_SIZE, IB_DEFAULT_BANDWIDTH_GBPS, IB_BASE_LINK_ERROR_RATE, TRAINING_JOB_CONFIG, TRAINING_JOB_OFFER_INTERVAL, TRAINING_JOB_OFFER_POOL_SIZE, TRAINING_JOB_OFFER_TTL, TRAINING_JOB_CUSTOMERS, TRAINING_JOB_REPUTATION, TRAINING_JOB_FAIL_REPUTATION } from './configs/equipment'
 
 export { PDU_OPTIONS, CABLE_TRAY_OPTIONS, AISLE_CONFIG, AISLE_CONTAINMENT_CONFIG, SPACING_CONFIG, generateLayout, SUITE_TIERS, SUITE_TIER_ORDER, BUSWAY_OPTIONS, CROSSCONNECT_OPTIONS, INROW_COOLING_OPTIONS, NOISE_CONFIG, POWER_REDUNDANCY_CONFIG, ZONE_BONUS_CONFIG, MIXED_ENV_PENALTY_CONFIG, DEDICATED_ROW_BONUS_CONFIG, FLOOR_PLAN_CONFIG, WIDE_AISLE_COOLING_BONUS, MIN_ROW_GAP, buildLayoutFromRows } from './configs/infrastructure'
 import { PDU_OPTIONS, CABLE_TRAY_OPTIONS, AISLE_CONFIG, AISLE_CONTAINMENT_CONFIG, SPACING_CONFIG, SUITE_TIERS, SUITE_TIER_ORDER, BUSWAY_OPTIONS, CROSSCONNECT_OPTIONS, INROW_COOLING_OPTIONS, NOISE_CONFIG, POWER_REDUNDANCY_CONFIG, ZONE_BONUS_CONFIG, MIXED_ENV_PENALTY_CONFIG, DEDICATED_ROW_BONUS_CONFIG, FLOOR_PLAN_CONFIG, MIN_ROW_GAP, buildLayoutFromRows } from './configs/infrastructure'
@@ -364,6 +367,14 @@ interface GameState {
   ibLinkRepairs: IBLinkRepair[]              // active electrician dispatches
   selectedNocLinkId: string | null           // open link in the NOC detail drawer
   pendingPanelOpen: string | null            // scene → sidebar handoff (e.g. NOC drawer from Phaser click)
+
+  // Training Jobs & AI Revenue (Phase 8E)
+  trainingJobs: TrainingJob[]                // active + completed/failed jobs (kept for short-term history)
+  trainingJobOffers: TrainingJobOffer[]      // available jobs the player can accept
+  jobOfferCooldown: number                   // ticks until next offer batch refresh
+  trainingJobsCompleted: number              // lifetime success counter
+  trainingJobsFailed: number                 // lifetime failure counter
+  trainingRevenue: number                    // lump-sum payouts collected this tick (for UI)
 
   // Sandbox Mode
   sandboxMode: boolean
@@ -659,6 +670,10 @@ interface GameState {
   openNocDrawer: (linkId: string | null) => void
   clearPendingPanel: () => void
   refreshGpu: (cabinetId: string) => void
+  // Training Jobs (Phase 8E)
+  acceptTrainingContract: (offerId: string, podId: string) => void
+  restartTrainingJob: (jobId: string) => void
+  cancelTrainingJob: (jobId: string) => void
   placeChillerPlant: (tier: ChillerTier, col: number, row: number) => void
   removeChillerPlant: (id: string) => void
   placeCoolingPipe: (col: number, row: number) => void
@@ -780,6 +795,8 @@ let nextIBFabricId = 1
 let nextIBSwitchId = 1
 let nextIBLinkId = 1
 let nextIBRepairId = 1
+let nextTrainingJobId = 1
+let nextTrainingOfferId = 1
 let nextIncidentId = 1
 let nextContractId = 1
 let nextGeneratorId = 1
@@ -1131,6 +1148,14 @@ export const useGameStore = create<GameState>((set) => ({
   ibLinkRepairs: [],
   selectedNocLinkId: null,
   pendingPanelOpen: null,
+
+  // Training Jobs & AI Revenue (Phase 8E)
+  trainingJobs: [],
+  trainingJobOffers: [],
+  jobOfferCooldown: 0,
+  trainingJobsCompleted: 0,
+  trainingJobsFailed: 0,
+  trainingRevenue: 0,
 
   // Sandbox Mode
   sandboxMode: false,
@@ -2411,6 +2436,80 @@ export const useGameStore = create<GameState>((set) => ({
         cabinets: state.cabinets.map((c) =>
           c.id === cabinetId ? { ...c, eccFaultedGpus: 0 } : c
         ),
+      }
+    }),
+
+  // ── Training Jobs (Phase 8E) ───────────────────────────────────
+  acceptTrainingContract: (offerId: string, podId: string) =>
+    set((state) => {
+      const offer = state.trainingJobOffers.find((o) => o.id === offerId)
+      if (!offer) return state
+      const pod = state.gpuPods.find((p) => p.id === podId)
+      if (!pod) return state
+      if (pod.activeJobId) return state          // pod already has work
+      const fabric = state.infiniBandFabrics.find((f) => f.podId === podId)
+      if (!fabric) return state                  // pod must have an IB fabric
+      const job: TrainingJob = {
+        id: `tj-${nextTrainingJobId++}`,
+        customerName: offer.customerName,
+        podId,
+        jobType: offer.jobType,
+        durationTicks: offer.durationTicks,
+        ticksRemaining: offer.durationTicks,
+        basePayout: offer.basePayout,
+        progressPct: 0,
+        status: 'running',
+        valueAtRisk: 0,
+        restartCount: 0,
+        startedAtTick: state.tickCount,
+        slaRequirements: offer.slaRequirements,
+        incidentsSeen: 0,
+      }
+      return {
+        trainingJobs: [...state.trainingJobs, job],
+        trainingJobOffers: state.trainingJobOffers.filter((o) => o.id !== offerId),
+        gpuPods: state.gpuPods.map((p) => p.id === podId ? { ...p, activeJobId: job.id } : p),
+      }
+    }),
+
+  restartTrainingJob: (jobId: string) =>
+    set((state) => {
+      const job = state.trainingJobs.find((j) => j.id === jobId)
+      if (!job) return state
+      if (job.status === 'completed' || job.status === 'failed') return state
+      // Within budget → reset progress and bump the counter.
+      if (job.restartCount < job.slaRequirements.maxRestarts) {
+        return {
+          trainingJobs: state.trainingJobs.map((j) =>
+            j.id === jobId
+              ? { ...j, restartCount: j.restartCount + 1, ticksRemaining: j.durationTicks, progressPct: 0, valueAtRisk: 0, status: 'running' as TrainingJobStatus }
+              : j
+          ),
+        }
+      }
+      // Out of restarts → fail the job, free the pod, take the reputation hit.
+      return {
+        trainingJobs: state.trainingJobs.map((j) =>
+          j.id === jobId ? { ...j, status: 'failed' as TrainingJobStatus, valueAtRisk: 0 } : j
+        ),
+        gpuPods: state.gpuPods.map((p) => p.activeJobId === jobId ? { ...p, activeJobId: null } : p),
+        reputationScore: Math.max(0, state.reputationScore + TRAINING_JOB_FAIL_REPUTATION),
+        trainingJobsFailed: state.trainingJobsFailed + 1,
+      }
+    }),
+
+  cancelTrainingJob: (jobId: string) =>
+    set((state) => {
+      const job = state.trainingJobs.find((j) => j.id === jobId)
+      if (!job) return state
+      if (job.status !== 'running' && job.status !== 'restarting') return state
+      return {
+        trainingJobs: state.trainingJobs.map((j) =>
+          j.id === jobId ? { ...j, status: 'failed' as TrainingJobStatus, valueAtRisk: 0 } : j
+        ),
+        gpuPods: state.gpuPods.map((p) => p.activeJobId === jobId ? { ...p, activeJobId: null } : p),
+        reputationScore: Math.max(0, state.reputationScore + TRAINING_JOB_FAIL_REPUTATION),
+        trainingJobsFailed: state.trainingJobsFailed + 1,
       }
     }),
 
@@ -4374,6 +4473,12 @@ export const useGameStore = create<GameState>((set) => ({
       ibLinks: [],
       ibLinkRepairs: [],
       selectedNocLinkId: null,
+      trainingJobs: [],
+      trainingJobOffers: [],
+      jobOfferCooldown: 0,
+      trainingJobsCompleted: 0,
+      trainingJobsFailed: 0,
+      trainingRevenue: 0,
       money: 1285000,
       tickCount: 2600,
       gameHour: 14,
@@ -4704,6 +4809,12 @@ export const useGameStore = create<GameState>((set) => ({
       ibLinks: [],
       ibLinkRepairs: [],
       selectedNocLinkId: null,
+      trainingJobs: [],
+      trainingJobOffers: [],
+      jobOfferCooldown: 0,
+      trainingJobsCompleted: 0,
+      trainingJobsFailed: 0,
+      trainingRevenue: 0,
       sandboxMode: false,
       activeScenario: null,
       scenarioProgress: {},
@@ -5105,6 +5216,12 @@ export const useGameStore = create<GameState>((set) => ({
       ibLinks: [],
       ibLinkRepairs: [],
       selectedNocLinkId: null,
+      trainingJobs: [],
+      trainingJobOffers: [],
+      jobOfferCooldown: 0,
+      trainingJobsCompleted: 0,
+      trainingJobsFailed: 0,
+      trainingRevenue: 0,
       sandboxMode: false,
       activeScenario: null,
       scenarioProgress: {},
@@ -6459,6 +6576,17 @@ export const useGameStore = create<GameState>((set) => ({
       )
 
       // 3. Calculate revenue (with customer type, depreciation, tech bonuses, outage penalty)
+      // Phase 8E — per-pod ai_lab base revenue multiplier driven by active training job:
+      //   no job   → 0.5× (idle GPUs)
+      //   pretraining / fine_tuning / rl_training active → 1.0× base + lump sum on completion
+      //   inference_batch active → 0.25× base (the lump sum is small but ongoing fill)
+      const aiLabPodMultipliers = new Map<string, number>()
+      for (const pod of state.gpuPods) {
+        const job = state.trainingJobs.find((j) => j.id === pod.activeJobId && (j.status === 'running' || j.status === 'restarting'))
+        if (!job) { aiLabPodMultipliers.set(pod.id, 0.5); continue }
+        aiLabPodMultipliers.set(pod.id, job.jobType === 'inference_batch' ? 0.25 : 1.0)
+      }
+
       let revenue = 0
       for (const cab of newCabinets) {
         if (cab.powerStatus) {
@@ -6481,6 +6609,20 @@ export const useGameStore = create<GameState>((set) => ({
           // Tech bonuses
           baseRevenue *= (1 + techRevenueBonus)
           if (cab.customerType === 'ai_training') baseRevenue *= (1 + techAiBonus)
+
+          // Phase 8E: ai_lab cabinets in a pod earn baseline revenue scaled by
+          // the active training-job state. Lump-sum payouts are added separately
+          // on completion (see training-job lifecycle block).
+          if (cab.customerType === 'ai_lab' && cab.podId) {
+            const mult = aiLabPodMultipliers.get(cab.podId)
+            if (mult != null) baseRevenue *= mult
+          }
+
+          // Phase 8D: ECC-faulted GPUs are out of service → proportional revenue cut.
+          const ecc = cab.eccFaultedGpus ?? 0
+          if (ecc > 0 && cab.gpuCount > 0) {
+            baseRevenue *= Math.max(0, 1 - ecc / cab.gpuCount)
+          }
 
           // Zone adjacency bonus: cabinets in organized zones earn more
           const cabZoneBonus = cabinetZoneBonuses.get(cab.id)
@@ -8223,18 +8365,126 @@ export const useGameStore = create<GameState>((set) => ({
         })
       }
 
+      // ── Phase 8E: Training-job lifecycle ──────────────────────────
+      let tickedTrainingJobs = state.trainingJobs
+      let tickedTrainingOffers = state.trainingJobOffers
+      let tickedGpuPods = state.gpuPods
+      let tickedJobOfferCooldown = state.jobOfferCooldown - 1
+      let trainingRevenueThisTick = 0
+      let trainingJobsCompletedDelta = 0
+      const trainingJobsFailedDelta = 0
+      let trainingReputationDelta = 0
+      const aiFabricIncidentByPod = new Map<string, number>()
+      for (const inc of activeIncidents) {
+        if (inc.resolved) continue
+        if ((inc.def.effect !== 'ai_fabric' && inc.def.effect !== 'ai_cabinet') || !inc.affectedPodId) continue
+        aiFabricIncidentByPod.set(inc.affectedPodId, (aiFabricIncidentByPod.get(inc.affectedPodId) ?? 0) + 1)
+      }
+
+      if (state.gpuPods.length > 0 || state.trainingJobs.length > 0 || state.trainingJobOffers.length > 0) {
+        // 1. Decay offer TTLs; drop expired offers (player ignored them).
+        tickedTrainingOffers = state.trainingJobOffers.filter((o) => o.expiresAtTick > newTickCount)
+
+        // 2. Refill the offer pool periodically. Requires at least one pod (no
+        //    AI tenants will pitch if there's nothing to run on).
+        if (tickedJobOfferCooldown <= 0 && state.gpuPods.length > 0 && tickedTrainingOffers.length < TRAINING_JOB_OFFER_POOL_SIZE) {
+          const slots = TRAINING_JOB_OFFER_POOL_SIZE - tickedTrainingOffers.length
+          const newOffers: TrainingJobOffer[] = []
+          const types: TrainingJobType[] = ['pretraining', 'fine_tuning', 'inference_batch', 'rl_training']
+          for (let i = 0; i < slots; i++) {
+            const jt = types[Math.floor(Math.random() * types.length)]
+            const cfg = TRAINING_JOB_CONFIG[jt]
+            const dur = cfg.minDuration + Math.floor(Math.random() * (cfg.maxDuration - cfg.minDuration + 1))
+            const pay = Math.round(cfg.minPayout + Math.random() * (cfg.maxPayout - cfg.minPayout))
+            const customerName = TRAINING_JOB_CUSTOMERS[Math.floor(Math.random() * TRAINING_JOB_CUSTOMERS.length)]
+            newOffers.push({
+              id: `tjo-${nextTrainingOfferId++}`,
+              jobType: jt,
+              customerName,
+              durationTicks: dur,
+              basePayout: pay,
+              slaRequirements: {
+                maxRestarts: cfg.maxRestarts,
+                minThroughputPct: cfg.minThroughputPct,
+                maxIncidents: jt === 'pretraining' ? 1 : jt === 'inference_batch' ? 5 : 3,
+              },
+              expiresAtTick: newTickCount + TRAINING_JOB_OFFER_TTL,
+            })
+          }
+          tickedTrainingOffers = [...tickedTrainingOffers, ...newOffers]
+          tickedJobOfferCooldown = TRAINING_JOB_OFFER_INTERVAL
+        }
+        if (tickedJobOfferCooldown < 0) tickedJobOfferCooldown = 0
+
+        // 3. Advance each running job by the pod's effective fabric activity.
+        //    activity=fabricLoadTarget → 1 work-tick / tick. Stalled fabric → no progress.
+        const completedJobIds = new Set<string>()
+        const failedJobIds = new Set<string>()
+        tickedTrainingJobs = state.trainingJobs.map((job) => {
+          if (job.status === 'completed' || job.status === 'failed') return job
+          const fabric = tickedIBFabrics.find((f) => f.podId === job.podId)
+          if (!fabric) return job
+          const cfg = TRAINING_JOB_CONFIG[job.jobType]
+          const activity = fabric.activityLevel
+          // Progress proportional to (activity / fabricLoadTarget), clamped to 1.5
+          // so a perfectly-running fabric can claw back a bit of lost time.
+          const progressTick = Math.min(1.5, activity / Math.max(0.01, cfg.fabricLoadTarget))
+          const newTicksRemaining = Math.max(0, job.ticksRemaining - progressTick)
+          const newProgressPct = Math.min(100, ((job.durationTicks - newTicksRemaining) / job.durationTicks) * 100)
+          const newValueAtRisk = +(job.basePayout * (newProgressPct / 100)).toFixed(2)
+          const incHit = (aiFabricIncidentByPod.get(job.podId) ?? 0) > 0 ? 1 : 0
+          const newIncidentsSeen = job.incidentsSeen + incHit
+          let next: TrainingJob = {
+            ...job,
+            ticksRemaining: newTicksRemaining,
+            progressPct: +newProgressPct.toFixed(2),
+            valueAtRisk: newValueAtRisk,
+            incidentsSeen: newIncidentsSeen,
+          }
+          if (newTicksRemaining <= 0) {
+            next = { ...next, status: 'completed', valueAtRisk: job.basePayout, progressPct: 100 }
+            completedJobIds.add(job.id)
+            trainingRevenueThisTick += job.basePayout
+            trainingJobsCompletedDelta += 1
+            trainingReputationDelta += TRAINING_JOB_REPUTATION[job.jobType]
+            floatingTexts.push({ text: `+$${(job.basePayout / 1000).toFixed(0)}K ${cfg.label} ✓`, color: '#00ff88', center: true, fontSize: '14px' })
+            eventLog.push({ tick: newTickCount, gameHour: newHour, category: 'finance' as EventCategory, message: `${cfg.label} for ${job.customerName} completed: +$${job.basePayout.toLocaleString()}`, severity: 'success' as EventSeverity })
+            cameraEffects.push({ type: 'zoom_pulse' })
+          }
+          return next
+        })
+
+        // 4. Free the pods of just-completed jobs so they can take new work.
+        if (completedJobIds.size > 0 || failedJobIds.size > 0) {
+          tickedGpuPods = state.gpuPods.map((p) =>
+            (p.activeJobId && (completedJobIds.has(p.activeJobId) || failedJobIds.has(p.activeJobId)))
+              ? { ...p, activeJobId: null }
+              : p
+          )
+        }
+      }
+
       return {
         cabinets: newCabinets,
         spineSwitches,
         ibLinks: tickedIBLinks,
         infiniBandFabrics: tickedIBFabrics,
         ibLinkRepairs: tickedIBRepairs,
+        trainingJobs: tickedTrainingJobs,
+        trainingJobOffers: tickedTrainingOffers,
+        gpuPods: tickedGpuPods,
+        jobOfferCooldown: tickedJobOfferCooldown,
+        trainingJobsCompleted: state.trainingJobsCompleted + trainingJobsCompletedDelta,
+        trainingJobsFailed: state.trainingJobsFailed + trainingJobsFailedDelta,
+        trainingRevenue: trainingRevenueThisTick,
         tickCount: newTickCount,
         revenue: +revenue.toFixed(2),
         expenses,
         powerCost,
         coolingCost,
-        money: sandboxMoneyAdjust > 0 ? sandboxMoneyAdjust : finalNewMoney,
+        // Phase 8E: fold training-job lump-sum payouts into the tick's money
+        // delta (sandbox bypasses normal money flow).
+        money: sandboxMoneyAdjust > 0 ? sandboxMoneyAdjust : finalNewMoney + trainingRevenueThisTick,
         trafficStats,
         gameHour: newHour,
         demandMultiplier,
@@ -8262,7 +8512,8 @@ export const useGameStore = create<GameState>((set) => ({
         fireDamageTaken,
         unlockedTech,
         activeResearch,
-        reputationScore,
+        // Phase 8E: fold training-job reputation deltas into the tick output.
+        reputationScore: Math.max(0, Math.min(100, reputationScore + trainingReputationDelta)),
         uptimeTicks,
         totalOperatingTicks,
         powerPriceMultiplier,

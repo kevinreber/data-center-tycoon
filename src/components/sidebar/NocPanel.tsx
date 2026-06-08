@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useGameStore } from '@/stores/gameStore'
+import { useGameStore, TRAINING_JOB_CONFIG } from '@/stores/gameStore'
 import type { IBLink, IBLinkStatus } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -67,6 +67,10 @@ export function NocPanel() {
   const staff = useGameStore((s) => s.staff)
   // Phase 8D: filter active fabric/cabinet incidents to show in the NOC.
   const activeIncidents = useGameStore((s) => s.activeIncidents)
+  // Phase 8E: training jobs for the Jobs tab
+  const trainingJobs = useGameStore((s) => s.trainingJobs)
+  const restartTrainingJob = useGameStore((s) => s.restartTrainingJob)
+  const cancelTrainingJob = useGameStore((s) => s.cancelTrainingJob)
 
   const [tab, setTab] = useState<NocTab>('links')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
@@ -157,12 +161,94 @@ export function NocPanel() {
         </button>
       </div>
 
-      {tab === 'jobs' && (
-        <div className="text-xs text-muted-foreground italic leading-relaxed border border-dashed border-border/40 rounded p-3">
-          Training-job health dashboard ships in Phase 8E. Active job count, value at risk, AllReduce ring
-          status, and ETA will land here alongside per-pod attribution.
-        </div>
-      )}
+      {tab === 'jobs' && (() => {
+        const activeJobs = trainingJobs.filter((j) => j.status === 'running' || j.status === 'restarting')
+        const totalValueAtRisk = activeJobs.reduce((s, j) => s + j.valueAtRisk, 0)
+        const totalIncidentsSeen = activeJobs.reduce((s, j) => s + j.incidentsSeen, 0)
+        if (activeJobs.length === 0) {
+          return (
+            <div className="text-xs text-muted-foreground italic leading-relaxed border border-dashed border-border/40 rounded p-3">
+              No training jobs running. Accept a training contract from the Build panel to put your GPU pods to work.
+            </div>
+          )
+        }
+        return (
+          <div className="flex flex-col gap-2">
+            {/* Aggregate header */}
+            <div className="rounded border border-neon-pink/30 bg-neon-pink/5 p-2 text-[10px] font-mono grid grid-cols-3 gap-2">
+              <div>
+                <div className="text-muted-foreground tracking-widest">JOBS</div>
+                <div className="text-neon-pink text-sm">{activeJobs.length}</div>
+              </div>
+              <div>
+                <div className="text-muted-foreground tracking-widest">VALUE AT RISK</div>
+                <div className="text-neon-yellow text-sm">${Math.round(totalValueAtRisk / 1000)}K</div>
+              </div>
+              <div>
+                <div className="text-muted-foreground tracking-widest">INCIDENTS</div>
+                <div className={`text-sm ${totalIncidentsSeen > 0 ? 'text-neon-orange' : 'text-neon-green'}`}>{totalIncidentsSeen}</div>
+              </div>
+            </div>
+            {/* Per-job cards */}
+            {activeJobs.map((job) => {
+              const cfg = TRAINING_JOB_CONFIG[job.jobType]
+              const fabric = infiniBandFabrics.find((f) => f.podId === job.podId)
+              const pod = gpuPods.find((p) => p.id === job.podId)
+              const restartsLeft = job.slaRequirements.maxRestarts - job.restartCount
+              const activityPct = fabric ? Math.round(fabric.activityLevel * 100) : 0
+              const allReduceOk = fabric && fabric.activityLevel >= cfg.fabricLoadTarget * 0.9
+              return (
+                <div key={job.id} className="rounded border border-border/40 bg-card/40 p-2 flex flex-col gap-1">
+                  <div className="flex items-center justify-between text-[11px] font-mono">
+                    <span style={{ color: cfg.color }}>{cfg.label}</span>
+                    <span className="text-muted-foreground">{pod?.name ?? job.podId}</span>
+                  </div>
+                  <div className="text-[10px] text-muted-foreground">{job.customerName}</div>
+                  {/* Progress bar */}
+                  <div className="h-1.5 rounded bg-card overflow-hidden border border-border/30">
+                    <div className="h-full bg-neon-green/60 transition-all" style={{ width: `${Math.min(100, job.progressPct)}%` }} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-2 text-[10px] font-mono">
+                    <span className="text-muted-foreground">Progress</span>
+                    <span className="text-right">{job.progressPct.toFixed(0)}%</span>
+                    <span className="text-muted-foreground">ETA</span>
+                    <span className="text-right">{Math.ceil(job.ticksRemaining)}t</span>
+                    <span className="text-muted-foreground">Value at risk</span>
+                    <span className="text-right text-neon-yellow">${Math.round(job.valueAtRisk / 1000)}K</span>
+                    <span className="text-muted-foreground">Fabric activity</span>
+                    <span className={`text-right ${allReduceOk ? 'text-neon-green' : 'text-neon-orange'}`}>{activityPct}%</span>
+                    <span className="text-muted-foreground">AllReduce ring</span>
+                    <span className={`text-right ${allReduceOk ? 'text-neon-green' : 'text-neon-orange'}`}>{allReduceOk ? 'HEALTHY' : 'DEGRADED'}</span>
+                    <span className="text-muted-foreground">Restarts</span>
+                    <span className={`text-right ${restartsLeft === 0 ? 'text-neon-red' : 'text-foreground'}`}>{job.restartCount}/{job.slaRequirements.maxRestarts}</span>
+                    {job.incidentsSeen > 0 && (
+                      <>
+                        <span className="text-muted-foreground">Incidents seen</span>
+                        <span className="text-right text-neon-orange">{job.incidentsSeen}</span>
+                      </>
+                    )}
+                  </div>
+                  <div className="flex gap-1 mt-1">
+                    <button
+                      onClick={() => restartTrainingJob(job.id)}
+                      disabled={restartsLeft <= 0}
+                      className="text-[10px] px-1.5 py-0.5 rounded border border-neon-orange/30 text-neon-orange hover:bg-neon-orange/10 disabled:opacity-30 disabled:hover:bg-transparent"
+                    >
+                      Restart ({restartsLeft} left)
+                    </button>
+                    <button
+                      onClick={() => cancelTrainingJob(job.id)}
+                      className="text-[10px] px-1.5 py-0.5 rounded border border-neon-red/30 text-neon-red hover:bg-neon-red/10"
+                    >
+                      Abandon
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )
+      })()}
 
       {tab === 'links' && (
         <>

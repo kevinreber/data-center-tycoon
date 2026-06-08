@@ -364,6 +364,17 @@ AI Incident types (Phase 8D):
 - `Cabinet.eccFaultedGpus?: number` — count of GPUs out of service from `gpu_ecc_fault`, cleared by `refreshGpu($15K)`.
 - 7 new incidents in `INCIDENT_CATALOG`: `ib_link_flap` (minor; bumps target link errorCount by 4/tick), `nccl_collective_hang` (major; pod activity → 0 for 20t), `silent_data_corruption` (critical; activity ×0.5 for 50t, silent — only visible in NOC), `optic_failure` (minor; hard-downs the link, recovery via `replaceOptic`), `pfc_storm` (critical; only spawns when fabric avg util >90%, caps activity at 0.1 for 20t), `thermal_runaway` (critical; only spawns on `high_density`/`extreme_density` cabinets without `direct_to_chip`/`single_phase_immersion` cooling — auto-shuts the cabinet if not resolved within 3t), `gpu_ecc_fault` (major; bumps `eccFaultedGpus`, requires `refreshGpu`).
 
+Training Job types (Phase 8E):
+- `TrainingJobType` = `'pretraining' | 'fine_tuning' | 'inference_batch' | 'rl_training'`.
+- `TrainingJobStatus` = `'running' | 'restarting' | 'completed' | 'failed'`.
+- `TrainingJob` — id, customerName, podId, jobType, durationTicks, ticksRemaining, basePayout, progressPct, status, valueAtRisk, restartCount, startedAtTick, slaRequirements, incidentsSeen.
+- `TrainingJobOffer` — id, jobType, customerName, durationTicks (rolled within type range), basePayout (rolled within type range), slaRequirements, expiresAtTick.
+- `TrainingJobSLA` — maxRestarts, minThroughputPct, maxIncidents.
+- `TrainingJobConfig` — type, label, minDuration, maxDuration, minPayout, maxPayout, maxRestarts, minThroughputPct, fabricLoadTarget, color.
+- `GPUPod.activeJobId?: string | null` — the running job bound to this pod (null when idle).
+- State additions: `trainingJobs: TrainingJob[]`, `trainingJobOffers: TrainingJobOffer[]`, `jobOfferCooldown: number` (ticks until next offer refresh), `trainingJobsCompleted: number`, `trainingJobsFailed: number`, `trainingRevenue: number` (lump sums paid this tick).
+- Configs: `TRAINING_JOB_CONFIG` (4 job types with duration/payout/restart/load profiles), `TRAINING_JOB_OFFER_INTERVAL = 40`, `TRAINING_JOB_OFFER_POOL_SIZE = 4`, `TRAINING_JOB_OFFER_TTL = 120`, `TRAINING_JOB_CUSTOMERS` (12 procedural names), `TRAINING_JOB_REPUTATION` (per-type rep bonus on completion), `TRAINING_JOB_FAIL_REPUTATION = -8`.
+
 42U rack types:
 - `RackEquipmentType` = `'1u_server' | '2u_server' | '4u_storage' | '1u_switch' | '2u_patch_panel' | '1u_pdu' | '3u_ups' | '2u_cable_mgmt'`
 - `RackSlot` — u position, equipment type, equipment label
@@ -420,6 +431,7 @@ Key interfaces (core):
 | Backend Fabric (Phase 8B) | `toggleBackendFabricVisible` (drives the IB switches, cables, and AllReduce ring pulse layer; auto-disabled until the first pod is built) |
 | NOC / Traffic Triage (Phase 8C) | `drainPort` (20-tick utilization freeze, free), `resetSwitch` (clears errorCount on attached links, 5-tick cooldown, won't auto-recover down links), `replaceOptic` ($2K, instant reset + 50-tick error-suppression boost), `dispatchElectrician` (needs on-shift electrician, 10-tick repair), `openNocDrawer(linkId)` (sets `selectedNocLinkId` + flags `pendingPanelOpen: 'noc'`), `clearPendingPanel` |
 | AI Incidents (Phase 8D) | `refreshGpu(cabinetId)` ($15K, clears `eccFaultedGpus` from `gpu_ecc_fault` incidents). 7 new incident types spawn via the existing `INCIDENT_CATALOG` pipeline — see "AI Incident types" above. |
+| Training Jobs (Phase 8E) | `acceptTrainingContract(offerId, podId)` (binds an offer to an idle pod), `restartTrainingJob(jobId)` (within budget resets progress; exceeded budget fails + reputation hit), `cancelTrainingJob(jobId)` (player abandons → fail). ai_lab cabinets earn 0.5× base while idle, 1.0× during training, 0.25× during inference_batch — lump sums land on completion via the tick lifecycle. |
 | Incidents | `resolveIncident`, `buyGenerator`, `activateGenerator`, `upgradeSuppression` |
 | Operations Progression | `upgradeOpsTier` |
 | Contracts | `acceptContract` |
