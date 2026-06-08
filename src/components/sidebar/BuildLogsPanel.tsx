@@ -16,6 +16,28 @@ interface VersionEntry {
 
 const CHANGELOG: VersionEntry[] = [
   {
+    version: 'v0.6.1',
+    date: 'Jun 2026',
+    title: 'The AI Operations Era',
+    highlights: 'The AI tier now plays. A new NOC sidebar turns flapping IB links into one-click triage; seven AI-specific incidents (NCCL hangs, PFC storms, thermal runaway, GPU ECC faults, more) test your operational chops; and training contracts pay lump-sum on completion with restart-budget SLAs.',
+    changes: [
+      { text: 'NOC panel — sidebar view with per-pod fabric health summary, sortable/filterable IB link table, and a detail drawer with a 50-tick utilization sparkline', type: 'new' },
+      { text: 'Four link triage actions — drain port (20t freeze, free), reset switch (5t cooldown, clears errors on attached links), replace optic ($2K + 50t error-suppression boost), dispatch electrician (10t hands-on repair, needs on-shift staff)', type: 'new' },
+      { text: 'Click an InfiniBand cable in the scene to open its NOC drawer directly — per-link hit zones layered over the violet IB cables', type: 'new' },
+      { text: 'In-flight repairs persist across save/load and site switches', type: 'new' },
+      { text: '7 AI-specific incidents — IB link flap, NCCL collective hang, silent data corruption, optic failure, PFC storm (only spawns when fabric utilization >90%), thermal runaway (only on high-density cabinets without direct-to-chip cooling, auto-shuts the cabinet at the 3-tick mark), GPU ECC fault', type: 'new' },
+      { text: 'New Refresh GPU action ($15K) to bring an ECC-faulted GPU back online', type: 'new' },
+      { text: 'Cabinet detail panel surfaces an AI Alerts section: thermal runaway countdown banner + ECC-fault card with inline Refresh', type: 'new' },
+      { text: 'Training contracts — 4 job types: pretraining ($2M–$5M, 0 restarts), fine-tuning ($500K–$1M, 1 restart), inference batch ($200K, 2 restarts), RL training ($1M, 1 restart)', type: 'new' },
+      { text: 'New Training Contracts section in the Build panel lists available offers; click "Run on Pod-N" to assign one to an idle pod', type: 'new' },
+      { text: 'Per-pod active-job card shows customer, progress bar, ETA, value at risk, restart accounting, and inline Restart / Cancel buttons', type: 'new' },
+      { text: 'NOC Jobs tab — aggregate header (jobs, total value at risk, incidents seen) and per-job detail cards with AllReduce ring health driven off fabric activity', type: 'new' },
+      { text: 'AI Lab revenue model — ai_lab cabinets earn 50% baseline while pods are idle, 100% during training, 25% during inference fill; lump sums land on completion', type: 'improved' },
+      { text: 'GPU ECC faults reduce a cabinet\'s effective revenue proportionally until refreshed', type: 'improved' },
+      { text: 'NOC drawer countdown badges + status chips give one-glance visibility into drain timers, electrician dispatches, and optic boost windows', type: 'improved' },
+    ],
+  },
+  {
     version: 'v0.6.0',
     date: 'Jun 2026',
     title: 'The AI Infrastructure Era',

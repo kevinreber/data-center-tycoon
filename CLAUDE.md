@@ -4,7 +4,7 @@
 
 **Fabric Tycoon: Data Center Simulator** is a web-based isometric tycoon game where players build and manage a data center. Players place cabinets, install servers and network switches, design a Clos (spine-leaf) network fabric, and balance power, heat, and revenue to scale from a single rack to a global operation.
 
-**Current version:** v0.6.0
+**Current version:** v0.6.1
 
 ## Tech Stack
 
@@ -91,7 +91,7 @@ src/
 │   │   ├── equipment.ts        # Cooling, server config, PDU, cable tray, aisle configs
 │   │   ├── features.ts         # Row-end slots, aisle widths, raised floor, cable mgmt, workloads, advanced tiers, rack equipment, audio, prestige/New Game+
 │   │   ├── infrastructure.ts   # Busway, cross-connect, in-row cooling, spacing, zone configs
-│   │   ├── progression.ts      # Tech tree, achievements (106), incidents (21), contracts, scenarios, tutorial tips (43), guided tutorial steps
+│   │   ├── progression.ts      # Tech tree, achievements (110), incidents (29 incl. 7 Phase 8D AI types), contracts, scenarios, tutorial tips (44), guided tutorial steps
 │   │   └── world.ts            # Staff, supply chain, weather, interconnection, peering, competitors, regions, sites, sovereignty, demand
 │   ├── gameStore.test.ts       # Vitest tests for cabinet placement and placement hints
 │   ├── __tests__/
@@ -153,7 +153,7 @@ All game state lives in a **single Zustand store** (`useGameStore`). The store (
 - **Spacing & layout configs** (`SPACING_CONFIG`): adjacency heat penalties, aisle bonuses, airflow bonuses, maintenance access, fire spread mechanics
 - **Zone bonus configs** (`ZONE_BONUS_CONFIG`): minimum cluster size (3), environment and customer type bonuses
 - **Economy configs**: loan options, depreciation, power market parameters, insurance options, valuation milestones
-- **Progression configs**: tech tree (9 techs), contracts (9 base + 4 compliance-gated + zone contracts), achievements (106), incidents (21 types), scenarios (5)
+- **Progression configs**: tech tree (9 techs), contracts (9 base + 4 compliance-gated + zone contracts), achievements (110), incidents (29 types — includes 7 Phase 8D AI fabric/cabinet incidents), scenarios (5)
 - **Staff configs** (`STAFF_ROLE_CONFIG`, `STAFF_CERT_CONFIG`, `SHIFT_PATTERN_CONFIG`): roles, certifications, shift costs
 - **Supply chain configs** (`SUPPLY_CHAIN_CONFIG`): lead times, bulk discounts, shortage mechanics
 - **Weather configs** (`SEASON_CONFIG`, `WEATHER_CONDITION_CONFIG`): seasonal/weather ambient modifiers
@@ -618,7 +618,7 @@ A `setInterval` in `App.tsx` calls `tick()` at the rate determined by `gameSpeed
 1. **Time-of-day**: Advances `gameHour` (0–23), applies demand curve and random traffic spikes
 2. **Weather**: Season rotation, weather condition changes, ambient temperature modifiers
 3. **Supply chain**: Ticks pending orders, delivery processing, supply shortage events
-4. **Incidents & Ops Tier**: Spawns random incidents (21 types, reduced by ops tier), ticks active incidents, applies effects (revenue penalties reduced by ops tier), ops tier auto-resolve bonus, prevented incident tracking
+4. **Incidents & Ops Tier**: Spawns random incidents (29 types incl. 7 Phase 8D AI types, reduced by ops tier), ticks active incidents, applies effects (revenue penalties reduced by ops tier), ops tier auto-resolve bonus, prevented incident tracking. Phase 8D AI incidents use deferred-mutation queues (`pendingOpticFailures`, `pendingEccFaults`, `thermalRunawayShutoffCabIds`) so the spawn block doesn't directly mutate IB/cabinet state.
 5. **Tech tree**: Ticks active research progress
 6. **Power market**: Updates spot pricing with random walk, mean reversion, and price spikes
 7. **Generators**: Manages fuel consumption, startup/cooldown, auto-activation during outages
@@ -736,7 +736,7 @@ A `setInterval` in `App.tsx` calls `tick()` at the rate determined by `gameSpeed
 - Revenue based on allocated capacity × current spot price
 
 **Incidents & Resilience:**
-- **21 incident types** with minor/major/critical severity (includes cooling infrastructure incidents: compressor_failure, refrigerant_leak, chiller_malfunction, pipe_burst)
+- **29 incident types** with minor/major/critical severity. Includes cooling infrastructure incidents (compressor_failure, refrigerant_leak, chiller_malfunction, pipe_burst), regional disasters, security intrusions, and the 7 Phase 8D AI fabric/cabinet incidents (ib_link_flap, nccl_collective_hang, silent_data_corruption, optic_failure, pfc_storm, thermal_runaway, gpu_ecc_fault). Phase 8D incidents have per-type spawn preconditions (e.g. pfc_storm only when fabric avg util > 90%; thermal_runaway only on high-density cabinets without direct-to-chip cooling).
 - **Generators**: 3 options (Small Diesel, Large Diesel, Natural Gas) with fuel management
 - **Fire suppression**: none, water (cheap, some damage), gas (expensive, minimal damage)
 - **Fires** trigger at critical temperature (95°C)
