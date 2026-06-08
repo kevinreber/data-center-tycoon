@@ -907,7 +907,7 @@ export interface IncidentDef {
   description: string
   durationTicks: number
   resolveCost: number
-  effect: 'heat_spike' | 'revenue_penalty' | 'power_surge' | 'traffic_drop' | 'cooling_failure' | 'hardware_failure' | 'chiller_failure' | 'pipe_failure' | 'link_flap'
+  effect: 'heat_spike' | 'revenue_penalty' | 'power_surge' | 'traffic_drop' | 'cooling_failure' | 'hardware_failure' | 'chiller_failure' | 'pipe_failure' | 'link_flap' | 'ai_fabric' | 'ai_cabinet'
   effectMagnitude: number
   hardwareTarget?: 'spine' | 'leaf'
 }
@@ -920,6 +920,10 @@ export interface ActiveIncident {
   affectedHardwareId?: string
   /** For link_flap incidents: "leafCabinetId:spineId" identifying the affected port */
   affectedLinkKey?: string
+  /** Phase 8D: AI-fabric incidents target a pod or a specific cabinet/IB link. */
+  affectedPodId?: string
+  affectedIbLinkId?: string
+  affectedCabinetId?: string
 }
 
 /** Identifies which switch to inspect in the port detail modal */
@@ -1000,6 +1004,10 @@ export interface Cabinet {
   gpuCount: number              // 0 for standard, 8 per high-density cabinet, 8 per extreme cabinet
   liquidCooling: LiquidCoolingType
   podId: string | null          // membership in a GPUPod, null for standalone
+  /** Phase 8D: count of GPUs that have failed ECC and are out of service. Capped
+   *  at gpuCount; cleared by refreshGpu($15K). Reduces the effective GPU count
+   *  used in workload / revenue calculations once Phase 8E lands. */
+  eccFaultedGpus?: number
 }
 
 export interface PlacementHint {
@@ -1023,6 +1031,67 @@ export interface GPUPod {
   cabinetCount: number          // 4, 8, 16, or 32
   gpuCount: number              // 64, 128, 256, or 512
   installedAtTick: number
+  /** Phase 8E: id of the TrainingJob currently bound to this pod, or null when idle. */
+  activeJobId?: string | null
+}
+
+// ── Phase 8E — Training Jobs & AI Revenue ─────────────────────
+// AI tenants buy time on pods for one of four workload shapes. Revenue is
+// lumpy — base AI Lab rate ticks while idle, but the real money lands as a
+// lump-sum payout when a training job completes within its SLA budget.
+
+export type TrainingJobType = 'pretraining' | 'fine_tuning' | 'inference_batch' | 'rl_training'
+
+export type TrainingJobStatus = 'running' | 'restarting' | 'completed' | 'failed'
+
+export interface TrainingJobSLA {
+  maxRestarts: number            // 0 for pretraining (the whale), 1 for fine-tune/RL, 2 for inference
+  minThroughputPct: number       // pod must average ≥ this much fabric activity (0–100)
+  maxIncidents: number           // soft cap on AI fabric incidents during the run (informational)
+}
+
+export interface TrainingJob {
+  id: string
+  customerName: string           // procedural — e.g. "Helios AI Labs", "QuantStack Research"
+  podId: string
+  jobType: TrainingJobType
+  durationTicks: number          // total ticks at full fabric activity to complete
+  ticksRemaining: number         // remaining work units (decremented by activity per tick)
+  basePayout: number             // dollars on full completion within SLA
+  progressPct: number            // 0–100
+  status: TrainingJobStatus
+  valueAtRisk: number            // current expected payout if job were to terminate now
+  restartCount: number
+  startedAtTick: number
+  slaRequirements: TrainingJobSLA
+  /** Phase 8E: number of AI fabric incidents that hit this pod while the job
+   *  has been running. Drives soft reputation feedback but doesn't auto-fail. */
+  incidentsSeen: number
+}
+
+export interface TrainingJobOffer {
+  id: string
+  jobType: TrainingJobType
+  customerName: string
+  durationTicks: number          // rolled within the type's range
+  basePayout: number             // rolled within the type's range
+  slaRequirements: TrainingJobSLA
+  expiresAtTick: number
+}
+
+export interface TrainingJobConfig {
+  type: TrainingJobType
+  label: string
+  description: string
+  minDuration: number
+  maxDuration: number
+  minPayout: number
+  maxPayout: number
+  maxRestarts: number
+  minThroughputPct: number
+  /** Per-tick fabric activity target while this job is running (0–1). */
+  fabricLoadTarget: number
+  color: string
 }
 
 export interface GPUPodConfig {

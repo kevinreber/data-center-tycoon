@@ -16,6 +16,8 @@ import type {
   ServerConfigDef,
   SuppressionConfig,
   SuppressionType,
+  TrainingJobConfig,
+  TrainingJobType,
 } from '../types'
 
 // ── Customer Type Config ──────────────────────────────────────
@@ -425,3 +427,85 @@ export const DENSITY_SCALING: Record<'standard' | 'high_density' | 'extreme_dens
   high_density: { powerMultiplier: 5.0, heatMultiplier: 4.5, maxServers: 8, label: 'High Density 30-35kW' },
   extreme_density: { powerMultiplier: 8.0, heatMultiplier: 7.0, maxServers: 8, label: 'Extreme 45-50kW' },
 }
+
+// ── Training Jobs (Phase 8E) ──────────────────────────────────
+
+export const TRAINING_JOB_CONFIG: Record<TrainingJobType, TrainingJobConfig> = {
+  pretraining: {
+    type: 'pretraining',
+    label: 'Foundation Pretraining',
+    description: 'Multi-hundred-billion-parameter pretraining run. The whale — single restart loses everything.',
+    minDuration: 150,
+    maxDuration: 200,
+    minPayout: 2_000_000,
+    maxPayout: 5_000_000,
+    maxRestarts: 0,
+    minThroughputPct: 90,
+    fabricLoadTarget: 0.95,
+    color: '#ff44ff',
+  },
+  fine_tuning: {
+    type: 'fine_tuning',
+    label: 'Fine-Tune',
+    description: 'Customer-specific model fine-tune. Forgiving SLA, steady revenue.',
+    minDuration: 50,
+    maxDuration: 80,
+    minPayout: 500_000,
+    maxPayout: 1_000_000,
+    maxRestarts: 1,
+    minThroughputPct: 80,
+    fabricLoadTarget: 0.75,
+    color: '#cc88ff',
+  },
+  inference_batch: {
+    type: 'inference_batch',
+    label: 'Inference Batch',
+    description: 'Steady inference fill between training runs. Low payout, low risk, fills idle GPU time.',
+    minDuration: 30,
+    maxDuration: 30,
+    minPayout: 200_000,
+    maxPayout: 200_000,
+    maxRestarts: 2,
+    minThroughputPct: 70,
+    fabricLoadTarget: 0.4,
+    color: '#88ccff',
+  },
+  rl_training: {
+    type: 'rl_training',
+    label: 'RL Training',
+    description: 'Reinforcement-learning run. Bursty traffic, harder on the fabric, premium payout.',
+    minDuration: 100,
+    maxDuration: 100,
+    minPayout: 1_000_000,
+    maxPayout: 1_000_000,
+    maxRestarts: 1,
+    minThroughputPct: 85,
+    fabricLoadTarget: 0.85,
+    color: '#ffaa88',
+  },
+}
+
+/** Number of ticks between training-job offer refreshes. */
+export const TRAINING_JOB_OFFER_INTERVAL = 40
+/** Number of offers in the pool at any time. */
+export const TRAINING_JOB_OFFER_POOL_SIZE = 4
+/** Ticks an offer stays available before it expires. */
+export const TRAINING_JOB_OFFER_TTL = 120
+
+/** Procedural customer pool used to roll TrainingJobOffer.customerName. */
+export const TRAINING_JOB_CUSTOMERS = [
+  'Helios AI Labs', 'QuantStack Research', 'Nimbus Cognition', 'Orchid Foundation',
+  'Cipher Models', 'Vector Diligence', 'Pinnacle Inference', 'Arcadia Synthesis',
+  'Lattice Reasoning', 'Helix BioCompute', 'Stratus Vision', 'Quanta Cortex',
+]
+
+/** Reputation gain on completion of each job type (scaled by progress at fail). */
+export const TRAINING_JOB_REPUTATION = {
+  pretraining: 6,
+  fine_tuning: 2,
+  inference_batch: 0.5,
+  rl_training: 3,
+}
+
+/** Reputation lost on outright failure (max-restarts exceeded). */
+export const TRAINING_JOB_FAIL_REPUTATION = -8

@@ -63,7 +63,9 @@ import {
   TECH_TREE,
   GPU_POD_CONFIG,
   LIQUID_COOLING_CONFIG,
+  TRAINING_JOB_CONFIG,
 } from '@/stores/gameStore'
+import type { TrainingJobOffer } from '@/stores/gameStore'
 import type { RegionId } from '@/stores/gameStore'
 
 // Helper to get/set store state
@@ -5189,6 +5191,383 @@ describe('NOC / Traffic Triage (Phase 8C)', () => {
     getState().removeGPUPod(getState().gpuPods[0].id)
     expect(getState().ibLinkRepairs).toHaveLength(0)
     expect(getState().selectedNocLinkId).toBeNull()
+  })
+})
+
+// ============================================================================
+// AI-Specific Incidents (Phase 8D)
+// ============================================================================
+describe('AI-Specific Incidents (Phase 8D)', () => {
+  beforeEach(() => {
+    setState({
+      sandboxMode: true,
+      money: 5_000_000,
+      suiteTier: 'standard',
+      unlockedTech: ['ai_infrastructure', 'immersion_cooling'],
+      tickCount: 100,
+      activeIncidents: [],
+    })
+    getState().createGPUPod('small', 0, STD_ROW_0)
+  })
+
+  // Helpers — directly inject an active AI incident so tests don't depend on
+  // Math.random spawn gating. The tick effect handlers are what we care about.
+  function injectAi(type: string, opts: { affectedPodId?: string; affectedIbLinkId?: string; affectedCabinetId?: string; ticksRemaining?: number } = {}) {
+    const def = INCIDENT_CATALOG.find((d) => d.type === type)!
+    const incident: ActiveIncident = {
+      id: `inc-test-${type}-${Math.random().toString(36).slice(2, 8)}`,
+      def,
+      ticksRemaining: opts.ticksRemaining ?? def.durationTicks,
+      resolved: false,
+      ...(opts.affectedPodId ? { affectedPodId: opts.affectedPodId } : {}),
+      ...(opts.affectedIbLinkId ? { affectedIbLinkId: opts.affectedIbLinkId } : {}),
+      ...(opts.affectedCabinetId ? { affectedCabinetId: opts.affectedCabinetId } : {}),
+    }
+    setState({ activeIncidents: [...getState().activeIncidents, incident] })
+  }
+
+  // ── Catalog presence ──────────────────────────────────────────
+  it('catalog includes all 7 Phase 8D incident types', () => {
+    const required = ['ib_link_flap', 'nccl_collective_hang', 'silent_data_corruption', 'optic_failure', 'pfc_storm', 'thermal_runaway', 'gpu_ecc_fault']
+    for (const type of required) {
+      expect(INCIDENT_CATALOG.find((d) => d.type === type)).toBeDefined()
+    }
+  })
+
+  // ── nccl_collective_hang: zeros fabric activity ──────────────
+  it('nccl_collective_hang drives fabric.activityLevel to 0 while active', () => {
+    const pod = getState().gpuPods[0]
+    // Ramp activity first
+    for (let i = 0; i < 15; i++) getState().tick()
+    expect(getState().infiniBandFabrics[0].activityLevel).toBeGreaterThan(0.3)
+
+    injectAi('nccl_collective_hang', { affectedPodId: pod.id })
+    getState().tick()
+    expect(getState().infiniBandFabrics[0].activityLevel).toBe(0)
+  })
+
+  // ── silent_data_corruption: halves activity ──────────────────
+  it('silent_data_corruption multiplies fabric.activityLevel by ~0.5', () => {
+    const pod = getState().gpuPods[0]
+    for (let i = 0; i < 20; i++) getState().tick()
+    const baseline = getState().infiniBandFabrics[0].activityLevel
+    expect(baseline).toBeGreaterThan(0.4)
+
+    injectAi('silent_data_corruption', { affectedPodId: pod.id })
+    getState().tick()
+    const after = getState().infiniBandFabrics[0].activityLevel
+    expect(after).toBeLessThan(baseline * 0.7)
+  })
+
+  // ── pfc_storm: caps activity at 0.1 ──────────────────────────
+  it('pfc_storm clamps fabric.activityLevel to 0.1 max', () => {
+    const pod = getState().gpuPods[0]
+    for (let i = 0; i < 20; i++) getState().tick()
+    expect(getState().infiniBandFabrics[0].activityLevel).toBeGreaterThan(0.3)
+
+    injectAi('pfc_storm', { affectedPodId: pod.id })
+    getState().tick()
+    expect(getState().infiniBandFabrics[0].activityLevel).toBeLessThanOrEqual(0.1)
+  })
+
+  // ── ib_link_flap: pumps errors fast ──────────────────────────
+  it('ib_link_flap bumps errorCount on its target link by 4/tick', () => {
+    const link = getState().ibLinks[0]
+    injectAi('ib_link_flap', { affectedIbLinkId: link.id, affectedPodId: getState().gpuPods[0].id })
+    const startErrors = link.errorCount
+    getState().tick()
+    getState().tick()
+    getState().tick()
+    const after = getState().ibLinks.find((l) => l.id === link.id)!
+    // 3 ticks × 4 errors per tick (the effectMagnitude) + maybe 1 base accrual
+    expect(after.errorCount).toBeGreaterThanOrEqual(startErrors + 12)
+  })
+
+  it('ib_link_flap escalates a healthy link to flapping and then down', () => {
+    const link = getState().ibLinks[0]
+    injectAi('ib_link_flap', { affectedIbLinkId: link.id, affectedPodId: getState().gpuPods[0].id, ticksRemaining: 999 })
+    for (let i = 0; i < 10; i++) getState().tick()  // ~40 errors injected
+    const after = getState().ibLinks.find((l) => l.id === link.id)!
+    expect(after.status).toBe('down')
+  })
+
+  // ── thermal_runaway: heat dump + auto-shutoff on expiry ──────
+  it('thermal_runaway adds heat to its target cabinet each tick while active', () => {
+    const pod = getState().gpuPods[0]
+    const cab = getState().cabinets.find((c) => c.podId === pod.id)!
+    // Start at low heat to make the bump easy to see.
+    setState({ cabinets: getState().cabinets.map((c) => c.id === cab.id ? { ...c, heatLevel: 25 } : c) })
+    injectAi('thermal_runaway', { affectedCabinetId: cab.id, affectedPodId: pod.id, ticksRemaining: 999 })
+    const before = getState().cabinets.find((c) => c.id === cab.id)!.heatLevel
+    getState().tick()
+    const after = getState().cabinets.find((c) => c.id === cab.id)!.heatLevel
+    // +12°C heat from the incident, minus normal cooling — net increase expected.
+    expect(after).toBeGreaterThan(before + 5)
+  })
+
+  it('thermal_runaway auto-shuts its cabinet when it expires unresolved', () => {
+    const pod = getState().gpuPods[0]
+    const cab = getState().cabinets.find((c) => c.podId === pod.id)!
+    expect(cab.powerStatus).toBe(true)
+
+    // Spawn with 1 tick left → expires this tick → triggers auto-shutoff path.
+    injectAi('thermal_runaway', { affectedCabinetId: cab.id, affectedPodId: pod.id, ticksRemaining: 1 })
+    getState().tick()
+    const afterCab = getState().cabinets.find((c) => c.id === cab.id)!
+    expect(afterCab.powerStatus).toBe(false)
+  })
+
+  // ── gpu_ecc_fault + refreshGpu ──────────────────────────────
+  it('refreshGpu costs $15K and clears eccFaultedGpus', () => {
+    setState({ sandboxMode: false, money: 100_000 })
+    const cab = getState().cabinets.find((c) => c.podId === getState().gpuPods[0].id)!
+    setState({ cabinets: getState().cabinets.map((c) => c.id === cab.id ? { ...c, eccFaultedGpus: 2 } : c) })
+
+    getState().refreshGpu(cab.id)
+    expect(getState().money).toBe(85_000)
+    expect(getState().cabinets.find((c) => c.id === cab.id)!.eccFaultedGpus).toBe(0)
+  })
+
+  it('refreshGpu is a no-op when the cabinet has no ECC faults', () => {
+    setState({ sandboxMode: false, money: 100_000 })
+    const cab = getState().cabinets.find((c) => c.podId === getState().gpuPods[0].id)!
+    expect(cab.eccFaultedGpus ?? 0).toBe(0)
+    getState().refreshGpu(cab.id)
+    expect(getState().money).toBe(100_000)
+  })
+
+  it('refreshGpu is blocked when the player cannot afford it (non-sandbox)', () => {
+    setState({ sandboxMode: false, money: 500 })
+    const cab = getState().cabinets.find((c) => c.podId === getState().gpuPods[0].id)!
+    setState({ cabinets: getState().cabinets.map((c) => c.id === cab.id ? { ...c, eccFaultedGpus: 1 } : c) })
+
+    getState().refreshGpu(cab.id)
+    expect(getState().money).toBe(500)
+    expect(getState().cabinets.find((c) => c.id === cab.id)!.eccFaultedGpus).toBe(1)
+  })
+})
+
+// ============================================================================
+// Training Jobs & AI Revenue Model (Phase 8E)
+// ============================================================================
+describe('Training Jobs & AI Revenue (Phase 8E)', () => {
+  beforeEach(() => {
+    setState({
+      sandboxMode: true,
+      money: 5_000_000,
+      suiteTier: 'standard',
+      unlockedTech: ['ai_infrastructure', 'immersion_cooling'],
+      tickCount: 100,
+      trainingJobs: [],
+      trainingJobOffers: [],
+      jobOfferCooldown: 0,
+      trainingJobsCompleted: 0,
+      trainingJobsFailed: 0,
+      activeIncidents: [],
+    })
+    getState().createGPUPod('small', 0, STD_ROW_0)
+  })
+
+  function injectOffer(jobType: 'pretraining' | 'fine_tuning' | 'inference_batch' | 'rl_training', overrides: Partial<TrainingJobOffer> = {}): TrainingJobOffer {
+    const cfg = TRAINING_JOB_CONFIG[jobType]
+    const offer: TrainingJobOffer = {
+      id: `tjo-test-${jobType}-${Math.random().toString(36).slice(2, 8)}`,
+      jobType,
+      customerName: 'Test Customer',
+      durationTicks: overrides.durationTicks ?? cfg.minDuration,
+      basePayout: overrides.basePayout ?? cfg.minPayout,
+      slaRequirements: overrides.slaRequirements ?? {
+        maxRestarts: cfg.maxRestarts,
+        minThroughputPct: cfg.minThroughputPct,
+        maxIncidents: 3,
+      },
+      expiresAtTick: overrides.expiresAtTick ?? getState().tickCount + 120,
+      ...overrides,
+    }
+    setState({ trainingJobOffers: [...getState().trainingJobOffers, offer] })
+    return offer
+  }
+
+  // ── acceptTrainingContract ───────────────────────────────────
+  it('acceptTrainingContract assigns the job to the pod and removes the offer', () => {
+    const pod = getState().gpuPods[0]
+    const offer = injectOffer('fine_tuning')
+    getState().acceptTrainingContract(offer.id, pod.id)
+
+    expect(getState().trainingJobs).toHaveLength(1)
+    const job = getState().trainingJobs[0]
+    expect(job.podId).toBe(pod.id)
+    expect(job.status).toBe('running')
+    expect(job.restartCount).toBe(0)
+    expect(getState().trainingJobOffers).toHaveLength(0)
+    expect(getState().gpuPods[0].activeJobId).toBe(job.id)
+  })
+
+  it('acceptTrainingContract fails when the pod already has an active job', () => {
+    const pod = getState().gpuPods[0]
+    const offer1 = injectOffer('fine_tuning')
+    const offer2 = injectOffer('inference_batch')
+    getState().acceptTrainingContract(offer1.id, pod.id)
+    expect(getState().trainingJobs).toHaveLength(1)
+
+    getState().acceptTrainingContract(offer2.id, pod.id)
+    expect(getState().trainingJobs).toHaveLength(1)            // second accept blocked
+    expect(getState().trainingJobOffers).toHaveLength(1)        // offer still in pool
+  })
+
+  // ── tick lifecycle ───────────────────────────────────────────
+  it('tick advances job progress and updates valueAtRisk', () => {
+    const pod = getState().gpuPods[0]
+    const offer = injectOffer('fine_tuning', { durationTicks: 50, basePayout: 1_000_000 })
+    getState().acceptTrainingContract(offer.id, pod.id)
+
+    // Ramp activity high so progress accumulates predictably.
+    for (let i = 0; i < 30; i++) getState().tick()
+    const job = getState().trainingJobs.find((j) => j.podId === pod.id)!
+    expect(job.progressPct).toBeGreaterThan(20)
+    expect(job.valueAtRisk).toBeCloseTo(offer.basePayout * (job.progressPct / 100), -2)
+  })
+
+  it('completes the job at duration end with lump-sum payout', () => {
+    const pod = getState().gpuPods[0]
+    setState({ sandboxMode: false, money: 0, reputationScore: 50 })
+    const offer = injectOffer('fine_tuning', { durationTicks: 50, basePayout: 800_000 })
+    getState().acceptTrainingContract(offer.id, pod.id)
+
+    // Tick enough to finish: at full activity (0.7 / fabricLoadTarget=0.75 ≈ 0.93 work/t)
+    // need ~55 ticks to finish 50 work units. Add buffer for ramp-up. Keep cabinets
+    // cool so no thermal throttling skews the money math.
+    for (let i = 0; i < 150; i++) {
+      setState({ cabinets: getState().cabinets.map((c) => ({ ...c, heatLevel: 30 })) })
+      getState().tick()
+    }
+    const job = getState().trainingJobs.find((j) => j.podId === pod.id)!
+    expect(job.status).toBe('completed')
+    expect(job.progressPct).toBe(100)
+    expect(getState().money).toBeGreaterThanOrEqual(800_000)    // got the lump sum (minus expenses)
+    expect(getState().trainingJobsCompleted).toBe(1)
+    expect(getState().gpuPods[0].activeJobId).toBeNull()         // pod freed
+  })
+
+  it('completing a job awards a reputation boost matching the job type', () => {
+    const pod = getState().gpuPods[0]
+    setState({ sandboxMode: true, reputationScore: 50 })
+    const offer = injectOffer('fine_tuning', { durationTicks: 30, basePayout: 500_000 })
+    getState().acceptTrainingContract(offer.id, pod.id)
+
+    // Force fabric to full activity + job near-done so the next tick completes.
+    setState({
+      cabinets: getState().cabinets.map((c) => ({ ...c, heatLevel: 30 })),
+      infiniBandFabrics: getState().infiniBandFabrics.map((f) => ({ ...f, activityLevel: 1.0 })),
+      trainingJobs: getState().trainingJobs.map((j) => ({ ...j, ticksRemaining: 0.5 })),
+    })
+    getState().tick()
+    expect(getState().trainingJobs[0].status).toBe('completed')
+    expect(getState().reputationScore).toBeGreaterThan(50)
+  })
+
+  // ── restart accounting ───────────────────────────────────────
+  it('restartTrainingJob within budget resets progress + bumps restartCount', () => {
+    const pod = getState().gpuPods[0]
+    const offer = injectOffer('fine_tuning', { durationTicks: 60 })  // 1 restart allowed
+    getState().acceptTrainingContract(offer.id, pod.id)
+    for (let i = 0; i < 20; i++) getState().tick()
+    const beforeProgress = getState().trainingJobs[0].progressPct
+    expect(beforeProgress).toBeGreaterThan(0)
+
+    getState().restartTrainingJob(getState().trainingJobs[0].id)
+    const job = getState().trainingJobs[0]
+    expect(job.restartCount).toBe(1)
+    expect(job.progressPct).toBe(0)
+    expect(job.status).toBe('running')
+  })
+
+  it('restartTrainingJob beyond budget fails the job, frees the pod, and hits reputation', () => {
+    const pod = getState().gpuPods[0]
+    setState({ reputationScore: 60 })
+    // Pretraining has 0 restarts — first restart attempt should fail it.
+    const offer = injectOffer('pretraining', { durationTicks: 150, basePayout: 3_000_000 })
+    getState().acceptTrainingContract(offer.id, pod.id)
+    for (let i = 0; i < 5; i++) getState().tick()
+
+    getState().restartTrainingJob(getState().trainingJobs[0].id)
+    const job = getState().trainingJobs[0]
+    expect(job.status).toBe('failed')
+    expect(getState().gpuPods[0].activeJobId).toBeNull()
+    expect(getState().reputationScore).toBeLessThan(60)
+    expect(getState().trainingJobsFailed).toBe(1)
+  })
+
+  it('cancelTrainingJob marks the job failed and frees the pod', () => {
+    const pod = getState().gpuPods[0]
+    setState({ reputationScore: 60 })
+    const offer = injectOffer('rl_training')
+    getState().acceptTrainingContract(offer.id, pod.id)
+    const jobId = getState().trainingJobs[0].id
+
+    getState().cancelTrainingJob(jobId)
+    const job = getState().trainingJobs.find((j) => j.id === jobId)!
+    expect(job.status).toBe('failed')
+    expect(getState().gpuPods[0].activeJobId).toBeNull()
+    expect(getState().reputationScore).toBeLessThan(60)
+  })
+
+  // ── ai_lab revenue model ─────────────────────────────────────
+  // Pin heat low so thermal throttling doesn't confound the multiplier signal,
+  // and let the fabric ramp up before sampling.
+  function tickWithCoolCabs(n: number) {
+    for (let i = 0; i < n; i++) {
+      setState({ cabinets: getState().cabinets.map((c) => ({ ...c, heatLevel: 30 })) })
+      getState().tick()
+    }
+  }
+
+  it('ai_lab cabinets earn ~0.5× base revenue while their pod is idle vs full training', () => {
+    setState({ sandboxMode: true })
+    tickWithCoolCabs(5)
+    const idleRev = getState().revenue
+
+    // Accept a fine_tune job → multiplier flips to 1.0×.
+    const offer = injectOffer('fine_tuning', { durationTicks: 200 })
+    getState().acceptTrainingContract(offer.id, getState().gpuPods[0].id)
+    tickWithCoolCabs(10)
+    const trainingRev = getState().revenue
+
+    // Training revenue should be roughly double the idle revenue (1.0× vs 0.5×).
+    expect(trainingRev).toBeGreaterThan(idleRev * 1.5)
+  })
+
+  it('ai_lab cabinets earn 0.25× base revenue during inference_batch', () => {
+    setState({ sandboxMode: true })
+    const offer1 = injectOffer('fine_tuning', { durationTicks: 200 })
+    getState().acceptTrainingContract(offer1.id, getState().gpuPods[0].id)
+    tickWithCoolCabs(10)
+    const trainRev = getState().revenue
+
+    getState().cancelTrainingJob(getState().trainingJobs[0].id)
+    const offer2 = injectOffer('inference_batch', { durationTicks: 200 })
+    getState().acceptTrainingContract(offer2.id, getState().gpuPods[0].id)
+    tickWithCoolCabs(10)
+    const inferRev = getState().revenue
+
+    // Inference fill (0.25×) should be much lower than full training (1.0×).
+    expect(inferRev).toBeLessThan(trainRev * 0.5)
+  })
+
+  // ── offer pool ───────────────────────────────────────────────
+  it('tick refills the training-job offer pool when cooldown elapses', () => {
+    setState({ trainingJobOffers: [], jobOfferCooldown: 0 })
+    expect(getState().trainingJobOffers).toHaveLength(0)
+    getState().tick()
+    expect(getState().trainingJobOffers.length).toBeGreaterThan(0)
+  })
+
+  it('expired offers are dropped from the pool', () => {
+    const offer = injectOffer('inference_batch', { expiresAtTick: getState().tickCount + 1 })
+    // After one tick newTickCount = tickCount+1 (becomes 101 if started at 100). Offer expires when expiresAtTick > newTickCount fails.
+    getState().tick()
+    getState().tick()
+    expect(getState().trainingJobOffers.find((o) => o.id === offer.id)).toBeUndefined()
   })
 })
 

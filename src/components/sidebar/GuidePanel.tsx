@@ -578,6 +578,118 @@ export function GuidePanel() {
         </ul>
       </div>
 
+      {/* ── Phase 8A/8B — AI Infrastructure ─────────────────────── */}
+      <div className="rounded-lg border border-neon-pink/20 bg-neon-pink/5 p-3">
+        <p className="text-xs font-bold text-neon-pink mb-2">AI INFRASTRUCTURE (PHASE 8)</p>
+        <p className="text-xs font-mono text-muted-foreground mb-2">
+          Research <span className="text-neon-cyan">AI Infrastructure</span> in the R&amp;D Lab to unlock high-density GPU pods.
+          Each pod groups 4&ndash;8 cabinets running the new <span className="text-neon-pink">ai_lab</span> customer type
+          (4&times; revenue, 2.5&times; power, requires liquid cooling).
+        </p>
+        <div className="rounded border border-border/40 bg-card/40 p-2 mb-2">
+          <p className="text-[10px] font-mono font-bold text-neon-pink mb-1">POD SIZES (placeable today)</p>
+          <ul className="text-[11px] font-mono text-muted-foreground space-y-0.5 list-disc list-inside">
+            <li><strong className="text-foreground">Small Pod</strong> &mdash; <span className="text-neon-yellow">$200K</span> &middot; 4 cabinets &middot; 64 GPUs &middot; rear-door HX cooling &middot; ~45kW/cab at full load</li>
+            <li><strong className="text-foreground">Medium Pod</strong> &mdash; <span className="text-neon-yellow">$450K</span> &middot; 8 cabinets &middot; 128 GPUs &middot; direct-to-chip cooling &middot; ~45kW/cab at full load</li>
+            <li><em>Large + Hyperpod</em> &mdash; multi-row footprint, coming in a follow-up release</li>
+          </ul>
+        </div>
+        <div className="rounded border border-border/40 bg-card/40 p-2 mb-2">
+          <p className="text-[10px] font-mono font-bold text-neon-cyan mb-1">LIQUID COOLING TIERS</p>
+          <ul className="text-[11px] font-mono text-muted-foreground space-y-0.5 list-disc list-inside">
+            <li><strong className="text-foreground">Rear-Door HX</strong> &mdash; <span className="text-neon-yellow">$30K/cab</span> &middot; handles up to 35kW &middot; standard for small pods</li>
+            <li><strong className="text-foreground">Direct-to-Chip</strong> &mdash; <span className="text-neon-yellow">$80K/cab</span> &middot; handles up to 50kW &middot; required for medium pods (and prevents <span className="text-neon-red">thermal runaway</span> on high-density cabinets)</li>
+            <li><strong className="text-foreground">Single-Phase Immersion</strong> &mdash; <span className="text-neon-yellow">$150K/cab</span> &middot; handles 100kW+ &middot; requires Immersion Cooling tech</li>
+          </ul>
+        </div>
+        <div className="rounded border border-border/40 bg-card/40 p-2">
+          <p className="text-[10px] font-mono font-bold text-[#aa44ff] mb-1">INFINIBAND BACKEND FABRIC</p>
+          <p className="text-[11px] font-mono text-muted-foreground mb-1">
+            Every pod auto-builds a rail-optimized fat-tree fabric in violet (separate from the cyan Ethernet Clos).
+            4 parallel rails (8 for hyperpods) keep AllReduce running even if a single rail degrades.
+          </p>
+          <ul className="text-[11px] font-mono text-muted-foreground space-y-0.5 list-disc list-inside">
+            <li><strong className="text-foreground">IB Leaf</strong> &mdash; 32&times; 400G NDR ports, 1 per rail per pod</li>
+            <li><strong className="text-foreground">IB Spine</strong> &mdash; 64-port non-blocking, 1 per rail per pod</li>
+            <li>Toggle the <span className="text-[#aa44ff]">Backend Fabric</span> layer in the Layers popup to show/hide IB switches, cables, and the AllReduce ring pulse animation</li>
+          </ul>
+        </div>
+      </div>
+
+      {/* ── Phase 8C/8D — NOC + AI incidents ───────────────────── */}
+      <div className="rounded-lg border border-[#aa44ff]/20 bg-[#aa44ff]/5 p-3">
+        <p className="text-xs font-bold text-[#aa44ff] mb-2">NOC &mdash; TRAFFIC TRIAGE</p>
+        <p className="text-xs font-mono text-muted-foreground mb-2">
+          The <span className="text-[#aa44ff]">NOC</span> sidebar lights up once your first pod is built.
+          It surfaces per-pod fabric health, a sortable link list, and a detail drawer with a 50-tick utilization sparkline.
+          <strong className="text-foreground"> Click an IB cable in the scene</strong> to jump straight to that link's drawer.
+        </p>
+        <div className="rounded border border-border/40 bg-card/40 p-2 mb-2">
+          <p className="text-[10px] font-mono font-bold text-[#aa44ff] mb-1">LINK TRIAGE ACTIONS</p>
+          <ul className="text-[11px] font-mono text-muted-foreground space-y-0.5 list-disc list-inside">
+            <li><strong className="text-foreground">Drain port</strong> &mdash; force utilization to 0 for 20 ticks. <em>Free.</em> Use when you need to work on a flapping link without traffic flying through it.</li>
+            <li><strong className="text-foreground">Reset switch</strong> &mdash; clear errorCount on every link attached to the switch. <span className="text-neon-yellow">5-tick cooldown.</span> Won't auto-recover <span className="text-neon-red">down</span> links &mdash; those need an optic.</li>
+            <li><strong className="text-foreground">Replace optic</strong> &mdash; <span className="text-neon-yellow">$2K</span> &middot; instantly resets the link to healthy and suppresses new errors for 50 ticks.</li>
+            <li><strong className="text-foreground">Dispatch electrician</strong> &mdash; 10-tick hands-on repair. Requires an on-shift electrician (hire one in the Operations panel).</li>
+          </ul>
+        </div>
+        <p className="text-xs font-mono text-muted-foreground mb-2">
+          <span className="text-neon-orange">AI fabric incidents</span> spawn through the existing incident pipeline but target the IB subsystem.
+          They appear in the NOC's <strong className="text-foreground">ACTIVE FABRIC INCIDENTS</strong> section with severity colors and countdowns.
+        </p>
+        <div className="rounded border border-border/40 bg-card/40 p-2">
+          <p className="text-[10px] font-mono font-bold text-neon-orange mb-1">7 NEW INCIDENT TYPES</p>
+          <ul className="text-[11px] font-mono text-muted-foreground space-y-0.5 list-disc list-inside">
+            <li><strong className="text-foreground">IB link flap</strong> (minor) &mdash; errorCount climbs fast. <em>Mitigation:</em> drain + replace optic.</li>
+            <li><strong className="text-foreground">NCCL collective hang</strong> (major) &mdash; pod activity forced to 0 for 20t. <em>Mitigation:</em> resolve or wait.</li>
+            <li><strong className="text-foreground">Silent data corruption</strong> (critical) &mdash; activity &times;0.5 for 50t. <em>Mitigation:</em> visible only in the NOC; resolve from the Incidents panel.</li>
+            <li><strong className="text-foreground">Optic failure</strong> (minor) &mdash; link hard-down. <em>Mitigation:</em> <span className="text-neon-yellow">$2K</span> replace optic.</li>
+            <li><strong className="text-foreground">PFC storm</strong> (critical) &mdash; fabric throughput capped at 10%. <em>Spawns only when fabric utilization &gt; 90%.</em></li>
+            <li><strong className="text-foreground">Thermal runaway</strong> (critical) &mdash; cabinet auto-shuts at 3t if unresolved. <em>Spawns only on high-density cabinets without direct-to-chip or immersion cooling.</em></li>
+            <li><strong className="text-foreground">GPU ECC fault</strong> (major) &mdash; reduces a cabinet's effective GPU count. <em>Mitigation:</em> <span className="text-neon-yellow">$15K</span> Refresh GPU (button in the cabinet detail panel).</li>
+          </ul>
+        </div>
+      </div>
+
+      {/* ── Phase 8E — Training contracts + AI revenue ─────────── */}
+      <div className="rounded-lg border border-neon-pink/20 bg-neon-pink/5 p-3">
+        <p className="text-xs font-bold text-neon-pink mb-2">TRAINING CONTRACTS &amp; AI REVENUE</p>
+        <p className="text-xs font-mono text-muted-foreground mb-2">
+          AI tenants buy time on your GPU pods. Revenue is <strong className="text-foreground">lumpy</strong> &mdash;
+          steady AI Lab base rate ticks while pods are idle, but the real money lands as a
+          <strong className="text-neon-green"> lump-sum payout</strong> on completion.
+        </p>
+        <div className="rounded border border-border/40 bg-card/40 p-2 mb-2">
+          <p className="text-[10px] font-mono font-bold text-neon-pink mb-1">JOB TYPES</p>
+          <ul className="text-[11px] font-mono text-muted-foreground space-y-0.5 list-disc list-inside">
+            <li><strong className="text-foreground">Pretraining</strong> &mdash; <span className="text-neon-green">$2M&ndash;$5M</span> &middot; 150&ndash;200t &middot; <span className="text-neon-red">0 restarts</span> (the whale; single hiccup forfeits)</li>
+            <li><strong className="text-foreground">Fine-tuning</strong> &mdash; <span className="text-neon-green">$500K&ndash;$1M</span> &middot; 50&ndash;80t &middot; 1 restart allowed (the bread and butter)</li>
+            <li><strong className="text-foreground">Inference batch</strong> &mdash; <span className="text-neon-green">$200K</span> &middot; 30t &middot; 2 restarts (steady fill between training runs)</li>
+            <li><strong className="text-foreground">RL training</strong> &mdash; <span className="text-neon-green">$1M</span> &middot; 100t &middot; 1 restart (bursty, harder on the fabric)</li>
+          </ul>
+        </div>
+        <div className="rounded border border-border/40 bg-card/40 p-2 mb-2">
+          <p className="text-[10px] font-mono font-bold text-neon-yellow mb-1">PLAYER FLOW</p>
+          <ol className="text-[11px] font-mono text-muted-foreground space-y-0.5 list-decimal list-inside">
+            <li>Build a small or medium GPU pod.</li>
+            <li>Wait for offers to populate the <strong className="text-foreground">TRAINING CONTRACTS</strong> section in the Build panel.</li>
+            <li>Click <span className="text-neon-pink">Run on Pod-N</span> to assign an offer to an idle pod.</li>
+            <li>Watch progress in the pod card or the NOC <strong className="text-foreground">Jobs</strong> tab &mdash; ETA, value at risk, restart budget, AllReduce ring health.</li>
+            <li>On completion: lump-sum lands in cash, reputation ticks up, pod is freed.</li>
+          </ol>
+        </div>
+        <div className="rounded border border-border/40 bg-card/40 p-2">
+          <p className="text-[10px] font-mono font-bold text-neon-cyan mb-1">AI LAB REVENUE MULTIPLIERS</p>
+          <ul className="text-[11px] font-mono text-muted-foreground space-y-0.5 list-disc list-inside">
+            <li><strong className="text-foreground">Pod idle</strong> &mdash; <span className="text-neon-orange">0.5&times;</span> base (GPUs costing power but doing nothing)</li>
+            <li><strong className="text-foreground">Training</strong> &mdash; <span className="text-neon-green">1.0&times;</span> base (lump-sum comes on completion)</li>
+            <li><strong className="text-foreground">Inference batch</strong> &mdash; <span className="text-neon-cyan">0.25&times;</span> base (lumpy sum is small but ongoing fill)</li>
+            <li>Failed jobs (max restarts exceeded or cancelled) cost reputation</li>
+            <li>GPU ECC faults reduce the effective revenue proportionally until <span className="text-neon-yellow">$15K</span> Refresh GPU</li>
+          </ul>
+        </div>
+      </div>
+
       <div className="rounded-lg border border-[#aa44ff]/20 bg-[#aa44ff]/5 p-3">
         <p className="text-xs font-bold text-[#aa44ff] mb-2">CONTRIBUTE</p>
         <p className="text-xs font-mono text-muted-foreground mb-3">

@@ -312,6 +312,16 @@ export const INCIDENT_CATALOG: IncidentDef[] = [
   { type: 'pipe_burst', label: 'Cooling Pipe Burst', severity: 'minor', description: 'A chilled water pipe has burst. Pipe segment destroyed — must be rebuilt.', durationTicks: 6, resolveCost: 3000, effect: 'pipe_failure', effectMagnitude: 0 },
   // Network port incidents
   { type: 'link_flap', label: 'Link Flap', severity: 'minor', description: 'A switch port is flapping — intermittent connectivity causing packet loss. Inspect the switch to identify the failing port.', durationTicks: 12, resolveCost: 2500, effect: 'link_flap', effectMagnitude: 0.15 },
+  // ── Phase 8D — AI-specific fabric incidents ──────────────────
+  // ib_link_flap raises one IB link's errorCount fast — different from the
+  // Ethernet link_flap above (which targets the front-end Clos fabric).
+  { type: 'ib_link_flap', label: 'IB Link Flap', severity: 'minor', description: 'An InfiniBand port is flapping. Errors accruing fast — drain it or it will degrade the rail.', durationTicks: 25, resolveCost: 2500, effect: 'ai_fabric', effectMagnitude: 4 },
+  { type: 'nccl_collective_hang', label: 'NCCL Collective Hang', severity: 'major', description: 'AllReduce stalled across the pod. The whole cluster is burning power but doing zero useful work until it recovers.', durationTicks: 20, resolveCost: 8000, effect: 'ai_fabric', effectMagnitude: 0 },
+  { type: 'silent_data_corruption', label: 'Silent Data Corruption', severity: 'critical', description: 'Training accuracy is silently dropping. Fabric activity halved for 50 ticks; only visible in the NOC panel.', durationTicks: 50, resolveCost: 18000, effect: 'ai_fabric', effectMagnitude: 0.5 },
+  { type: 'optic_failure', label: 'Optic Failure', severity: 'minor', description: 'A QSFP-DD optic has died. The link is hard-down until you replace the optic.', durationTicks: 30, resolveCost: 2000, effect: 'ai_fabric', effectMagnitude: 0 },
+  { type: 'pfc_storm', label: 'PFC Storm', severity: 'critical', description: 'Priority Flow Control pause frames are cascading through the fabric. Whole-fabric throughput collapsed to 10%.', durationTicks: 20, resolveCost: 15000, effect: 'ai_fabric', effectMagnitude: 0.1 },
+  { type: 'thermal_runaway', label: 'Thermal Runaway', severity: 'critical', description: 'A high-density cabinet without direct-to-chip cooling is in thermal runaway. The pod will auto-shut down within 3 ticks to prevent hardware damage.', durationTicks: 3, resolveCost: 25000, effect: 'ai_cabinet', effectMagnitude: 0 },
+  { type: 'gpu_ecc_fault', label: 'GPU ECC Fault', severity: 'major', description: 'A GPU has thrown unrecoverable ECC errors. The card is offline until you refresh it ($15K).', durationTicks: 40, resolveCost: 5000, effect: 'ai_cabinet', effectMagnitude: 1 },
 ]
 
 /** Chance per tick of an incident occurring (when fewer than max active) */
