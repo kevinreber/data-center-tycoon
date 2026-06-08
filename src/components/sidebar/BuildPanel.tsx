@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useGameStore, RACK_COST, MAX_SERVERS_PER_CABINET, ENVIRONMENT_CONFIG, CUSTOMER_TYPE_CONFIG, SUITE_TIERS, getSuiteLimits, DEDICATED_ROW_BONUS_CONFIG, MIXED_ENV_PENALTY_CONFIG, FLOOR_PLAN_CONFIG, GPU_POD_CONFIG, LIQUID_COOLING_CONFIG } from '@/stores/gameStore'
+import { useGameStore, RACK_COST, MAX_SERVERS_PER_CABINET, ENVIRONMENT_CONFIG, CUSTOMER_TYPE_CONFIG, SUITE_TIERS, getSuiteLimits, DEDICATED_ROW_BONUS_CONFIG, MIXED_ENV_PENALTY_CONFIG, FLOOR_PLAN_CONFIG, GPU_POD_CONFIG, LIQUID_COOLING_CONFIG, DENSITY_SCALING, POWER_DRAW } from '@/stores/gameStore'
 import type { CabinetEnvironment, CustomerType, LayoutMode, GPUPodSize } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
 import { Server, Network, Plus, MousePointer, Rows3, Trash2, Wand2, ArrowUp, ArrowDown, FlipVertical, Minus, Cpu } from 'lucide-react'
@@ -518,6 +518,17 @@ export function BuildPanel() {
               const noRoom = !findFirstPodFit(cfg.cabinetCount)
               const disabled = techMissing || cantAfford || noRoom
               const reason = techMissing ? `Needs ${cooling.label}` : cantAfford ? 'Insufficient cash' : noRoom ? 'No empty row with contiguous space' : null
+              // Real per-cabinet power matches the sim's calcStats() formula:
+              //   serverCount * POWER_DRAW.server * customerType.powerMultiplier * density.powerMultiplier (+ leaf switch)
+              // Pods start at 1 server/cab and scale up to maxServers; both numbers are shown so
+              // players can plan UPS and cooling around the worst case, not the nominal datasheet kW.
+              const density = DENSITY_SCALING[cfg.density]
+              const aiLab = CUSTOMER_TYPE_CONFIG.ai_lab
+              const perServerW = POWER_DRAW.server * aiLab.powerMultiplier * density.powerMultiplier
+              const startCabKW = (perServerW + POWER_DRAW.leaf_switch) / 1000
+              const fullCabKW = (perServerW * density.maxServers + POWER_DRAW.leaf_switch) / 1000
+              const startPodKW = startCabKW * cfg.cabinetCount
+              const fullPodKW = fullCabKW * cfg.cabinetCount
               return (
                 <Tooltip key={size}>
                   <TooltipTrigger asChild>
@@ -541,7 +552,16 @@ export function BuildPanel() {
                   <TooltipContent side="right" className="max-w-64">
                     <p className="text-xs">{cfg.description}</p>
                     <p className="text-[10px] text-muted-foreground mt-1">
-                      {cfg.cabinetCount} cabinets · {cfg.gpuCount} GPUs · {cfg.powerDrawKW}kW/cab · {cooling.label}
+                      {cfg.cabinetCount} cabinets · {cfg.gpuCount} GPUs · {cooling.label}
+                    </p>
+                    <p className="text-[10px] text-neon-orange mt-1">
+                      ~{startCabKW.toFixed(1)}kW/cab at install ({startPodKW.toFixed(0)}kW pod)
+                    </p>
+                    <p className="text-[10px] text-neon-red">
+                      ~{fullCabKW.toFixed(0)}kW/cab at full load ({fullPodKW.toFixed(0)}kW pod max)
+                    </p>
+                    <p className="text-[9px] text-muted-foreground italic">
+                      ai_lab {aiLab.powerMultiplier}× × density {density.powerMultiplier}× compounding
                     </p>
                     {reason && <p className="text-[10px] text-neon-red mt-1">{reason}</p>}
                   </TooltipContent>

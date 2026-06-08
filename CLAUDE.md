@@ -4,7 +4,7 @@
 
 **Fabric Tycoon: Data Center Simulator** is a web-based isometric tycoon game where players build and manage a data center. Players place cabinets, install servers and network switches, design a Clos (spine-leaf) network fabric, and balance power, heat, and revenue to scale from a single rack to a global operation.
 
-**Current version:** v0.5.3
+**Current version:** v0.6.0
 
 ## Tech Stack
 
@@ -183,6 +183,10 @@ All game state lives in a **single Zustand store** (`useGameStore`). The store (
 - **Advanced tier configs** (`ADVANCED_TIER_CONFIG`): Nuclear and Fusion late-game tiers
 - **Rack equipment configs** (`RACK_EQUIPMENT_CONFIG`): 8 equipment types for 42U rack model
 - **Chiller plant configs** (`CHILLER_PLANT_CONFIG`): 2 tiers (basic/advanced) with range and efficiency
+- **GPU pod configs** (`GPU_POD_CONFIG`): 4 pod sizes (small/medium/large/hyperpod) with cabinet count, GPU count, install cost, required liquid cooling, density tier — currently only small + medium are placeable
+- **Liquid cooling configs** (`LIQUID_COOLING_CONFIG`): 4 tiers (none, rear-door HX, direct-to-chip, single-phase immersion) with per-cabinet cost, max kW handling, heat dissipation bonus, maintenance cost
+- **Density scaling configs** (`DENSITY_SCALING`): power and heat multipliers per density tier (standard 1×, high_density 5×/4.5×, extreme_density 8×/7×), max servers per cabinet
+- **InfiniBand switch configs** (`IB_SWITCH_CONFIG`): `ib_leaf` ($30K, 32× 400G NDR ports) and `ib_spine` ($80K, 64-port non-blocking) — auto-built per pod by `buildIBFabricForPod()`
 - **Region catalog** (`REGION_CATALOG`): 15 global regions with profiles (power cost, labor, climate, demand, disasters)
 - **Site type configs** (`SITE_TYPE_CONFIG`): 6 site types (HQ, edge_pop, colocation, hyperscale, network_hub, disaster_recovery)
 - **Inter-site link configs** (`INTER_SITE_LINK_CONFIG`): 4 link types with bandwidth, latency, cost, reliability
@@ -218,7 +222,7 @@ Core types:
 - `CabinetEnvironment` = `'production' | 'lab' | 'management'`
 - `CoolingType` = `'air' | 'water'`
 - `CoolingUnitType` = `'fan_tray' | 'crac' | 'crah' | 'immersion_pod'`
-- `CustomerType` = `'general' | 'ai_training' | 'streaming' | 'crypto' | 'enterprise'`
+- `CustomerType` = `'general' | 'ai_training' | 'streaming' | 'crypto' | 'enterprise' | 'ai_lab'` (Phase 8: `ai_lab` = frontier AI labs leasing GPU pods, 4× revenue / 2.5× power)
 - `CabinetFacing` = `'north' | 'south' | 'east' | 'west'` (only N/S used by row-enforced layout)
 - `SuiteTier` = `'starter' | 'standard' | 'professional' | 'enterprise'`
 - `LayoutMode` = `'auto' | 'custom' | 'guided'`
@@ -332,6 +336,23 @@ Advanced tier types:
 - `AdvancedTier` = `'nuclear' | 'fusion'`
 - `AdvancedTierConfig` — tier, label, cost, maxCabinets, coolingBonus, carbonMultiplier, requiresTier
 
+AI Infrastructure types (Phase 8A — GPU pods & high-density cabinets):
+- `CabinetDensity` = `'standard' | 'high_density' | 'extreme_density'` (drives the `DENSITY_SCALING` power/heat multipliers and max-server cap per cabinet)
+- `GPUPodSize` = `'small' | 'medium' | 'large' | 'hyperpod'` (64 / 128 / 256 / 512 GPUs; only `small` and `medium` are placeable today, large/hyperpod are gated until multi-row footprint support lands)
+- `LiquidCoolingType` = `'none' | 'rear_door_hx' | 'direct_to_chip' | 'single_phase_immersion'` (gates 35 / 50 / 100 kW per-cabinet ceilings; immersion requires the existing `immersion_cooling` tech)
+- `GPUPod` — id, name, size, cabinetIds[], anchorCol/Row, cabinetCount, gpuCount, installedAtTick
+- `GPUPodConfig` — size, label, description, cabinetCount, gpuCount, installCost, powerDrawKW (nominal datasheet value — UI shows the real compounded number), requiredLiquidCooling, density, color
+- `LiquidCoolingConfig` — type, label, costPerCabinet, maxKWPerCabinet, heatDissipationBonus, maintenanceCostPerTick, requiresTech, color
+- High-density cabinet fields on `Cabinet`: `density`, `gpuCount`, `liquidCooling`, `podId`
+
+AI Infrastructure types (Phase 8B — InfiniBand backend fabric):
+- `IBSwitchType` = `'ib_leaf' | 'ib_spine'`
+- `InfiniBandFabric` — id, podId (1:1 with a GPU pod), railCount (4 or 8), leafSwitchIds[], spineSwitchIds[], topology (`'fat_tree'` today, `'dragonfly'` reserved), health
+- `IBSwitch` — id, fabricId, type, rail, portsTotal, portsUsed, errorRate, operational
+- `IBLink` — id, fabricId, fromSwitchId, toSwitchId, bandwidthGbps (200/400/800 — currently 400 NDR), utilizationPct, errorCount, status (`'healthy' | 'flapping' | 'down'`), lastErrorTick
+- `IBSwitchConfig` — type, label, cost, portsTotal, powerDraw, bandwidthPerPortGbps, color
+- Rail counts: `RAIL_COUNT_BY_POD_SIZE` (small/medium/large = 4 rails, hyperpod = 8). Default link bandwidth `IB_DEFAULT_BANDWIDTH_GBPS = 400`. Idle error accrual `IB_BASE_LINK_ERROR_RATE = 0.0002`/tick.
+
 42U rack types:
 - `RackEquipmentType` = `'1u_server' | '2u_server' | '4u_storage' | '1u_switch' | '2u_patch_panel' | '1u_pdu' | '3u_ups' | '2u_cable_mgmt'`
 - `RackSlot` — u position, equipment type, equipment label
@@ -384,6 +405,8 @@ Key interfaces (core):
 | Finance | `takeLoan`, `refreshServers`, `upgradeSuite` |
 | Infrastructure | `placePDU`, `placeCableTray`, `autoRouteCables`, `toggleCabinetFacing`, `installAisleContainment`, `placeBusway`, `placeCrossConnect`, `placeInRowCooling` |
 | Cooling Units | `placeCoolingUnit`, `removeCoolingUnit`, `placeChillerPlant`, `removeChillerPlant`, `placeCoolingPipe`, `removeCoolingPipe` |
+| GPU Pods (Phase 8A) | `createGPUPod`, `removeGPUPod` (decommissioned servers route to `eWasteStockpile`), `installLiquidCooling` |
+| Backend Fabric (Phase 8B) | `toggleBackendFabricVisible` (drives the IB switches, cables, and AllReduce ring pulse layer; auto-disabled until the first pod is built) |
 | Incidents | `resolveIncident`, `buyGenerator`, `activateGenerator`, `upgradeSuppression` |
 | Operations Progression | `upgradeOpsTier` |
 | Contracts | `acceptContract` |
@@ -616,7 +639,7 @@ A `setInterval` in `App.tsx` calls `tick()` at the rate determined by `gameSpeed
 
 **Infrastructure:**
 - **Cabinet environments**: production (baseline), lab (low revenue, low heat), management (3% bonus per server, capped at 30%)
-- **Customer types**: general, ai_training, streaming, crypto, enterprise — each with power/heat/revenue/bandwidth multipliers
+- **Customer types**: general, ai_training, streaming, crypto, enterprise, ai_lab — each with power/heat/revenue/bandwidth multipliers (Phase 8: `ai_lab` is the frontier-training-lab tenant attached to GPU pods at 4× revenue / 2.5× power / 2.5× heat / 0.5× bandwidth)
 - **Cooling**: facility-wide air (2.0°C/tick, free) or water (3.5°C/tick, $25,000 upgrade), plus placeable cooling units (fan trays, CRACs, CRAHs, immersion pods) with per-cabinet coverage zones and capacity degradation
 - **PDUs**: Power distribution units with capacity limits; overloaded PDUs cause heat and revenue penalties
 - **Cable trays**: Organized cabling reduces messy cable penalties

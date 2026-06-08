@@ -240,6 +240,7 @@ interface GameState {
   // Traffic
   trafficStats: TrafficStats
   trafficVisible: boolean
+  backendFabricVisible: boolean        // Phase 8B: IB switches, cables, and AllReduce ring pulse
 
   // Time-of-day / demand
   gameHour: number              // 0–24 float, current in-game time
@@ -608,6 +609,7 @@ interface GameState {
   setLayerColor: (type: NodeType, colors: LayerColors | null) => void
   setGameSpeed: (speed: GameSpeed) => void
   toggleTrafficVisible: () => void
+  toggleBackendFabricVisible: () => void
   upgradeCooling: (type: CoolingType) => void
   takeLoan: (optionIndex: number) => void
   resolveIncident: (id: string) => void
@@ -993,6 +995,7 @@ export const useGameStore = create<GameState>((set) => ({
     spineUtilization: {},
   },
   trafficVisible: true,
+  backendFabricVisible: true,
 
   // Time-of-day / demand
   gameHour: 8,                // start at 8:00 AM
@@ -1574,6 +1577,9 @@ export const useGameStore = create<GameState>((set) => ({
 
   toggleTrafficVisible: () =>
     set((state) => ({ trafficVisible: !state.trafficVisible })),
+
+  toggleBackendFabricVisible: () =>
+    set((state) => ({ backendFabricVisible: !state.backendFabricVisible })),
 
   upgradeCooling: (type: CoolingType) =>
     set((state) => {
@@ -2215,6 +2221,7 @@ export const useGameStore = create<GameState>((set) => ({
       const pod = state.gpuPods.find((p) => p.id === id)
       if (!pod) return state
 
+      const removedCabs = state.cabinets.filter((c) => c.podId === id)
       const remainingCabs = state.cabinets.filter((c) => c.podId !== id)
       const suiteLimits = getSuiteLimits(state.suiteTier)
       const activeLayout = state.customLayout ?? suiteLimits.layout
@@ -2229,6 +2236,9 @@ export const useGameStore = create<GameState>((set) => ({
       const remainingSwitches = state.ibSwitches.filter((s) => !removedSwitchIds.has(s.id))
       const remainingLinks = state.ibLinks.filter((l) => !fabricIds.has(l.fabricId))
 
+      // Phase 4B: decommissioned pod servers become e-waste (same path as refreshServers).
+      const wasteAdded = removedCabs.reduce((sum, c) => sum + c.serverCount, 0)
+
       return {
         cabinets: remainingCabs,
         gpuPods: state.gpuPods.filter((p) => p.id !== id),
@@ -2237,6 +2247,7 @@ export const useGameStore = create<GameState>((set) => ({
         ibLinks: remainingLinks,
         aisleBonus: newAisleBonus,
         zones: newZones,
+        eWasteStockpile: state.eWasteStockpile + wasteAdded,
         ...calcStats(remainingCabs, state.spineSwitches),
       }
     }),
@@ -4278,6 +4289,7 @@ export const useGameStore = create<GameState>((set) => ({
       // Traffic
       trafficStats: demoTrafficStats,
       trafficVisible: true,
+      backendFabricVisible: true,
       // Meet-me room & interconnects
       meetMeRoomTier: 2, // Premium tier (48 ports)
       interconnectPorts: demoInterconnectPorts,

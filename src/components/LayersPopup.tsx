@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { NodeType, LayerColors } from '@/stores/gameStore'
 import { useGameStore, DEFAULT_COLORS } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
-import { Eye, EyeOff, SlidersHorizontal, RotateCcw, AlertTriangle, X } from 'lucide-react'
+import { Eye, EyeOff, SlidersHorizontal, RotateCcw, AlertTriangle, X, Network } from 'lucide-react'
 import {
   Tooltip,
   TooltipContent,
@@ -41,10 +41,13 @@ export function LayersPopup() {
   const layerColors = useGameStore((s) => s.layerColors)
   const trafficVisible = useGameStore((s) => s.trafficVisible)
   const trafficStats = useGameStore((s) => s.trafficStats)
+  const backendFabricVisible = useGameStore((s) => s.backendFabricVisible)
+  const gpuPodCount = useGameStore((s) => s.gpuPods.length)
   const toggleLayerVisibility = useGameStore((s) => s.toggleLayerVisibility)
   const setLayerOpacity = useGameStore((s) => s.setLayerOpacity)
   const setLayerColor = useGameStore((s) => s.setLayerColor)
   const toggleTrafficVisible = useGameStore((s) => s.toggleTrafficVisible)
+  const toggleBackendFabricVisible = useGameStore((s) => s.toggleBackendFabricVisible)
 
   return (
     <TooltipProvider>
@@ -207,6 +210,34 @@ export function LayersPopup() {
                     REDIRECT
                   </span>
                 )}
+              </div>
+
+              {/* Backend fabric (Phase 8B InfiniBand) toggle */}
+              <div className="flex items-center gap-2">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      onClick={() => toggleBackendFabricVisible()}
+                      disabled={gpuPodCount === 0}
+                      className={`font-mono text-xs transition-all min-w-[120px] justify-start gap-1.5 ${
+                        backendFabricVisible && gpuPodCount > 0
+                          ? 'bg-neon-purple/20 text-neon-purple border border-neon-purple/40'
+                          : 'text-muted-foreground line-through opacity-50'
+                      }`}
+                    >
+                      {backendFabricVisible && gpuPodCount > 0 ? <Eye className="size-3" /> : <EyeOff className="size-3" />}
+                      <Network className="size-3" />
+                      Backend Fabric
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    {gpuPodCount === 0
+                      ? 'Build a GPU pod to enable the InfiniBand fabric layer'
+                      : `${backendFabricVisible ? 'Hide' : 'Show'} IB switches, cables, and AllReduce ring pulse`}
+                  </TooltipContent>
+                </Tooltip>
               </div>
             </div>
           </div>
