@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useGameStore, RACK_COST, MAX_SERVERS_PER_CABINET, ENVIRONMENT_CONFIG, CUSTOMER_TYPE_CONFIG, SUITE_TIERS, getSuiteLimits, DEDICATED_ROW_BONUS_CONFIG, MIXED_ENV_PENALTY_CONFIG, FLOOR_PLAN_CONFIG, GPU_POD_CONFIG, LIQUID_COOLING_CONFIG, DENSITY_SCALING, POWER_DRAW } from '@/stores/gameStore'
+import { useGameStore, RACK_COST, MAX_SERVERS_PER_CABINET, ENVIRONMENT_CONFIG, CUSTOMER_TYPE_CONFIG, SUITE_TIERS, getSuiteLimits, DEDICATED_ROW_BONUS_CONFIG, MIXED_ENV_PENALTY_CONFIG, FLOOR_PLAN_CONFIG, GPU_POD_CONFIG, LIQUID_COOLING_CONFIG, DENSITY_SCALING, POWER_DRAW, TRAINING_JOB_CONFIG } from '@/stores/gameStore'
 import type { CabinetEnvironment, CustomerType, LayoutMode, GPUPodSize } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
 import { Server, Network, Plus, MousePointer, Rows3, Trash2, Wand2, ArrowUp, ArrowDown, FlipVertical, Minus, Cpu } from 'lucide-react'
@@ -22,6 +22,9 @@ export function BuildPanel() {
     enterRowPlacementMode, exitRowPlacementMode, toggleRowPlacementFacing,
     rowPlacementFacing,
     gpuPods, createGPUPod, removeGPUPod, unlockedTech,
+    // Phase 8E: training jobs + offers
+    trainingJobs, trainingJobOffers, acceptTrainingContract, restartTrainingJob, cancelTrainingJob,
+    infiniBandFabrics, tickCount,
   } = useGameStore()
 
   const [selectedEnv, setSelectedEnv] = useState<CabinetEnvironment>('production')
@@ -574,21 +577,101 @@ export function BuildPanel() {
           </div>
         )}
         {gpuPods.length > 0 && (
-          <div className="mt-2 flex flex-col gap-0.5">
-            {gpuPods.map((pod) => (
-              <div key={pod.id} className="flex items-center justify-between text-[10px] px-1 py-0.5 rounded bg-neon-pink/5">
-                <span className="font-mono text-neon-pink">{pod.name}</span>
-                <span className="text-muted-foreground">{pod.gpuCount} GPU</span>
-                <Button
-                  variant="ghost"
-                  size="xs"
-                  onClick={() => removeGPUPod(pod.id)}
-                  className="h-4 px-1 text-muted-foreground hover:text-neon-red"
-                >
-                  <Trash2 className="size-3" />
-                </Button>
-              </div>
-            ))}
+          <div className="mt-2 flex flex-col gap-1">
+            {gpuPods.map((pod) => {
+              const job = trainingJobs.find((j) => j.id === pod.activeJobId && (j.status === 'running' || j.status === 'restarting'))
+              const jobCfg = job ? TRAINING_JOB_CONFIG[job.jobType] : null
+              const restartsLeft = job ? job.slaRequirements.maxRestarts - job.restartCount : 0
+              return (
+                <div key={pod.id} className="flex flex-col gap-0.5 rounded border border-neon-pink/20 bg-neon-pink/5 p-1.5">
+                  <div className="flex items-center justify-between text-[10px]">
+                    <span className="font-mono text-neon-pink">{pod.name}</span>
+                    <span className="text-muted-foreground">{pod.gpuCount} GPU</span>
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      onClick={() => removeGPUPod(pod.id)}
+                      className="h-4 px-1 text-muted-foreground hover:text-neon-red"
+                    >
+                      <Trash2 className="size-3" />
+                    </Button>
+                  </div>
+                  {job && jobCfg ? (
+                    <div className="text-[9px] font-mono">
+                      <div className="flex items-center justify-between">
+                        <span style={{ color: jobCfg.color }}>{jobCfg.label}</span>
+                        <span className="text-muted-foreground">{job.customerName}</span>
+                      </div>
+                      <div className="mt-0.5 h-1 rounded bg-card overflow-hidden border border-border/30">
+                        <div className="h-full bg-neon-green/60" style={{ width: `${Math.min(100, job.progressPct)}%` }} />
+                      </div>
+                      <div className="flex items-center justify-between text-[9px] text-muted-foreground mt-0.5">
+                        <span>{job.progressPct.toFixed(0)}% · ETA {Math.ceil(job.ticksRemaining)}t</span>
+                        <span className="text-neon-yellow">VaR ${Math.round(job.valueAtRisk / 1000)}K</span>
+                      </div>
+                      <div className="flex items-center justify-between text-[9px] mt-0.5">
+                        <span className="text-muted-foreground">Restarts {job.restartCount}/{job.slaRequirements.maxRestarts}</span>
+                        <span className="flex gap-1">
+                          <button
+                            onClick={() => restartTrainingJob(job.id)}
+                            disabled={restartsLeft <= 0}
+                            className="px-1 rounded text-neon-orange hover:bg-neon-orange/10 disabled:opacity-30 disabled:hover:bg-transparent"
+                            title={restartsLeft > 0 ? 'Restart from scratch (consumes 1 SLA restart)' : 'No restarts left in SLA'}
+                          >
+                            Restart
+                          </button>
+                          <button
+                            onClick={() => cancelTrainingJob(job.id)}
+                            className="px-1 rounded text-neon-red hover:bg-neon-red/10"
+                            title="Abandon job (counts as failure)"
+                          >
+                            Cancel
+                          </button>
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-[9px] text-muted-foreground italic">Idle — pick a training contract below.</div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Phase 8E: Available training contracts */}
+        {gpuPods.length > 0 && trainingJobOffers.length > 0 && (
+          <div className="mt-2 flex flex-col gap-1">
+            <span className="text-[9px] font-bold text-muted-foreground tracking-widest">TRAINING CONTRACTS</span>
+            {trainingJobOffers.map((offer) => {
+              const cfg = TRAINING_JOB_CONFIG[offer.jobType]
+              const idlePods = gpuPods.filter((p) => !p.activeJobId && infiniBandFabrics.some((f) => f.podId === p.id))
+              const ticksLeft = Math.max(0, offer.expiresAtTick - tickCount)
+              return (
+                <div key={offer.id} className="rounded border border-border/40 bg-card/40 p-1.5 text-[10px] font-mono flex flex-col gap-0.5">
+                  <div className="flex items-center justify-between">
+                    <span style={{ color: cfg.color }}>{cfg.label}</span>
+                    <span className="text-neon-green">${(offer.basePayout / 1000).toFixed(0)}K</span>
+                  </div>
+                  <div className="text-[9px] text-muted-foreground">
+                    {offer.customerName} · {offer.durationTicks}t · ≤{offer.slaRequirements.maxRestarts} restart · expires {ticksLeft}t
+                  </div>
+                  <div className="flex flex-wrap gap-1 mt-0.5">
+                    {idlePods.length === 0 ? (
+                      <span className="text-[9px] text-muted-foreground italic">No idle pod</span>
+                    ) : idlePods.slice(0, 3).map((p) => (
+                      <button
+                        key={p.id}
+                        onClick={() => acceptTrainingContract(offer.id, p.id)}
+                        className="text-[9px] px-1 rounded border border-neon-pink/40 text-neon-pink hover:bg-neon-pink/10"
+                      >
+                        Run on {p.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
           </div>
         )}
       </div>

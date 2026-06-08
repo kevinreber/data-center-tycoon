@@ -4,7 +4,7 @@
 
 **Fabric Tycoon: Data Center Simulator** is a web-based isometric tycoon game where players build and manage a data center. Players place cabinets, install servers and network switches, design a Clos (spine-leaf) network fabric, and balance power, heat, and revenue to scale from a single rack to a global operation.
 
-**Current version:** v0.6.0
+**Current version:** v0.6.1
 
 ## Tech Stack
 
@@ -91,7 +91,7 @@ src/
 │   │   ├── equipment.ts        # Cooling, server config, PDU, cable tray, aisle configs
 │   │   ├── features.ts         # Row-end slots, aisle widths, raised floor, cable mgmt, workloads, advanced tiers, rack equipment, audio, prestige/New Game+
 │   │   ├── infrastructure.ts   # Busway, cross-connect, in-row cooling, spacing, zone configs
-│   │   ├── progression.ts      # Tech tree, achievements (106), incidents (21), contracts, scenarios, tutorial tips (43), guided tutorial steps
+│   │   ├── progression.ts      # Tech tree, achievements (110), incidents (29 incl. 7 Phase 8D AI types), contracts, scenarios, tutorial tips (44), guided tutorial steps
 │   │   └── world.ts            # Staff, supply chain, weather, interconnection, peering, competitors, regions, sites, sovereignty, demand
 │   ├── gameStore.test.ts       # Vitest tests for cabinet placement and placement hints
 │   ├── __tests__/
@@ -153,7 +153,7 @@ All game state lives in a **single Zustand store** (`useGameStore`). The store (
 - **Spacing & layout configs** (`SPACING_CONFIG`): adjacency heat penalties, aisle bonuses, airflow bonuses, maintenance access, fire spread mechanics
 - **Zone bonus configs** (`ZONE_BONUS_CONFIG`): minimum cluster size (3), environment and customer type bonuses
 - **Economy configs**: loan options, depreciation, power market parameters, insurance options, valuation milestones
-- **Progression configs**: tech tree (9 techs), contracts (9 base + 4 compliance-gated + zone contracts), achievements (106), incidents (21 types), scenarios (5)
+- **Progression configs**: tech tree (9 techs), contracts (9 base + 4 compliance-gated + zone contracts), achievements (110), incidents (29 types — includes 7 Phase 8D AI fabric/cabinet incidents), scenarios (5)
 - **Staff configs** (`STAFF_ROLE_CONFIG`, `STAFF_CERT_CONFIG`, `SHIFT_PATTERN_CONFIG`): roles, certifications, shift costs
 - **Supply chain configs** (`SUPPLY_CHAIN_CONFIG`): lead times, bulk discounts, shortage mechanics
 - **Weather configs** (`SEASON_CONFIG`, `WEATHER_CONDITION_CONFIG`): seasonal/weather ambient modifiers
@@ -364,6 +364,17 @@ AI Incident types (Phase 8D):
 - `Cabinet.eccFaultedGpus?: number` — count of GPUs out of service from `gpu_ecc_fault`, cleared by `refreshGpu($15K)`.
 - 7 new incidents in `INCIDENT_CATALOG`: `ib_link_flap` (minor; bumps target link errorCount by 4/tick), `nccl_collective_hang` (major; pod activity → 0 for 20t), `silent_data_corruption` (critical; activity ×0.5 for 50t, silent — only visible in NOC), `optic_failure` (minor; hard-downs the link, recovery via `replaceOptic`), `pfc_storm` (critical; only spawns when fabric avg util >90%, caps activity at 0.1 for 20t), `thermal_runaway` (critical; only spawns on `high_density`/`extreme_density` cabinets without `direct_to_chip`/`single_phase_immersion` cooling — auto-shuts the cabinet if not resolved within 3t), `gpu_ecc_fault` (major; bumps `eccFaultedGpus`, requires `refreshGpu`).
 
+Training Job types (Phase 8E):
+- `TrainingJobType` = `'pretraining' | 'fine_tuning' | 'inference_batch' | 'rl_training'`.
+- `TrainingJobStatus` = `'running' | 'restarting' | 'completed' | 'failed'`.
+- `TrainingJob` — id, customerName, podId, jobType, durationTicks, ticksRemaining, basePayout, progressPct, status, valueAtRisk, restartCount, startedAtTick, slaRequirements, incidentsSeen.
+- `TrainingJobOffer` — id, jobType, customerName, durationTicks (rolled within type range), basePayout (rolled within type range), slaRequirements, expiresAtTick.
+- `TrainingJobSLA` — maxRestarts, minThroughputPct, maxIncidents.
+- `TrainingJobConfig` — type, label, minDuration, maxDuration, minPayout, maxPayout, maxRestarts, minThroughputPct, fabricLoadTarget, color.
+- `GPUPod.activeJobId?: string | null` — the running job bound to this pod (null when idle).
+- State additions: `trainingJobs: TrainingJob[]`, `trainingJobOffers: TrainingJobOffer[]`, `jobOfferCooldown: number` (ticks until next offer refresh), `trainingJobsCompleted: number`, `trainingJobsFailed: number`, `trainingRevenue: number` (lump sums paid this tick).
+- Configs: `TRAINING_JOB_CONFIG` (4 job types with duration/payout/restart/load profiles), `TRAINING_JOB_OFFER_INTERVAL = 40`, `TRAINING_JOB_OFFER_POOL_SIZE = 4`, `TRAINING_JOB_OFFER_TTL = 120`, `TRAINING_JOB_CUSTOMERS` (12 procedural names), `TRAINING_JOB_REPUTATION` (per-type rep bonus on completion), `TRAINING_JOB_FAIL_REPUTATION = -8`.
+
 42U rack types:
 - `RackEquipmentType` = `'1u_server' | '2u_server' | '4u_storage' | '1u_switch' | '2u_patch_panel' | '1u_pdu' | '3u_ups' | '2u_cable_mgmt'`
 - `RackSlot` — u position, equipment type, equipment label
@@ -420,6 +431,7 @@ Key interfaces (core):
 | Backend Fabric (Phase 8B) | `toggleBackendFabricVisible` (drives the IB switches, cables, and AllReduce ring pulse layer; auto-disabled until the first pod is built) |
 | NOC / Traffic Triage (Phase 8C) | `drainPort` (20-tick utilization freeze, free), `resetSwitch` (clears errorCount on attached links, 5-tick cooldown, won't auto-recover down links), `replaceOptic` ($2K, instant reset + 50-tick error-suppression boost), `dispatchElectrician` (needs on-shift electrician, 10-tick repair), `openNocDrawer(linkId)` (sets `selectedNocLinkId` + flags `pendingPanelOpen: 'noc'`), `clearPendingPanel` |
 | AI Incidents (Phase 8D) | `refreshGpu(cabinetId)` ($15K, clears `eccFaultedGpus` from `gpu_ecc_fault` incidents). 7 new incident types spawn via the existing `INCIDENT_CATALOG` pipeline — see "AI Incident types" above. |
+| Training Jobs (Phase 8E) | `acceptTrainingContract(offerId, podId)` (binds an offer to an idle pod), `restartTrainingJob(jobId)` (within budget resets progress; exceeded budget fails + reputation hit), `cancelTrainingJob(jobId)` (player abandons → fail). ai_lab cabinets earn 0.5× base while idle, 1.0× during training, 0.25× during inference_batch — lump sums land on completion via the tick lifecycle. |
 | Incidents | `resolveIncident`, `buyGenerator`, `activateGenerator`, `upgradeSuppression` |
 | Operations Progression | `upgradeOpsTier` |
 | Contracts | `acceptContract` |
@@ -606,7 +618,7 @@ A `setInterval` in `App.tsx` calls `tick()` at the rate determined by `gameSpeed
 1. **Time-of-day**: Advances `gameHour` (0–23), applies demand curve and random traffic spikes
 2. **Weather**: Season rotation, weather condition changes, ambient temperature modifiers
 3. **Supply chain**: Ticks pending orders, delivery processing, supply shortage events
-4. **Incidents & Ops Tier**: Spawns random incidents (21 types, reduced by ops tier), ticks active incidents, applies effects (revenue penalties reduced by ops tier), ops tier auto-resolve bonus, prevented incident tracking
+4. **Incidents & Ops Tier**: Spawns random incidents (29 types incl. 7 Phase 8D AI types, reduced by ops tier), ticks active incidents, applies effects (revenue penalties reduced by ops tier), ops tier auto-resolve bonus, prevented incident tracking. Phase 8D AI incidents use deferred-mutation queues (`pendingOpticFailures`, `pendingEccFaults`, `thermalRunawayShutoffCabIds`) so the spawn block doesn't directly mutate IB/cabinet state.
 5. **Tech tree**: Ticks active research progress
 6. **Power market**: Updates spot pricing with random walk, mean reversion, and price spikes
 7. **Generators**: Manages fuel consumption, startup/cooldown, auto-activation during outages
@@ -724,7 +736,7 @@ A `setInterval` in `App.tsx` calls `tick()` at the rate determined by `gameSpeed
 - Revenue based on allocated capacity × current spot price
 
 **Incidents & Resilience:**
-- **21 incident types** with minor/major/critical severity (includes cooling infrastructure incidents: compressor_failure, refrigerant_leak, chiller_malfunction, pipe_burst)
+- **29 incident types** with minor/major/critical severity. Includes cooling infrastructure incidents (compressor_failure, refrigerant_leak, chiller_malfunction, pipe_burst), regional disasters, security intrusions, and the 7 Phase 8D AI fabric/cabinet incidents (ib_link_flap, nccl_collective_hang, silent_data_corruption, optic_failure, pfc_storm, thermal_runaway, gpu_ecc_fault). Phase 8D incidents have per-type spawn preconditions (e.g. pfc_storm only when fabric avg util > 90%; thermal_runaway only on high-density cabinets without direct-to-chip cooling).
 - **Generators**: 3 options (Small Diesel, Large Diesel, Natural Gas) with fuel management
 - **Fire suppression**: none, water (cheap, some damage), gas (expensive, minimal damage)
 - **Fires** trigger at critical temperature (95°C)

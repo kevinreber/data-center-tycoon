@@ -63,7 +63,9 @@ import {
   TECH_TREE,
   GPU_POD_CONFIG,
   LIQUID_COOLING_CONFIG,
+  TRAINING_JOB_CONFIG,
 } from '@/stores/gameStore'
+import type { TrainingJobOffer } from '@/stores/gameStore'
 import type { RegionId } from '@/stores/gameStore'
 
 // Helper to get/set store state
@@ -5342,6 +5344,230 @@ describe('AI-Specific Incidents (Phase 8D)', () => {
     getState().refreshGpu(cab.id)
     expect(getState().money).toBe(500)
     expect(getState().cabinets.find((c) => c.id === cab.id)!.eccFaultedGpus).toBe(1)
+  })
+})
+
+// ============================================================================
+// Training Jobs & AI Revenue Model (Phase 8E)
+// ============================================================================
+describe('Training Jobs & AI Revenue (Phase 8E)', () => {
+  beforeEach(() => {
+    setState({
+      sandboxMode: true,
+      money: 5_000_000,
+      suiteTier: 'standard',
+      unlockedTech: ['ai_infrastructure', 'immersion_cooling'],
+      tickCount: 100,
+      trainingJobs: [],
+      trainingJobOffers: [],
+      jobOfferCooldown: 0,
+      trainingJobsCompleted: 0,
+      trainingJobsFailed: 0,
+      activeIncidents: [],
+    })
+    getState().createGPUPod('small', 0, STD_ROW_0)
+  })
+
+  function injectOffer(jobType: 'pretraining' | 'fine_tuning' | 'inference_batch' | 'rl_training', overrides: Partial<TrainingJobOffer> = {}): TrainingJobOffer {
+    const cfg = TRAINING_JOB_CONFIG[jobType]
+    const offer: TrainingJobOffer = {
+      id: `tjo-test-${jobType}-${Math.random().toString(36).slice(2, 8)}`,
+      jobType,
+      customerName: 'Test Customer',
+      durationTicks: overrides.durationTicks ?? cfg.minDuration,
+      basePayout: overrides.basePayout ?? cfg.minPayout,
+      slaRequirements: overrides.slaRequirements ?? {
+        maxRestarts: cfg.maxRestarts,
+        minThroughputPct: cfg.minThroughputPct,
+        maxIncidents: 3,
+      },
+      expiresAtTick: overrides.expiresAtTick ?? getState().tickCount + 120,
+      ...overrides,
+    }
+    setState({ trainingJobOffers: [...getState().trainingJobOffers, offer] })
+    return offer
+  }
+
+  // ── acceptTrainingContract ───────────────────────────────────
+  it('acceptTrainingContract assigns the job to the pod and removes the offer', () => {
+    const pod = getState().gpuPods[0]
+    const offer = injectOffer('fine_tuning')
+    getState().acceptTrainingContract(offer.id, pod.id)
+
+    expect(getState().trainingJobs).toHaveLength(1)
+    const job = getState().trainingJobs[0]
+    expect(job.podId).toBe(pod.id)
+    expect(job.status).toBe('running')
+    expect(job.restartCount).toBe(0)
+    expect(getState().trainingJobOffers).toHaveLength(0)
+    expect(getState().gpuPods[0].activeJobId).toBe(job.id)
+  })
+
+  it('acceptTrainingContract fails when the pod already has an active job', () => {
+    const pod = getState().gpuPods[0]
+    const offer1 = injectOffer('fine_tuning')
+    const offer2 = injectOffer('inference_batch')
+    getState().acceptTrainingContract(offer1.id, pod.id)
+    expect(getState().trainingJobs).toHaveLength(1)
+
+    getState().acceptTrainingContract(offer2.id, pod.id)
+    expect(getState().trainingJobs).toHaveLength(1)            // second accept blocked
+    expect(getState().trainingJobOffers).toHaveLength(1)        // offer still in pool
+  })
+
+  // ── tick lifecycle ───────────────────────────────────────────
+  it('tick advances job progress and updates valueAtRisk', () => {
+    const pod = getState().gpuPods[0]
+    const offer = injectOffer('fine_tuning', { durationTicks: 50, basePayout: 1_000_000 })
+    getState().acceptTrainingContract(offer.id, pod.id)
+
+    // Ramp activity high so progress accumulates predictably.
+    for (let i = 0; i < 30; i++) getState().tick()
+    const job = getState().trainingJobs.find((j) => j.podId === pod.id)!
+    expect(job.progressPct).toBeGreaterThan(20)
+    expect(job.valueAtRisk).toBeCloseTo(offer.basePayout * (job.progressPct / 100), -2)
+  })
+
+  it('completes the job at duration end with lump-sum payout', () => {
+    const pod = getState().gpuPods[0]
+    setState({ sandboxMode: false, money: 0, reputationScore: 50 })
+    const offer = injectOffer('fine_tuning', { durationTicks: 50, basePayout: 800_000 })
+    getState().acceptTrainingContract(offer.id, pod.id)
+
+    // Tick enough to finish: at full activity (0.7 / fabricLoadTarget=0.75 ≈ 0.93 work/t)
+    // need ~55 ticks to finish 50 work units. Add buffer for ramp-up. Keep cabinets
+    // cool so no thermal throttling skews the money math.
+    for (let i = 0; i < 150; i++) {
+      setState({ cabinets: getState().cabinets.map((c) => ({ ...c, heatLevel: 30 })) })
+      getState().tick()
+    }
+    const job = getState().trainingJobs.find((j) => j.podId === pod.id)!
+    expect(job.status).toBe('completed')
+    expect(job.progressPct).toBe(100)
+    expect(getState().money).toBeGreaterThanOrEqual(800_000)    // got the lump sum (minus expenses)
+    expect(getState().trainingJobsCompleted).toBe(1)
+    expect(getState().gpuPods[0].activeJobId).toBeNull()         // pod freed
+  })
+
+  it('completing a job awards a reputation boost matching the job type', () => {
+    const pod = getState().gpuPods[0]
+    setState({ sandboxMode: true, reputationScore: 50 })
+    const offer = injectOffer('fine_tuning', { durationTicks: 30, basePayout: 500_000 })
+    getState().acceptTrainingContract(offer.id, pod.id)
+
+    // Force fabric to full activity + job near-done so the next tick completes.
+    setState({
+      cabinets: getState().cabinets.map((c) => ({ ...c, heatLevel: 30 })),
+      infiniBandFabrics: getState().infiniBandFabrics.map((f) => ({ ...f, activityLevel: 1.0 })),
+      trainingJobs: getState().trainingJobs.map((j) => ({ ...j, ticksRemaining: 0.5 })),
+    })
+    getState().tick()
+    expect(getState().trainingJobs[0].status).toBe('completed')
+    expect(getState().reputationScore).toBeGreaterThan(50)
+  })
+
+  // ── restart accounting ───────────────────────────────────────
+  it('restartTrainingJob within budget resets progress + bumps restartCount', () => {
+    const pod = getState().gpuPods[0]
+    const offer = injectOffer('fine_tuning', { durationTicks: 60 })  // 1 restart allowed
+    getState().acceptTrainingContract(offer.id, pod.id)
+    for (let i = 0; i < 20; i++) getState().tick()
+    const beforeProgress = getState().trainingJobs[0].progressPct
+    expect(beforeProgress).toBeGreaterThan(0)
+
+    getState().restartTrainingJob(getState().trainingJobs[0].id)
+    const job = getState().trainingJobs[0]
+    expect(job.restartCount).toBe(1)
+    expect(job.progressPct).toBe(0)
+    expect(job.status).toBe('running')
+  })
+
+  it('restartTrainingJob beyond budget fails the job, frees the pod, and hits reputation', () => {
+    const pod = getState().gpuPods[0]
+    setState({ reputationScore: 60 })
+    // Pretraining has 0 restarts — first restart attempt should fail it.
+    const offer = injectOffer('pretraining', { durationTicks: 150, basePayout: 3_000_000 })
+    getState().acceptTrainingContract(offer.id, pod.id)
+    for (let i = 0; i < 5; i++) getState().tick()
+
+    getState().restartTrainingJob(getState().trainingJobs[0].id)
+    const job = getState().trainingJobs[0]
+    expect(job.status).toBe('failed')
+    expect(getState().gpuPods[0].activeJobId).toBeNull()
+    expect(getState().reputationScore).toBeLessThan(60)
+    expect(getState().trainingJobsFailed).toBe(1)
+  })
+
+  it('cancelTrainingJob marks the job failed and frees the pod', () => {
+    const pod = getState().gpuPods[0]
+    setState({ reputationScore: 60 })
+    const offer = injectOffer('rl_training')
+    getState().acceptTrainingContract(offer.id, pod.id)
+    const jobId = getState().trainingJobs[0].id
+
+    getState().cancelTrainingJob(jobId)
+    const job = getState().trainingJobs.find((j) => j.id === jobId)!
+    expect(job.status).toBe('failed')
+    expect(getState().gpuPods[0].activeJobId).toBeNull()
+    expect(getState().reputationScore).toBeLessThan(60)
+  })
+
+  // ── ai_lab revenue model ─────────────────────────────────────
+  // Pin heat low so thermal throttling doesn't confound the multiplier signal,
+  // and let the fabric ramp up before sampling.
+  function tickWithCoolCabs(n: number) {
+    for (let i = 0; i < n; i++) {
+      setState({ cabinets: getState().cabinets.map((c) => ({ ...c, heatLevel: 30 })) })
+      getState().tick()
+    }
+  }
+
+  it('ai_lab cabinets earn ~0.5× base revenue while their pod is idle vs full training', () => {
+    setState({ sandboxMode: true })
+    tickWithCoolCabs(5)
+    const idleRev = getState().revenue
+
+    // Accept a fine_tune job → multiplier flips to 1.0×.
+    const offer = injectOffer('fine_tuning', { durationTicks: 200 })
+    getState().acceptTrainingContract(offer.id, getState().gpuPods[0].id)
+    tickWithCoolCabs(10)
+    const trainingRev = getState().revenue
+
+    // Training revenue should be roughly double the idle revenue (1.0× vs 0.5×).
+    expect(trainingRev).toBeGreaterThan(idleRev * 1.5)
+  })
+
+  it('ai_lab cabinets earn 0.25× base revenue during inference_batch', () => {
+    setState({ sandboxMode: true })
+    const offer1 = injectOffer('fine_tuning', { durationTicks: 200 })
+    getState().acceptTrainingContract(offer1.id, getState().gpuPods[0].id)
+    tickWithCoolCabs(10)
+    const trainRev = getState().revenue
+
+    getState().cancelTrainingJob(getState().trainingJobs[0].id)
+    const offer2 = injectOffer('inference_batch', { durationTicks: 200 })
+    getState().acceptTrainingContract(offer2.id, getState().gpuPods[0].id)
+    tickWithCoolCabs(10)
+    const inferRev = getState().revenue
+
+    // Inference fill (0.25×) should be much lower than full training (1.0×).
+    expect(inferRev).toBeLessThan(trainRev * 0.5)
+  })
+
+  // ── offer pool ───────────────────────────────────────────────
+  it('tick refills the training-job offer pool when cooldown elapses', () => {
+    setState({ trainingJobOffers: [], jobOfferCooldown: 0 })
+    expect(getState().trainingJobOffers).toHaveLength(0)
+    getState().tick()
+    expect(getState().trainingJobOffers.length).toBeGreaterThan(0)
+  })
+
+  it('expired offers are dropped from the pool', () => {
+    const offer = injectOffer('inference_batch', { expiresAtTick: getState().tickCount + 1 })
+    // After one tick newTickCount = tickCount+1 (becomes 101 if started at 100). Offer expires when expiresAtTick > newTickCount fails.
+    getState().tick()
+    getState().tick()
+    expect(getState().trainingJobOffers.find((o) => o.id === offer.id)).toBeUndefined()
   })
 })
 
