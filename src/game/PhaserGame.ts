@@ -200,6 +200,10 @@ class DataCenterScene extends Phaser.Scene {
   private ibLinkGraphics: Phaser.GameObjects.Graphics | null = null
   private ibSwitchLabels: Phaser.GameObjects.Text[] = []
   private backendFabricVisible = true
+  // Phase 8C: per-link hit zones so the operator can click a flapping link in
+  // the scene and have the NOC drawer jump straight to it.
+  private ibLinkHitZones: Phaser.GameObjects.Zone[] = []
+  private onIBLinkClickCb: ((linkId: string) => void) | null = null
   // Phase 8B: AllReduce ring pulse animation state
   private allReduceGraphics: Phaser.GameObjects.Graphics | null = null
   private allReducePhase = 0    // 0..1, advances over time and wraps
@@ -2663,6 +2667,8 @@ class DataCenterScene extends Phaser.Scene {
     this.ibLinkEntries.clear()
     for (const t of this.ibSwitchLabels) t.destroy()
     this.ibSwitchLabels = []
+    for (const z of this.ibLinkHitZones) z.destroy()
+    this.ibLinkHitZones = []
 
     if (!this.backendFabricVisible) return
 
@@ -2763,7 +2769,25 @@ class DataCenterScene extends Phaser.Scene {
       g.moveTo(a.x, a.y)
       g.lineTo(b.x, b.y)
       g.strokePath()
+
+      // Phase 8C: midpoint hit zone so the link is clickable in the scene.
+      // Sized to match the cable visual; flapping/down links pulse for affordance.
+      const mx = (a.x + b.x) / 2
+      const my = (a.y + b.y) / 2
+      const zone = this.add.zone(mx, my, 18, 18)
+      zone.setDepth(46) // just above the link graphic, below switches
+      zone.setInteractive({ useHandCursor: true })
+      const linkId = link.id
+      zone.on('pointerdown', () => {
+        if (this.onIBLinkClickCb) this.onIBLinkClickCb(linkId)
+      })
+      this.ibLinkHitZones.push(zone)
     }
+  }
+
+  /** Phase 8C: callback fires when the operator clicks an IB link in the scene. */
+  setOnIBLinkClick(cb: ((linkId: string) => void) | null) {
+    this.onIBLinkClickCb = cb
   }
 
   private drawIBSwitches() {
@@ -2803,6 +2827,8 @@ class DataCenterScene extends Phaser.Scene {
     if (this.ibLinkGraphics) this.ibLinkGraphics.setVisible(visible)
     if (this.allReduceGraphics) this.allReduceGraphics.setVisible(visible)
     for (const label of this.ibSwitchLabels) label.setVisible(visible)
+    // Phase 8C: hide the click zones too — no point making invisible cables clickable.
+    for (const zone of this.ibLinkHitZones) zone.setVisible(visible).setActive(visible)
   }
 
   /** Draw AllReduce ring-style packet dots traveling around each pod's cabinets.

@@ -75,7 +75,8 @@ src/
 │       ├── GuidePanel.tsx      # How to play / tutorial (with Phase 4-6 system guides)
 │       ├── BuildLogsPanel.tsx  # What's New changelog (version history, player-facing)
 │       ├── ScenarioPanel.tsx   # Scenario select screen with cards, star ratings, locked progression
-│       └── WorldMapPanel.tsx   # Global expansion: regions, sites, inter-site links, disaster prep
+│       ├── WorldMapPanel.tsx   # Global expansion: regions, sites, inter-site links, disaster prep
+│       └── NocPanel.tsx        # Phase 8C: NOC / traffic triage — fabric health, link list, detail drawer, repair actions
 ├── game/
 │   ├── PhaserGame.ts           # Phaser scene: isometric rendering, traffic visualization, placement mode
 │   └── CLAUDE.md               # Phaser-specific coding rules (see Sub-module Rules below)
@@ -348,10 +349,14 @@ AI Infrastructure types (Phase 8A — GPU pods & high-density cabinets):
 AI Infrastructure types (Phase 8B — InfiniBand backend fabric):
 - `IBSwitchType` = `'ib_leaf' | 'ib_spine'`
 - `InfiniBandFabric` — id, podId (1:1 with a GPU pod), railCount (4 or 8), leafSwitchIds[], spineSwitchIds[], topology (`'fat_tree'` today, `'dragonfly'` reserved), health
-- `IBSwitch` — id, fabricId, type, rail, portsTotal, portsUsed, errorRate, operational
-- `IBLink` — id, fabricId, fromSwitchId, toSwitchId, bandwidthGbps (200/400/800 — currently 400 NDR), utilizationPct, errorCount, status (`'healthy' | 'flapping' | 'down'`), lastErrorTick
+- `IBSwitch` — id, fabricId, type, rail, portsTotal, portsUsed, errorRate, operational, `lastResetTick?` (Phase 8C — 5-tick `resetSwitch` cooldown)
+- `IBLink` — id, fabricId, fromSwitchId, toSwitchId, bandwidthGbps (200/400/800 — currently 400 NDR), utilizationPct, errorCount, status (`'healthy' | 'flapping' | 'down'`), lastErrorTick. Phase 8C adds `utilizationHistory?` (rolling 50-sample sparkline buffer), `drainTicksRemaining?` (drainPort countdown), `lastReplaceTick?` (50-tick post-replace error-suppression window).
 - `IBSwitchConfig` — type, label, cost, portsTotal, powerDraw, bandwidthPerPortGbps, color
 - Rail counts: `RAIL_COUNT_BY_POD_SIZE` (small/medium/large = 4 rails, hyperpod = 8). Default link bandwidth `IB_DEFAULT_BANDWIDTH_GBPS = 400`. Idle error accrual `IB_BASE_LINK_ERROR_RATE = 0.0002`/tick.
+
+NOC / Traffic Triage types (Phase 8C):
+- `IBLinkRepair` — id, linkId, ticksRemaining, dispatchedAtTick, staffId (electrician assigned). Created by `dispatchElectrician`; ticked down in `tick()`; on completion the link resets to healthy + errorCount 0.
+- State: `ibLinkRepairs: IBLinkRepair[]`, `selectedNocLinkId: string | null` (open drawer), `pendingPanelOpen: string | null` (one-shot scene → sidebar handoff signal — Sidebar subscribes via `useGameStore.subscribe` and clears it after opening the matching panel).
 
 42U rack types:
 - `RackEquipmentType` = `'1u_server' | '2u_server' | '4u_storage' | '1u_switch' | '2u_patch_panel' | '1u_pdu' | '3u_ups' | '2u_cable_mgmt'`
@@ -405,8 +410,9 @@ Key interfaces (core):
 | Finance | `takeLoan`, `refreshServers`, `upgradeSuite` |
 | Infrastructure | `placePDU`, `placeCableTray`, `autoRouteCables`, `toggleCabinetFacing`, `installAisleContainment`, `placeBusway`, `placeCrossConnect`, `placeInRowCooling` |
 | Cooling Units | `placeCoolingUnit`, `removeCoolingUnit`, `placeChillerPlant`, `removeChillerPlant`, `placeCoolingPipe`, `removeCoolingPipe` |
-| GPU Pods (Phase 8A) | `createGPUPod`, `removeGPUPod` (decommissioned servers route to `eWasteStockpile`), `installLiquidCooling` |
+| GPU Pods (Phase 8A) | `createGPUPod`, `removeGPUPod` (decommissioned servers route to `eWasteStockpile`; in-flight NOC repairs are dropped), `installLiquidCooling` |
 | Backend Fabric (Phase 8B) | `toggleBackendFabricVisible` (drives the IB switches, cables, and AllReduce ring pulse layer; auto-disabled until the first pod is built) |
+| NOC / Traffic Triage (Phase 8C) | `drainPort` (20-tick utilization freeze, free), `resetSwitch` (clears errorCount on attached links, 5-tick cooldown, won't auto-recover down links), `replaceOptic` ($2K, instant reset + 50-tick error-suppression boost), `dispatchElectrician` (needs on-shift electrician, 10-tick repair), `openNocDrawer(linkId)` (sets `selectedNocLinkId` + flags `pendingPanelOpen: 'noc'`), `clearPendingPanel` |
 | Incidents | `resolveIncident`, `buyGenerator`, `activateGenerator`, `upgradeSuppression` |
 | Operations Progression | `upgradeOpsTier` |
 | Contracts | `acceptContract` |

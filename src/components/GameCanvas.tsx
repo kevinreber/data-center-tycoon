@@ -444,6 +444,18 @@ export function GameCanvas() {
     scene.setBackendFabricVisible(backendFabricVisible)
   }, [backendFabricVisible, sceneReady])
 
+  // Phase 8C: wire IB link clicks to the NOC drawer. The drawer + sidebar
+  // panel both open via openNocDrawer (it also sets pendingPanelOpen).
+  useEffect(() => {
+    if (!gameRef.current) return
+    const scene = getScene(gameRef.current)
+    if (!scene) return
+    scene.setOnIBLinkClick((linkId: string) => {
+      useGameStore.getState().openNocDrawer(linkId)
+    })
+    return () => scene.setOnIBLinkClick(null)
+  }, [sceneReady])
+
   // Sync heat map visibility to Phaser (re-render when cabinets change to update temperatures)
   useEffect(() => {
     if (!gameRef.current) return
