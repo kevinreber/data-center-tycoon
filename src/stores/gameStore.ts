@@ -27,6 +27,7 @@ export type {
   CapacityProjection, HistoryPoint, LifetimeStats, TutorialTip,
   CoolingUnit, CoolingUnitConfig, ChillerTier, ChillerPlant, ChillerPlantConfig, CoolingPipe,
   Loan, IncidentSeverity, IncidentDef, ActiveIncident,
+  IncidentTicket, TicketStatus, TicketPriority,
   ContractTier, ContractDef, ActiveContract, AchievementDef, Achievement,
   EnvironmentConfig, Cabinet, PlacementHint, SpineSwitch,
   TrafficLink, TrafficStats, LayerColors, LayerVisibility, LayerOpacity, LayerColorOverrides,
@@ -67,7 +68,7 @@ import type {
   ChillerTier, Cabinet, SpineSwitch, TrafficStats, LayerColors,
   LayerVisibility, LayerOpacity, LayerColorOverrides, NodeType,
   ContractDef, ActiveResearch,
-  Generator, Loan, IncidentDef, ActiveIncident, ActiveContract, Achievement,
+  Generator, Loan, IncidentSeverity, IncidentDef, ActiveIncident, IncidentTicket, TicketStatus, TicketPriority, ActiveContract, Achievement,
   PDU, CableTray, CableRun, Busway, CrossConnect, InRowCooling,
   CoolingUnit, ChillerPlant, CoolingPipe, Zone, DedicatedRowInfo,
   StaffMember, StaffTraining, HardwareOrder, InterconnectPort, PeeringAgreement,
@@ -224,6 +225,13 @@ interface GameState {
   activeIncidents: ActiveIncident[]
   incidentLog: string[]   // recent incident messages
   resolvedCount: number   // total incidents resolved (for achievements)
+
+  // Incident tickets (Jira-style work tracking)
+  tickets: IncidentTicket[]        // open + recently resolved tickets (capped)
+  ticketsOpenedTotal: number       // lifetime tickets filed
+  ticketsResolvedTotal: number     // lifetime tickets closed
+  ticketResolutionTickSum: number  // sum of resolution times (for MTTR average)
+  ticketsSlaBreachedTotal: number  // lifetime tickets that breached SLA
 
   // Achievements
   achievements: Achievement[]
@@ -798,6 +806,7 @@ let nextIBRepairId = 1
 let nextTrainingJobId = 1
 let nextTrainingOfferId = 1
 let nextIncidentId = 1
+let nextTicketId = 1
 let nextContractId = 1
 let nextGeneratorId = 1
 let nextStaffId = 1
@@ -832,7 +841,90 @@ function restoreIdCounters(data: Record<string, unknown>) {
   nextIBSwitchId = maxIdNum(ibSwitches, 'ibsw-') + 1
   nextIBLinkId = maxIdNum(ibLinks, 'iblnk-') + 1
   nextIncidentId = 1
+  const tickets = (data.tickets ?? []) as { id: string }[]
+  nextTicketId = maxIdNum(tickets, 'INC-') + 1
   nextContractId = 1
+}
+
+// ── Incident ticket helpers (Jira-style work tracking) ─────────
+/** Max tickets retained in the board (open + recently resolved). */
+const MAX_TICKETS = 60
+/** SLA budget in ticks per priority — exceeding it flags an SLA breach. */
+export const TICKET_SLA_TICKS: Record<TicketPriority, number> = { P1: 12, P2: 30, P3: 60 }
+
+function ticketPriorityFromSeverity(severity: IncidentSeverity): TicketPriority {
+  return severity === 'critical' ? 'P1' : severity === 'major' ? 'P2' : 'P3'
+}
+
+/** Human-readable maintenance work order derived from the incident effect. */
+function ticketWorkType(def: IncidentDef): string {
+  switch (def.effect) {
+    case 'hardware_failure':
+      return def.hardwareTarget === 'spine' ? 'Replace spine switch' : 'Replace leaf switch'
+    case 'cooling_failure': return 'Service cooling unit'
+    case 'chiller_failure': return 'Repair chiller plant'
+    case 'pipe_failure': return 'Fix coolant pipe'
+    case 'heat_spike': return 'Investigate thermal event'
+    case 'power_surge': return 'Inspect power distribution'
+    case 'revenue_penalty': return 'Customer remediation'
+    case 'traffic_drop':
+    case 'link_flap': return 'Repair network link'
+    case 'ai_fabric': return 'Service InfiniBand fabric'
+    case 'ai_cabinet': return 'Service GPU cabinet'
+    default: return 'Investigate & remediate'
+  }
+}
+
+/** Format an id like "cab-3" / "spine-2" into a friendly "C3" / "S2" label. */
+function shortAssetLabel(id: string): string {
+  const m = id.match(/(\d+)$/)
+  const num = m ? m[1] : id
+  if (id.startsWith('cab-')) return `Cabinet C${num}`
+  if (id.startsWith('spine-')) return `Spine S${num}`
+  if (id.startsWith('site-')) return `Site ${num}`
+  return id
+}
+
+/** Human-readable affected asset for a ticket from the incident's targeting. */
+function ticketAffectedAsset(inc: ActiveIncident): string {
+  if (inc.affectedHardwareId) return shortAssetLabel(inc.affectedHardwareId)
+  if (inc.affectedCabinetId) return shortAssetLabel(inc.affectedCabinetId)
+  if (inc.affectedIbLinkId) return 'InfiniBand link'
+  if (inc.affectedPodId) {
+    const m = inc.affectedPodId.match(/(\d+)$/)
+    return `GPU Pod ${m ? m[1] : inc.affectedPodId}`
+  }
+  if (inc.affectedLinkKey) return 'Fabric link'
+  switch (inc.def.effect) {
+    case 'cooling_failure': return 'Cooling system'
+    case 'chiller_failure': return 'Chiller plant'
+    case 'pipe_failure': return 'Coolant loop'
+    case 'power_surge': return 'Power distribution'
+    case 'traffic_drop':
+    case 'link_flap': return 'Network fabric'
+    default: return 'Facility'
+  }
+}
+
+/** File a new ticket for a freshly spawned incident. */
+function createTicketForIncident(inc: ActiveIncident, tick: number): IncidentTicket {
+  const priority = ticketPriorityFromSeverity(inc.def.severity)
+  return {
+    id: `INC-${nextTicketId++}`,
+    incidentId: inc.id,
+    title: inc.def.label,
+    description: inc.def.description,
+    priority,
+    severity: inc.def.severity,
+    status: 'open',
+    workType: ticketWorkType(inc.def),
+    affectedAsset: ticketAffectedAsset(inc),
+    createdTick: tick,
+    resolvedTick: null,
+    resolutionTicks: null,
+    resolution: null,
+    slaBreached: false,
+  }
 }
 
 // Phase 8B: build a rail-optimized fat-tree InfiniBand fabric for a freshly
@@ -1000,6 +1092,13 @@ export const useGameStore = create<GameState>((set) => ({
   activeIncidents: [],
   incidentLog: [],
   resolvedCount: 0,
+
+  // Incident tickets
+  tickets: [],
+  ticketsOpenedTotal: 0,
+  ticketsResolvedTotal: 0,
+  ticketResolutionTickSum: 0,
+  ticketsSlaBreachedTotal: 0,
 
   // Achievements
   achievements: [],
@@ -1687,6 +1786,23 @@ export const useGameStore = create<GameState>((set) => ({
         }
       }
 
+      // Close the linked ticket (resolved by the ops team).
+      let ticketsResolvedTotal = state.ticketsResolvedTotal
+      let ticketResolutionTickSum = state.ticketResolutionTickSum
+      const tickets = state.tickets.map((t) => {
+        if (t.incidentId !== id || t.status === 'resolved') return t
+        const resolutionTicks = Math.max(0, state.tickCount - t.createdTick)
+        ticketsResolvedTotal += 1
+        ticketResolutionTickSum += resolutionTicks
+        return {
+          ...t,
+          status: 'resolved' as TicketStatus,
+          resolvedTick: state.tickCount,
+          resolutionTicks,
+          resolution: 'ops_team' as const,
+        }
+      })
+
       return {
         activeIncidents: state.activeIncidents.map((i) =>
           i.id === id ? { ...i, resolved: true, ticksRemaining: 0 } : i
@@ -1695,6 +1811,9 @@ export const useGameStore = create<GameState>((set) => ({
         spineSwitches,
         money: state.money - effectiveCost,
         resolvedCount: state.resolvedCount + 1,
+        tickets,
+        ticketsResolvedTotal,
+        ticketResolutionTickSum,
         incidentLog: [`Resolved: ${incident.def.label}${costReduction > 0 ? ` (${Math.round(costReduction * 100)}% ops discount)` : ''}`, ...state.incidentLog].slice(0, 10),
         ...calcStats(cabinets, spineSwitches),
         trafficStats: calcTraffic(cabinets, spineSwitches, state.demandMultiplier),
@@ -4501,6 +4620,15 @@ export const useGameStore = create<GameState>((set) => ({
       activeIncidents: [],
       incidentLog: ['Cooling sensor alarm cleared', 'Power fluctuation resolved', 'Network loop detected and resolved', 'DDoS attack blocked by NACLs', 'Regional flood mitigated at London site'],
       resolvedCount: 22,
+      tickets: [
+        { id: 'INC-24', incidentId: 'inc-demo-24', title: 'CRAC Unit Failure', description: 'A CRAC unit tripped offline; cooling capacity reduced.', priority: 'P2', severity: 'major', status: 'resolved', workType: 'Service cooling unit', affectedAsset: 'Cooling system', createdTick: 2540, resolvedTick: 2558, resolutionTicks: 18, resolution: 'ops_team', slaBreached: false },
+        { id: 'INC-23', incidentId: 'inc-demo-23', title: 'Spine Switch Failure', description: 'A spine switch failed; traffic redistributed.', priority: 'P2', severity: 'major', status: 'resolved', workType: 'Replace spine switch', affectedAsset: 'Spine S2', createdTick: 2490, resolvedTick: 2503, resolutionTicks: 13, resolution: 'auto', slaBreached: false },
+        { id: 'INC-22', incidentId: 'inc-demo-22', title: 'DDoS Attack', description: 'Volumetric attack absorbed by NACLs.', priority: 'P1', severity: 'critical', status: 'resolved', workType: 'Customer remediation', affectedAsset: 'Network fabric', createdTick: 2455, resolvedTick: 2470, resolutionTicks: 15, resolution: 'ops_team', slaBreached: true },
+      ],
+      ticketsOpenedTotal: 24,
+      ticketsResolvedTotal: 22,
+      ticketResolutionTickSum: 352,
+      ticketsSlaBreachedTotal: 3,
       contractOffers: [],
       activeContracts: demoActiveContracts,
       contractLog: ['DevForge contract completed', 'StartupCo contract completed', 'PixelDream contract completed', 'ShopEngine contract completed', 'CloudBurst contract completed', 'SecureVault contract completed', 'DataStream contract completed'],
@@ -4743,6 +4871,11 @@ export const useGameStore = create<GameState>((set) => ({
       activeIncidents: [],
       incidentLog: [],
       resolvedCount: 0,
+      tickets: [],
+      ticketsOpenedTotal: 0,
+      ticketsResolvedTotal: 0,
+      ticketResolutionTickSum: 0,
+      ticketsSlaBreachedTotal: 0,
       achievements: [],
       newAchievement: null,
       contractOffers: [],
@@ -4946,6 +5079,11 @@ export const useGameStore = create<GameState>((set) => ({
         pdus: state.pdus,
         cableTrays: state.cableTrays,
         resolvedCount: state.resolvedCount,
+        tickets: state.tickets,
+        ticketsOpenedTotal: state.ticketsOpenedTotal,
+        ticketsResolvedTotal: state.ticketsResolvedTotal,
+        ticketResolutionTickSum: state.ticketResolutionTickSum,
+        ticketsSlaBreachedTotal: state.ticketsSlaBreachedTotal,
         insurancePolicies: state.insurancePolicies,
         insurancePayouts: state.insurancePayouts,
         patents: state.patents,
@@ -5054,6 +5192,11 @@ export const useGameStore = create<GameState>((set) => ({
         pdus: data.pdus ?? state.pdus,
         cableTrays: data.cableTrays ?? state.cableTrays,
         resolvedCount: data.resolvedCount ?? state.resolvedCount,
+        tickets: data.tickets ?? state.tickets,
+        ticketsOpenedTotal: data.ticketsOpenedTotal ?? state.ticketsOpenedTotal,
+        ticketsResolvedTotal: data.ticketsResolvedTotal ?? state.ticketsResolvedTotal,
+        ticketResolutionTickSum: data.ticketResolutionTickSum ?? state.ticketResolutionTickSum,
+        ticketsSlaBreachedTotal: data.ticketsSlaBreachedTotal ?? state.ticketsSlaBreachedTotal,
         insurancePolicies: data.insurancePolicies ?? state.insurancePolicies,
         insurancePayouts: data.insurancePayouts ?? state.insurancePayouts,
         patents: data.patents ?? state.patents,
@@ -5144,6 +5287,11 @@ export const useGameStore = create<GameState>((set) => ({
       activeIncidents: [],
       incidentLog: [],
       resolvedCount: 0,
+      tickets: [],
+      ticketsOpenedTotal: 0,
+      ticketsResolvedTotal: 0,
+      ticketResolutionTickSum: 0,
+      ticketsSlaBreachedTotal: 0,
       achievements: [],
       newAchievement: null,
       contractOffers: [],
@@ -5439,6 +5587,13 @@ export const useGameStore = create<GameState>((set) => ({
       let activeIncidents = [...state.activeIncidents]
       let incidentLog = [...state.incidentLog]
       const resolvedCount = state.resolvedCount
+      // Incident ticket tracking (Jira-style). Tickets are filed on spawn and
+      // closed when their incident resolves; metrics drive the NOC dashboard.
+      let tickets = [...state.tickets]
+      let ticketsOpenedTotal = state.ticketsOpenedTotal
+      let ticketsResolvedTotal = state.ticketsResolvedTotal
+      let ticketResolutionTickSum = state.ticketResolutionTickSum
+      let ticketsSlaBreachedTotal = state.ticketsSlaBreachedTotal
       let coolingUnits = [...state.coolingUnits]
       let chillerPlants = [...state.chillerPlants]
       let coolingPipes = [...state.coolingPipes]
@@ -5453,6 +5608,25 @@ export const useGameStore = create<GameState>((set) => ({
       // Clean up resolved incidents and track hardware that needs restoration
       const justResolved = activeIncidents.filter((i) => i.resolved)
       activeIncidents = activeIncidents.filter((i) => !i.resolved)
+
+      // Close tickets for incidents that resolved via staff/auto/expiry last tick.
+      // (Manual paid resolves already closed their ticket in resolveIncident.)
+      if (justResolved.length > 0) {
+        const resolvedIds = new Set(justResolved.map((i) => i.id))
+        tickets = tickets.map((t) => {
+          if (t.status === 'resolved' || !resolvedIds.has(t.incidentId)) return t
+          const resolutionTicks = Math.max(0, newTickCount - t.createdTick)
+          ticketsResolvedTotal += 1
+          ticketResolutionTickSum += resolutionTicks
+          return {
+            ...t,
+            status: 'resolved' as TicketStatus,
+            resolvedTick: newTickCount,
+            resolutionTicks,
+            resolution: 'auto' as const,
+          }
+        })
+      }
 
       // Restore hardware from incidents resolved in the previous tick
       const restoredLeafCabIds = new Set<string>()
@@ -5651,6 +5825,8 @@ export const useGameStore = create<GameState>((set) => ({
             ...(affectedCabinetId ? { affectedCabinetId } : {}),
           }
           activeIncidents.push(incident)
+          tickets = [createTicketForIncident(incident, newTickCount), ...tickets]
+          ticketsOpenedTotal += 1
 
           // ── Phase 8D — collect at-spawn effects (applied below) ──────
           // We can't mutate state here, so we record what to do and the IB tick
@@ -5769,6 +5945,8 @@ export const useGameStore = create<GameState>((set) => ({
               affectedHardwareId: site.id,
             }
             activeIncidents.push(incident)
+            tickets = [createTicketForIncident(incident, newTickCount), ...tickets]
+            ticketsOpenedTotal += 1
             regionalIncidentCount++
             incidentLog = [`[${site.name}] New: ${riDef.label} — ${riDef.description}${hasMitigation ? ' (damage reduced by ' + DISASTER_PREP_CONFIG[riDef.mitigatedBy!].label + ')' : ''}`, ...incidentLog].slice(0, 10)
             const sevColor = riDef.severity === 'critical' ? '#ff4444' : riDef.severity === 'major' ? '#ff8844' : '#ffcc00'
@@ -5956,6 +6134,35 @@ export const useGameStore = create<GameState>((set) => ({
         }
         return { ...i, ticksRemaining: remaining }
       })
+
+      // ── Ticket status & SLA tracking ───────────────────────
+      // Open tickets move to "in_progress" once work has started (incident clock
+      // has ticked down, or staff are on shift). Tickets exceeding their priority
+      // SLA budget get flagged (counted once toward the lifetime breach total).
+      const activeIncidentById = new Map(activeIncidents.map((i) => [i.id, i]))
+      tickets = tickets.map((t) => {
+        if (t.status === 'resolved') return t
+        const inc = activeIncidentById.get(t.incidentId)
+        let next = t
+        if (inc) {
+          const working = onShiftStaff.length > 0 || inc.ticksRemaining < inc.def.durationTicks
+          const status: TicketStatus = working ? 'in_progress' : 'open'
+          if (status !== t.status) next = { ...next, status }
+        }
+        if (!next.slaBreached && newTickCount - next.createdTick > TICKET_SLA_TICKS[next.priority]) {
+          ticketsSlaBreachedTotal += 1
+          next = { ...next, slaBreached: true }
+        }
+        return next
+      })
+
+      // Cap the board: keep every unresolved ticket, trim oldest resolved ones.
+      if (tickets.length > MAX_TICKETS) {
+        const open = tickets.filter((t) => t.status !== 'resolved')
+        const resolvedTickets = tickets.filter((t) => t.status === 'resolved')
+        const keepResolved = new Set(resolvedTickets.slice(0, Math.max(0, MAX_TICKETS - open.length)))
+        tickets = tickets.filter((t) => t.status !== 'resolved' || keepResolved.has(t))
+      }
 
       // Fatigue recovery: -2 per tick for on-shift staff (slow recovery), -5 for off-shift
       updatedStaff = updatedStaff.map((s) => ({
@@ -6244,6 +6451,11 @@ export const useGameStore = create<GameState>((set) => ({
           activeIncidents,
           incidentLog,
           resolvedCount,
+          tickets,
+          ticketsOpenedTotal,
+          ticketsResolvedTotal,
+          ticketResolutionTickSum,
+          ticketsSlaBreachedTotal,
           powerPriceMultiplier,
           powerPriceSpikeActive,
           powerPriceSpikeTicks,
@@ -8496,6 +8708,11 @@ export const useGameStore = create<GameState>((set) => ({
         activeIncidents,
         incidentLog,
         resolvedCount,
+        tickets,
+        ticketsOpenedTotal,
+        ticketsResolvedTotal,
+        ticketResolutionTickSum,
+        ticketsSlaBreachedTotal,
         activeContracts: updatedContracts,
         contractOffers,
         contractLog,

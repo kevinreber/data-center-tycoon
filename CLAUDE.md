@@ -4,7 +4,7 @@
 
 **Fabric Tycoon: Data Center Simulator** is a web-based isometric tycoon game where players build and manage a data center. Players place cabinets, install servers and network switches, design a Clos (spine-leaf) network fabric, and balance power, heat, and revenue to scale from a single rack to a global operation.
 
-**Current version:** v0.6.1
+**Current version:** v0.6.2
 
 ## Tech Stack
 
@@ -41,7 +41,7 @@ src/
 ├── index.css                   # Global styles, Tailwind imports, neon color theme
 ├── components/
 │   ├── GameCanvas.tsx          # Phaser <-> React bridge; syncs Zustand state to Phaser scene
-│   ├── Sidebar.tsx             # Icon-rail sidebar with 20 slide-out panels
+│   ├── Sidebar.tsx             # Icon-rail sidebar with 21 slide-out panels
 │   ├── HUD.tsx                 # Legacy control panel (build, layers, finance, traffic, equipment)
 │   ├── CabinetDetailPanel.tsx  # Floating detail panel for selected cabinet (stats, actions)
 │   ├── LayersPopup.tsx         # Layer visibility/opacity/color controls popup
@@ -65,6 +65,7 @@ src/
 │       ├── ResearchPanel.tsx   # Tech tree, patents
 │       ├── ContractsPanel.tsx  # Contracts, RFP bidding, multi-site global contracts
 │       ├── IncidentsPanel.tsx  # Active incidents, DR drills, insurance
+│       ├── TicketsPanel.tsx    # Jira-style incident ticket board + ops metrics (backlog, MTTR, SLA)
 │       ├── FacilityPanel.tsx   # Suite upgrades, noise, sound barriers, power redundancy
 │       ├── CarbonPanel.tsx     # Energy source, carbon tracker, green certs, e-waste
 │       ├── SecurityPanel.tsx   # Security tier, features, compliance certs
@@ -235,6 +236,11 @@ Progression types:
 - `IncidentSeverity` = `'minor' | 'major' | 'critical'`
 - `GeneratorStatus` = `'standby' | 'running' | 'cooldown'`
 - `SuppressionType` = `'none' | 'water_suppression' | 'gas_suppression'`
+
+Incident ticket types (Jira-style work tracking):
+- `TicketStatus` = `'open' | 'in_progress' | 'resolved'`
+- `TicketPriority` = `'P1' | 'P2' | 'P3'` (mapped from severity: critical→P1, major→P2, minor→P3)
+- `IncidentTicket` — auto-filed when an incident spawns; tracks `incidentId`, `title`, `priority`, `status`, `workType` (maintenance work order, e.g. "Replace leaf switch"), `affectedAsset` (e.g. "Cabinet C3"), `createdTick`, `resolvedTick`, `resolutionTicks` (MTTR contribution), `resolution` (`'ops_team' | 'auto'`), and `slaBreached`. State lives in `tickets[]` plus the lifetime counters `ticketsOpenedTotal`, `ticketsResolvedTotal`, `ticketResolutionTickSum`, `ticketsSlaBreachedTotal`. SLA budgets per priority are in `TICKET_SLA_TICKS`. Tickets are filed in `tick()` (and the regional-incident path), advanced to `in_progress`/flagged for SLA each tick, and closed when their incident resolves (immediately in `resolveIncident`, or on the next-tick cleanup for staff/auto/expiry).
 
 Staff & HR types:
 - `StaffRole` = `'network_engineer' | 'electrician' | 'cooling_specialist' | 'security_officer'`
@@ -563,8 +569,8 @@ gridRow 4: Corridor (bottom access)
 
 The UI uses a **sidebar-driven navigation pattern**:
 
-- **`Sidebar.tsx`** renders an icon rail on the left with 20 panel icons organized into top/middle/bottom sections. Clicking an icon slides out the corresponding panel.
-- **`sidebar/*.tsx`** — Each panel is a separate component: `BuildPanel`, `EquipmentPanel`, `FinancePanel`, `NetworkPanel`, `OperationsPanel`, `InfrastructurePanel`, `ResearchPanel`, `ContractsPanel`, `IncidentsPanel`, `FacilityPanel`, `CarbonPanel`, `SecurityPanel`, `MarketPanel`, `CapacityPanel`, `WorldMapPanel`, `ProgressPanel`, `ScenarioPanel`, `BuildLogsPanel`, `SettingsPanel`, `GuidePanel`
+- **`Sidebar.tsx`** renders an icon rail on the left with 21 panel icons organized into top/middle/bottom sections. Clicking an icon slides out the corresponding panel.
+- **`sidebar/*.tsx`** — Each panel is a separate component: `BuildPanel`, `EquipmentPanel`, `FinancePanel`, `NetworkPanel`, `OperationsPanel`, `InfrastructurePanel`, `ResearchPanel`, `ContractsPanel`, `IncidentsPanel`, `TicketsPanel`, `FacilityPanel`, `CarbonPanel`, `SecurityPanel`, `MarketPanel`, `CapacityPanel`, `WorldMapPanel`, `ProgressPanel`, `ScenarioPanel`, `BuildLogsPanel`, `SettingsPanel`, `GuidePanel`
 - **`CabinetDetailPanel.tsx`** — Floating detail panel shown when a cabinet is selected; displays hardware slots, real-time stats (power, temp, revenue, age, traffic), and actions (power toggle, flip facing, refresh servers)
 - **`LayersPopup.tsx`** — Layer controls popup for toggling visibility, opacity, and custom colors per network layer
 - **`HUD.tsx`** — Legacy monolithic control panel (still present, ~2940 lines)

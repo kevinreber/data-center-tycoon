@@ -64,8 +64,9 @@ import {
   GPU_POD_CONFIG,
   LIQUID_COOLING_CONFIG,
   TRAINING_JOB_CONFIG,
+  TICKET_SLA_TICKS,
 } from '@/stores/gameStore'
-import type { TrainingJobOffer } from '@/stores/gameStore'
+import type { TrainingJobOffer, IncidentTicket } from '@/stores/gameStore'
 import type { RegionId } from '@/stores/gameStore'
 
 // Helper to get/set store state
@@ -5568,6 +5569,122 @@ describe('Training Jobs & AI Revenue (Phase 8E)', () => {
     getState().tick()
     getState().tick()
     expect(getState().trainingJobOffers.find((o) => o.id === offer.id)).toBeUndefined()
+  })
+})
+
+// ============================================================================
+// Incident Ticket Tracking (Jira-style)
+// ============================================================================
+describe('Incident Tickets', () => {
+  const revenueDef = INCIDENT_CATALOG.find((d) => d.effect === 'revenue_penalty')!
+  const criticalDef = INCIDENT_CATALOG.find((d) => d.severity === 'critical' && d.durationTicks >= 10)!
+
+  function makeTicket(overrides: Partial<IncidentTicket> & { incidentId: string }): IncidentTicket {
+    return {
+      id: 'INC-1',
+      title: 'Test Incident',
+      description: 'Test',
+      priority: 'P2',
+      severity: 'major',
+      status: 'open',
+      workType: 'Investigate & remediate',
+      affectedAsset: 'Facility',
+      createdTick: 0,
+      resolvedTick: null,
+      resolutionTicks: null,
+      resolution: null,
+      slaBreached: false,
+      ...overrides,
+    }
+  }
+
+  it('manually resolving an incident closes its ticket and records MTTR', () => {
+    setState({
+      sandboxMode: true,
+      money: 999999,
+      tickCount: 50,
+      activeIncidents: [{ id: 'inc-t1', def: revenueDef, ticksRemaining: revenueDef.durationTicks, resolved: false }],
+      tickets: [makeTicket({ incidentId: 'inc-t1', createdTick: 40 })],
+      ticketsResolvedTotal: 0,
+      ticketResolutionTickSum: 0,
+    })
+    getState().resolveIncident('inc-t1')
+    const t = getState().tickets.find((x) => x.incidentId === 'inc-t1')!
+    expect(t.status).toBe('resolved')
+    expect(t.resolution).toBe('ops_team')
+    expect(t.resolutionTicks).toBe(10) // 50 - 40
+    expect(getState().ticketsResolvedTotal).toBe(1)
+    expect(getState().ticketResolutionTickSum).toBe(10)
+  })
+
+  it('auto/staff/expiry resolution closes the ticket on the next tick', () => {
+    setState({
+      sandboxMode: true,
+      money: 999999,
+      tickCount: 100,
+      // Incident already flagged resolved (e.g. by staff/expiry) — cleanup runs next tick
+      activeIncidents: [{ id: 'inc-t2', def: revenueDef, ticksRemaining: 0, resolved: true }],
+      tickets: [makeTicket({ id: 'INC-2', incidentId: 'inc-t2', createdTick: 90 })],
+      ticketsResolvedTotal: 0,
+      ticketResolutionTickSum: 0,
+    })
+    getState().tick()
+    const t = getState().tickets.find((x) => x.incidentId === 'inc-t2')!
+    expect(t.status).toBe('resolved')
+    expect(t.resolution).toBe('auto')
+    expect(t.resolutionTicks).toBe(11) // newTickCount 101 - 90
+    expect(getState().ticketsResolvedTotal).toBe(1)
+  })
+
+  it('flags an SLA breach and moves a worked ticket to in_progress', () => {
+    setState({
+      sandboxMode: true,
+      money: 999999,
+      tickCount: 100,
+      // Active incident with work started (ticksRemaining < duration)
+      activeIncidents: [{ id: 'inc-t3', def: criticalDef, ticksRemaining: criticalDef.durationTicks - 1, resolved: false }],
+      // P1 ticket opened long ago — well past its 12-tick SLA budget
+      tickets: [makeTicket({ id: 'INC-3', incidentId: 'inc-t3', priority: 'P1', severity: 'critical', createdTick: 50 })],
+      ticketsSlaBreachedTotal: 0,
+      staff: [],
+    })
+    getState().tick()
+    const t = getState().tickets.find((x) => x.incidentId === 'inc-t3')!
+    expect(t.status).toBe('in_progress')
+    expect(t.slaBreached).toBe(true)
+    expect(getState().ticketsSlaBreachedTotal).toBe(1)
+    // P1 SLA budget is the tightest
+    expect(TICKET_SLA_TICKS.P1).toBeLessThan(TICKET_SLA_TICKS.P3)
+  })
+
+  it('every active incident has a corresponding ticket after running ticks', () => {
+    setupBasicDataCenter()
+    setState({ money: 999999 })
+    // Run enough ticks that incidents very likely spawn
+    for (let i = 0; i < 300; i++) getState().tick()
+    const active = getState().activeIncidents.filter((inc) => !inc.resolved)
+    const ticketIncidentIds = new Set(getState().tickets.map((t) => t.incidentId))
+    for (const inc of active) {
+      expect(ticketIncidentIds.has(inc.id)).toBe(true)
+    }
+    // The board should never exceed its cap
+    expect(getState().tickets.length).toBeLessThanOrEqual(60)
+  })
+
+  it('resetGame clears all ticket state', () => {
+    setState({
+      tickets: [makeTicket({ incidentId: 'inc-x' })],
+      ticketsOpenedTotal: 5,
+      ticketsResolvedTotal: 3,
+      ticketResolutionTickSum: 42,
+      ticketsSlaBreachedTotal: 2,
+    })
+    getState().resetGame()
+    expect(getState().tickets).toHaveLength(0)
+    expect(getState().ticketsOpenedTotal).toBe(0)
+    expect(getState().ticketsResolvedTotal).toBe(0)
+    expect(getState().ticketResolutionTickSum).toBe(0)
+    expect(getState().ticketsSlaBreachedTotal).toBe(0)
   })
 })
 
