@@ -147,6 +147,7 @@ export function Sidebar() {
   const [mobileRailOpen, setMobileRailOpen] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
   const incidentCount = useGameStore((s) => s.activeIncidents.filter((i) => !i.resolved).length)
+  const ticketBacklog = useGameStore((s) => s.tickets.filter((t) => t.status !== 'resolved').length)
   const trackPanelOpen = useGameStore((s) => s.trackPanelOpen)
   const isMobile = useIsMobile()
 
@@ -257,7 +258,7 @@ export function Sidebar() {
                   item={item}
                   isActive={activePanel === item.id}
                   onClick={() => togglePanel(item.id)}
-                  badgeCount={item.id === 'incidents' ? incidentCount : undefined}
+                  badgeCount={item.id === 'incidents' ? incidentCount : item.id === 'tickets' ? ticketBacklog : undefined}
                   mobile
                 />
               ))}
@@ -349,7 +350,7 @@ export function Sidebar() {
                 item={item}
                 isActive={activePanel === item.id}
                 onClick={() => togglePanel(item.id)}
-                badgeCount={item.id === 'incidents' ? incidentCount : undefined}
+                badgeCount={item.id === 'incidents' ? incidentCount : item.id === 'tickets' ? ticketBacklog : undefined}
               />
             ))}
           </div>

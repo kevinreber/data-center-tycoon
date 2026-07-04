@@ -5594,6 +5594,9 @@ export const useGameStore = create<GameState>((set) => ({
       let ticketsResolvedTotal = state.ticketsResolvedTotal
       let ticketResolutionTickSum = state.ticketResolutionTickSum
       let ticketsSlaBreachedTotal = state.ticketsSlaBreachedTotal
+      // SLA-breach messages collected during ticket processing, emitted to the
+      // event log once logEvent is defined later in the tick.
+      const ticketSlaBreachEvents: string[] = []
       let coolingUnits = [...state.coolingUnits]
       let chillerPlants = [...state.chillerPlants]
       let coolingPipes = [...state.coolingPipes]
@@ -6152,6 +6155,7 @@ export const useGameStore = create<GameState>((set) => ({
         if (!next.slaBreached && newTickCount - next.createdTick > TICKET_SLA_TICKS[next.priority]) {
           ticketsSlaBreachedTotal += 1
           next = { ...next, slaBreached: true }
+          ticketSlaBreachEvents.push(`SLA breach — ${next.id} ${next.priority} "${next.title}" (${next.affectedAsset})`)
         }
         return next
       })
@@ -7133,6 +7137,11 @@ export const useGameStore = create<GameState>((set) => ({
       if (state.loans.length > 0 && updatedLoans.length === 0) unlock('debt_free')
       if (resolvedCount > state.resolvedCount || justResolved.length > 0) unlock('survive_incident')
       if (resolvedCount >= 5) unlock('five_incidents')
+      // Incident ticket achievements
+      if (ticketsResolvedTotal >= 1) unlock('first_ticket_closed')
+      if (ticketsOpenedTotal >= 10 && tickets.every((t) => t.status === 'resolved')) unlock('zero_backlog')
+      if (ticketsResolvedTotal >= 5 && ticketResolutionTickSum / ticketsResolvedTotal < 10) unlock('fast_mttr')
+      if (ticketsResolvedTotal >= 15 && ticketsSlaBreachedTotal === 0) unlock('sla_clean_sheet')
       if (newMoney >= 100000) unlock('hundred_k')
       if (newMoney >= 1000000) unlock('million')
       if (stats.pue > 0 && stats.pue <= 1.30) unlock('low_pue')
@@ -7825,6 +7834,7 @@ export const useGameStore = create<GameState>((set) => ({
         if (eventLog.length > 200) eventLog.splice(0, eventLog.length - 200)
       }
       // Log key events
+      for (const msg of ticketSlaBreachEvents) logEvent('incident', msg, 'warning')
       if (fireActive && !state.fireActive) logEvent('incident', 'Fire detected!', 'error')
       if (powerOutage && !state.powerOutage) logEvent('incident', 'Power outage!', 'error')
       if (supplyShortageActive && !state.supplyShortageActive) logEvent('system', `Chip shortage active (${shortagePriceMultiplier}x prices)`, 'warning')
@@ -7879,6 +7889,7 @@ export const useGameStore = create<GameState>((set) => ({
           if (tip.id === 'no_leaf_switch' && newCabinets.filter((c) => !c.hasLeafSwitch).length >= 3) trigger = true
           if (tip.id === 'no_spine' && newCabinets.some((c) => c.hasLeafSwitch) && spineSwitches.length === 0) trigger = true
           if (tip.id === 'first_incident' && activeIncidents.length > 0 && state.activeIncidents.length === 0) trigger = true
+          if (tip.id === 'first_ticket' && ticketsOpenedTotal > 0 && state.ticketsOpenedTotal === 0) trigger = true
           if (tip.id === 'aisle_hint' && newCabinets.length >= 4 && state.aisleBonus === 0) trigger = true
           if (tip.id === 'zone_hint' && newCabinets.length >= 3 && currentZones.length === 0) trigger = true
           if (tip.id === 'first_contract' && state.contractOffers.length > 0 && state.activeContracts.length === 0 && completedContracts === 0) trigger = true

@@ -5641,6 +5641,10 @@ describe('Incident Tickets', () => {
       sandboxMode: true,
       money: 999999,
       tickCount: 100,
+      // A spine (no cabinets) keeps us out of the empty-facility early-return path
+      // while preventing new incident spawns (spawns require cabinets.length > 0).
+      cabinets: [],
+      spineSwitches: [{ id: 'spine-1', powerStatus: true }],
       // Active incident with work started (ticksRemaining < duration)
       activeIncidents: [{ id: 'inc-t3', def: criticalDef, ticksRemaining: criticalDef.durationTicks - 1, resolved: false }],
       // P1 ticket opened long ago — well past its 12-tick SLA budget
@@ -5655,6 +5659,8 @@ describe('Incident Tickets', () => {
     expect(getState().ticketsSlaBreachedTotal).toBe(1)
     // P1 SLA budget is the tightest
     expect(TICKET_SLA_TICKS.P1).toBeLessThan(TICKET_SLA_TICKS.P3)
+    // The breach is recorded in the filterable event log
+    expect(getState().eventLog.some((e) => e.message.includes('SLA breach') && e.category === 'incident')).toBe(true)
   })
 
   it('every active incident has a corresponding ticket after running ticks', () => {
@@ -5669,6 +5675,30 @@ describe('Incident Tickets', () => {
     }
     // The board should never exceed its cap
     expect(getState().tickets.length).toBeLessThanOrEqual(60)
+  })
+
+  it('unlocks ticket achievements when metrics are met', () => {
+    // A spine with no cabinets: stays out of the early-return path yet blocks
+    // new incident spawns (which need cabinets), keeping the backlog clean.
+    setState({
+      sandboxMode: true,
+      money: 999999,
+      cabinets: [],
+      spineSwitches: [{ id: 'spine-1', powerStatus: true }],
+      tickCount: 100,
+      ticketsOpenedTotal: 20,
+      ticketsResolvedTotal: 16,
+      ticketResolutionTickSum: 16 * 5, // avg MTTR 5t
+      ticketsSlaBreachedTotal: 0,
+      tickets: [], // backlog is clear
+      achievements: [],
+    })
+    getState().tick()
+    const ids = getState().achievements.map((a) => a.def.id)
+    expect(ids).toContain('first_ticket_closed')
+    expect(ids).toContain('zero_backlog')
+    expect(ids).toContain('fast_mttr')
+    expect(ids).toContain('sla_clean_sheet')
   })
 
   it('resetGame clears all ticket state', () => {
