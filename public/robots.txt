@@ -2,4 +2,4 @@ User-agent: *
 Allow: /
 Disallow: /assets/
 
-Sitemap: https://kevinreber.github.io/data-center-tycoon/sitemap.xml
+Sitemap: https://data-center-tycoon.vercel.app/sitemap.xml
