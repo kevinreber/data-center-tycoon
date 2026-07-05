@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { useGameStore } from '@/stores/gameStore'
 import type {
   Season,
@@ -5534,11 +5534,23 @@ describe('Training Jobs & AI Revenue (Phase 8E)', () => {
 
   // ── ai_lab revenue model ─────────────────────────────────────
   // Pin heat low so thermal throttling doesn't confound the multiplier signal,
-  // and let the fabric ramp up before sampling.
+  // and let the fabric ramp up before sampling. These tests compare revenue
+  // sampled across two tick windows, so all per-tick randomness (incident
+  // spawns, traffic spikes, power market walk) and the time-of-day demand
+  // curve must be pinned — otherwise the comparison is flaky depending on
+  // where the global Math.random sequence happens to land.
   function tickWithCoolCabs(n: number) {
-    for (let i = 0; i < n; i++) {
-      setState({ cabinets: getState().cabinets.map((c) => ({ ...c, heatLevel: 30 })) })
-      getState().tick()
+    const rng = vi.spyOn(Math, 'random').mockReturnValue(0.5)
+    try {
+      for (let i = 0; i < n; i++) {
+        setState({
+          cabinets: getState().cabinets.map((c) => ({ ...c, heatLevel: 30 })),
+          gameHour: 12,
+        })
+        getState().tick()
+      }
+    } finally {
+      rng.mockRestore()
     }
   }
 
