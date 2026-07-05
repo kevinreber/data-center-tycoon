@@ -7747,6 +7747,7 @@ export const useGameStore = create<GameState>((set) => ({
             case 'has_leaf': stepDone = newCabinets.some((c) => c.hasLeafSwitch); break
             case 'has_spine': stepDone = spineSwitches.length > 0; break
             case 'game_unpaused': stepDone = state.gameSpeed > 0; break
+            case 'traffic_flowing': stepDone = state.trafficVisible && trafficStats.totalFlows > 0; break
             case 'earned_revenue': stepDone = state.money > 50000; break
             case 'heat_rising': stepDone = stats.avgHeat > SIM.ambientTemp + 2; break
             case 'has_two_equipped_cabinets': stepDone = newCabinets.filter((c) => c.serverCount > 0).length >= 2; break

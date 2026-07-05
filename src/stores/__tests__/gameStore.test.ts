@@ -4081,6 +4081,26 @@ describe('Guided Tutorial System', () => {
       expect(getState().tutorialStepIndex).toBeGreaterThanOrEqual(5)
     })
 
+    it('advances traffic_flowing step when the fabric carries traffic', () => {
+      setState({ sandboxMode: true, suiteTier: 'standard' })
+      getState().startTutorial()
+      getState().selectHqRegion('ashburn')
+
+      // Full network: cabinet + server + leaf + spine → traffic flows exist
+      getState().addCabinet(0, STD_ROW_0, 'production', 'general', 'north')
+      getState().upgradeNextCabinet()
+      getState().addLeafToNextCabinet()
+      getState().addSpineSwitch()
+
+      const trafficStepIndex = TUTORIAL_STEPS.findIndex((s) => s.completionCheck === 'traffic_flowing')
+      expect(trafficStepIndex).toBeGreaterThan(-1)
+
+      // Ticks advance through build/unpause steps, then past the traffic step
+      // (trafficVisible defaults to true and the fabric has active flows)
+      for (let i = 0; i < 10; i++) getState().tick()
+      expect(getState().tutorialStepIndex).toBeGreaterThan(trafficStepIndex)
+    })
+
     it('advances panel-based steps when panels are opened', () => {
       setState({ sandboxMode: true, suiteTier: 'standard' })
       getState().startTutorial()
