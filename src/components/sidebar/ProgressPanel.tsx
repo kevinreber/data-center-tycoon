@@ -1,5 +1,5 @@
 import { useGameStore, ACHIEVEMENT_CATALOG, getReputationTier, PRESTIGE_REQUIREMENTS, MAX_PRESTIGE_LEVEL, calcPrestigePoints, canPrestige } from '@/stores/gameStore'
-import { Star, RefreshCw, RotateCw, Zap, DollarSign, Thermometer, Award } from 'lucide-react'
+import { Star, RefreshCw, RotateCw, Zap, DollarSign, Thermometer, Award, Ticket } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 export function ProgressPanel() {
@@ -9,8 +9,14 @@ export function ProgressPanel() {
     completedContracts, totalRefreshes,
     prestige: prestigeState,
     cabinets, money, suiteTier, sites,
+    ticketsOpenedTotal, ticketsResolvedTotal, ticketResolutionTickSum, ticketsSlaBreachedTotal,
     doPrestige,
   } = useGameStore()
+
+  const mttr = ticketsResolvedTotal > 0 ? Math.round(ticketResolutionTickSum / ticketsResolvedTotal) : 0
+  const slaRate = ticketsOpenedTotal > 0
+    ? Math.max(0, Math.round((1 - ticketsSlaBreachedTotal / ticketsOpenedTotal) * 100))
+    : 100
 
   const tier = getReputationTier(reputationScore)
   const canPrestigeNow = canPrestige({ suiteTier, money, reputationScore, cabinets, prestige: prestigeState })
@@ -214,6 +220,34 @@ export function ProgressPanel() {
           </p>
         </div>
       </div>
+
+      {/* Incident ops metrics */}
+      {ticketsOpenedTotal > 0 && (
+        <div className="border-t border-border pt-3">
+          <div className="flex items-center gap-2 mb-2">
+            <Ticket className="size-3 text-neon-cyan" />
+            <span className="text-xs font-bold text-neon-cyan">INCIDENT OPS</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="rounded border border-border bg-muted/20 p-2">
+              <div className="text-sm font-bold font-mono text-neon-green tabular-nums">{ticketsResolvedTotal}</div>
+              <div className="text-[9px] uppercase tracking-wider text-muted-foreground mt-0.5">Tickets resolved</div>
+            </div>
+            <div className="rounded border border-border bg-muted/20 p-2">
+              <div className="text-sm font-bold font-mono text-neon-cyan tabular-nums">{mttr}t</div>
+              <div className="text-[9px] uppercase tracking-wider text-muted-foreground mt-0.5">Avg MTTR</div>
+            </div>
+            <div className="rounded border border-border bg-muted/20 p-2">
+              <div className={`text-sm font-bold font-mono tabular-nums ${slaRate >= 90 ? 'text-neon-green' : slaRate >= 70 ? 'text-neon-yellow' : 'text-neon-red'}`}>{slaRate}%</div>
+              <div className="text-[9px] uppercase tracking-wider text-muted-foreground mt-0.5">SLA on-time</div>
+            </div>
+            <div className="rounded border border-border bg-muted/20 p-2">
+              <div className={`text-sm font-bold font-mono tabular-nums ${ticketsSlaBreachedTotal > 0 ? 'text-neon-red' : 'text-neon-green'}`}>{ticketsSlaBreachedTotal}</div>
+              <div className="text-[9px] uppercase tracking-wider text-muted-foreground mt-0.5">SLA breaches</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Achievements */}
       <div className="border-t border-border pt-3">

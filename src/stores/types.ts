@@ -926,6 +926,34 @@ export interface ActiveIncident {
   affectedCabinetId?: string
 }
 
+// ── Incident Ticket Tracking (Jira-style) ─────────────────────
+/** Workflow column for a ticket — open → in_progress → resolved */
+export type TicketStatus = 'open' | 'in_progress' | 'resolved'
+/** Priority maps from incident severity: P1=critical, P2=major, P3=minor */
+export type TicketPriority = 'P1' | 'P2' | 'P3'
+
+/**
+ * A Jira-style work ticket auto-filed whenever an incident spawns. Tracks the
+ * affected asset, the maintenance work required, and time-to-resolution so the
+ * NOC/ops dashboard can surface MTTR and SLA metrics.
+ */
+export interface IncidentTicket {
+  id: string                  // human key, e.g. "INC-42"
+  incidentId: string          // links to the ActiveIncident.id that opened it
+  title: string               // incident label
+  description: string
+  priority: TicketPriority
+  severity: IncidentSeverity
+  status: TicketStatus
+  workType: string            // maintenance work order (e.g. "Replace leaf switch")
+  affectedAsset: string       // human-readable affected asset (e.g. "Cabinet C3")
+  createdTick: number
+  resolvedTick: number | null
+  resolutionTicks: number | null   // ticks from open → resolved (MTTR contribution)
+  resolution: 'ops_team' | 'auto' | null  // how it closed
+  slaBreached: boolean        // open longer than its priority SLA budget
+}
+
 /** Identifies which switch to inspect in the port detail modal */
 export interface SwitchDetailTarget {
   type: 'leaf' | 'spine'

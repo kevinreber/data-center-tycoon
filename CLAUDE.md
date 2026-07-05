@@ -4,7 +4,7 @@
 
 **Fabric Tycoon: Data Center Simulator** is a web-based isometric tycoon game where players build and manage a data center. Players place cabinets, install servers and network switches, design a Clos (spine-leaf) network fabric, and balance power, heat, and revenue to scale from a single rack to a global operation.
 
-**Current version:** v0.6.1
+**Current version:** v0.6.2
 
 ## Tech Stack
 
@@ -41,7 +41,7 @@ src/
 ├── index.css                   # Global styles, Tailwind imports, neon color theme
 ├── components/
 │   ├── GameCanvas.tsx          # Phaser <-> React bridge; syncs Zustand state to Phaser scene
-│   ├── Sidebar.tsx             # Icon-rail sidebar with 20 slide-out panels
+│   ├── Sidebar.tsx             # Icon-rail sidebar with 21 slide-out panels
 │   ├── HUD.tsx                 # Legacy control panel (build, layers, finance, traffic, equipment)
 │   ├── CabinetDetailPanel.tsx  # Floating detail panel for selected cabinet (stats, actions)
 │   ├── LayersPopup.tsx         # Layer visibility/opacity/color controls popup
@@ -65,6 +65,7 @@ src/
 │       ├── ResearchPanel.tsx   # Tech tree, patents
 │       ├── ContractsPanel.tsx  # Contracts, RFP bidding, multi-site global contracts
 │       ├── IncidentsPanel.tsx  # Active incidents, DR drills, insurance
+│       ├── TicketsPanel.tsx    # Jira-style incident ticket board + ops metrics (backlog, MTTR, SLA)
 │       ├── FacilityPanel.tsx   # Suite upgrades, noise, sound barriers, power redundancy
 │       ├── CarbonPanel.tsx     # Energy source, carbon tracker, green certs, e-waste
 │       ├── SecurityPanel.tsx   # Security tier, features, compliance certs
@@ -91,7 +92,7 @@ src/
 │   │   ├── equipment.ts        # Cooling, server config, PDU, cable tray, aisle configs
 │   │   ├── features.ts         # Row-end slots, aisle widths, raised floor, cable mgmt, workloads, advanced tiers, rack equipment, audio, prestige/New Game+
 │   │   ├── infrastructure.ts   # Busway, cross-connect, in-row cooling, spacing, zone configs
-│   │   ├── progression.ts      # Tech tree, achievements (110), incidents (29 incl. 7 Phase 8D AI types), contracts, scenarios, tutorial tips (44), guided tutorial steps
+│   │   ├── progression.ts      # Tech tree, achievements (114), incidents (29 incl. 7 Phase 8D AI types), contracts, scenarios, tutorial tips (45), guided tutorial steps
 │   │   └── world.ts            # Staff, supply chain, weather, interconnection, peering, competitors, regions, sites, sovereignty, demand
 │   ├── gameStore.test.ts       # Vitest tests for cabinet placement and placement hints
 │   ├── __tests__/
@@ -153,7 +154,7 @@ All game state lives in a **single Zustand store** (`useGameStore`). The store (
 - **Spacing & layout configs** (`SPACING_CONFIG`): adjacency heat penalties, aisle bonuses, airflow bonuses, maintenance access, fire spread mechanics
 - **Zone bonus configs** (`ZONE_BONUS_CONFIG`): minimum cluster size (3), environment and customer type bonuses
 - **Economy configs**: loan options, depreciation, power market parameters, insurance options, valuation milestones
-- **Progression configs**: tech tree (9 techs), contracts (9 base + 4 compliance-gated + zone contracts), achievements (110), incidents (29 types — includes 7 Phase 8D AI fabric/cabinet incidents), scenarios (5)
+- **Progression configs**: tech tree (9 techs), contracts (9 base + 4 compliance-gated + zone contracts), achievements (114), incidents (29 types — includes 7 Phase 8D AI fabric/cabinet incidents), scenarios (5)
 - **Staff configs** (`STAFF_ROLE_CONFIG`, `STAFF_CERT_CONFIG`, `SHIFT_PATTERN_CONFIG`): roles, certifications, shift costs
 - **Supply chain configs** (`SUPPLY_CHAIN_CONFIG`): lead times, bulk discounts, shortage mechanics
 - **Weather configs** (`SEASON_CONFIG`, `WEATHER_CONDITION_CONFIG`): seasonal/weather ambient modifiers
@@ -164,7 +165,7 @@ All game state lives in a **single Zustand store** (`useGameStore`). The store (
 - **Power redundancy configs** (`POWER_REDUNDANCY_CONFIG`): N, N+1, 2N levels
 - **Noise configs** (`NOISE_CONFIG`): noise generation, complaints, fines, sound barriers
 - **Spot compute configs** (`SPOT_COMPUTE_CONFIG`): dynamic spot market pricing
-- **Tutorial tips** (`TUTORIAL_TIPS`): 43 contextual gameplay tips (including carbon, security, NACL, market, operations, cooling, infrastructure, and multi-site tips)
+- **Tutorial tips** (`TUTORIAL_TIPS`): 45 contextual gameplay tips (including carbon, security, NACL, market, operations, cooling, infrastructure, incident-ticket, and multi-site tips)
 - **Guided tutorial steps** (`TUTORIAL_STEPS`): Step-by-step guided tutorial for new players with completion checks and panel highlights
 - **Energy source configs** (`ENERGY_SOURCE_CONFIG`): 4 energy sources with cost/carbon/reliability
 - **Green cert configs** (`GREEN_CERT_CONFIG`): 4 green certifications with requirements and bonuses
@@ -235,6 +236,11 @@ Progression types:
 - `IncidentSeverity` = `'minor' | 'major' | 'critical'`
 - `GeneratorStatus` = `'standby' | 'running' | 'cooldown'`
 - `SuppressionType` = `'none' | 'water_suppression' | 'gas_suppression'`
+
+Incident ticket types (Jira-style work tracking):
+- `TicketStatus` = `'open' | 'in_progress' | 'resolved'`
+- `TicketPriority` = `'P1' | 'P2' | 'P3'` (mapped from severity: critical→P1, major→P2, minor→P3)
+- `IncidentTicket` — auto-filed when an incident spawns; tracks `incidentId`, `title`, `priority`, `status`, `workType` (maintenance work order, e.g. "Replace leaf switch"), `affectedAsset` (e.g. "Cabinet C3"), `createdTick`, `resolvedTick`, `resolutionTicks` (MTTR contribution), `resolution` (`'ops_team' | 'auto'`), and `slaBreached`. State lives in `tickets[]` plus the lifetime counters `ticketsOpenedTotal`, `ticketsResolvedTotal`, `ticketResolutionTickSum`, `ticketsSlaBreachedTotal`. SLA budgets per priority are in `TICKET_SLA_TICKS`. Tickets are filed in `tick()` (and the regional-incident path), advanced to `in_progress`/flagged for SLA each tick, and closed when their incident resolves (immediately in `resolveIncident`, or on the next-tick cleanup for staff/auto/expiry).
 
 Staff & HR types:
 - `StaffRole` = `'network_engineer' | 'electrician' | 'cooling_specialist' | 'security_officer'`
@@ -563,8 +569,8 @@ gridRow 4: Corridor (bottom access)
 
 The UI uses a **sidebar-driven navigation pattern**:
 
-- **`Sidebar.tsx`** renders an icon rail on the left with 20 panel icons organized into top/middle/bottom sections. Clicking an icon slides out the corresponding panel.
-- **`sidebar/*.tsx`** — Each panel is a separate component: `BuildPanel`, `EquipmentPanel`, `FinancePanel`, `NetworkPanel`, `OperationsPanel`, `InfrastructurePanel`, `ResearchPanel`, `ContractsPanel`, `IncidentsPanel`, `FacilityPanel`, `CarbonPanel`, `SecurityPanel`, `MarketPanel`, `CapacityPanel`, `WorldMapPanel`, `ProgressPanel`, `ScenarioPanel`, `BuildLogsPanel`, `SettingsPanel`, `GuidePanel`
+- **`Sidebar.tsx`** renders an icon rail on the left with 21 panel icons organized into top/middle/bottom sections. Clicking an icon slides out the corresponding panel.
+- **`sidebar/*.tsx`** — Each panel is a separate component: `BuildPanel`, `EquipmentPanel`, `FinancePanel`, `NetworkPanel`, `OperationsPanel`, `InfrastructurePanel`, `ResearchPanel`, `ContractsPanel`, `IncidentsPanel`, `TicketsPanel`, `FacilityPanel`, `CarbonPanel`, `SecurityPanel`, `MarketPanel`, `CapacityPanel`, `WorldMapPanel`, `ProgressPanel`, `ScenarioPanel`, `BuildLogsPanel`, `SettingsPanel`, `GuidePanel`
 - **`CabinetDetailPanel.tsx`** — Floating detail panel shown when a cabinet is selected; displays hardware slots, real-time stats (power, temp, revenue, age, traffic), and actions (power toggle, flip facing, refresh servers)
 - **`LayersPopup.tsx`** — Layer controls popup for toggling visibility, opacity, and custom colors per network layer
 - **`HUD.tsx`** — Legacy monolithic control panel (still present, ~2940 lines)
@@ -634,7 +640,7 @@ A `setInterval` in `App.tsx` calls `tick()` at the rate determined by `gameSpeed
 17. **Contracts**: Checks SLA compliance, termination/completion logic
 18. **Reputation**: Adjusts score based on SLAs, outages, fires, violations
 19. **Depreciation**: Ages servers, reduces efficiency after 30% of 800-tick lifespan
-20. **Achievements**: Checks 106 achievement conditions
+20. **Achievements**: Checks 114 achievement conditions
 21. **Traffic**: ECMP distribution across active spines
 22. **Capacity history**: Records snapshot of current stats each tick (capped at 100 entries)
 23. **Lifetime stats**: Updates running totals (revenue, expenses, peak temp, uptime streaks, etc.)

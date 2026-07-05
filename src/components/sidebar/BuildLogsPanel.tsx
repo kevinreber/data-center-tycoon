@@ -16,6 +16,24 @@ interface VersionEntry {
 
 const CHANGELOG: VersionEntry[] = [
   {
+    version: 'v0.6.2',
+    date: 'Jun 2026',
+    title: 'Incident Ticketing',
+    highlights: 'Every incident now files a Jira-style work ticket the moment it spawns. A new Tickets sidebar gives you a live board (Open → In Progress → Resolved) plus an ops dashboard tracking backlog, mean-time-to-resolve, SLA breaches, and open P1 count — so you can run your data center like a real NOC.',
+    changes: [
+      { text: 'Tickets panel — auto-filed work tickets for every incident, grouped into Open / In Progress / Resolved columns with priority chips (P1/P2/P3) and SLA-breach flags', type: 'new' },
+      { text: 'Each ticket shows the affected asset (e.g. Cabinet C3, Spine S2, GPU Pod 2) and the maintenance work order required (Replace leaf switch, Service cooling unit, Repair network link, etc.)', type: 'new' },
+      { text: 'Ops dashboard metrics — backlog, lifetime resolved, average MTTR, total filed, SLA breaches, and open P1 count', type: 'new' },
+      { text: 'Dispatch a fix straight from a ticket card — same paid-resolution path as the Incidents panel, with the ops discount applied', type: 'new' },
+      { text: 'Per-priority SLA budgets (P1 fastest) — tickets that overrun their budget get flagged and counted toward your lifetime breach total', type: 'new' },
+      { text: 'Backlog badge on the Tickets sidebar icon shows open + in-progress count at a glance', type: 'new' },
+      { text: '4 new achievements — First Responder, Inbox Zero, Rapid Response (sub-10-tick MTTR), and Clean Sheet (15 tickets, zero SLA breaches)', type: 'new' },
+      { text: 'Incident Ops metrics card in the Progress panel — tickets resolved, average MTTR, SLA on-time rate, and breach count', type: 'new' },
+      { text: 'SLA breaches are recorded in the filterable event log; a contextual tip points new players to the board when their first ticket is filed', type: 'improved' },
+      { text: 'Tickets persist across save/load; the board is capped so resolved history stays tidy without ever dropping an open ticket', type: 'improved' },
+    ],
+  },
+  {
     version: 'v0.6.1',
     date: 'Jun 2026',
     title: 'The AI Operations Era',

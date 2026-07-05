@@ -4,7 +4,7 @@ import {
   Cpu, Server, DollarSign, Radio, Zap, Plug,
   FlaskConical, FileText, Siren, Building, Trophy,
   Save, X, HelpCircle, Leaf, Shield, TrendingUp, Newspaper, BarChart3, Globe, Target,
-  Menu, Activity,
+  Menu, Activity, Ticket,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -24,6 +24,7 @@ import { InfrastructurePanel } from '@/components/sidebar/InfrastructurePanel'
 import { ResearchPanel } from '@/components/sidebar/ResearchPanel'
 import { ContractsPanel } from '@/components/sidebar/ContractsPanel'
 import { IncidentsPanel } from '@/components/sidebar/IncidentsPanel'
+import { TicketsPanel } from '@/components/sidebar/TicketsPanel'
 import { FacilityPanel } from '@/components/sidebar/FacilityPanel'
 import { ProgressPanel } from '@/components/sidebar/ProgressPanel'
 import { SettingsPanel } from '@/components/sidebar/SettingsPanel'
@@ -37,7 +38,7 @@ import { WorldMapPanel } from '@/components/sidebar/WorldMapPanel'
 import { ScenarioPanel } from '@/components/sidebar/ScenarioPanel'
 import { NocPanel } from '@/components/sidebar/NocPanel'
 
-type PanelId = 'guide' | 'build' | 'equipment' | 'finance' | 'network' | 'noc' | 'operations' | 'infrastructure' | 'research' | 'contracts' | 'incidents' | 'facility' | 'carbon' | 'security' | 'market' | 'capacity' | 'world_map' | 'progress' | 'scenarios' | 'settings' | 'build_logs'
+type PanelId = 'guide' | 'build' | 'equipment' | 'finance' | 'network' | 'noc' | 'operations' | 'infrastructure' | 'research' | 'contracts' | 'incidents' | 'tickets' | 'facility' | 'carbon' | 'security' | 'market' | 'capacity' | 'world_map' | 'progress' | 'scenarios' | 'settings' | 'build_logs'
 
 interface SidebarItem {
   id: PanelId
@@ -59,6 +60,7 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
   { id: 'research', icon: FlaskConical, label: 'Research', color: '#00aaff', section: 'middle' },
   { id: 'contracts', icon: FileText, label: 'Contracts', color: '#aa44ff', section: 'middle' },
   { id: 'incidents', icon: Siren, label: 'Incidents', color: '#ff4444', section: 'middle' },
+  { id: 'tickets', icon: Ticket, label: 'Tickets', color: '#00ccff', section: 'middle' },
   { id: 'facility', icon: Building, label: 'Facility', color: '#00aaff', section: 'middle' },
   { id: 'carbon', icon: Leaf, label: 'Carbon', color: '#44cc44', section: 'middle' },
   { id: 'security', icon: Shield, label: 'Security', color: '#ff8844', section: 'middle' },
@@ -83,6 +85,7 @@ const PANEL_TITLES: Record<PanelId, string> = {
   research: 'R&D LAB',
   contracts: 'CONTRACTS',
   incidents: 'INCIDENTS',
+  tickets: 'INCIDENT TICKETS',
   facility: 'FACILITY',
   carbon: 'CARBON & ENVIRONMENT',
   security: 'SECURITY & COMPLIANCE',
@@ -108,6 +111,7 @@ function PanelContent({ panelId }: { panelId: PanelId }) {
     case 'research': return <ResearchPanel />
     case 'contracts': return <ContractsPanel />
     case 'incidents': return <IncidentsPanel />
+    case 'tickets': return <TicketsPanel />
     case 'facility': return <FacilityPanel />
     case 'carbon': return <CarbonPanel />
     case 'security': return <SecurityPanel />
@@ -143,6 +147,7 @@ export function Sidebar() {
   const [mobileRailOpen, setMobileRailOpen] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
   const incidentCount = useGameStore((s) => s.activeIncidents.filter((i) => !i.resolved).length)
+  const ticketBacklog = useGameStore((s) => s.tickets.filter((t) => t.status !== 'resolved').length)
   const trackPanelOpen = useGameStore((s) => s.trackPanelOpen)
   const isMobile = useIsMobile()
 
@@ -253,7 +258,7 @@ export function Sidebar() {
                   item={item}
                   isActive={activePanel === item.id}
                   onClick={() => togglePanel(item.id)}
-                  badgeCount={item.id === 'incidents' ? incidentCount : undefined}
+                  badgeCount={item.id === 'incidents' ? incidentCount : item.id === 'tickets' ? ticketBacklog : undefined}
                   mobile
                 />
               ))}
@@ -345,7 +350,7 @@ export function Sidebar() {
                 item={item}
                 isActive={activePanel === item.id}
                 onClick={() => togglePanel(item.id)}
-                badgeCount={item.id === 'incidents' ? incidentCount : undefined}
+                badgeCount={item.id === 'incidents' ? incidentCount : item.id === 'tickets' ? ticketBacklog : undefined}
               />
             ))}
           </div>
