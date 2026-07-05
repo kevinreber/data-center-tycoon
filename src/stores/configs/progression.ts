@@ -514,6 +514,14 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     completionCheck: 'game_unpaused',
   },
   {
+    id: 'watch_traffic',
+    title: 'Watch Your Traffic Flow',
+    objective: 'See packets flowing across your Clos fabric',
+    description: 'Look at the grid — animated packets are flowing between your leaf switch and spine switch! This is your Clos fabric carrying customer traffic. Link colors show utilization: green = healthy, yellow = busy, red = saturated. As you add more spines, traffic spreads evenly across them — that\'s ECMP routing keeping your network fault-tolerant.',
+    uiHint: 'Traffic lines: green = low, yellow = medium, red = high utilization. Toggle in the LAYERS popup anytime.',
+    completionCheck: 'traffic_flowing',
+  },
+  {
     id: 'read_topbar',
     title: 'Read Your Dashboard',
     objective: 'Watch your stats change as the simulation runs',
@@ -579,7 +587,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     id: 'explore_sidebar',
     title: 'Explore Your Tools',
     objective: 'Open any 3 more sidebar panels to discover what\'s available',
-    description: 'Your sidebar has 18 panels covering every aspect of your data center. Try exploring a few: INFRASTRUCTURE for PDUs and cabling, R&D LAB for technology research, FACILITY for suite upgrades and noise management, or PROGRESS for achievements. Each icon\'s tooltip tells you what it does.',
+    description: 'Your sidebar has 20 panels covering every aspect of your data center. Try exploring a few: INFRASTRUCTURE for PDUs and cabling, R&D LAB for technology research, FACILITY for suite upgrades and noise management, or PROGRESS for achievements. Each icon\'s tooltip tells you what it does.',
     uiHint: 'Sidebar icons: hover for tooltips. Green = core, Orange = systems, Cyan = advanced, Yellow = progress.',
     completionCheck: 'explored_panels',
   },
