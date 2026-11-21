@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { GameCanvas } from '@/components/GameCanvas'
 import { Sidebar } from '@/components/Sidebar'
 import { LayersPopup } from '@/components/LayersPopup'
+import { ViewToggles } from '@/components/ViewToggles'
 import { CabinetDetailPanel } from '@/components/CabinetDetailPanel'
 import { SpineDetailPanel } from '@/components/SpineDetailPanel'
 import { StatusBar } from '@/components/StatusBar'
@@ -341,6 +342,7 @@ function App() {
             {/* Phaser canvas */}
             <div className="flex-1 min-h-0 relative">
               <GameCanvas />
+              <ViewToggles />
               <LayersPopup />
               <CabinetDetailPanel />
               <SpineDetailPanel />

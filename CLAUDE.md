@@ -46,6 +46,7 @@ src/
 │   ├── HUD.tsx                 # Legacy control panel (build, layers, finance, traffic, equipment)
 │   ├── CabinetDetailPanel.tsx  # Floating detail panel for selected cabinet (stats, actions)
 │   ├── LayersPopup.tsx         # Layer visibility/opacity/color controls popup
+│   ├── ViewToggles.tsx         # Overlay toggle bar over the game view (traffic, InfiniBand, heat map, free server slots)
 │   ├── StatusBar.tsx           # Bottom footer bar (status, nodes, tick, speed, suite tier, version)
 │   ├── TutorialOverlay.tsx     # Guided tutorial step overlay and contextual tip popups
 │   ├── WelcomeModal.tsx        # First-launch welcome modal with tutorial start/skip
@@ -426,7 +427,7 @@ Key interfaces (core):
 |----------|---------|
 | Build | `addCabinet`, `enterPlacementMode`, `exitPlacementMode`, `upgradeNextCabinet`, `addLeafToNextCabinet`, `addSpineSwitch` |
 | Power | `toggleCabinetPower`, `toggleSpinePower` |
-| Visual | `toggleLayerVisibility`, `setLayerOpacity`, `setLayerColor`, `toggleTrafficVisible`, `toggleHeatMap`, `setRendererStyle` (classic / v2 hardware art; display preference, not saved to slots) |
+| Visual | `toggleLayerVisibility`, `setLayerOpacity`, `setLayerColor`, `toggleTrafficVisible`, `toggleHeatMap`, `toggleServerSlotsVisible` (view-only highlight of cabinets with a free server slot), `setRendererStyle` (classic / v2 hardware art; display preference, not saved to slots) |
 | Simulation | `setGameSpeed`, `upgradeCooling`, `tick` |
 | Finance | `takeLoan`, `refreshServers`, `upgradeSuite` |
 | Infrastructure | `placePDU`, `placeCableTray`, `autoRouteCables`, `toggleCabinetFacing`, `installAisleContainment`, `placeBusway`, `placeCrossConnect`, `placeInRowCooling` |
@@ -546,6 +547,7 @@ gridRow 4: Corridor (bottom access)
 - `addSpineToScene(id)` / `updateSpine(id, powerOn)`
 - `setLayerVisibility(visibility)` / `setLayerOpacity(opacity)` / `setLayerColors(colors)`
 - `setTrafficLinks(links)` / `setTrafficVisible(visible)`
+- `setServerSlotHighlight(cabinetIds | null)` — view-only free-slot highlight (same look as server placement, no click-to-install)
 - `setGridSize(cols, rows, spineSlots)` — rebuilds layout on suite upgrade
 - `setPlacementMode(active)` — enter/exit interactive placement
 - `setOnTileClick(callback)` / `setOnTileHover(callback)` — placement callbacks

@@ -48,6 +48,7 @@ export function GameCanvas() {
   const customLayout = useGameStore((s) => s.customLayout)
   const rowPlacementMode = useGameStore((s) => s.rowPlacementMode)
   const equipmentPlacementMode = useGameStore((s) => s.equipmentPlacementMode)
+  const serverSlotsVisible = useGameStore((s) => s.serverSlotsVisible)
   const gpuPods = useGameStore((s) => s.gpuPods)
   const infiniBandFabrics = useGameStore((s) => s.infiniBandFabrics)
   const ibSwitches = useGameStore((s) => s.ibSwitches)
@@ -201,10 +202,12 @@ export function GameCanvas() {
       scene.setEquipmentPlacementMode(equipmentPlacementMode, validIds)
       scene.clearSelection()
       useGameStore.getState().selectCabinet(null)
+    } else if (serverSlotsVisible) {
+      scene.setServerSlotHighlight(cabinets.filter((c) => c.serverCount < MAX_SERVERS_PER_CABINET).map((c) => c.id))
     } else {
       scene.setEquipmentPlacementMode(null, [])
     }
-  }, [equipmentPlacementMode, cabinets, handleEquipmentCabinetClick, sceneReady])
+  }, [equipmentPlacementMode, serverSlotsVisible, cabinets, handleEquipmentCabinetClick, sceneReady])
 
   // Sync placement facing to Phaser (updates zone overlays when user changes direction)
   useEffect(() => {

@@ -4198,17 +4198,31 @@ class DataCenterScene extends Phaser.Scene {
   setEquipmentPlacementMode(mode: 'server' | 'leaf' | null, validCabinetIds: string[]) {
     this.equipmentPlacementMode = mode
     if (!mode) {
-      const previous = this.equipHighlightState?.ids ?? []
-      this.equipHighlightState = null
-      if (this.equipHighlightGraphics) {
-        this.equipHighlightGraphics.destroy()
-        this.equipHighlightGraphics = null
-      }
-      // v2 draws highlights inside each cabinet, so those cabinets need a redraw
-      if (this.rendererStyle === 'v2') this.rerenderCabinets(previous)
+      this.clearEquipmentHighlights()
       return
     }
     this.renderEquipmentHighlights(validCabinetIds, mode === 'server' ? 0x00ff88 : 0x00aaff)
+  }
+
+  /** View-only highlight (same look as server placement) without click-to-install; null clears it */
+  setServerSlotHighlight(cabinetIds: string[] | null) {
+    this.equipmentPlacementMode = null
+    if (!cabinetIds) {
+      this.clearEquipmentHighlights()
+      return
+    }
+    this.renderEquipmentHighlights(cabinetIds, 0x00ff88)
+  }
+
+  private clearEquipmentHighlights() {
+    const previous = this.equipHighlightState?.ids ?? []
+    this.equipHighlightState = null
+    if (this.equipHighlightGraphics) {
+      this.equipHighlightGraphics.destroy()
+      this.equipHighlightGraphics = null
+    }
+    // v2 draws highlights inside each cabinet, so those cabinets need a redraw
+    if (this.rendererStyle === 'v2') this.rerenderCabinets(previous)
   }
 
   /** Set callback for cabinet clicks during equipment placement */

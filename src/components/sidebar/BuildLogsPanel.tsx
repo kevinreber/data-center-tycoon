@@ -37,6 +37,7 @@ const CHANGELOG: VersionEntry[] = [
       { text: 'NOC drawer countdown badges + status chips give one-glance visibility into drain timers, electrician dispatches, and optic boost windows', type: 'improved' },
       { text: 'Detailed hardware art — racks now show rails, drive bays, leaf-switch ports and blinking status LEDs; GPU racks get heatsinks and coolant hoses; spines, PDUs, cooling units and chillers are redrawn too', type: 'new' },
       { text: 'Hot racks glow, incidents pulse an outline around the affected rack, and GPU nodes with ECC faults light up red', type: 'improved' },
+      { text: 'Quick view toggles along the top of the floor: Traffic, InfiniBand, Heat map, and a new Free slots highlight showing which cabinets have room for another server', type: 'new' },
       { text: 'Prefer the old look? Switch back to classic hardware under Settings → Experimental', type: 'system' },
     ],
   },

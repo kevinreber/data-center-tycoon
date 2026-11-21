@@ -5603,3 +5603,17 @@ describe('Training Jobs & AI Revenue (Phase 8E)', () => {
   })
 })
 
+describe('View overlay toggles', () => {
+  beforeEach(() => {
+    getState().resetGame()
+  })
+
+  it('toggles the free server slot highlight and resets it with the game', () => {
+    expect(getState().serverSlotsVisible).toBe(false)
+    getState().toggleServerSlotsVisible()
+    expect(getState().serverSlotsVisible).toBe(true)
+    getState().resetGame()
+    expect(getState().serverSlotsVisible).toBe(false)
+  })
+})
+

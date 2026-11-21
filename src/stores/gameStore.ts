@@ -401,6 +401,8 @@ interface GameState {
 
   // Heat Map
   heatMapVisible: boolean
+  /** View-only highlight of cabinets with a free server slot (no click-to-install) */
+  serverSlotsVisible: boolean
 
   // Supply Chain & Procurement
   pendingOrders: HardwareOrder[]
@@ -695,6 +697,7 @@ interface GameState {
   startTraining: (staffId: string, certId: string) => void
   // Heat map
   toggleHeatMap: () => void
+  toggleServerSlotsVisible: () => void
   // Supply Chain actions
   placeOrder: (itemType: string, quantity: number) => void
   // Interconnection actions
@@ -1186,6 +1189,7 @@ export const useGameStore = create<GameState>((set) => ({
 
   // Heat Map
   heatMapVisible: false,
+  serverSlotsVisible: false,
 
   // Supply Chain & Procurement
   pendingOrders: [],
@@ -2674,6 +2678,9 @@ export const useGameStore = create<GameState>((set) => ({
 
   toggleHeatMap: () =>
     set((state) => ({ heatMapVisible: !state.heatMapVisible })),
+
+  toggleServerSlotsVisible: () =>
+    set((state) => ({ serverSlotsVisible: !state.serverSlotsVisible })),
 
   // ── Supply Chain Actions ────────────────────────────────────────
 
@@ -4720,6 +4727,7 @@ export const useGameStore = create<GameState>((set) => ({
       placementMode: false,
       equipmentPlacementMode: null,
       heatMapVisible: false,
+      serverSlotsVisible: false,
       hasSaved: false,
       activeSlotId: null,
       ...calcStats(demoCabinets, demoSpines),
@@ -4837,6 +4845,7 @@ export const useGameStore = create<GameState>((set) => ({
       scenarioStartTick: 0,
       networkTopology: { totalLinks: 0, healthyLinks: 0, oversubscriptionRatio: 0, avgUtilization: 0, redundancyLevel: 0 },
       heatMapVisible: false,
+      serverSlotsVisible: false,
       hasSaved: false,
       staff: [],
       shiftPattern: 'day_only' as ShiftPattern,
@@ -5244,6 +5253,7 @@ export const useGameStore = create<GameState>((set) => ({
       scenarioStartTick: 0,
       networkTopology: { totalLinks: 0, healthyLinks: 0, oversubscriptionRatio: 0, avgUtilization: 0, redundancyLevel: 0 },
       heatMapVisible: false,
+      serverSlotsVisible: false,
       hasSaved: false,
       // Staff & HR
       staff: [],
