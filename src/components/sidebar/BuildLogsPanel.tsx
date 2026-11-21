@@ -35,6 +35,9 @@ const CHANGELOG: VersionEntry[] = [
       { text: 'AI Lab revenue model — ai_lab cabinets earn 50% baseline while pods are idle, 100% during training, 25% during inference fill; lump sums land on completion', type: 'improved' },
       { text: 'GPU ECC faults reduce a cabinet\'s effective revenue proportionally until refreshed', type: 'improved' },
       { text: 'NOC drawer countdown badges + status chips give one-glance visibility into drain timers, electrician dispatches, and optic boost windows', type: 'improved' },
+      { text: 'Detailed hardware art — racks now show rails, drive bays, leaf-switch ports and blinking status LEDs; GPU racks get heatsinks and coolant hoses; spines, PDUs, cooling units and chillers are redrawn too', type: 'new' },
+      { text: 'Hot racks glow, incidents pulse an outline around the affected rack, and GPU nodes with ECC faults light up red', type: 'improved' },
+      { text: 'Prefer the old look? Switch back to classic hardware under Settings → Experimental', type: 'system' },
     ],
   },
   {

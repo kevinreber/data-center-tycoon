@@ -3,8 +3,8 @@
 
 export type RendererStyle = 'classic' | 'v2'
 
-/** Flip to 'v2' to make the new hardware renderer the default for everyone */
-export const DEFAULT_RENDERER_STYLE: RendererStyle = 'classic'
+/** Default for players who haven't chosen; set to 'classic' to roll back to the original renderer */
+export const DEFAULT_RENDERER_STYLE: RendererStyle = 'v2'
 
 export const RENDERER_STORAGE_KEY = 'fabric-tycoon-renderer'
 
