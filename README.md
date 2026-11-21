@@ -3,7 +3,7 @@
 ## 🛸 Project Vision
 A web-based, 2D isometric Tycoon game (think Roller Coaster Tycoon) where the player builds and manages a data center. The goal is to scale from a single rack to a global AI powerhouse while balancing network topology, power consumption, and environmental impact.
 
-<img width="1619" height="990" alt="image" src="https://github.com/user-attachments/assets/72e1c54c-6041-44f6-bb95-325f67709124" />
+<img width="1619" height="990" alt="Fabric Tycoon enterprise demo: isometric data center floor with detailed server racks, spine switches and live leaf-to-spine traffic, with the Network panel and a cabinet's detail panel open" src="docs/images/screenshot.jpg" />
 
 
 ## 🕹 Core Gameplay Loop
