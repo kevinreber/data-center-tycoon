@@ -2,7 +2,7 @@
 
 Goal: make the isometric hardware (cabinets, servers, leaf/spine switches, GPU nodes, InfiniBand switches, PDUs, cooling) look like the polished isometric style of Designed to Scale and Protocol Explorer (see `docs/VISUAL_REFERENCES.md`). This must not change what production players see until we explicitly flip it on.
 
-Status: planned, not started.
+Status: phases 0–5 implemented. The v2 renderer ships behind the `rendererStyle` flag (default `classic`). Phase 6 (flip the default) is the remaining step. See "Implementation notes" at the end.
 
 ## Principles
 
@@ -88,6 +88,24 @@ Total: roughly 1.5–2.5 weeks of focused work. Phases 0–4 never touch product
 - **Draw order bugs.** Images must use the same `baseDepth` formula the Graphics objects use today. The Lab grid exercises adjacent cabinets and rows so overlaps show up early.
 - **Theme clash.** The light blueprint style won't match the dark UI chrome. Recommendation: ship the dark neon v2 style first. Treat the blueprint style as an experiment that would only make sense alongside a light UI theme.
 - **Launch timing.** The project is in a launch-polish phase. Phases 0–4 are safe to run in parallel because production can't reach them. Merge Phase 5 only when we're comfortable with a flagged rendering change near launch, or schedule it right after.
+
+## Implementation notes
+
+Where the build differs from the plan above, and what was learned:
+
+- **The Lab drives the real scene.** `src/lab/LabApp.tsx` creates a real `DataCenterScene` (one per view in split mode) and feeds it specimens through the scene's public API, the same calls `GameCanvas.tsx` makes. That guarantees the Lab shows exactly what ships. It imports the game store module only for its configs and types; it never calls store actions, so saves and analytics are untouched. In a hidden browser tab Phaser pauses its frame loop; `window.__labGames` (dev) lets automation step frames.
+- **Cabinets are layered textures.** Chassis, servers, leaf and (for rear-door heat exchangers) a door layer are separate cached images inside one Container, so layer opacity and visibility still work. Texture keys include facing, density, power, colors and liquid cooling. An enterprise demo uses about 18 textures; the full Lab specimen grid about 55.
+- **Texture resolution follows zoom.** `textureScaleForZoom` picks 1×/2×/3× textures; crossing a bucket re-renders hardware and prunes the old scale.
+- **The perforated door mesh was dropped.** At game zoom it shimmered (moiré) and hid the server bezels. Racks are drawn open-frame with rails, blanking panels and a door handle instead.
+- **Opaque racks changed overlay rules.** Classic racks are 60% transparent, so overlays drawn below them still showed through. In v2:
+  - Selection and hover draw an outline above the hardware.
+  - Equipment-placement targets are tinted inside each cabinet's container.
+  - The heat map tints racks directly, with its labels above.
+  - Floor overlays (heat tiles, pod outlines, InfiniBand cables, the selection floor marker) move beneath all hardware (`floorOverlayDepth`).
+- **Animated parts are Images, not Graphics.** The first version redrew one Graphics object per rack each frame. That forced a WebGL batch flush per rack and doubled frame time (11 ms vs 5.5 ms classic on the enterprise demo). LEDs are now pre-colored LED sprites that batch with the hardware art; only alert outlines and cooling-unit fan blades use Graphics. Result: v2 4.6 ms/frame vs classic 5.5 ms/frame.
+- **New data passed to the scene (v2 only):** cabinet `liquidCooling` (hoses, rear-door coil), `eccFaultedGpus` and `gpuCount` (red wash and red LEDs on faulted GPU nodes). Classic ignores them.
+- **Not converted:** row-end slots, cooling pipes, busways and the sub-floor view still use classic drawing in both renderers. Worker sprites, particles and traffic lines are shared.
+- **Blueprint theme** works for all hardware but is Lab-only; the floor and UI stay dark.
 
 ## Out of scope for v2
 
