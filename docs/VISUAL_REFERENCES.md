@@ -43,6 +43,8 @@ Reference projects for making the isometric hardware (cabinets, servers, leaf/sp
 
 ## What this means for Fabric Tycoon
 
+> Status (v0.6.2): implemented as the v2 hardware renderer, now the default. Everything below is the original analysis; see `docs/HARDWARE_VISUALS_PLAN.md` for what was built and how it differs (Canvas 2D textures rather than `generateTexture`, no perforated door mesh).
+
 Our renderer (`src/game/PhaserGame.ts`) already uses the same isometric projection as references 1 and 2. They look better because of what is drawn on each face, not because of better technology. In rough order of impact:
 
 1. **Outlines** — a 1–2 px stroke around each cube silhouette (darker than the fill in a light theme, lighter in a dark theme).

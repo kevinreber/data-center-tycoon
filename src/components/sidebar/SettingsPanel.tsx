@@ -17,7 +17,7 @@ function formatDate(ts: number): string {
     ' ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
 }
 
-/** Experimental hardware renderer switch — hidden from production players while v2 is opt-in */
+/** Hardware style switch (detailed default vs classic); shouldShowRendererToggle hides it only if classic is ever the default again */
 function RendererSettings() {
   const rendererStyle = useGameStore((s) => s.rendererStyle)
   const setRendererStyle = useGameStore((s) => s.setRendererStyle)
@@ -25,9 +25,9 @@ function RendererSettings() {
 
   return (
     <div className="border-t border-border pt-3">
-      <span className="text-xs font-bold text-muted-foreground tracking-widest mb-2 block">EXPERIMENTAL</span>
+      <span className="text-xs font-bold text-muted-foreground tracking-widest mb-2 block">HARDWARE STYLE</span>
       <div className="flex gap-1.5">
-        {(['classic', 'v2'] as const).map((style) => (
+        {(['v2', 'classic'] as const).map((style) => (
           <Button
             key={style}
             variant={rendererStyle === style ? 'default' : 'outline'}
@@ -35,12 +35,12 @@ function RendererSettings() {
             className={`text-[9px] flex-1 ${rendererStyle === style ? 'bg-neon-green/20 text-neon-green border-neon-green/30' : ''}`}
             onClick={() => setRendererStyle(style)}
           >
-            {style === 'classic' ? 'Classic hardware' : 'Detailed hardware (v2)'}
+            {style === 'classic' ? 'Classic' : 'Detailed (default)'}
           </Button>
         ))}
       </div>
       <p className="text-[10px] text-muted-foreground mt-1.5">
-        Preview of the new hardware art. Rendering only — your game is unaffected.
+        Classic is the original look and will be retired in a future update. Changes visuals only — your game is unaffected.
       </p>
     </div>
   )

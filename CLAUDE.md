@@ -73,7 +73,7 @@ src/
 │       ├── MarketPanel.tsx     # Competitors, market share, bids, events, regional presence
 │       ├── CapacityPanel.tsx   # Capacity planning dashboard, trends, projections, alerts
 │       ├── ProgressPanel.tsx   # Achievements, reputation, lifetime stats
-│       ├── SettingsPanel.tsx   # Save/load, sandbox mode, reset, demo
+│       ├── SettingsPanel.tsx   # Save/load, sandbox mode, reset, demo, hardware style (detailed / classic)
 │       ├── GuidePanel.tsx      # How to play / tutorial (with Phase 4-6 system guides)
 │       ├── BuildLogsPanel.tsx  # What's New changelog (version history, player-facing)
 │       ├── ScenarioPanel.tsx   # Scenario select screen with cards, star ratings, locked progression
@@ -494,7 +494,7 @@ Key interfaces (core):
 
 ### Phaser Rendering — `src/game/PhaserGame.ts`
 
-The `DataCenterScene` class handles all isometric graphics using Phaser's Graphics API (no image assets — everything is procedurally drawn).
+The `DataCenterScene` class handles all isometric graphics, all procedurally drawn (no image assets). Hardware has two renderers selected by `rendererStyle`: v2 (default) draws each variant once with Canvas 2D from `src/game/hardware/` and shows it as cached-texture Images; classic draws with Phaser's Graphics API via `drawIsoCube()`. Floor, overlays, traffic and particles use Graphics in both. See `src/game/CLAUDE.md` and `docs/HARDWARE_VISUALS_PLAN.md`.
 
 **Module-level exports:**
 - `createGame(parent: string): Phaser.Game` — creates and returns Phaser game instance
