@@ -62,6 +62,8 @@ export function contactShadow(dc: DrawCtx, b: IsoBox, spread = 2) {
 
 export interface BoxOptions {
   shadow?: boolean
+  /** Fill the three faces (false draws only rim / outline, e.g. over detail) */
+  faces?: boolean
   outline?: boolean
   rim?: boolean
 }
@@ -69,13 +71,15 @@ export interface BoxOptions {
 /** Three gradient-shaded faces with outline and rim light — the base of every piece */
 export function drawBox(dc: DrawCtx, b: IsoBox, palette: ChassisPalette, opts: BoxOptions = {}) {
   const { ctx, style } = dc
-  const { shadow = true, outline = true, rim = true } = opts
+  const { shadow = true, faces = true, outline = true, rim = true } = opts
   if (shadow) contactShadow(dc, b)
 
-  const hw = b.w / 2
-  fillPoly(ctx, topFace(b), faceGradient(ctx, b.x - hw, b.y - b.d, b.x + hw, b.y + b.h - b.d, palette.top))
-  fillPoly(ctx, leftFace(b), faceGradient(ctx, 0, b.y - b.d, 0, b.y + b.h, palette.left))
-  fillPoly(ctx, rightFace(b), faceGradient(ctx, 0, b.y - b.d, 0, b.y + b.h, palette.right))
+  if (faces) {
+    const hw = b.w / 2
+    fillPoly(ctx, topFace(b), faceGradient(ctx, b.x - hw, b.y - b.d, b.x + hw, b.y + b.h - b.d, palette.top))
+    fillPoly(ctx, leftFace(b), faceGradient(ctx, 0, b.y - b.d, 0, b.y + b.h, palette.left))
+    fillPoly(ctx, rightFace(b), faceGradient(ctx, 0, b.y - b.d, 0, b.y + b.h, palette.right))
+  }
 
   if (rim) {
     const t = topFace(b)

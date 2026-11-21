@@ -15,6 +15,6 @@ export {
   textureKey,
   textureScaleForZoom,
 } from './textureCache'
-export type { CabinetArtSpec } from './pieces/cabinet'
-export { cabinetChassisArt, cabinetServersArt, cabinetLeafArt } from './pieces/cabinet'
+export type { CabinetArtSpec, LiquidCooling } from './pieces/cabinet'
+export { cabinetChassisArt, cabinetServersArt, cabinetLeafArt, cabinetDoorArt, cabinetHasDoor, cabinetLedAnchors } from './pieces/cabinet'
 export { CAB, SPINE, IB_SWITCH, PDU, COOLING, CHILLER } from './pieces/dimensions'

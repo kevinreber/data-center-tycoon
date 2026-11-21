@@ -1,4 +1,4 @@
-import type { CabinetEnvironment, CabinetFacing, CoolingUnitType, ChillerTier, TrafficLink } from '@/stores/gameStore'
+import type { CabinetEnvironment, CabinetFacing, CoolingUnitType, ChillerTier, TrafficLink, LiquidCoolingType } from '@/stores/gameStore'
 import { generateLayout } from '@/stores/gameStore'
 
 // The Lab drives the real DataCenterScene through its public API, so every
@@ -17,6 +17,7 @@ export interface CabinetVisual {
   hasIncident: boolean
   inMaintenance: boolean
   serverAge: number
+  liquidCooling: LiquidCoolingType
 }
 
 export interface CabinetSpec {
@@ -59,6 +60,7 @@ const NORMAL: CabinetVisual = {
   hasIncident: false,
   inMaintenance: false,
   serverAge: 0,
+  liquidCooling: 'none',
 }
 
 // Enterprise layout: 14 cols, 5 cabinet rows. generateLayout puts cabinet
@@ -123,16 +125,17 @@ function gpuRow(row: number): { cabinets: CabinetSpec[]; pods: PodSpec[] } {
   for (let i = 0; i < 4; i++) {
     const id = `gpu-a${i}`
     podA.push(id)
-    cabinets.push(cab(id, i, row, { servers: 1, density: 'high_density', podId: 'pod-a' }))
+    cabinets.push(cab(id, i, row, { servers: 1, density: 'high_density', podId: 'pod-a', visual: { ...NORMAL, liquidCooling: 'rear_door_hx' } }))
   }
   // Medium pod: 8 cabinets, varying node counts
   for (let i = 0; i < 8; i++) {
     const id = `gpu-b${i}`
     podB.push(id)
-    cabinets.push(cab(id, 4 + i, row, { servers: 1 + (i % 4), density: 'high_density', podId: 'pod-b' }))
+    cabinets.push(cab(id, 4 + i, row, { servers: 1 + (i % 4), density: 'high_density', podId: 'pod-b', visual: { ...NORMAL, liquidCooling: 'direct_to_chip' } }))
   }
-  cabinets.push(cab('gpu-x0', 12, row, { servers: 4, density: 'extreme_density' }))
-  cabinets.push(cab('gpu-x1', 13, row, { servers: 2, density: 'extreme_density', powerOn: false }))
+  const immersion = { ...NORMAL, liquidCooling: 'single_phase_immersion' as const }
+  cabinets.push(cab('gpu-x0', 12, row, { servers: 4, density: 'extreme_density', visual: immersion }))
+  cabinets.push(cab('gpu-x1', 13, row, { servers: 2, density: 'extreme_density', powerOn: false, visual: immersion }))
   return { cabinets, pods: [{ id: 'pod-a', cabinetIds: podA }, { id: 'pod-b', cabinetIds: podB }] }
 }
 
@@ -167,7 +170,15 @@ export function buildSpecimenScenario(): LabScenario {
   const gpu = gpuRow(9)
   return {
     ...baseScenario(),
-    cabinets: [...catalogRow('f', 1), ...catalogRow('r', 3), ...stateRow(5), ...gpu.cabinets],
+    cabinets: [
+      ...catalogRow('f', 1),
+      ...catalogRow('r', 3),
+      ...stateRow(5),
+      // Rear-view GPU racks (row 7 cols 12–13 stay clear of the pods' InfiniBand switches)
+      cab('gpu-r-hx', 12, 7, { servers: 2, density: 'high_density', visual: { ...NORMAL, liquidCooling: 'rear_door_hx' } }),
+      cab('gpu-r-d2c', 13, 7, { servers: 4, density: 'high_density', visual: { ...NORMAL, liquidCooling: 'direct_to_chip' } }),
+      ...gpu.cabinets,
+    ],
     pods: gpu.pods,
     rowLegend: [
       { gridRow: 1, label: 'Front view (south-facing): 0–4 servers without leaf, 0–4 with leaf, lab, management, offline, aging' },
@@ -176,7 +187,8 @@ export function buildSpecimenScenario(): LabScenario {
       { gridRow: 4, label: 'Aisle: fan tray, CRAC, CRAH, immersion pod, failed CRAC, failed immersion' },
       { gridRow: 5, label: 'States: normal, warm, throttled, fire, incident, maintenance, offline, aging' },
       { gridRow: 6, label: 'Aisle: chiller, advanced chiller, failed chiller' },
-      { gridRow: 9, label: 'GPU: small pod (4), medium pod (8), extreme density, extreme density offline' },
+      { gridRow: 7, label: 'Rear-view GPU racks: rear-door heat exchanger, direct-to-chip (InfiniBand switches sit between rows 7 and 9)' },
+      { gridRow: 9, label: 'GPU: small pod (rear-door HX), medium pod (direct-to-chip), extreme density immersion, same offline' },
     ],
   }
 }

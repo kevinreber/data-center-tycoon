@@ -275,6 +275,7 @@ export function GameCanvas() {
         hasIncident: incidentCabIds.has(cab.id),
         inMaintenance: maintCabIds.has(cab.id),
         serverAge: cab.serverAge,
+        liquidCooling: cab.liquidCooling,
       }, cab.density, cab.podId)
     }
 

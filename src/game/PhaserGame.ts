@@ -1,9 +1,9 @@
 import Phaser from 'phaser'
-import type { LayerVisibility, LayerOpacity, LayerColors, LayerColorOverrides, TrafficLink, CabinetEnvironment, CabinetFacing, PlacementHint, DataCenterLayout, CoolingUnitType, ChillerTier, ViewMode, RowEndSlot } from '@/stores/gameStore'
+import type { LayerVisibility, LayerOpacity, LayerColors, LayerColorOverrides, TrafficLink, CabinetEnvironment, CabinetFacing, PlacementHint, DataCenterLayout, CoolingUnitType, ChillerTier, ViewMode, RowEndSlot, LiquidCoolingType } from '@/stores/gameStore'
 import { DEFAULT_COLORS, ENVIRONMENT_CONFIG, MAX_SERVERS_PER_CABINET, getFacingOffsets, COOLING_UNIT_CONFIG, CHILLER_PLANT_CONFIG, ROW_END_SLOT_CONFIG } from '@/stores/gameStore'
 import type { RendererStyle } from '@/game/hardware'
 import type { HardwareArt, HardwareTheme } from '@/game/hardware'
-import { HARDWARE_STYLES, makeHardwareImage, pruneHardwareTextures, textureScaleForZoom, cabinetChassisArt, cabinetServersArt, cabinetLeafArt } from '@/game/hardware'
+import { HARDWARE_STYLES, makeHardwareImage, pruneHardwareTextures, textureScaleForZoom, cabinetChassisArt, cabinetServersArt, cabinetLeafArt, cabinetDoorArt, cabinetHasDoor } from '@/game/hardware'
 
 const COLORS = DEFAULT_COLORS
 
@@ -107,6 +107,18 @@ interface CabinetEntry {
   // Phase 8A: GPU pod fields
   density: 'standard' | 'high_density' | 'extreme_density'
   podId: string | null
+  liquidCooling: LiquidCoolingType  // drawn by the v2 renderer only
+}
+
+/** Per-tick cabinet state pushed from React; optional fields are only used by the v2 renderer */
+export interface CabinetVisualState {
+  heatLevel: number
+  isThrottled: boolean
+  isOnFire: boolean
+  hasIncident: boolean
+  inMaintenance: boolean
+  serverAge: number
+  liquidCooling?: LiquidCoolingType
 }
 
 interface GPUPodEntry {
@@ -1357,12 +1369,14 @@ class DataCenterScene extends Phaser.Scene {
       serverColor,
       leafColor,
       powerOn: entry.powerOn,
+      liquidCooling: entry.liquidCooling,
     }
     const layers: Phaser.GameObjects.Image[] = []
     const push = (img: Phaser.GameObjects.Image | null) => { if (img) layers.push(img) }
     push(this.hardwareImage(cabinetChassisArt(spec), cx, cy))
     if (entry.serverCount > 0 && serverAlpha > 0) push(this.hardwareImage(cabinetServersArt(spec), cx, cy, serverAlpha))
     if (entry.hasLeafSwitch && leafAlpha > 0) push(this.hardwareImage(cabinetLeafArt(spec), cx, cy, leafAlpha))
+    if (cabinetHasDoor(spec)) push(this.hardwareImage(cabinetDoorArt(spec), cx, cy))
     return layers
   }
 
@@ -1534,20 +1548,23 @@ class DataCenterScene extends Phaser.Scene {
         .setAlpha(powerMult)
         .setDepth(baseDepth + 2)
       labels.push(gpuLabel)
-      // Magenta top-edge glow — thick bright stripe + thinner outer halo for prominence
-      g.lineStyle(3, 0xff44ff, 0.95 * powerMult)
-      g.beginPath()
-      g.moveTo(cx - CUBE_W / 2, cy + CUBE_H / 2 - CABINET_ENCLOSURE_DEPTH)
-      g.lineTo(cx, cy - CABINET_ENCLOSURE_DEPTH)
-      g.lineTo(cx + CUBE_W / 2, cy + CUBE_H / 2 - CABINET_ENCLOSURE_DEPTH)
-      g.strokePath()
-      // Outer halo for glow
-      g.lineStyle(6, 0xff44ff, 0.25 * powerMult)
-      g.beginPath()
-      g.moveTo(cx - CUBE_W / 2, cy + CUBE_H / 2 - CABINET_ENCLOSURE_DEPTH)
-      g.lineTo(cx, cy - CABINET_ENCLOSURE_DEPTH)
-      g.lineTo(cx + CUBE_W / 2, cy + CUBE_H / 2 - CABINET_ENCLOSURE_DEPTH)
-      g.strokePath()
+      // v2 bakes this glow into the chassis texture
+      if (!v2) {
+        // Magenta top-edge glow — thick bright stripe + thinner outer halo for prominence
+        g.lineStyle(3, 0xff44ff, 0.95 * powerMult)
+        g.beginPath()
+        g.moveTo(cx - CUBE_W / 2, cy + CUBE_H / 2 - CABINET_ENCLOSURE_DEPTH)
+        g.lineTo(cx, cy - CABINET_ENCLOSURE_DEPTH)
+        g.lineTo(cx + CUBE_W / 2, cy + CUBE_H / 2 - CABINET_ENCLOSURE_DEPTH)
+        g.strokePath()
+        // Outer halo for glow
+        g.lineStyle(6, 0xff44ff, 0.25 * powerMult)
+        g.beginPath()
+        g.moveTo(cx - CUBE_W / 2, cy + CUBE_H / 2 - CABINET_ENCLOSURE_DEPTH)
+        g.lineTo(cx, cy - CABINET_ENCLOSURE_DEPTH)
+        g.lineTo(cx + CUBE_W / 2, cy + CUBE_H / 2 - CABINET_ENCLOSURE_DEPTH)
+        g.strokePath()
+      }
     }
 
     // Content summary label — shows slot fill state so players know what's inside
@@ -2629,7 +2646,7 @@ class DataCenterScene extends Phaser.Scene {
   addCabinetToScene(id: string, col: number, row: number, serverCount: number, hasLeafSwitch: boolean, environment: CabinetEnvironment = 'production', facing: CabinetFacing = 'north', density: 'standard' | 'high_density' | 'extreme_density' = 'standard', podId: string | null = null) {
     this.cabCount++
 
-    const entry: CabinetEntry = { id, col, row, serverCount, hasLeafSwitch, powerOn: true, environment, facing, heatLevel: 22, isThrottled: false, isOnFire: false, hasIncident: false, inMaintenance: false, serverAge: 0, recentlyPlaced: Date.now(), density, podId }
+    const entry: CabinetEntry = { id, col, row, serverCount, hasLeafSwitch, powerOn: true, environment, facing, heatLevel: 22, isThrottled: false, isOnFire: false, hasIncident: false, inMaintenance: false, serverAge: 0, recentlyPlaced: Date.now(), density, podId, liquidCooling: 'none' }
     this.cabEntries.set(id, entry)
     this.occupiedTiles.add(`${col},${row}`)
     this.renderCabinet(entry)
@@ -2648,7 +2665,7 @@ class DataCenterScene extends Phaser.Scene {
     this.cameraPanTo(col, row, 300)
   }
 
-  updateCabinet(id: string, serverCount: number, hasLeafSwitch: boolean, powerOn: boolean, environment: CabinetEnvironment = 'production', facing: CabinetFacing = 'north', visualState?: { heatLevel: number; isThrottled: boolean; isOnFire: boolean; hasIncident: boolean; inMaintenance: boolean; serverAge: number }, density: 'standard' | 'high_density' | 'extreme_density' = 'standard', podId: string | null = null) {
+  updateCabinet(id: string, serverCount: number, hasLeafSwitch: boolean, powerOn: boolean, environment: CabinetEnvironment = 'production', facing: CabinetFacing = 'north', visualState?: CabinetVisualState, density: 'standard' | 'high_density' | 'extreme_density' = 'standard', podId: string | null = null) {
     const entry = this.cabEntries.get(id)
     if (!entry) return
 
@@ -2685,6 +2702,7 @@ class DataCenterScene extends Phaser.Scene {
       entry.hasIncident = visualState.hasIncident
       entry.inMaintenance = visualState.inMaintenance
       entry.serverAge = visualState.serverAge
+      if (visualState.liquidCooling) entry.liquidCooling = visualState.liquidCooling
     }
     this.renderCabinet(entry)
   }
