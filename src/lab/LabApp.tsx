@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type Phaser from 'phaser'
 import { createGame, getScene } from '@/game/PhaserGame'
+import { countHardwareTextures } from '@/game/hardware'
+import type { HardwareTheme, RendererStyle } from '@/game/hardware'
 import {
   LAB_LAYOUT,
   applyOverride,
@@ -16,7 +18,7 @@ type Scene = NonNullable<ReturnType<typeof getScene>>
 interface ViewportStats {
   fps: number
   objects: number
-  zoom: number
+  textures: number
 }
 
 function populate(scene: Scene, scenario: LabScenario, override: StateOverride) {
@@ -54,25 +56,33 @@ function applyCabinetStates(scene: Scene, scenario: LabScenario, override: State
 
 interface ViewportProps {
   containerId: string
-  title: string
   scenario: LabScenario
+  rendererStyle: RendererStyle
+  theme: HardwareTheme
   override: StateOverride
   trafficOn: boolean
   fabricOn: boolean
   zoom: number
   resetToken: number
-  onStats: (stats: ViewportStats) => void
+  /** Fired when the user zooms inside this viewport (wheel / pinch) */
+  onZoomInput: (zoom: number) => void
 }
 
-function LabViewport({ containerId, title, scenario, override, trafficOn, fabricOn, zoom, resetToken, onStats }: ViewportProps) {
+function LabViewport({ containerId, scenario, rendererStyle, theme, override, trafficOn, fabricOn, zoom, resetToken, onZoomInput }: ViewportProps) {
   const gameRef = useRef<Phaser.Game | null>(null)
+  const knownZoom = useRef(1)
   const [scene, setScene] = useState<Scene | null>(null)
+  const [stats, setStats] = useState<ViewportStats>({ fps: 0, objects: 0, textures: 0 })
+
   // Boot a fresh Phaser game per scenario; the scene starts asynchronously.
   // The per-control effects below all depend on `scene`, so they apply the
   // current control values as soon as it is published.
   useEffect(() => {
     const game = createGame(containerId)
     gameRef.current = game
+    // Exposed for devtools / automated screenshots
+    const debug = window as unknown as { __labGames?: Record<string, Phaser.Game> }
+    debug.__labGames = { ...debug.__labGames, [containerId]: game }
     let resetTimer: ReturnType<typeof setTimeout> | undefined
     const poll = setInterval(() => {
       const s = getScene(game)
@@ -82,6 +92,7 @@ function LabViewport({ containerId, title, scenario, override, trafficOn, fabric
       // addCabinetToScene pans the camera to each new cabinet; recentre once those pans finish.
       resetTimer = setTimeout(() => {
         s.resetCamera()
+        knownZoom.current = 1
         setScene(s)
       }, 450)
     }, 50)
@@ -90,9 +101,14 @@ function LabViewport({ containerId, title, scenario, override, trafficOn, fabric
       if (resetTimer) clearTimeout(resetTimer)
       setScene(null)
       gameRef.current = null
+      if (debug.__labGames?.[containerId] === game) delete debug.__labGames[containerId]
       game.destroy(true)
     }
   }, [containerId, scenario])
+
+  useEffect(() => {
+    scene?.setRendererStyle(rendererStyle, theme)
+  }, [scene, rendererStyle, theme])
 
   useEffect(() => {
     if (scene) applyCabinetStates(scene, scenario, override)
@@ -107,7 +123,9 @@ function LabViewport({ containerId, title, scenario, override, trafficOn, fabric
   }, [scene, fabricOn])
 
   useEffect(() => {
-    if (scene && Math.abs(scene.getCameraZoom() - zoom) > 0.001) scene.setCameraZoom(zoom)
+    if (!scene) return
+    knownZoom.current = zoom
+    if (Math.abs(scene.getCameraZoom() - zoom) > 0.001) scene.setCameraZoom(zoom)
   }, [scene, zoom])
 
   useEffect(() => {
@@ -120,15 +138,27 @@ function LabViewport({ containerId, title, scenario, override, trafficOn, fabric
     const id = setInterval(() => {
       const game = gameRef.current
       if (!game) return
-      onStats({ fps: game.loop.actualFps, objects: scene.children.length, zoom: scene.getCameraZoom() })
-    }, 500)
+      setStats({ fps: game.loop.actualFps, objects: scene.children.length, textures: countHardwareTextures(scene.textures) })
+      const z = scene.getCameraZoom()
+      if (Math.abs(z - knownZoom.current) > 0.001) {
+        knownZoom.current = z
+        onZoomInput(z)
+      }
+    }, 300)
     return () => clearInterval(id)
-  }, [scene, onStats])
+  }, [scene, onZoomInput])
 
+  const light = rendererStyle === 'v2' && theme === 'blueprint'
+  const title = rendererStyle === 'classic' ? 'CLASSIC' : `V2 · ${theme.toUpperCase()}`
   return (
-    <div className="relative flex-1 min-w-0 border border-border rounded-md overflow-hidden bg-[#070b10]">
-      <div className="absolute top-2 left-2 z-10 text-[10px] font-mono tracking-widest text-neon-cyan bg-black/60 border border-neon-cyan/30 rounded px-2 py-0.5 pointer-events-none">
-        {title}
+    <div className={`relative flex-1 min-w-0 border border-border rounded-md overflow-hidden ${light ? 'bg-[#e9edf7]' : 'bg-[#070b10]'}`}>
+      <div className="absolute top-2 left-2 right-2 z-10 flex justify-between gap-2 text-[10px] font-mono pointer-events-none">
+        <span className="tracking-widest text-neon-cyan bg-black/70 border border-neon-cyan/30 rounded px-2 py-0.5">{title}</span>
+        <span className="tabular-nums text-muted-foreground bg-black/70 border border-border rounded px-2 py-0.5">
+          FPS <span className={stats.fps >= 55 ? 'text-neon-green' : stats.fps >= 30 ? 'text-neon-yellow' : 'text-neon-red'}>{stats.fps.toFixed(0)}</span>
+          {' · '}objects <span className="text-foreground">{stats.objects}</span>
+          {' · '}textures <span className="text-foreground">{stats.textures}</span>
+        </span>
       </div>
       <div id={containerId} className="w-full h-full" />
     </div>
@@ -146,23 +176,26 @@ const OVERRIDES: { value: StateOverride; label: string }[] = [
   { value: 'aging', label: 'Aging servers' },
 ]
 
+type ViewMode = 'classic' | 'v2' | 'split'
+
 export function LabApp() {
   const [mode, setMode] = useState<LabMode>('specimens')
+  const [view, setView] = useState<ViewMode>('split')
+  const [theme, setTheme] = useState<HardwareTheme>('neon')
   const [override, setOverride] = useState<StateOverride>('none')
-  const [trafficOn, setTrafficOn] = useState(true)
+  const [trafficOn, setTrafficOn] = useState(false)
   const [fabricOn, setFabricOn] = useState(true)
   const [zoom, setZoom] = useState(1)
   const [resetToken, setResetToken] = useState(0)
-  const [stats, setStats] = useState<ViewportStats>({ fps: 0, objects: 0, zoom: 1 })
 
   const scenario = useMemo(() => (mode === 'stress' ? buildStressScenario() : buildSpecimenScenario()), [mode])
+  const onZoomInput = useCallback((z: number) => setZoom(z), [])
 
-  // Keep the slider in sync with wheel / pinch zoom inside the canvas
-  const onStats = useCallback((s: ViewportStats) => {
-    setStats(s)
-    setZoom((z) => (Math.abs(z - s.zoom) > 0.001 ? s.zoom : z))
-  }, [])
+  const viewports: { id: string; style: RendererStyle }[] =
+    view === 'split' ? [{ id: 'lab-view-classic', style: 'classic' }, { id: 'lab-view-v2', style: 'v2' }]
+      : [{ id: `lab-view-${view}`, style: view }]
 
+  const select = 'bg-card border border-border rounded px-1.5 py-0.5'
   return (
     <div className="h-screen flex flex-col bg-background text-foreground font-mono">
       <header className="flex flex-wrap items-center gap-x-5 gap-y-2 px-4 py-2 border-b border-border text-[11px]">
@@ -173,15 +206,32 @@ export function LabApp() {
 
         <label className="flex items-center gap-1.5">
           <span className="text-muted-foreground">Scene</span>
-          <select className="bg-card border border-border rounded px-1.5 py-0.5" value={mode} onChange={(e) => setMode(e.target.value as LabMode)}>
+          <select className={select} value={mode} onChange={(e) => setMode(e.target.value as LabMode)}>
             <option value="specimens">Specimen grid</option>
             <option value="stress">Stress test (50 cabinets)</option>
           </select>
         </label>
 
         <label className="flex items-center gap-1.5">
+          <span className="text-muted-foreground">Renderer</span>
+          <select className={select} value={view} onChange={(e) => setView(e.target.value as ViewMode)}>
+            <option value="split">Classic vs v2</option>
+            <option value="classic">Classic only</option>
+            <option value="v2">v2 only</option>
+          </select>
+        </label>
+
+        <label className="flex items-center gap-1.5">
+          <span className="text-muted-foreground">v2 theme</span>
+          <select className={select} value={theme} onChange={(e) => setTheme(e.target.value as HardwareTheme)}>
+            <option value="neon">Dark neon</option>
+            <option value="blueprint">Light blueprint</option>
+          </select>
+        </label>
+
+        <label className="flex items-center gap-1.5">
           <span className="text-muted-foreground">Force state</span>
-          <select className="bg-card border border-border rounded px-1.5 py-0.5" value={override} onChange={(e) => setOverride(e.target.value as StateOverride)}>
+          <select className={select} value={override} onChange={(e) => setOverride(e.target.value as StateOverride)}>
             {OVERRIDES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
         </label>
@@ -203,33 +253,31 @@ export function LabApp() {
         <button className="border border-border rounded px-2 py-0.5 hover:border-neon-green/50" onClick={() => { setZoom(1); setResetToken((t) => t + 1) }}>
           Reset camera
         </button>
-
-        <div className="ml-auto flex gap-3 tabular-nums text-muted-foreground">
-          <span>FPS <span className={stats.fps >= 55 ? 'text-neon-green' : stats.fps >= 30 ? 'text-neon-yellow' : 'text-neon-red'}>{stats.fps.toFixed(0)}</span></span>
-          <span>Objects <span className="text-foreground">{stats.objects}</span></span>
-        </div>
       </header>
 
       <main className="flex-1 min-h-0 flex gap-2 p-2">
-        <LabViewport
-          key={mode}
-          containerId="lab-view-main"
-          title="CLASSIC"
-          scenario={scenario}
-          override={override}
-          trafficOn={trafficOn}
-          fabricOn={fabricOn}
-          zoom={zoom}
-          resetToken={resetToken}
-          onStats={onStats}
-        />
+        {viewports.map((v) => (
+          <LabViewport
+            key={`${v.id}:${mode}`}
+            containerId={v.id}
+            scenario={scenario}
+            rendererStyle={v.style}
+            theme={theme}
+            override={override}
+            trafficOn={trafficOn}
+            fabricOn={fabricOn}
+            zoom={zoom}
+            resetToken={resetToken}
+            onZoomInput={onZoomInput}
+          />
+        ))}
       </main>
 
       <footer className="px-4 py-2 border-t border-border text-[10px] text-muted-foreground grid gap-0.5">
         {scenario.rowLegend.map((r) => (
           <div key={r.gridRow}><span className="text-neon-cyan">Row {r.gridRow}</span> · {r.label}</div>
         ))}
-        <div>Click a cabinet to test selection, hover to test highlight, drag to pan, scroll to zoom.</div>
+        <div>Click a cabinet to test selection, hover to test highlight, drag to pan, scroll to zoom. The blueprint theme only restyles hardware; the floor stays dark.</div>
       </footer>
     </div>
   )

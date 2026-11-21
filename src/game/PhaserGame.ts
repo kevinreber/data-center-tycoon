@@ -1,6 +1,9 @@
 import Phaser from 'phaser'
 import type { LayerVisibility, LayerOpacity, LayerColors, LayerColorOverrides, TrafficLink, CabinetEnvironment, CabinetFacing, PlacementHint, DataCenterLayout, CoolingUnitType, ChillerTier, ViewMode, RowEndSlot } from '@/stores/gameStore'
 import { DEFAULT_COLORS, ENVIRONMENT_CONFIG, MAX_SERVERS_PER_CABINET, getFacingOffsets, COOLING_UNIT_CONFIG, CHILLER_PLANT_CONFIG, ROW_END_SLOT_CONFIG } from '@/stores/gameStore'
+import type { RendererStyle } from '@/game/hardware'
+import type { HardwareArt, HardwareTheme } from '@/game/hardware'
+import { HARDWARE_STYLES, makeHardwareImage, pruneHardwareTextures, textureScaleForZoom, cabinetChassisArt, cabinetServersArt, cabinetLeafArt } from '@/game/hardware'
 
 const COLORS = DEFAULT_COLORS
 
@@ -179,14 +182,21 @@ interface SpineEntry {
   powerOn: boolean
 }
 
+// Classic hardware is a single Graphics object; v2 hardware is a Container of
+// cached-texture Images plus a Graphics overlay. Both support destroy, alpha,
+// depth and visibility, which is all the bookkeeping maps rely on.
+type HardwareObject = Phaser.GameObjects.Graphics | Phaser.GameObjects.Container
+
+type IBFabricArgs = Parameters<DataCenterScene['setInfiniBandFabrics']>
+
 class DataCenterScene extends Phaser.Scene {
   private gridGraphics: Phaser.GameObjects.Graphics | null = null
   private floorGraphics: Phaser.GameObjects.Graphics | null = null
   private spineFloorGraphics: Phaser.GameObjects.Graphics | null = null
   private spineLabel: Phaser.GameObjects.Text | null = null
-  private cabinetGraphics: Map<string, Phaser.GameObjects.Graphics> = new Map()
+  private cabinetGraphics: Map<string, HardwareObject> = new Map()
   private cabinetLabels: Map<string, Phaser.GameObjects.Text[]> = new Map()
-  private spineGraphics: Map<string, Phaser.GameObjects.Graphics> = new Map()
+  private spineGraphics: Map<string, HardwareObject> = new Map()
   private spineNodeLabels: Map<string, Phaser.GameObjects.Text> = new Map()
   private cabEntries: Map<string, CabinetEntry> = new Map()
   private spineEntries: Map<string, SpineEntry> = new Map()
@@ -238,15 +248,15 @@ class DataCenterScene extends Phaser.Scene {
   private packetTime = 0   // cumulative time (seconds) for per-link speed animation
 
   // Infrastructure overlays
-  private pduGraphics: Map<string, Phaser.GameObjects.Graphics> = new Map()
+  private pduGraphics: Map<string, HardwareObject> = new Map()
   private pduLabels: Map<string, Phaser.GameObjects.Text> = new Map()
   private pduEntries: Map<string, PDUEntry> = new Map()
-  private cableTrayGraphics: Map<string, Phaser.GameObjects.Graphics> = new Map()
+  private cableTrayGraphics: Map<string, HardwareObject> = new Map()
   private cableTrayEntries: Map<string, CableTrayEntry> = new Map()
-  private coolingUnitGraphics: Map<string, Phaser.GameObjects.Graphics> = new Map()
+  private coolingUnitGraphics: Map<string, HardwareObject> = new Map()
   private coolingUnitLabels: Map<string, Phaser.GameObjects.Text> = new Map()
   private coolingUnitEntries: Map<string, CoolingUnitEntry> = new Map()
-  private chillerGraphics: Map<string, Phaser.GameObjects.Graphics> = new Map()
+  private chillerGraphics: Map<string, HardwareObject> = new Map()
   private chillerLabels: Map<string, Phaser.GameObjects.Text> = new Map()
   private chillerEntries: Map<string, ChillerPlantEntry> = new Map()
   private pipeGraphics: Map<string, Phaser.GameObjects.Graphics> = new Map()
@@ -352,6 +362,12 @@ class DataCenterScene extends Phaser.Scene {
   private currentSeason = 'spring'
   private currentGameHour = 8
   private weatherParticles: WeatherParticle[] = []
+
+  // Hardware renderer: 'classic' draws vector cubes, 'v2' shows cached textures
+  private rendererStyle: RendererStyle = 'classic'
+  private hwTheme: HardwareTheme = 'neon'
+  private hwScale = textureScaleForZoom(1)
+  private lastIBFabricArgs: IBFabricArgs | null = null
 
   // Previous server counts per cabinet (for detecting server installs)
   private prevServerCounts: Map<string, number> = new Map()
@@ -544,6 +560,7 @@ class DataCenterScene extends Phaser.Scene {
           const scale = currentDist / this.pinchStartDistance
           this.zoomLevel = Math.max(0.3, Math.min(2.5, this.pinchStartZoom * scale))
           this.cameras.main.setZoom(this.zoomLevel)
+          this.onZoomChanged()
         }
         return
       }
@@ -573,6 +590,7 @@ class DataCenterScene extends Phaser.Scene {
       const zoomDelta = dy > 0 ? -0.1 : 0.1
       this.zoomLevel = Math.max(0.3, Math.min(2.5, this.zoomLevel + zoomDelta))
       this.cameras.main.setZoom(this.zoomLevel)
+      this.onZoomChanged()
     })
   }
 
@@ -1319,6 +1337,69 @@ class DataCenterScene extends Phaser.Scene {
     g.lineBetween(x + hw, y + hh - depth, x, y + h - depth)
   }
 
+  // ── v2 hardware renderer ──────────────────────────────────
+
+  /** Image for a piece of v2 hardware art, with its local origin at (x, y) */
+  private hardwareImage(art: HardwareArt, x: number, y: number, alpha = 1): Phaser.GameObjects.Image | null {
+    const img = makeHardwareImage(this, art, HARDWARE_STYLES[this.hwTheme], this.hwScale, x, y)
+    if (img && alpha !== 1) img.setAlpha(alpha)
+    return img
+  }
+
+  /** v2 cabinet: chassis, server and leaf layers as separate images so layer opacity still applies */
+  private buildCabinetLayers(entry: CabinetEntry, cx: number, cy: number, serverColor: number, leafColor: number, serverAlpha: number, leafAlpha: number): Phaser.GameObjects.Image[] {
+    const spec = {
+      servers: entry.serverCount,
+      leaf: entry.hasLeafSwitch,
+      facing: entry.facing,
+      density: entry.density,
+      envColor: Phaser.Display.Color.HexStringToColor(ENVIRONMENT_CONFIG[entry.environment].color).color,
+      serverColor,
+      leafColor,
+      powerOn: entry.powerOn,
+    }
+    const layers: Phaser.GameObjects.Image[] = []
+    const push = (img: Phaser.GameObjects.Image | null) => { if (img) layers.push(img) }
+    push(this.hardwareImage(cabinetChassisArt(spec), cx, cy))
+    if (entry.serverCount > 0 && serverAlpha > 0) push(this.hardwareImage(cabinetServersArt(spec), cx, cy, serverAlpha))
+    if (entry.hasLeafSwitch && leafAlpha > 0) push(this.hardwareImage(cabinetLeafArt(spec), cx, cy, leafAlpha))
+    return layers
+  }
+
+  /** Switch hardware renderer and/or theme, re-rendering every hardware object */
+  setRendererStyle(style: RendererStyle, theme: HardwareTheme = this.hwTheme) {
+    if (style === this.rendererStyle && theme === this.hwTheme) return
+    this.rendererStyle = style
+    this.hwTheme = theme
+    this.hwScale = textureScaleForZoom(this.zoomLevel)
+    this.rerenderHardware()
+  }
+
+  getRendererStyle(): { style: RendererStyle; theme: HardwareTheme } {
+    return { style: this.rendererStyle, theme: this.hwTheme }
+  }
+
+  /** Re-render all hardware, then drop cached textures the new render no longer uses */
+  private rerenderHardware() {
+    this.rerenderAll()
+    for (const entry of this.pduEntries.values()) this.renderPDU(entry)
+    for (const entry of this.cableTrayEntries.values()) this.renderCableTray(entry)
+    for (const entry of this.coolingUnitEntries.values()) this.renderCoolingUnit(entry)
+    for (const entry of this.chillerEntries.values()) this.renderChillerPlant(entry)
+    if (this.lastIBFabricArgs) this.setInfiniBandFabrics(...this.lastIBFabricArgs)
+    // Every v2 object was just rebuilt, so only textures for the active theme and scale are in use
+    pruneHardwareTextures(this.textures, this.rendererStyle === 'v2' ? `:${this.hwTheme}@${this.hwScale}` : null)
+  }
+
+  /** Called whenever zoomLevel changes; swaps texture resolution when the zoom crosses a bucket */
+  private onZoomChanged() {
+    if (this.rendererStyle !== 'v2') return
+    const scale = textureScaleForZoom(this.zoomLevel)
+    if (scale === this.hwScale) return
+    this.hwScale = scale
+    this.rerenderHardware()
+  }
+
   /** Draw a stacked cabinet: base frame + server layers + optional leaf switch on top */
   private renderCabinet(entry: CabinetEntry) {
     // Clean up existing
@@ -1346,61 +1427,69 @@ class DataCenterScene extends Phaser.Scene {
     const leafOpacity = this.layerOpacity.leaf_switch
     const powerMult = entry.powerOn ? 1 : 0.2
 
-    // 1. Full-height cabinet enclosure — light gray normally, dark magenta for GPU pods
-    const cabinetAlpha = 0.6 * powerMult
-    const enclosureColors = entry.density !== 'standard' ? GPU_CABINET_COLORS : CABINET_COLORS
-    this.drawIsoCube(g, cx, cy, CUBE_W, CUBE_H, CABINET_ENCLOSURE_DEPTH, enclosureColors, cabinetAlpha)
+    // 1–3. Enclosure, servers and leaf switch
+    const v2 = this.rendererStyle === 'v2'
+    const v2Layers: Phaser.GameObjects.GameObject[] = []
+    if (v2) {
+      v2Layers.push(...this.buildCabinetLayers(entry, cx, cy, serverColors.top, leafColors.top,
+        serverVis ? serverOpacity : 0, leafVis ? leafOpacity : 0))
+    } else {
+      // 1. Full-height cabinet enclosure — light gray normally, dark magenta for GPU pods
+      const cabinetAlpha = 0.6 * powerMult
+      const enclosureColors = entry.density !== 'standard' ? GPU_CABINET_COLORS : CABINET_COLORS
+      this.drawIsoCube(g, cx, cy, CUBE_W, CUBE_H, CABINET_ENCLOSURE_DEPTH, enclosureColors, cabinetAlpha)
 
-    // Environment accent — thin wireframe tint on the enclosure
-    const envColor = ENVIRONMENT_CONFIG[entry.environment].frameColors.top
-    this.drawIsoWireframe(g, cx, cy, CUBE_W, CUBE_H, CABINET_ENCLOSURE_DEPTH, envColor, 0.5 * powerMult)
+      // Environment accent — thin wireframe tint on the enclosure
+      const envColor = ENVIRONMENT_CONFIG[entry.environment].frameColors.top
+      this.drawIsoWireframe(g, cx, cy, CUBE_W, CUBE_H, CABINET_ENCLOSURE_DEPTH, envColor, 0.5 * powerMult)
 
-    // 2. Server layers inside the cabinet (smaller, sitting inside the gray shell)
-    let slotY = cy - BASE_DEPTH - SECTION_GAP
-    if (serverVis) {
-      for (let i = 0; i < entry.serverCount; i++) {
-        const alpha = 0.9 * serverOpacity * powerMult
-        this.drawIsoCube(g, cx, slotY, CUBE_W - SERVER_INSET, CUBE_H - SERVER_INSET / 2, SERVER_DEPTH, serverColors, alpha)
+      // 2. Server layers inside the cabinet (smaller, sitting inside the gray shell)
+      let slotY = cy - BASE_DEPTH - SECTION_GAP
+      if (serverVis) {
+        for (let i = 0; i < entry.serverCount; i++) {
+          const alpha = 0.9 * serverOpacity * powerMult
+          this.drawIsoCube(g, cx, slotY, CUBE_W - SERVER_INSET, CUBE_H - SERVER_INSET / 2, SERVER_DEPTH, serverColors, alpha)
 
-        // Server LED
-        if (serverOpacity > 0.3) {
-          const ledColor = `#${serverColors.top.toString(16).padStart(6, '0')}`
-          const led = this.add
-            .text(cx + (CUBE_W - SERVER_INSET) / 2 - 4, slotY - SERVER_DEPTH + 1, '●', {
-              fontFamily: 'monospace',
-              fontSize: '5px',
-              color: ledColor,
-            })
-            .setOrigin(0.5)
-            .setAlpha(entry.powerOn ? 0.9 * serverOpacity : 0.1)
-            .setDepth(baseDepth + 1)
-          labels.push(led)
+          // Server LED
+          if (serverOpacity > 0.3) {
+            const ledColor = `#${serverColors.top.toString(16).padStart(6, '0')}`
+            const led = this.add
+              .text(cx + (CUBE_W - SERVER_INSET) / 2 - 4, slotY - SERVER_DEPTH + 1, '●', {
+                fontFamily: 'monospace',
+                fontSize: '5px',
+                color: ledColor,
+              })
+              .setOrigin(0.5)
+              .setAlpha(entry.powerOn ? 0.9 * serverOpacity : 0.1)
+              .setDepth(baseDepth + 1)
+            labels.push(led)
+          }
+
+          slotY -= SERVER_DEPTH + SECTION_GAP
         }
-
-        slotY -= SERVER_DEPTH + SECTION_GAP
       }
-    }
 
-    // 3. Leaf switch at top of cabinet (also inset, cyan)
-    const leafSlotY = cy - BASE_DEPTH - SECTION_GAP - MAX_SERVERS_PER_CABINET * (SERVER_DEPTH + SECTION_GAP)
-    if (entry.hasLeafSwitch) {
-      if (leafVis) {
-        const alpha = 0.9 * leafOpacity * powerMult
-        this.drawIsoCube(g, cx, leafSlotY, CUBE_W - SERVER_INSET, CUBE_H - SERVER_INSET / 2, LEAF_DEPTH, leafColors, alpha)
+      // 3. Leaf switch at top of cabinet (also inset, cyan)
+      const leafSlotY = cy - BASE_DEPTH - SECTION_GAP - MAX_SERVERS_PER_CABINET * (SERVER_DEPTH + SECTION_GAP)
+      if (entry.hasLeafSwitch) {
+        if (leafVis) {
+          const alpha = 0.9 * leafOpacity * powerMult
+          this.drawIsoCube(g, cx, leafSlotY, CUBE_W - SERVER_INSET, CUBE_H - SERVER_INSET / 2, LEAF_DEPTH, leafColors, alpha)
 
-        // Leaf LED
-        if (leafOpacity > 0.3) {
-          const ledColor = `#${leafColors.top.toString(16).padStart(6, '0')}`
-          const led = this.add
-            .text(cx, leafSlotY - LEAF_DEPTH - 4, '●', {
-              fontFamily: 'monospace',
-              fontSize: '6px',
-              color: ledColor,
-            })
-            .setOrigin(0.5)
-            .setAlpha(entry.powerOn ? 1 * leafOpacity : 0.1)
-            .setDepth(baseDepth + 1)
-          labels.push(led)
+          // Leaf LED
+          if (leafOpacity > 0.3) {
+            const ledColor = `#${leafColors.top.toString(16).padStart(6, '0')}`
+            const led = this.add
+              .text(cx, leafSlotY - LEAF_DEPTH - 4, '●', {
+                fontFamily: 'monospace',
+                fontSize: '6px',
+                color: ledColor,
+              })
+              .setOrigin(0.5)
+              .setAlpha(entry.powerOn ? 1 * leafOpacity : 0.1)
+              .setDepth(baseDepth + 1)
+            labels.push(led)
+          }
         }
       }
     }
@@ -1648,8 +1737,14 @@ class DataCenterScene extends Phaser.Scene {
       }
     }
 
-    g.setDepth(baseDepth)
-    this.cabinetGraphics.set(entry.id, g)
+    if (v2) {
+      const container = this.add.container(0, 0, [...v2Layers, g])
+      container.setDepth(baseDepth)
+      this.cabinetGraphics.set(entry.id, container)
+    } else {
+      g.setDepth(baseDepth)
+      this.cabinetGraphics.set(entry.id, g)
+    }
     this.cabinetLabels.set(entry.id, labels)
   }
 
@@ -2653,6 +2748,7 @@ class DataCenterScene extends Phaser.Scene {
     switches: Array<{ id: string; type: 'ib_leaf' | 'ib_spine'; podId: string; rail: number; operational: boolean }>,
     links: Array<{ id: string; fromSwitchId: string; toSwitchId: string; fabricId: string; rail: number; status: 'healthy' | 'flapping' | 'down' }>,
   ) {
+    this.lastIBFabricArgs = [fabrics, switches, links]
     if (!this.ibSwitchGraphics) {
       this.ibSwitchGraphics = this.add.graphics()
       this.ibSwitchGraphics.setDepth(120) // above cabinets but below interactive overlays
@@ -4401,6 +4497,7 @@ class DataCenterScene extends Phaser.Scene {
     cam.zoomTo(targetZoom, 800, 'Power2')
     this.time.delayedCall(800, () => {
       this.zoomLevel = targetZoom
+      this.onZoomChanged()
     })
   }
 
@@ -4408,6 +4505,7 @@ class DataCenterScene extends Phaser.Scene {
   setCameraZoom(zoom: number) {
     this.zoomLevel = Math.max(0.3, Math.min(2.5, zoom))
     this.cameras.main.setZoom(this.zoomLevel)
+    this.onZoomChanged()
   }
 
   getCameraZoom(): number {
@@ -4418,6 +4516,7 @@ class DataCenterScene extends Phaser.Scene {
   resetCamera() {
     this.zoomLevel = 1
     this.cameras.main.setZoom(1)
+    this.onZoomChanged()
 
     // Compute content center in world space and scroll so it's at viewport center
     const w = this.scale.width
