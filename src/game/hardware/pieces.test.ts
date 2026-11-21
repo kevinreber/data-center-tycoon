@@ -6,7 +6,7 @@ import type { HardwareStyle } from './styles'
 import type { DrawCtx, HardwareArt } from './draw'
 import type { CabinetArtSpec } from './pieces/cabinet'
 import { cabinetChassisArt, cabinetServersArt, cabinetLeafArt, cabinetDoorArt, cabinetHasDoor, cabinetLedAnchors } from './pieces/cabinet'
-import { spineArt, ibSwitchArt, pduArt, coolingArt, coolingBox, coolingFanAnchor, chillerArt, cableTrayArt } from './pieces/infra'
+import { spineArt, ibSwitchArt, pduArt, coolingArt, coolingBox, coolingFans, coolingFanCenter, chillerArt, cableTrayArt } from './pieces/infra'
 
 /** Canvas 2D stand-in that accepts every call, so draw code can run under jsdom */
 export function fakeDrawCtx(style: HardwareStyle = HARDWARE_STYLES.neon): DrawCtx {
@@ -49,16 +49,16 @@ describe('infrastructure art', () => {
     expect(new Set(arts.map((a) => a.key)).size).toBe(arts.length)
   })
 
-  it('places the live fan overlay on top of fan-equipped cooling units only', () => {
-    for (const type of ['fan_tray', 'crac', 'crah'] as const) {
-      const anchor = coolingFanAnchor(type)
-      const b = coolingBox(type)
-      expect(anchor).not.toBeNull()
-      // Center of the top face sits one box-height above the base diamond's center
-      expect(anchor![0]).toBeCloseTo(0)
-      expect(anchor![1]).toBeCloseTo(b.h / 2 - b.d)
-    }
-    expect(coolingFanAnchor('immersion_pod')).toBeNull()
+  it('exposes the same fans the art draws, centered on the top face', () => {
+    expect(coolingFans('fan_tray')).toHaveLength(2)
+    expect(coolingFans('crac')).toHaveLength(1)
+    expect(coolingFans('crah')).toHaveLength(1)
+    expect(coolingFans('immersion_pod')).toHaveLength(0)
+    const b = coolingBox('crac')
+    const [x, y] = coolingFanCenter('crac', coolingFans('crac')[0])
+    // Center of the top face sits one box-height above the base diamond's center
+    expect(x).toBeCloseTo(0)
+    expect(y).toBeCloseTo(b.h / 2 - b.d)
   })
 })
 

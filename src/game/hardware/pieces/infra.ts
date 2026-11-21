@@ -52,6 +52,14 @@ export interface SpineArtSpec {
 
 const SPINE_BOX = box(0, 0, SPINE.w, SPINE.h, SPINE.depth)
 
+/** Box-local LED positions on the spine's front: supervisor status, then one per line card */
+export function spineLedAnchors(): Pt[] {
+  return [
+    facePoint(SPINE_BOX, 'left', 3, 2.1),
+    ...[0, 1, 2].map((k) => facePoint(SPINE_BOX, 'left', 2, 3.5 + k * 3.4 + 1.45)),
+  ]
+}
+
 /** Modular spine chassis: line cards with port rows, fan trays, PSUs */
 export function spineArt(spec: SpineArtSpec): HardwareArt {
   const b = SPINE_BOX
@@ -190,12 +198,30 @@ export function coolingBox(type: CoolingArtType): IsoBox {
   return box(0, 0, COOLING.w, COOLING.h, COOLING_DEPTH[type])
 }
 
-/** Box-local center of the top-face fan, for the live spinning-blade overlay */
-export function coolingFanAnchor(type: CoolingArtType): Pt | null {
-  if (type === 'immersion_pod') return null
-  const b = coolingBox(type)
-  const L = faceWidth(b)
-  return facePoint(b, 'top', L / 2, L / 2)
+/** Top-face fans as fractions of the face width — shared by the art and the live blade overlay */
+const COOLING_FANS: Record<CoolingArtType, { s: number; t: number; r: number }[]> = {
+  fan_tray: [{ s: 0.3, t: 0.5, r: 0.2 }, { s: 0.72, t: 0.5, r: 0.2 }],
+  crac: [{ s: 0.5, t: 0.5, r: 0.28 }],
+  crah: [{ s: 0.5, t: 0.5, r: 0.28 }],
+  immersion_pod: [],
+}
+
+export interface FanPlacement {
+  /** Fan center in top-face local units */
+  s: number
+  t: number
+  r: number
+}
+
+/** Top-face fans in face-local units; map points with facePoint(coolingBox(type), 'top', s, t) */
+export function coolingFans(type: CoolingArtType): FanPlacement[] {
+  const L = faceWidth(coolingBox(type))
+  return COOLING_FANS[type].map((f) => ({ s: f.s * L, t: f.t * L, r: f.r * L }))
+}
+
+/** Box-local center of a fan, for positioning overlays */
+export function coolingFanCenter(type: CoolingArtType, fan: FanPlacement): Pt {
+  return facePoint(coolingBox(type), 'top', fan.s, fan.t)
 }
 
 export function coolingArt(spec: CoolingArtSpec): HardwareArt {
@@ -228,12 +254,15 @@ export function coolingArt(spec: CoolingArtSpec): HardwareArt {
   }
 }
 
+function drawTopFans(ctx: CanvasRenderingContext2D, style: HardwareStyle, b: IsoBox, type: CoolingArtType, c: number) {
+  onFace(ctx, b, 'top', () => {
+    for (const f of coolingFans(type)) fan(ctx, f.s, f.t, f.r, rgba(c, 0.8), style.recess)
+  })
+}
+
 function drawFanTray(dc: DrawCtx, b: IsoBox, c: number) {
   const { ctx, style } = dc
-  onFace(ctx, b, 'top', (w) => {
-    fan(ctx, w * 0.3, w * 0.5, w * 0.2, rgba(c, 0.8), style.recess)
-    fan(ctx, w * 0.72, w * 0.5, w * 0.2, rgba(c, 0.8), style.recess)
-  })
+  drawTopFans(ctx, style, b, 'fan_tray', c)
   onFace(ctx, b, 'left', (w, h) => {
     for (let s = 1.5; s < w - 1; s += 1.3) vline(ctx, s, 1.2, h - 1.2, style.detail, 0.5)
   })
@@ -253,8 +282,8 @@ function drawAirHandler(dc: DrawCtx, b: IsoBox, c: number, chilledWater: boolean
   onFace(ctx, b, 'right', (w, h) => {
     for (let t = 2; t < h - 1.5; t += 1.4) hline(ctx, 1.5, w - 1.5, t, style.detail, 0.5)
   })
+  drawTopFans(ctx, style, b, chilledWater ? 'crah' : 'crac', c)
   onFace(ctx, b, 'top', (w) => {
-    fan(ctx, w * 0.5, w * 0.5, w * 0.28, rgba(c, 0.8), style.recess)
     if (chilledWater) {
       // Chilled-water supply and return stubs
       dot(ctx, w * 0.16, w * 0.16, 1.2, rgba(0x3399ff))

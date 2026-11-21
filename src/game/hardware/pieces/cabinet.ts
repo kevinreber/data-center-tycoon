@@ -50,6 +50,18 @@ const serverLed = (i: number, front: boolean): [number, number] =>
 const leafPortLed = (p: number): [number, number] => [BAY_L + 1.75 + p * 2.2, zToT(LEAF_Z + LEAF_H) + 2.4]
 const leafRearLed = (): [number, number] => [BAY_L + 2.3, zToT(LEAF_Z + LEAF_H) + LEAF_H / 2]
 
+/** Box-local outline of server slot i's front panel (for fault highlights drawn over the art) */
+export function cabinetServerQuad(i: number): Pt[] {
+  const t0 = zToT(slotZ(i) + CAB.serverDepth)
+  const t1 = t0 + SERVER_H
+  return [
+    facePoint(ENCLOSURE, 'left', BAY_L, t0),
+    facePoint(ENCLOSURE, 'left', BAY_R, t0),
+    facePoint(ENCLOSURE, 'left', BAY_R, t1),
+    facePoint(ENCLOSURE, 'left', BAY_L, t1),
+  ]
+}
+
 /** Box-local LED positions for live blinking overlays (one per server, link lights on the leaf) */
 export function cabinetLedAnchors(spec: Pick<CabinetArtSpec, 'servers' | 'leaf' | 'facing'>): { servers: Pt[]; leaf: Pt[] } {
   const n = Math.max(0, Math.min(spec.servers, CAB.maxServers))

@@ -62,13 +62,15 @@ interface ViewportProps {
   override: StateOverride
   trafficOn: boolean
   fabricOn: boolean
+  heatMapOn: boolean
+  installHighlightOn: boolean
   zoom: number
   resetToken: number
   /** Fired when the user zooms inside this viewport (wheel / pinch) */
   onZoomInput: (zoom: number) => void
 }
 
-function LabViewport({ containerId, scenario, rendererStyle, theme, override, trafficOn, fabricOn, zoom, resetToken, onZoomInput }: ViewportProps) {
+function LabViewport({ containerId, scenario, rendererStyle, theme, override, trafficOn, fabricOn, heatMapOn, installHighlightOn, zoom, resetToken, onZoomInput }: ViewportProps) {
   const gameRef = useRef<Phaser.Game | null>(null)
   const knownZoom = useRef(1)
   const [scene, setScene] = useState<Scene | null>(null)
@@ -123,6 +125,17 @@ function LabViewport({ containerId, scenario, rendererStyle, theme, override, tr
   }, [scene, fabricOn])
 
   useEffect(() => {
+    scene?.setHeatMapVisible(heatMapOn)
+  }, [scene, heatMapOn, override])
+
+  // Mirrors the game's "install server" mode: highlight every powered cabinet with a free slot
+  useEffect(() => {
+    if (!scene) return
+    const ids = scenario.cabinets.filter((c) => c.servers < 4).map((c) => c.id)
+    scene.setEquipmentPlacementMode(installHighlightOn ? 'server' : null, ids)
+  }, [scene, scenario, installHighlightOn, rendererStyle])
+
+  useEffect(() => {
     if (!scene) return
     knownZoom.current = zoom
     if (Math.abs(scene.getCameraZoom() - zoom) > 0.001) scene.setCameraZoom(zoom)
@@ -174,6 +187,7 @@ const OVERRIDES: { value: StateOverride; label: string }[] = [
   { value: 'maintenance', label: 'Maintenance' },
   { value: 'offline', label: 'Powered off' },
   { value: 'aging', label: 'Aging servers' },
+  { value: 'ecc', label: 'ECC faults (GPU racks)' },
 ]
 
 type ViewMode = 'classic' | 'v2' | 'split'
@@ -185,6 +199,8 @@ export function LabApp() {
   const [override, setOverride] = useState<StateOverride>('none')
   const [trafficOn, setTrafficOn] = useState(false)
   const [fabricOn, setFabricOn] = useState(true)
+  const [heatMapOn, setHeatMapOn] = useState(false)
+  const [installHighlightOn, setInstallHighlightOn] = useState(false)
   const [zoom, setZoom] = useState(1)
   const [resetToken, setResetToken] = useState(0)
 
@@ -244,6 +260,14 @@ export function LabApp() {
           <input type="checkbox" checked={fabricOn} onChange={(e) => setFabricOn(e.target.checked)} className="accent-neon-green" />
           InfiniBand
         </label>
+        <label className="flex items-center gap-1.5">
+          <input type="checkbox" checked={heatMapOn} onChange={(e) => setHeatMapOn(e.target.checked)} className="accent-neon-green" />
+          Heat map
+        </label>
+        <label className="flex items-center gap-1.5">
+          <input type="checkbox" checked={installHighlightOn} onChange={(e) => setInstallHighlightOn(e.target.checked)} className="accent-neon-green" />
+          Install-server highlight
+        </label>
 
         <label className="flex items-center gap-1.5">
           <span className="text-muted-foreground">Zoom</span>
@@ -266,6 +290,8 @@ export function LabApp() {
             override={override}
             trafficOn={trafficOn}
             fabricOn={fabricOn}
+            heatMapOn={heatMapOn}
+            installHighlightOn={installHighlightOn}
             zoom={zoom}
             resetToken={resetToken}
             onZoomInput={onZoomInput}

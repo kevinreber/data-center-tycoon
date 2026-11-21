@@ -276,6 +276,8 @@ export function GameCanvas() {
         inMaintenance: maintCabIds.has(cab.id),
         serverAge: cab.serverAge,
         liquidCooling: cab.liquidCooling,
+        eccFaultedGpus: cab.eccFaultedGpus ?? 0,
+        gpuCount: cab.gpuCount,
       }, cab.density, cab.podId)
     }
 
