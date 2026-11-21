@@ -107,6 +107,14 @@ Where the build differs from the plan above, and what was learned:
 - **Not converted:** row-end slots, cooling pipes, busways and the sub-floor view still use classic drawing in both renderers. Worker sprites, particles and traffic lines are shared.
 - **Blueprint theme** works for all hardware but is Lab-only; the floor and UI stay dark.
 
+## Screenshots
+
+Captured from the enterprise demo (`?demo=true`) and the Hardware Lab, in `docs/images/hardware-v2/`:
+
+- `demo-before*.jpg` / `demo-after*.jpg`: classic (main before v2) vs v2, full view and close-up.
+- `demo-v2-toolbar-free-slots.jpg`: the overlay toggle bar with Free slots on.
+- `lab-split-<state>.jpg`: Lab classic vs v2 for every Force state option (none, warm, throttled, fire, incident, maintenance, offline, aging, ecc).
+
 ## Out of scope for v2
 
 - A real 3D engine (Three.js) or camera rotation.
