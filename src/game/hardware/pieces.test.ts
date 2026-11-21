@@ -6,6 +6,7 @@ import type { HardwareStyle } from './styles'
 import type { DrawCtx, HardwareArt } from './draw'
 import type { CabinetArtSpec } from './pieces/cabinet'
 import { cabinetChassisArt, cabinetServersArt, cabinetLeafArt, cabinetDoorArt, cabinetHasDoor, cabinetLedAnchors } from './pieces/cabinet'
+import { spineArt, ibSwitchArt, pduArt, coolingArt, coolingBox, coolingFanAnchor, chillerArt, cableTrayArt } from './pieces/infra'
 
 /** Canvas 2D stand-in that accepts every call, so draw code can run under jsdom */
 export function fakeDrawCtx(style: HardwareStyle = HARDWARE_STYLES.neon): DrawCtx {
@@ -31,6 +32,35 @@ export function drawsCleanly(art: HardwareArt) {
   expect(maxX).toBeGreaterThan(minX)
   expect(maxY).toBeGreaterThan(minY)
 }
+
+describe('infrastructure art', () => {
+  it('every variant draws without throwing and has a unique key', () => {
+    const arts: HardwareArt[] = []
+    for (const powerOn of [true, false]) arts.push(spineArt({ color: 0xff6644, powerOn }))
+    arts.push(spineArt({ color: 0x123456, powerOn: true }))
+    for (const type of ['ib_leaf', 'ib_spine'] as const) for (const operational of [true, false]) arts.push(ibSwitchArt({ type, operational }))
+    for (const overloaded of [true, false]) arts.push(pduArt({ overloaded }))
+    for (const type of ['fan_tray', 'crac', 'crah', 'immersion_pod'] as const)
+      for (const operational of [true, false]) arts.push(coolingArt({ type, operational, color: 0x00aaff }))
+    for (const tier of ['basic', 'advanced'] as const) for (const operational of [true, false]) arts.push(chillerArt({ tier, operational }))
+    arts.push(cableTrayArt())
+
+    for (const art of arts) drawsCleanly(art)
+    expect(new Set(arts.map((a) => a.key)).size).toBe(arts.length)
+  })
+
+  it('places the live fan overlay on top of fan-equipped cooling units only', () => {
+    for (const type of ['fan_tray', 'crac', 'crah'] as const) {
+      const anchor = coolingFanAnchor(type)
+      const b = coolingBox(type)
+      expect(anchor).not.toBeNull()
+      // Center of the top face sits one box-height above the base diamond's center
+      expect(anchor![0]).toBeCloseTo(0)
+      expect(anchor![1]).toBeCloseTo(b.h / 2 - b.d)
+    }
+    expect(coolingFanAnchor('immersion_pod')).toBeNull()
+  })
+})
 
 describe('cabinet art', () => {
   const base: CabinetArtSpec = {

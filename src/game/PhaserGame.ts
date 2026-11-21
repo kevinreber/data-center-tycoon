@@ -3,7 +3,7 @@ import type { LayerVisibility, LayerOpacity, LayerColors, LayerColorOverrides, T
 import { DEFAULT_COLORS, ENVIRONMENT_CONFIG, MAX_SERVERS_PER_CABINET, getFacingOffsets, COOLING_UNIT_CONFIG, CHILLER_PLANT_CONFIG, ROW_END_SLOT_CONFIG } from '@/stores/gameStore'
 import type { RendererStyle } from '@/game/hardware'
 import type { HardwareArt, HardwareTheme } from '@/game/hardware'
-import { HARDWARE_STYLES, makeHardwareImage, pruneHardwareTextures, textureScaleForZoom, cabinetChassisArt, cabinetServersArt, cabinetLeafArt, cabinetDoorArt, cabinetHasDoor } from '@/game/hardware'
+import { HARDWARE_STYLES, makeHardwareImage, pruneHardwareTextures, textureScaleForZoom, cabinetChassisArt, cabinetServersArt, cabinetLeafArt, cabinetDoorArt, cabinetHasDoor, spineArt, ibSwitchArt, pduArt, coolingArt, chillerArt, cableTrayArt } from '@/game/hardware'
 
 const COLORS = DEFAULT_COLORS
 
@@ -221,6 +221,7 @@ class DataCenterScene extends Phaser.Scene {
   private ibSwitchGraphics: Phaser.GameObjects.Graphics | null = null
   private ibLinkGraphics: Phaser.GameObjects.Graphics | null = null
   private ibSwitchLabels: Phaser.GameObjects.Text[] = []
+  private ibSwitchImages: Phaser.GameObjects.Image[] = []
   private backendFabricVisible = true
   // Phase 8C: per-link hit zones so the operator can click a flapping link in
   // the scene and have the NOC drawer jump straight to it.
@@ -1358,6 +1359,16 @@ class DataCenterScene extends Phaser.Scene {
     return img
   }
 
+  /** Container holding a v2 hardware image under an overlay Graphics (rings, tints) */
+  private hardwareContainer(img: Phaser.GameObjects.Image | null, overlay: Phaser.GameObjects.Graphics | null, depth: number): Phaser.GameObjects.Container {
+    const children: Phaser.GameObjects.GameObject[] = []
+    if (img) children.push(img)
+    if (overlay) children.push(overlay)
+    const container = this.add.container(0, 0, children)
+    container.setDepth(depth)
+    return container
+  }
+
   /** v2 cabinet: chassis, server and leaf layers as separate images so layer opacity still applies */
   private buildCabinetLayers(entry: CabinetEntry, cx: number, cy: number, serverColor: number, leafColor: number, serverAlpha: number, leafAlpha: number): Phaser.GameObjects.Image[] {
     const spec = {
@@ -1783,12 +1794,16 @@ class DataCenterScene extends Phaser.Scene {
     const opacity = this.layerOpacity.spine_switch
     const powerMult = entry.powerOn ? 1 : 0.2
 
-    const g = this.add.graphics()
-    const alpha = 0.9 * opacity * powerMult
-    this.drawIsoCube(g, x, y + SPINE_H / 2, SPINE_W, SPINE_H, SPINE_DEPTH, spineColors, alpha)
-
-    g.setDepth(5)
-    this.spineGraphics.set(entry.id, g)
+    if (this.rendererStyle === 'v2') {
+      const img = this.hardwareImage(spineArt({ color: spineColors.top, powerOn: entry.powerOn }), x, y + SPINE_H / 2, opacity)
+      this.spineGraphics.set(entry.id, this.hardwareContainer(img, null, 5))
+    } else {
+      const g = this.add.graphics()
+      const alpha = 0.9 * opacity * powerMult
+      this.drawIsoCube(g, x, y + SPINE_H / 2, SPINE_W, SPINE_H, SPINE_DEPTH, spineColors, alpha)
+      g.setDepth(5)
+      this.spineGraphics.set(entry.id, g)
+    }
 
     // LED + label
     const ledColor = `#${spineColors.top.toString(16).padStart(6, '0')}`
@@ -2781,6 +2796,8 @@ class DataCenterScene extends Phaser.Scene {
     this.ibLinkEntries.clear()
     for (const t of this.ibSwitchLabels) t.destroy()
     this.ibSwitchLabels = []
+    for (const img of this.ibSwitchImages) img.destroy()
+    this.ibSwitchImages = []
     for (const z of this.ibLinkHitZones) z.destroy()
     this.ibLinkHitZones = []
 
@@ -2917,8 +2934,17 @@ class DataCenterScene extends Phaser.Scene {
       const color = isLeaf
         ? { top: 0xaa44ff, side: 0x7733cc, front: 0x551a99 }
         : { top: 0xdd66ff, side: 0xaa55cc, front: 0x771a99 }
-      const alpha = sw.operational ? 0.9 : 0.4
-      this.drawIsoCube(g, pos.x, pos.y, switchW, switchH, switchDepth, color, alpha)
+      if (this.rendererStyle === 'v2') {
+        const img = this.hardwareImage(ibSwitchArt({ type: sw.type, operational: sw.operational }), pos.x, pos.y)
+        if (img) {
+          this.add.existing(img)
+          img.setDepth(120)
+          this.ibSwitchImages.push(img)
+        }
+      } else {
+        const alpha = sw.operational ? 0.9 : 0.4
+        this.drawIsoCube(g, pos.x, pos.y, switchW, switchH, switchDepth, color, alpha)
+      }
 
       // Small label
       const label = this.add
@@ -2941,6 +2967,7 @@ class DataCenterScene extends Phaser.Scene {
     if (this.ibLinkGraphics) this.ibLinkGraphics.setVisible(visible)
     if (this.allReduceGraphics) this.allReduceGraphics.setVisible(visible)
     for (const label of this.ibSwitchLabels) label.setVisible(visible)
+    for (const img of this.ibSwitchImages) img.setVisible(visible)
     // Phase 8C: hide the click zones too — no point making invisible cables clickable.
     for (const zone of this.ibLinkHitZones) zone.setVisible(visible).setActive(visible)
   }
@@ -3219,17 +3246,21 @@ class DataCenterScene extends Phaser.Scene {
     const cx = x
     const cy = y + TILE_H / 2
 
-    const g = this.add.graphics()
     const baseDepth = 10 + entry.row * this.cabCols + entry.col
 
-    // PDU is a small yellow/orange box
-    const pduColor = entry.overloaded
-      ? { top: 0xff4444, side: 0xcc2222, front: 0x991111 }
-      : { top: 0xffaa00, side: 0xcc8800, front: 0x996600 }
-    this.drawIsoCube(g, cx, cy, CUBE_W * 0.6, CUBE_H * 0.6, 6, pduColor, 0.8)
-
-    g.setDepth(baseDepth)
-    this.pduGraphics.set(entry.id, g)
+    if (this.rendererStyle === 'v2') {
+      const img = this.hardwareImage(pduArt({ overloaded: entry.overloaded }), cx, cy)
+      this.pduGraphics.set(entry.id, this.hardwareContainer(img, null, baseDepth))
+    } else {
+      const g = this.add.graphics()
+      // PDU is a small yellow/orange box
+      const pduColor = entry.overloaded
+        ? { top: 0xff4444, side: 0xcc2222, front: 0x991111 }
+        : { top: 0xffaa00, side: 0xcc8800, front: 0x996600 }
+      this.drawIsoCube(g, cx, cy, CUBE_W * 0.6, CUBE_H * 0.6, 6, pduColor, 0.8)
+      g.setDepth(baseDepth)
+      this.pduGraphics.set(entry.id, g)
+    }
 
     // Label
     const label = this.add
@@ -3268,9 +3299,15 @@ class DataCenterScene extends Phaser.Scene {
     const cx = x
     const cy = y + TILE_H / 2
 
-    const g = this.add.graphics()
     const baseDepth = 8 + entry.row * this.cabCols + entry.col
 
+    if (this.rendererStyle === 'v2') {
+      const img = this.hardwareImage(cableTrayArt(), cx, cy)
+      this.cableTrayGraphics.set(entry.id, this.hardwareContainer(img, null, baseDepth))
+      return
+    }
+
+    const g = this.add.graphics()
     // Cable tray is a flat colored marker on the floor
     const trayColor = 0x8866cc
     g.fillStyle(trayColor, 0.25)
@@ -3326,7 +3363,10 @@ class DataCenterScene extends Phaser.Scene {
     const darkerColor = ((colorNum >> 1) & 0x7f7f7f)
     const darkestColor = ((colorNum >> 2) & 0x3f3f3f)
 
-    if (entry.operational) {
+    const v2 = this.rendererStyle === 'v2'
+    if (v2) {
+      // Body is a cached image; the coverage ring below still draws into g
+    } else if (entry.operational) {
       this.drawIsoCube(g, cx, cy, CUBE_W * 0.5, CUBE_H * 0.5, 8,
         { top: colorNum, side: darkerColor, front: darkestColor }, 0.85)
     } else {
@@ -3360,8 +3400,13 @@ class DataCenterScene extends Phaser.Scene {
       }
     }
 
-    g.setDepth(baseDepth)
-    this.coolingUnitGraphics.set(entry.id, g)
+    if (v2) {
+      const img = this.hardwareImage(coolingArt({ type: entry.type, operational: entry.operational, color: colorNum }), cx, cy)
+      this.coolingUnitGraphics.set(entry.id, this.hardwareContainer(img, g, baseDepth))
+    } else {
+      g.setDepth(baseDepth)
+      this.coolingUnitGraphics.set(entry.id, g)
+    }
 
     // Label
     const shortLabel = entry.type === 'fan_tray' ? 'FAN' :
@@ -3438,8 +3483,11 @@ class DataCenterScene extends Phaser.Scene {
     const sideColor = entry.operational ? 0x007799 : 0x991111
     const frontColor = entry.operational ? 0x005566 : 0x660808
 
-    this.drawIsoCube(g, cx, cy, CUBE_W * 0.7, CUBE_H * 0.7, 12,
-      { top: topColor, side: sideColor, front: frontColor }, 0.9)
+    const v2 = this.rendererStyle === 'v2'
+    if (!v2) {
+      this.drawIsoCube(g, cx, cy, CUBE_W * 0.7, CUBE_H * 0.7, 12,
+        { top: topColor, side: sideColor, front: frontColor }, 0.9)
+    }
 
     // Coverage range ring
     if (cfg.range > 0 && entry.operational) {
@@ -3465,8 +3513,13 @@ class DataCenterScene extends Phaser.Scene {
       }
     }
 
-    g.setDepth(baseDepth)
-    this.chillerGraphics.set(entry.id, g)
+    if (v2) {
+      const img = this.hardwareImage(chillerArt({ tier: entry.tier, operational: entry.operational }), cx, cy)
+      this.chillerGraphics.set(entry.id, this.hardwareContainer(img, g, baseDepth))
+    } else {
+      g.setDepth(baseDepth)
+      this.chillerGraphics.set(entry.id, g)
+    }
 
     const tierLabel = entry.tier === 'advanced' ? 'CHILLER+' : 'CHILLER'
     const labelColor = entry.operational ? '#00aacc' : '#ff4444'

@@ -145,23 +145,24 @@ function baseScenario(): Omit<LabScenario, 'cabinets' | 'pods' | 'rowLegend'> {
     cabinetRows: CABINET_ROWS,
     spineSlots: 8,
     spines: Array.from({ length: 8 }, (_, i) => ({ id: `spine-${i}`, powerOn: i < 6 })),
+    // Infrastructure sits on the front corridor (grid row 10) so no cabinet row hides it
     pdus: [
-      { id: 'pdu-ok', col: 1, row: 2, overloaded: false },
-      { id: 'pdu-hot', col: 3, row: 2, overloaded: true },
+      { id: 'pdu-ok', col: 0, row: 10, overloaded: false },
+      { id: 'pdu-hot', col: 1, row: 10, overloaded: true },
     ],
-    cableTrays: [6, 7, 8].map((col) => ({ id: `tray-${col}`, col, row: 2 })),
+    cableTrays: [2, 3].map((col) => ({ id: `tray-${col}`, col, row: 10 })),
     coolingUnits: [
-      { id: 'cu-fan', col: 1, row: 4, type: 'fan_tray', operational: true },
-      { id: 'cu-crac', col: 3, row: 4, type: 'crac', operational: true },
-      { id: 'cu-crah', col: 5, row: 4, type: 'crah', operational: true },
-      { id: 'cu-imm', col: 7, row: 4, type: 'immersion_pod', operational: true },
-      { id: 'cu-crac-fail', col: 9, row: 4, type: 'crac', operational: false },
-      { id: 'cu-imm-fail', col: 11, row: 4, type: 'immersion_pod', operational: false },
+      { id: 'cu-fan', col: 4, row: 10, type: 'fan_tray', operational: true },
+      { id: 'cu-crac', col: 5, row: 10, type: 'crac', operational: true },
+      { id: 'cu-crah', col: 6, row: 10, type: 'crah', operational: true },
+      { id: 'cu-imm', col: 7, row: 10, type: 'immersion_pod', operational: true },
+      { id: 'cu-crac-fail', col: 8, row: 10, type: 'crac', operational: false },
+      { id: 'cu-imm-fail', col: 9, row: 10, type: 'immersion_pod', operational: false },
     ],
     chillers: [
-      { id: 'ch-basic', col: 1, row: 6, tier: 'basic', operational: true },
-      { id: 'ch-adv', col: 4, row: 6, tier: 'advanced', operational: true },
-      { id: 'ch-fail', col: 7, row: 6, tier: 'basic', operational: false },
+      { id: 'ch-basic', col: 11, row: 10, tier: 'basic', operational: true },
+      { id: 'ch-adv', col: 12, row: 10, tier: 'advanced', operational: true },
+      { id: 'ch-fail', col: 13, row: 10, tier: 'basic', operational: false },
     ],
   }
 }
@@ -182,13 +183,11 @@ export function buildSpecimenScenario(): LabScenario {
     pods: gpu.pods,
     rowLegend: [
       { gridRow: 1, label: 'Front view (south-facing): 0–4 servers without leaf, 0–4 with leaf, lab, management, offline, aging' },
-      { gridRow: 2, label: 'Aisle: PDU, overloaded PDU, cable trays' },
       { gridRow: 3, label: 'Rear view (north-facing): same catalog as the front row' },
-      { gridRow: 4, label: 'Aisle: fan tray, CRAC, CRAH, immersion pod, failed CRAC, failed immersion' },
       { gridRow: 5, label: 'States: normal, warm, throttled, fire, incident, maintenance, offline, aging' },
-      { gridRow: 6, label: 'Aisle: chiller, advanced chiller, failed chiller' },
       { gridRow: 7, label: 'Rear-view GPU racks: rear-door heat exchanger, direct-to-chip (InfiniBand switches sit between rows 7 and 9)' },
       { gridRow: 9, label: 'GPU: small pod (rear-door HX), medium pod (direct-to-chip), extreme density immersion, same offline' },
+      { gridRow: 10, label: 'Corridor: PDU, overloaded PDU, 2 cable trays, fan tray, CRAC, CRAH, immersion pod, failed CRAC, failed immersion, chiller, advanced chiller, failed chiller' },
     ],
   }
 }

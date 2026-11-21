@@ -17,4 +17,6 @@ export {
 } from './textureCache'
 export type { CabinetArtSpec, LiquidCooling } from './pieces/cabinet'
 export { cabinetChassisArt, cabinetServersArt, cabinetLeafArt, cabinetDoorArt, cabinetHasDoor, cabinetLedAnchors } from './pieces/cabinet'
+export type { SpineArtSpec, IBSwitchArtSpec, PduArtSpec, CoolingArtSpec, CoolingArtType, ChillerArtSpec } from './pieces/infra'
+export { spineArt, ibSwitchArt, pduArt, coolingArt, coolingBox, coolingFanAnchor, chillerArt, cableTrayArt } from './pieces/infra'
 export { CAB, SPINE, IB_SWITCH, PDU, COOLING, CHILLER } from './pieces/dimensions'

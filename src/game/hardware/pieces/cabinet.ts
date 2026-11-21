@@ -4,6 +4,7 @@ import type { IsoBox, Pt } from '../iso'
 import { box, boxBounds, facePoint, onFace, topFace } from '../iso'
 import { hexKey, rgba, shade } from '../styles'
 import { CAB } from './dimensions'
+import { dot, fan, hline, rect, vline } from './detail'
 
 export type LiquidCooling = 'none' | 'rear_door_hx' | 'direct_to_chip' | 'single_phase_immersion'
 
@@ -63,61 +64,16 @@ export function cabinetLedAnchors(spec: Pick<CabinetArtSpec, 'servers' | 'leaf' 
   return { servers, leaf }
 }
 
-function rect(ctx: CanvasRenderingContext2D, s: number, t: number, w: number, h: number, fill: string | CanvasGradient) {
-  ctx.fillStyle = fill
-  ctx.fillRect(s, t, w, h)
-}
-
-function hline(ctx: CanvasRenderingContext2D, s0: number, s1: number, t: number, color: string, width = 0.5) {
-  ctx.beginPath()
-  ctx.moveTo(s0, t)
-  ctx.lineTo(s1, t)
-  ctx.strokeStyle = color
-  ctx.lineWidth = width
-  ctx.stroke()
-}
-
-function vline(ctx: CanvasRenderingContext2D, s: number, t0: number, t1: number, color: string, width = 0.5) {
-  ctx.beginPath()
-  ctx.moveTo(s, t0)
-  ctx.lineTo(s, t1)
-  ctx.strokeStyle = color
-  ctx.lineWidth = width
-  ctx.stroke()
-}
-
-function dot(ctx: CanvasRenderingContext2D, s: number, t: number, r: number, color: string) {
-  ctx.beginPath()
-  ctx.arc(s, t, r, 0, Math.PI * 2)
-  ctx.fillStyle = color
-  ctx.fill()
-}
-
-function fan(ctx: CanvasRenderingContext2D, s: number, t: number, r: number, rim: string, hub: string) {
-  dot(ctx, s, t, r, hub)
-  ctx.beginPath()
-  ctx.arc(s, t, r, 0, Math.PI * 2)
-  ctx.strokeStyle = rim
-  ctx.lineWidth = 0.5
-  ctx.stroke()
-  // Blades as a cross so the fan reads at small sizes
-  ctx.beginPath()
-  ctx.moveTo(s - r * 0.7, t)
-  ctx.lineTo(s + r * 0.7, t)
-  ctx.moveTo(s, t - r * 0.7)
-  ctx.lineTo(s, t + r * 0.7)
-  ctx.stroke()
-}
-
 // ── Chassis ───────────────────────────────────────────────
 
 function drawRackFace(dc: DrawCtx, spec: CabinetArtSpec) {
   const { ctx, style } = dc
+  const palette = isGpu(spec) ? style.gpuChassis : style.chassis
   onFace(ctx, ENCLOSURE, 'left', (w, h) => {
     // Rack interior
     rect(ctx, RAIL, zToT(CAB.depth - 0.8), w - RAIL * 2, h - 0.8 - CAB.baseDepth, style.recess)
     // Vertical rails with mounting holes
-    const railFill = faceGradient(ctx, 0, 0, 0, h, style.chassis.left)
+    const railFill = faceGradient(ctx, 0, 0, 0, h, palette.left)
     rect(ctx, 0, 0, RAIL, h, railFill)
     rect(ctx, w - RAIL, 0, RAIL, h, railFill)
     for (let t = 2; t < h - CAB.baseDepth; t += 2.75) {
@@ -133,7 +89,7 @@ function drawRackFace(dc: DrawCtx, spec: CabinetArtSpec) {
     const lt = zToT(LEAF_Z + LEAF_H)
     rect(ctx, BAY_L, lt, BAY_R - BAY_L, LEAF_H, faceGradient(ctx, 0, lt, 0, lt + LEAF_H, style.blank))
     // Kickplate with environment stripe
-    rect(ctx, 0, h - CAB.baseDepth, w, CAB.baseDepth, faceGradient(ctx, 0, h - CAB.baseDepth, 0, h, style.chassis.right))
+    rect(ctx, 0, h - CAB.baseDepth, w, CAB.baseDepth, faceGradient(ctx, 0, h - CAB.baseDepth, 0, h, palette.right))
     rect(ctx, 1, h - CAB.baseDepth + 1.2, w - 2, 1.1, rgba(spec.envColor, spec.powerOn ? 0.85 : 0.3))
     if (showsFront(spec)) {
       // Door handle on the right rail
