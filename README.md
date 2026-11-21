@@ -143,6 +143,8 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instr
 
 Please read our [Code of Conduct](CODE_OF_CONDUCT.md) before participating.
 
+Working on visuals? See [docs/VISUAL_REFERENCES.md](docs/VISUAL_REFERENCES.md) for the art-direction references and notes on how they're built.
+
 ## 🎲 Incident System
 - **Real-World:** Squirrels chewing cables, fiber cuts, DDoSed tenants, leaking pipes.
 - **Creative:** Sentient AI outbreaks, solar flares, and quantum decoherence.

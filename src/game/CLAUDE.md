@@ -6,6 +6,8 @@ Rules for working in `src/game/`.
 
 Currently all visuals are drawn procedurally with `Phaser.GameObjects.Graphics` — the game has zero image assets. Prefer this approach for new features unless sprites/images are explicitly requested. If sprites are introduced, load them in `preload()` and place assets in `public/`.
 
+Art-direction targets for hardware visuals (outlines, face gradients, front-panel detail, contact shadows) are collected in `docs/VISUAL_REFERENCES.md`.
+
 ## Isometric Coordinate System
 
 The grid uses isometric projection with:
