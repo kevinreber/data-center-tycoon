@@ -51,6 +51,7 @@ src/
 │   ├── TutorialOverlay.tsx     # Guided tutorial step overlay and contextual tip popups
 │   ├── WelcomeModal.tsx        # First-launch welcome modal with tutorial start/skip
 │   ├── LandingPage.tsx         # Animated landing page with isometric data center visualization
+│   ├── LandingHero.tsx         # Landing hero canvas: the v2 hardware pieces baked once, plus animated LEDs, traffic and earnings
 │   ├── RegionSelectModal.tsx   # Region selection modal for choosing starting data center location
 │   ├── ui/                     # shadcn/ui primitives
 │   │   ├── badge.tsx
@@ -73,7 +74,7 @@ src/
 │       ├── MarketPanel.tsx     # Competitors, market share, bids, events, regional presence
 │       ├── CapacityPanel.tsx   # Capacity planning dashboard, trends, projections, alerts
 │       ├── ProgressPanel.tsx   # Achievements, reputation, lifetime stats
-│       ├── SettingsPanel.tsx   # Save/load, sandbox mode, reset, demo
+│       ├── SettingsPanel.tsx   # Save/load, sandbox mode, reset, demo, hardware style (detailed / classic)
 │       ├── GuidePanel.tsx      # How to play / tutorial (with Phase 4-6 system guides)
 │       ├── BuildLogsPanel.tsx  # What's New changelog (version history, player-facing)
 │       ├── ScenarioPanel.tsx   # Scenario select screen with cards, star ratings, locked progression
@@ -494,7 +495,7 @@ Key interfaces (core):
 
 ### Phaser Rendering — `src/game/PhaserGame.ts`
 
-The `DataCenterScene` class handles all isometric graphics using Phaser's Graphics API (no image assets — everything is procedurally drawn).
+The `DataCenterScene` class handles all isometric graphics, all procedurally drawn (no image assets). Hardware has two renderers selected by `rendererStyle`: v2 (default) draws each variant once with Canvas 2D from `src/game/hardware/` and shows it as cached-texture Images; classic draws with Phaser's Graphics API via `drawIsoCube()`. Floor, overlays, traffic and particles use Graphics in both. See `src/game/CLAUDE.md` and `docs/HARDWARE_VISUALS_PLAN.md`.
 
 **Module-level exports:**
 - `createGame(parent: string): Phaser.Game` — creates and returns Phaser game instance
@@ -576,7 +577,7 @@ The UI uses a **sidebar-driven navigation pattern**:
 - **`HUD.tsx`** — Legacy monolithic control panel (still present, ~2940 lines)
 - **`TutorialOverlay.tsx`** — Guided tutorial step-by-step overlay and contextual tip popups
 - **`WelcomeModal.tsx`** — First-launch welcome modal offering tutorial start or skip
-- **`LandingPage.tsx`** — Animated landing page with procedural isometric data center SVG visualization, feature cards, and play button; shown as the game's entry screen
+- **`LandingPage.tsx`** — Animated landing page with an isometric data center hero (`LandingHero.tsx`, drawn with the same v2 hardware pieces as the game, no Phaser), feature cards, and play button; shown as the game's entry screen
 - **`RegionSelectModal.tsx`** — Region selection modal presenting 5 curated starter regions (Ashburn, Nordics, Dallas, London, Singapore) with difficulty ratings and region profile stats
 
 ### React-Phaser Bridge — `src/components/GameCanvas.tsx`

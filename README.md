@@ -98,6 +98,8 @@ A web-based, 2D isometric Tycoon game (think Roller Coaster Tycoon) where the pl
 
 ### Views & Audio
 - **Cabinet View** — Standard isometric view of your data center floor.
+- **Detailed Hardware Art** — Racks show rails, drive bays, switch ports and blinking status LEDs; GPU racks get heatsinks and coolant hoses. Hot racks glow, fires and incidents pulse an outline, and GPUs with ECC faults light up red. Prefer the original look? Pick **Classic** under Settings → Hardware style.
+- **View Toggles** — One-click overlays along the top of the floor: Traffic, InfiniBand, Heat map, and Free slots (cabinets with room for another server).
 - **Sub-Floor View** — See cooling pipes, power conduits, and infrastructure beneath the raised floor.
 - **Sound Effects** — Procedural audio feedback for placement, alerts, achievements, and ambient data center hum with volume controls.
 
@@ -122,7 +124,7 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:5173/data-center-tycoon/` in your browser.
+Open `http://localhost:5173/` in your browser.
 
 ### Other Commands
 
@@ -135,7 +137,11 @@ npm run preview   # Serve production build
 
 ### Demo Mode
 
-Add `?demo=true` to the URL to load a pre-populated data center for quick exploration.
+Add `?demo=true` to the URL to load a pre-populated data center for quick exploration. Add `&renderer=classic` to compare against the original hardware art (the link doesn't change your saved setting).
+
+### Hardware Lab
+
+In dev, `http://localhost:5173/lab.html` shows every hardware variant side by side in the classic and detailed styles, with a control that forces every rack into a given state (hot, on fire, incident, powered off, ECC faults and more). Production builds leave it out unless `VITE_ENABLE_LAB=true`. Details in [docs/HARDWARE_VISUALS_PLAN.md](docs/HARDWARE_VISUALS_PLAN.md).
 
 ## Contributing
 

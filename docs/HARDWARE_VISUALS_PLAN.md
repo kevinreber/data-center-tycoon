@@ -2,7 +2,7 @@
 
 Goal: make the isometric hardware (cabinets, servers, leaf/spine switches, GPU nodes, InfiniBand switches, PDUs, cooling) look like the polished isometric style of Designed to Scale and Protocol Explorer (see `docs/VISUAL_REFERENCES.md`). This must not change what production players see until we explicitly flip it on.
 
-Status: phases 0–6 implemented. v2 is the default renderer (`DEFAULT_RENDERER_STYLE` in `src/stores/rendererPreference.ts`); classic stays selectable under Settings → Experimental for one release, then gets deleted. To roll back, set the default to `'classic'`. See "Implementation notes" at the end.
+Status: phases 0–6 implemented. v2 is the default renderer (`DEFAULT_RENDERER_STYLE` in `src/stores/rendererPreference.ts`); classic stays selectable under Settings → Hardware style for one release, then gets deleted. To roll back, set the default to `'classic'`. See "Implementation notes" at the end.
 
 ## Principles
 

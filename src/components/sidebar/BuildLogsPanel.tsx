@@ -36,7 +36,7 @@ const CHANGELOG: VersionEntry[] = [
       { text: 'Quick view toggles along the top of the floor — Traffic, InfiniBand and Heat map, one click each', type: 'new' },
       { text: 'Free slots view — highlights every cabinet with room for another server, without entering install mode', type: 'new' },
       { text: 'Hardware stays sharp when you zoom in, and the floor renders faster than before', type: 'system' },
-      { text: 'Prefer the old look? Switch back to classic hardware under Settings → Experimental', type: 'system' },
+      { text: 'Prefer the old look? Switch back to classic hardware under Settings → Hardware style', type: 'system' },
     ],
     screenshots: [
       [

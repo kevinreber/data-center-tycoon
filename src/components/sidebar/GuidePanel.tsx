@@ -72,6 +72,22 @@ export function GuidePanel() {
         </ol>
       </div>
 
+      <div className="rounded-lg border border-neon-cyan/20 bg-neon-cyan/5 p-3">
+        <p className="text-xs font-bold text-neon-cyan mb-2">READING THE FLOOR</p>
+        <ul className="text-[11px] font-mono text-muted-foreground space-y-1 list-disc list-inside">
+          <li>
+            The view toggles along the top of the floor switch overlays on and off:
+            {' '}<span className="text-neon-yellow">Traffic</span> (leaf-to-spine links colored by load),
+            {' '}<span className="text-[#aa44ff]">InfiniBand</span> (GPU pod fabric),
+            {' '}<span className="text-neon-red">Heat map</span> (racks colored by temperature) and
+            {' '}<span className="text-neon-green">Free slots</span> (cabinets with room for another server)
+          </li>
+          <li>Hot racks glow, fires and incidents pulse an outline, and GPU nodes with ECC faults light up red</li>
+          <li>Blinking LEDs mean a rack is powered and working; a dark rack is switched off</li>
+          <li>Prefer the original look? Pick <strong className="text-foreground">Classic</strong> under Hardware style in <span className="text-neon-cyan">SETTINGS</span></li>
+        </ul>
+      </div>
+
       {/* Bankruptcy warning */}
       <div className="rounded-lg border border-neon-red/20 bg-neon-red/5 p-3">
         <p className="text-xs font-bold text-neon-red mb-2">BANKRUPTCY &amp; GAME OVER</p>
@@ -611,7 +627,7 @@ export function GuidePanel() {
           <ul className="text-[11px] font-mono text-muted-foreground space-y-0.5 list-disc list-inside">
             <li><strong className="text-foreground">IB Leaf</strong> &mdash; 32&times; 400G NDR ports, 1 per rail per pod</li>
             <li><strong className="text-foreground">IB Spine</strong> &mdash; 64-port non-blocking, 1 per rail per pod</li>
-            <li>Toggle the <span className="text-[#aa44ff]">Backend Fabric</span> layer in the Layers popup to show/hide IB switches, cables, and the AllReduce ring pulse animation</li>
+            <li>Use the <span className="text-[#aa44ff]">InfiniBand</span> toggle along the top of the floor (or Backend Fabric in the Layers popup) to show/hide IB switches, cables, and the AllReduce ring pulse animation</li>
           </ul>
         </div>
       </div>
