@@ -90,6 +90,37 @@ export function ensureGlowTexture(textures: Phaser.Textures.TextureManager, colo
   return key
 }
 
+/** Display size (px) of an LED image created from ensureLedTexture */
+export const LED_DISPLAY_SIZE = 3.6
+
+/**
+ * Pre-colored LED sprite: hot near-white core, colored body, soft halo.
+ * LEDs are Images rather than Graphics so they batch with the hardware art
+ * (a Graphics object per rack forces a WebGL batch flush per rack).
+ */
+export function ensureLedTexture(textures: Phaser.Textures.TextureManager, color: number): string {
+  const key = `hwfx:led:${color.toString(16).padStart(6, '0')}`
+  if (textures.exists(key)) return key
+  const size = 16
+  const canvas = document.createElement('canvas')
+  canvas.width = size
+  canvas.height = size
+  const ctx = canvas.getContext('2d')
+  if (ctx) {
+    const r = (color >> 16) & 0xff, g = (color >> 8) & 0xff, b = color & 0xff
+    const mix = (c: number) => Math.round(c + (255 - c) * 0.6)
+    const grad = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2)
+    grad.addColorStop(0, `rgba(${mix(r)}, ${mix(g)}, ${mix(b)}, 1)`)
+    grad.addColorStop(0.22, `rgba(${r}, ${g}, ${b}, 1)`)
+    grad.addColorStop(0.4, `rgba(${r}, ${g}, ${b}, 0.45)`)
+    grad.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`)
+    ctx.fillStyle = grad
+    ctx.fillRect(0, 0, size, size)
+  }
+  textures.addCanvas(key, canvas)
+  return key
+}
+
 export function countHardwareTextures(textures: Phaser.Textures.TextureManager): number {
   return textures.getTextureKeys().filter((k) => k.startsWith(HW_TEXTURE_PREFIX)).length
 }

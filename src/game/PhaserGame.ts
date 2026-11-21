@@ -3,7 +3,7 @@ import type { LayerVisibility, LayerOpacity, LayerColors, LayerColorOverrides, T
 import { DEFAULT_COLORS, ENVIRONMENT_CONFIG, MAX_SERVERS_PER_CABINET, getFacingOffsets, COOLING_UNIT_CONFIG, CHILLER_PLANT_CONFIG, ROW_END_SLOT_CONFIG } from '@/stores/gameStore'
 import type { RendererStyle } from '@/game/hardware'
 import type { HardwareArt, HardwareTheme } from '@/game/hardware'
-import { HARDWARE_STYLES, makeHardwareImage, pruneHardwareTextures, textureScaleForZoom, ensureGlowTexture, silhouette, isoBox, cabinetChassisArt, cabinetServersArt, cabinetLeafArt, cabinetDoorArt, cabinetHasDoor, cabinetLedAnchors, cabinetServerQuad, spineArt, spineLedAnchors, ibSwitchArt, pduArt, coolingArt, coolingBox, coolingFans, chillerArt, cableTrayArt, facePoint } from '@/game/hardware'
+import { HARDWARE_STYLES, makeHardwareImage, pruneHardwareTextures, textureScaleForZoom, ensureGlowTexture, ensureLedTexture, LED_DISPLAY_SIZE, silhouette, isoBox, cabinetChassisArt, cabinetServersArt, cabinetLeafArt, cabinetDoorArt, cabinetHasDoor, cabinetLedAnchors, cabinetServerQuad, spineArt, spineLedAnchors, ibSwitchArt, pduArt, coolingArt, coolingBox, coolingFans, chillerArt, cableTrayArt, facePoint } from '@/game/hardware'
 import type { Pt } from '@/game/hardware'
 
 const COLORS = DEFAULT_COLORS
@@ -206,6 +206,13 @@ type HardwareObject = Phaser.GameObjects.Graphics | Phaser.GameObjects.Container
 
 type IBFabricArgs = Parameters<DataCenterScene['setInfiniBandFabrics']>
 
+interface CabinetLive {
+  servers: Phaser.GameObjects.Image[]
+  leaf: Phaser.GameObjects.Image[]
+  /** Pulsing outline for incidents / fire, drawn once and faded per frame */
+  alert: Phaser.GameObjects.Graphics | null
+}
+
 class DataCenterScene extends Phaser.Scene {
   private gridGraphics: Phaser.GameObjects.Graphics | null = null
   private floorGraphics: Phaser.GameObjects.Graphics | null = null
@@ -387,10 +394,12 @@ class DataCenterScene extends Phaser.Scene {
   private hwTheme: HardwareTheme = 'neon'
   private hwScale = textureScaleForZoom(1)
   private lastIBFabricArgs: IBFabricArgs | null = null
-  // v2 animated layers, one per object, living inside that object's container so
-  // nearer objects still cover them. Redrawn every frame by renderAmbientOverlay.
-  private cabinetLiveLayers: Map<string, Phaser.GameObjects.Graphics> = new Map()
-  private spineLiveLayers: Map<string, Phaser.GameObjects.Graphics> = new Map()
+  // v2 animated parts live inside each object's container so nearer objects still
+  // cover them; renderAmbientOverlay only updates their alpha/texture each frame.
+  // LEDs are Images (they batch with the hardware art); only the rare alert
+  // outline and the few cooling units use Graphics.
+  private cabinetLive: Map<string, CabinetLive> = new Map()
+  private spineLive: Map<string, Phaser.GameObjects.Image[]> = new Map()
   private coolingLiveLayers: Map<string, Phaser.GameObjects.Graphics> = new Map()
   private selectionOutlineGraphics: Phaser.GameObjects.Graphics | null = null
   private ledAnchorCache: Map<string, { servers: Pt[]; leaf: Pt[] }> = new Map()
@@ -1421,6 +1430,37 @@ class DataCenterScene extends Phaser.Scene {
     return Math.min(nodes, Math.max(1, Math.ceil(entry.eccFaultedGpus / perNode)))
   }
 
+  private ledImage(x: number, y: number, color: number, size = LED_DISPLAY_SIZE): Phaser.GameObjects.Image {
+    const img = this.make.image({ x, y, key: ensureLedTexture(this.textures, color) }, false)
+    img.setDisplaySize(size, size)
+    return img
+  }
+
+  /** v2: LED images at the art's anchor points plus an alert outline when needed */
+  private buildCabinetLive(entry: CabinetEntry, cx: number, cy: number, serverVis: boolean, leafVis: boolean): CabinetLive {
+    const live: CabinetLive = { servers: [], leaf: [], alert: null }
+    if (entry.powerOn) {
+      const anchors = this.cabinetLeds(entry)
+      const { color } = this.ledState(entry)
+      if (serverVis) live.servers = anchors.servers.map(([lx, ly]) => this.ledImage(cx + lx, cy + ly, color))
+      if (leafVis && entry.hasLeafSwitch) {
+        const leafColor = (this.layerColors.leaf_switch ?? COLORS.leaf_switch).top
+        live.leaf = anchors.leaf.map(([lx, ly]) => this.ledImage(cx + lx, cy + ly, leafColor, LED_DISPLAY_SIZE * 0.65))
+      }
+    }
+    if (entry.hasIncident || entry.isOnFire) {
+      const color = entry.isOnFire ? 0xff3300 : 0xffcc00
+      const outline = this.cabinetOutline(entry, 2.5)
+      const alert = this.make.graphics({}, false)
+      alert.lineStyle(4, color, 0.25)
+      alert.strokePoints(outline, true)
+      alert.lineStyle(1.5, color, 1)
+      alert.strokePoints(outline, true)
+      live.alert = alert
+    }
+    return live
+  }
+
   private cabinetLeds(entry: CabinetEntry): { servers: Pt[]; leaf: Pt[] } {
     const key = `${entry.serverCount}:${entry.hasLeafSwitch}:${entry.facing}`
     let anchors = this.ledAnchorCache.get(key)
@@ -1460,6 +1500,15 @@ class DataCenterScene extends Phaser.Scene {
     }
   }
 
+  /**
+   * Depth for floor-level overlays (heat tiles, pod outlines, IB cables, selection marker).
+   * Their classic depths sit above back-row cabinets, which only works because classic
+   * racks are translucent; under opaque v2 racks they go beneath all hardware instead.
+   */
+  private floorOverlayDepth(classicDepth: number): number {
+    return this.rendererStyle === 'v2' ? 3.5 : classicDepth
+  }
+
   /** Switch hardware renderer and/or theme, re-rendering every hardware object */
   setRendererStyle(style: RendererStyle, theme: HardwareTheme = this.hwTheme) {
     if (style === this.rendererStyle && theme === this.hwTheme) return
@@ -1475,6 +1524,8 @@ class DataCenterScene extends Phaser.Scene {
 
   /** Re-render all hardware, then drop cached textures the new render no longer uses */
   private rerenderHardware() {
+    this.gpuPodGraphics?.setDepth(this.floorOverlayDepth(50))
+    this.ibLinkGraphics?.setDepth(this.floorOverlayDepth(45))
     this.rerenderAll()
     for (const entry of this.pduEntries.values()) this.renderPDU(entry)
     for (const entry of this.cableTrayEntries.values()) this.renderCableTray(entry)
@@ -1862,13 +1913,15 @@ class DataCenterScene extends Phaser.Scene {
     }
 
     if (v2) {
-      const live = this.make.graphics({}, false)
-      const container = this.add.container(0, 0, [...v2Layers, g, live])
+      const live = this.buildCabinetLive(entry, cx, cy, serverVis, leafVis)
+      const liveObjects: Phaser.GameObjects.GameObject[] = [...live.servers, ...live.leaf]
+      if (live.alert) liveObjects.push(live.alert)
+      const container = this.add.container(0, 0, [...v2Layers, g, ...liveObjects])
       container.setDepth(baseDepth)
       this.cabinetGraphics.set(entry.id, container)
-      this.cabinetLiveLayers.set(entry.id, live)
+      this.cabinetLive.set(entry.id, live)
     } else {
-      this.cabinetLiveLayers.delete(entry.id)
+      this.cabinetLive.delete(entry.id)
       g.setDepth(baseDepth)
       this.cabinetGraphics.set(entry.id, g)
     }
@@ -1895,14 +1948,18 @@ class DataCenterScene extends Phaser.Scene {
 
     if (this.rendererStyle === 'v2') {
       const img = this.hardwareImage(spineArt({ color: spineColors.top, powerOn: entry.powerOn }), x, y + SPINE_H / 2, opacity)
-      const live = this.make.graphics({}, false)
-      this.spineGraphics.set(entry.id, this.hardwareContainer(img, live, 5))
-      this.spineLiveLayers.set(entry.id, live)
-      // The v2 art carries its own status LEDs, animated by the live layer
+      const container = this.hardwareContainer(img, null, 5)
+      // The v2 art carries its own status LEDs, animated per frame
+      const leds = entry.powerOn
+        ? spineLedAnchors().map(([lx, ly], i) => this.ledImage(x + lx, y + SPINE_H / 2 + ly, i === 0 ? 0x44ff66 : spineColors.top, LED_DISPLAY_SIZE * 0.85))
+        : []
+      container.add(leds)
+      this.spineGraphics.set(entry.id, container)
+      this.spineLive.set(entry.id, leds)
       this.spineNodeLabels.delete(entry.id)
       return
     } else {
-      this.spineLiveLayers.delete(entry.id)
+      this.spineLive.delete(entry.id)
       const g = this.add.graphics()
       const alpha = 0.9 * opacity * powerMult
       this.drawIsoCube(g, x, y + SPINE_H / 2, SPINE_W, SPINE_H, SPINE_DEPTH, spineColors, alpha)
@@ -1978,81 +2035,47 @@ class DataCenterScene extends Phaser.Scene {
 
   /** v2: redraw each object's animated layer (LEDs, link lights, alert pulse, fan blades) */
   private renderLiveLayersV2(t: number) {
-    const serverVis = this.layerVisibility.server
-    const leafVis = this.layerVisibility.leaf_switch
-    const leafColor = (this.layerColors.leaf_switch ?? COLORS.leaf_switch).top
-
-    for (const [id, live] of this.cabinetLiveLayers) {
+    for (const [id, live] of this.cabinetLive) {
       const entry = this.cabEntries.get(id)
-      if (!entry || !live.active) {
-        this.cabinetLiveLayers.delete(id)
+      const first = live.servers[0] ?? live.leaf[0] ?? live.alert
+      if (!entry || (first && !first.active)) {
+        this.cabinetLive.delete(id)
         continue
       }
-      live.clear()
-      const { x, y } = this.isoToScreen(entry.col, entry.row)
-      const cy = y + TILE_H / 2
-
-      if (entry.powerOn) {
-        const anchors = this.cabinetLeds(entry)
-        if (serverVis) {
-          const { speed, color } = this.ledState(entry)
-          const faulted = this.eccFaultedNodes(entry)
-          const opacity = this.layerOpacity.server
-          anchors.servers.forEach(([lx, ly], i) => {
-            const fault = i < faulted
-            const hz = fault ? 5 : speed
-            const a = (0.35 + 0.65 * (0.5 + 0.5 * Math.sin(t * hz * Math.PI * 2 + i * 1.1 + entry.col * 0.7 + entry.row * 1.3))) * opacity
-            const c = fault ? 0xff2222 : color
-            live.fillStyle(c, a * 0.3)
-            live.fillCircle(x + lx, cy + ly, 1.7)
-            live.fillStyle(c, a)
-            live.fillCircle(x + lx, cy + ly, 0.75)
-          })
-        }
-        if (leafVis && entry.hasLeafSwitch) {
-          const opacity = this.layerOpacity.leaf_switch
-          anchors.leaf.forEach(([lx, ly], p) => {
-            // Link activity: each port flickers on its own pseudo-random schedule
-            const tick = Math.floor(t * 9 + p * 2.3)
-            const n = Math.sin((tick + p * 17 + entry.col * 31 + entry.row * 57) * 12.9898) * 43758.5453
-            const lit = n - Math.floor(n) > 0.3
-            live.fillStyle(leafColor, (lit ? 0.95 : 0.25) * opacity)
-            live.fillCircle(x + lx, cy + ly, 0.55)
-          })
-        }
+      if (live.servers.length > 0) {
+        const { speed, color } = this.ledState(entry)
+        const faulted = this.eccFaultedNodes(entry)
+        const opacity = this.layerOpacity.server
+        live.servers.forEach((img, i) => {
+          const fault = i < faulted
+          const key = ensureLedTexture(this.textures, fault ? 0xff2222 : color)
+          if (img.texture.key !== key) img.setTexture(key)
+          const hz = fault ? 5 : speed
+          img.setAlpha((0.35 + 0.65 * (0.5 + 0.5 * Math.sin(t * hz * Math.PI * 2 + i * 1.1 + entry.col * 0.7 + entry.row * 1.3))) * opacity)
+        })
       }
-
-      if (entry.hasIncident || entry.isOnFire) {
-        const pulse = 0.35 + 0.55 * (0.5 + 0.5 * Math.sin(t * 5))
-        const color = entry.isOnFire ? 0xff3300 : 0xffcc00
-        const outline = this.cabinetOutline(entry, 2.5)
-        live.lineStyle(4, color, pulse * 0.25)
-        live.strokePoints(outline, true)
-        live.lineStyle(1.5, color, pulse)
-        live.strokePoints(outline, true)
+      if (live.leaf.length > 0) {
+        const opacity = this.layerOpacity.leaf_switch
+        live.leaf.forEach((img, p) => {
+          // Link activity: each port flickers on its own pseudo-random schedule
+          const tick = Math.floor(t * 9 + p * 2.3)
+          const n = Math.sin((tick + p * 17 + entry.col * 31 + entry.row * 57) * 12.9898) * 43758.5453
+          img.setAlpha((n - Math.floor(n) > 0.3 ? 0.95 : 0.2) * opacity)
+        })
       }
+      if (live.alert) live.alert.setAlpha(0.35 + 0.55 * (0.5 + 0.5 * Math.sin(t * 5)))
     }
 
-    const spineLeds = spineLedAnchors()
-    for (const [id, live] of this.spineLiveLayers) {
+    for (const [id, leds] of this.spineLive) {
       const entry = this.spineEntries.get(id)
-      if (!entry || !live.active) {
-        this.spineLiveLayers.delete(id)
+      if (!entry || (leds[0] && !leds[0].active)) {
+        this.spineLive.delete(id)
         continue
       }
-      live.clear()
-      if (!entry.powerOn) continue
-      const { x, y } = this.spineToScreen(entry.slot)
-      const by = y + SPINE_H / 2
-      const color = (this.layerColors.spine_switch ?? COLORS.spine_switch).top
       const opacity = this.layerOpacity.spine_switch
-      spineLeds.forEach(([lx, ly], i) => {
+      leds.forEach((img, i) => {
         const a = i === 0 ? 0.9 : 0.3 + 0.7 * (0.5 + 0.5 * Math.sin(t * 3 + i * 2 + entry.slot))
-        const c = i === 0 ? 0x44ff66 : color
-        live.fillStyle(c, a * 0.3 * opacity)
-        live.fillCircle(x + lx, by + ly, 1.4)
-        live.fillStyle(c, a * opacity)
-        live.fillCircle(x + lx, by + ly, 0.6)
+        img.setAlpha(a * opacity)
       })
     }
 
@@ -2954,7 +2977,7 @@ class DataCenterScene extends Phaser.Scene {
     // Init lazy graphics layer
     if (!this.gpuPodGraphics) {
       this.gpuPodGraphics = this.add.graphics()
-      this.gpuPodGraphics.setDepth(50) // above floor, below cabinets
+      this.gpuPodGraphics.setDepth(this.floorOverlayDepth(50)) // above floor, below cabinets
     }
     this.gpuPodGraphics.clear()
     this.gpuPodEntries.clear()
@@ -3014,7 +3037,7 @@ class DataCenterScene extends Phaser.Scene {
     }
     if (!this.ibLinkGraphics) {
       this.ibLinkGraphics = this.add.graphics()
-      this.ibLinkGraphics.setDepth(45) // above floor, below cabinets
+      this.ibLinkGraphics.setDepth(this.floorOverlayDepth(45)) // above floor, below cabinets
     }
     this.ibSwitchGraphics.clear()
     this.ibLinkGraphics.clear()
@@ -3904,7 +3927,7 @@ class DataCenterScene extends Phaser.Scene {
 
   /** Clear all cabinet graphics (used during site switching) */
   clearAllCabinets() {
-    this.cabinetLiveLayers.clear()
+    this.cabinetLive.clear()
     for (const g of this.cabinetGraphics.values()) g.destroy()
     for (const labels of this.cabinetLabels.values()) labels.forEach(l => l.destroy())
     this.cabinetGraphics.clear()
@@ -3915,7 +3938,7 @@ class DataCenterScene extends Phaser.Scene {
 
   /** Clear all spine switch graphics (used during site switching) */
   clearAllSpines() {
-    this.spineLiveLayers.clear()
+    this.spineLive.clear()
     for (const g of this.spineGraphics.values()) g.destroy()
     for (const l of this.spineNodeLabels.values()) l.destroy()
     this.spineGraphics.clear()
@@ -3944,7 +3967,7 @@ class DataCenterScene extends Phaser.Scene {
     if (!entry) return
 
     this.selectionGraphics = this.add.graphics()
-    this.selectionGraphics.setDepth(50)
+    this.selectionGraphics.setDepth(this.floorOverlayDepth(50))
 
     const { x, y } = this.isoToScreen(entry.col, entry.row)
     // Draw selection border
@@ -4106,7 +4129,7 @@ class DataCenterScene extends Phaser.Scene {
     if (!this.heatMapVisible) return
 
     this.heatMapGraphics = this.add.graphics()
-    this.heatMapGraphics.setDepth(45)
+    this.heatMapGraphics.setDepth(this.floorOverlayDepth(45))
 
     // Temperature range: ambient (22°C) = green, throttle (80°C) = yellow, critical (95°C) = red
     const tempMin = 22   // ambient

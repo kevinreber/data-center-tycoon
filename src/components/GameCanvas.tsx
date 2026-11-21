@@ -52,6 +52,7 @@ export function GameCanvas() {
   const infiniBandFabrics = useGameStore((s) => s.infiniBandFabrics)
   const ibSwitches = useGameStore((s) => s.ibSwitches)
   const ibLinks = useGameStore((s) => s.ibLinks)
+  const rendererStyle = useGameStore((s) => s.rendererStyle)
 
   // ── Detect site switch and trigger full Phaser re-render ─────────
   useEffect(() => {
@@ -124,6 +125,8 @@ export function GameCanvas() {
   useEffect(() => {
     if (!gameRef.current) {
       gameRef.current = createGame('phaser-container')
+      // Dev-only, like window.__store in main.tsx: lets devtools/automation step or inspect the scene
+      if (import.meta.env.DEV) (window as unknown as { __game?: Phaser.Game }).__game = gameRef.current
     }
 
     // Phaser scene boots asynchronously — poll until create() has run,
@@ -516,6 +519,14 @@ export function GameCanvas() {
     if (!scene) return
     scene.setRowEndSlots(rowEndSlots)
   }, [rowEndSlots, sceneReady])
+
+  // Sync hardware renderer (classic vector cubes vs. v2 cached art)
+  useEffect(() => {
+    if (!gameRef.current) return
+    const scene = getScene(gameRef.current)
+    if (!scene) return
+    scene.setRendererStyle(rendererStyle)
+  }, [rendererStyle, sceneReady])
 
   // Sync audio settings to Phaser
   useEffect(() => {

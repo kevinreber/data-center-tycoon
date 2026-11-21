@@ -1,7 +1,7 @@
 // v2 hardware renderer: Canvas 2D art cached as Phaser textures.
 // See docs/HARDWARE_VISUALS_PLAN.md.
 
-export type RendererStyle = 'classic' | 'v2'
+export type { RendererStyle } from '@/stores/rendererPreference'
 
 export type { HardwareArt, DrawCtx } from './draw'
 export type { HardwareTheme, HardwareStyle } from './styles'
@@ -11,7 +11,9 @@ export type { Pt, IsoBox } from './iso'
 export {
   HW_TEXTURE_PREFIX,
   countHardwareTextures,
+  LED_DISPLAY_SIZE,
   ensureGlowTexture,
+  ensureLedTexture,
   ensureHardwareTexture,
   makeHardwareImage,
   pruneHardwareTextures,
