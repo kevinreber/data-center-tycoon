@@ -6,15 +6,46 @@ interface ChangeEntry {
   type: 'new' | 'improved' | 'system'
 }
 
+interface Screenshot {
+  /** Path under public/, without the base path */
+  src: string
+  caption: string
+}
+
 interface VersionEntry {
   version: string
   date: string
   title: string
   highlights: string
   changes: ChangeEntry[]
+  /** Each inner array is one row of images shown side by side */
+  screenshots?: Screenshot[][]
 }
 
 const CHANGELOG: VersionEntry[] = [
+  {
+    version: 'v0.6.2',
+    date: 'Nov 2026',
+    title: 'The Hardware Glow-Up',
+    highlights: 'Every piece of hardware on the floor is redrawn in detail, racks now show what they are doing at a glance, and new quick toggles put traffic, heat and free capacity one click away.',
+    changes: [
+      { text: 'Detailed hardware art — racks show rails, drive bays, leaf-switch ports and blinking status LEDs; rear-facing racks show fans and power supplies', type: 'new' },
+      { text: 'GPU racks get heatsinks and a light bar; liquid-cooled racks show coolant hoses, and rear-door heat exchangers show a coil door', type: 'new' },
+      { text: 'Spine switches, InfiniBand switches, PDUs, cooling units, chillers and cable trays are redrawn too, including failed and powered-off looks; overloaded PDUs show hazard stripes', type: 'improved' },
+      { text: 'Racks tell you their state at a glance — hot racks glow, fires and incidents pulse an outline, and GPU nodes with ECC faults light up red', type: 'improved' },
+      { text: 'Quick view toggles along the top of the floor — Traffic, InfiniBand and Heat map, one click each', type: 'new' },
+      { text: 'Free slots view — highlights every cabinet with room for another server, without entering install mode', type: 'new' },
+      { text: 'Hardware stays sharp when you zoom in, and the floor renders faster than before', type: 'system' },
+      { text: 'Prefer the old look? Switch back to classic hardware under Settings → Experimental', type: 'system' },
+    ],
+    screenshots: [
+      [
+        { src: 'changelog/v0.6.2/before.jpg', caption: 'Before' },
+        { src: 'changelog/v0.6.2/after.jpg', caption: 'After' },
+      ],
+      [{ src: 'changelog/v0.6.2/toolbar.jpg', caption: 'Quick view toggles with Free slots on' }],
+    ],
+  },
   {
     version: 'v0.6.1',
     date: 'Jun 2026',
@@ -35,10 +66,6 @@ const CHANGELOG: VersionEntry[] = [
       { text: 'AI Lab revenue model — ai_lab cabinets earn 50% baseline while pods are idle, 100% during training, 25% during inference fill; lump sums land on completion', type: 'improved' },
       { text: 'GPU ECC faults reduce a cabinet\'s effective revenue proportionally until refreshed', type: 'improved' },
       { text: 'NOC drawer countdown badges + status chips give one-glance visibility into drain timers, electrician dispatches, and optic boost windows', type: 'improved' },
-      { text: 'Detailed hardware art — racks now show rails, drive bays, leaf-switch ports and blinking status LEDs; GPU racks get heatsinks and coolant hoses; spines, PDUs, cooling units and chillers are redrawn too', type: 'new' },
-      { text: 'Hot racks glow, incidents pulse an outline around the affected rack, and GPU nodes with ECC faults light up red', type: 'improved' },
-      { text: 'Quick view toggles along the top of the floor: Traffic, InfiniBand, Heat map, and a new Free slots highlight showing which cabinets have room for another server', type: 'new' },
-      { text: 'Prefer the old look? Switch back to classic hardware under Settings → Experimental', type: 'system' },
     ],
   },
   {
@@ -318,6 +345,24 @@ export function BuildLogsPanel() {
             {/* Expanded changes */}
             {isExpanded && (
               <div className="border-t border-border/40 px-2.5 py-2 flex flex-col gap-1.5">
+                {entry.screenshots?.map((row, r) => (
+                  <div key={r} className={`grid gap-1.5 ${row.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                    {row.map((shot) => {
+                      const url = `${import.meta.env.BASE_URL}${shot.src}`
+                      return (
+                        <a key={shot.src} href={url} target="_blank" rel="noopener noreferrer" className="group block">
+                          <img
+                            src={url}
+                            alt={shot.caption}
+                            loading="lazy"
+                            className="w-full rounded border border-border/60 group-hover:border-neon-green/50 transition-colors"
+                          />
+                          <span className="block text-[10px] text-muted-foreground mt-0.5">{shot.caption}</span>
+                        </a>
+                      )
+                    })}
+                  </div>
+                ))}
                 {entry.changes.map((change, i) => {
                   const config = TYPE_CONFIG[change.type]
                   const Icon = config.icon
