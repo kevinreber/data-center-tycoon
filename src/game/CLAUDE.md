@@ -4,7 +4,24 @@ Rules for working in `src/game/`.
 
 ## Procedural Graphics Preferred
 
-Currently all visuals are drawn procedurally with `Phaser.GameObjects.Graphics` — the game has zero image assets. Prefer this approach for new features unless sprites/images are explicitly requested. If sprites are introduced, load them in `preload()` and place assets in `public/`.
+All visuals are drawn procedurally — the game has zero image assets. Hardware is drawn with Canvas 2D and cached as textures (v2, the default) or with `Phaser.GameObjects.Graphics` (classic). Prefer this approach for new features unless sprites/images are explicitly requested. If sprites are introduced, load them in `preload()` and place assets in `public/`.
+
+Art-direction targets for hardware visuals (outlines, face gradients, front-panel detail, contact shadows) are collected in `docs/VISUAL_REFERENCES.md`.
+
+## Two Hardware Renderers (classic and v2)
+
+`rendererStyle` selects how hardware is drawn. Both must keep working until classic is removed:
+
+- **classic** — vector cubes via `drawIsoCube()` into a Graphics object (unchanged legacy path).
+- **v2** — art in `src/game/hardware/pieces/`, drawn once per variant with Canvas 2D and cached as a texture (`makeHardwareImage`). Each render method branches on `this.rendererStyle`; keep the classic branch byte-for-byte when touching it.
+
+Rules for v2:
+- Every visual difference must be in the art's `key`, or two variants will share one cached texture.
+- Keep footprints in `hardware/pieces/dimensions.ts` equal to the classic constants so labels, hit-testing and overlays line up.
+- A v2 object is a Container (images + overlay Graphics); bookkeeping maps hold `HardwareObject` (Graphics or Container).
+- Animate with Images (LED sprites from `ensureLedTexture`), not a Graphics object per rack: each Graphics forces a WebGL batch flush.
+- v2 racks are opaque. An overlay that must be seen goes inside the cabinet's container (correct occlusion) or above all hardware (depth 200+). A floor overlay goes beneath hardware via `floorOverlayDepth()`.
+- Test new pieces in `src/game/hardware/pieces.test.ts` (keys and a draw smoke test) and check them in the Hardware Lab (`/lab.html`).
 
 ## Isometric Coordinate System
 

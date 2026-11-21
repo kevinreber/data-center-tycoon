@@ -118,6 +118,8 @@ import { calcStats, calcTraffic, calcTrafficWithCapacity, calcCabinetCooling, is
 
 export { getChillerConnection } from './chiller'
 import { getChillerConnection } from './chiller'
+import type { RendererStyle } from './rendererPreference'
+import { loadRendererStyle, saveRendererStyle } from './rendererPreference'
 
 // ── Re-export new feature configs ─────────────────────────────
 export { ROW_END_SLOT_CONFIG, MAX_ROW_END_SLOTS, AISLE_WIDTH_CONFIG, RAISED_FLOOR_CONFIG, CABLE_MANAGEMENT_CONFIG, WORKLOAD_CONFIG, MAX_WORKLOADS_PER_CABINET, MAX_ACTIVE_WORKLOADS, ADVANCED_TIER_CONFIG, RACK_EQUIPMENT_CONFIG, RACK_TOTAL_U, DEFAULT_AUDIO_SETTINGS, LEADERBOARD_STORAGE_KEY, MAX_LEADERBOARD_ENTRIES, PRESTIGE_STORAGE_KEY, PRESTIGE_REQUIREMENTS, PRESTIGE_BONUSES_PER_LEVEL, MAX_PRESTIGE_LEVEL, PRESTIGE_POINT_WEIGHTS, DEFAULT_PRESTIGE_STATE, calcPrestigeBonuses, calcPrestigePoints } from './configs/features'
@@ -399,6 +401,8 @@ interface GameState {
 
   // Heat Map
   heatMapVisible: boolean
+  /** View-only highlight of cabinets with a free server slot (no click-to-install) */
+  serverSlotsVisible: boolean
 
   // Supply Chain & Procurement
   pendingOrders: HardwareOrder[]
@@ -587,6 +591,9 @@ interface GameState {
   // Audio Settings
   audioSettings: AudioSettings
 
+  // Hardware renderer (display preference; not saved to slots, kept across resetGame)
+  rendererStyle: RendererStyle
+
   // Floating Text Events (consumed by GameCanvas → Phaser each tick)
   pendingFloatingTexts: FloatingTextEvent[]
 
@@ -690,6 +697,7 @@ interface GameState {
   startTraining: (staffId: string, certId: string) => void
   // Heat map
   toggleHeatMap: () => void
+  toggleServerSlotsVisible: () => void
   // Supply Chain actions
   placeOrder: (itemType: string, quantity: number) => void
   // Interconnection actions
@@ -763,6 +771,7 @@ interface GameState {
   removeRackEquipment: (cabinetId: string, position: number) => void
   submitLeaderboardEntry: (playerName: string, category: LeaderboardCategory) => void
   setAudioSettings: (settings: Partial<AudioSettings>) => void
+  setRendererStyle: (style: RendererStyle) => void
   // Tutorial actions
   dismissTip: (tipId: string) => void
   toggleTutorial: () => void
@@ -1180,6 +1189,7 @@ export const useGameStore = create<GameState>((set) => ({
 
   // Heat Map
   heatMapVisible: false,
+  serverSlotsVisible: false,
 
   // Supply Chain & Procurement
   pendingOrders: [],
@@ -1373,6 +1383,9 @@ export const useGameStore = create<GameState>((set) => ({
 
   // Audio Settings
   audioSettings: { ...DEFAULT_AUDIO_SETTINGS },
+
+  // Hardware renderer — resetGame deliberately leaves this alone (display preference)
+  rendererStyle: loadRendererStyle(),
 
   // Floating Text Events
   pendingFloatingTexts: [],
@@ -2665,6 +2678,9 @@ export const useGameStore = create<GameState>((set) => ({
 
   toggleHeatMap: () =>
     set((state) => ({ heatMapVisible: !state.heatMapVisible })),
+
+  toggleServerSlotsVisible: () =>
+    set((state) => ({ serverSlotsVisible: !state.serverSlotsVisible })),
 
   // ── Supply Chain Actions ────────────────────────────────────────
 
@@ -3964,6 +3980,11 @@ export const useGameStore = create<GameState>((set) => ({
       audioSettings: { ...state.audioSettings, ...settings },
     })),
 
+  setRendererStyle: (style: RendererStyle) => {
+    saveRendererStyle(style)
+    set({ rendererStyle: style })
+  },
+
   // ── Tutorial Actions ────────────────────────────────────────────
 
   dismissTip: (tipId: string) =>
@@ -4706,6 +4727,7 @@ export const useGameStore = create<GameState>((set) => ({
       placementMode: false,
       equipmentPlacementMode: null,
       heatMapVisible: false,
+      serverSlotsVisible: false,
       hasSaved: false,
       activeSlotId: null,
       ...calcStats(demoCabinets, demoSpines),
@@ -4823,6 +4845,7 @@ export const useGameStore = create<GameState>((set) => ({
       scenarioStartTick: 0,
       networkTopology: { totalLinks: 0, healthyLinks: 0, oversubscriptionRatio: 0, avgUtilization: 0, redundancyLevel: 0 },
       heatMapVisible: false,
+      serverSlotsVisible: false,
       hasSaved: false,
       staff: [],
       shiftPattern: 'day_only' as ShiftPattern,
@@ -5230,6 +5253,7 @@ export const useGameStore = create<GameState>((set) => ({
       scenarioStartTick: 0,
       networkTopology: { totalLinks: 0, healthyLinks: 0, oversubscriptionRatio: 0, avgUtilization: 0, redundancyLevel: 0 },
       heatMapVisible: false,
+      serverSlotsVisible: false,
       hasSaved: false,
       // Staff & HR
       staff: [],

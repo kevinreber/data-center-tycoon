@@ -4,7 +4,7 @@
 
 **Fabric Tycoon: Data Center Simulator** is a web-based isometric tycoon game where players build and manage a data center. Players place cabinets, install servers and network switches, design a Clos (spine-leaf) network fabric, and balance power, heat, and revenue to scale from a single rack to a global operation.
 
-**Current version:** v0.6.1
+**Current version:** v0.6.2
 
 ## Tech Stack
 
@@ -28,6 +28,7 @@ npm run build     # Type-check (tsc -b) then production build (vite build)
 npm run lint      # Lint all .ts/.tsx files with ESLint
 npm run test      # Run Vitest test suite
 npm run preview   # Serve production build locally
+# Hardware Lab: http://localhost:5173/lab.html in dev (production builds include it only with VITE_ENABLE_LAB=true)
 ```
 
 Linting (`npm run lint`) and tests (`npm run test`) are the primary code quality checks. Always run both before submitting changes.
@@ -45,6 +46,7 @@ src/
 │   ├── HUD.tsx                 # Legacy control panel (build, layers, finance, traffic, equipment)
 │   ├── CabinetDetailPanel.tsx  # Floating detail panel for selected cabinet (stats, actions)
 │   ├── LayersPopup.tsx         # Layer visibility/opacity/color controls popup
+│   ├── ViewToggles.tsx         # Overlay toggle bar over the game view (traffic, InfiniBand, heat map, free server slots)
 │   ├── StatusBar.tsx           # Bottom footer bar (status, nodes, tick, speed, suite tier, version)
 │   ├── TutorialOverlay.tsx     # Guided tutorial step overlay and contextual tip popups
 │   ├── WelcomeModal.tsx        # First-launch welcome modal with tutorial start/skip
@@ -79,13 +81,16 @@ src/
 │       └── NocPanel.tsx        # Phase 8C: NOC / traffic triage — fabric health, link list, detail drawer, repair actions
 ├── game/
 │   ├── PhaserGame.ts           # Phaser scene: isometric rendering, traffic visualization, placement mode
+│   ├── hardware/               # v2 hardware renderer: Canvas 2D art baked into cached textures (iso geometry, styles, texture cache, pieces/)
 │   └── CLAUDE.md               # Phaser-specific coding rules (see Sub-module Rules below)
+├── lab/                        # Hardware Lab (lab.html, dev/preview only): specimen grid + stress scene driving the real scene
 ├── stores/
 │   ├── gameStore.ts            # Single Zustand store (~7300 lines): game state, actions, tick loop
 │   ├── types.ts                # All TypeScript type definitions (~1370 lines)
 │   ├── constants.ts            # Simulation constants (SIM, POWER_DRAW, TRAFFIC, etc.)
 │   ├── calculations.ts         # Pure calculation functions (calcStats, calcCabinetCooling, etc.)
 │   ├── chiller.ts              # Chiller plant connection algorithm (BFS through pipes)
+│   ├── rendererPreference.ts   # Hardware renderer preference (classic / v2): URL param, localStorage, Settings visibility
 │   ├── configs/
 │   │   ├── economy.ts          # Loan, depreciation, power market, insurance, valuation configs
 │   │   ├── equipment.ts        # Cooling, server config, PDU, cable tray, aisle configs
@@ -422,7 +427,7 @@ Key interfaces (core):
 |----------|---------|
 | Build | `addCabinet`, `enterPlacementMode`, `exitPlacementMode`, `upgradeNextCabinet`, `addLeafToNextCabinet`, `addSpineSwitch` |
 | Power | `toggleCabinetPower`, `toggleSpinePower` |
-| Visual | `toggleLayerVisibility`, `setLayerOpacity`, `setLayerColor`, `toggleTrafficVisible`, `toggleHeatMap` |
+| Visual | `toggleLayerVisibility`, `setLayerOpacity`, `setLayerColor`, `toggleTrafficVisible`, `toggleHeatMap`, `toggleServerSlotsVisible` (view-only highlight of cabinets with a free server slot), `setRendererStyle` (classic / v2 hardware art; display preference, not saved to slots) |
 | Simulation | `setGameSpeed`, `upgradeCooling`, `tick` |
 | Finance | `takeLoan`, `refreshServers`, `upgradeSuite` |
 | Infrastructure | `placePDU`, `placeCableTray`, `autoRouteCables`, `toggleCabinetFacing`, `installAisleContainment`, `placeBusway`, `placeCrossConnect`, `placeInRowCooling` |
@@ -542,6 +547,7 @@ gridRow 4: Corridor (bottom access)
 - `addSpineToScene(id)` / `updateSpine(id, powerOn)`
 - `setLayerVisibility(visibility)` / `setLayerOpacity(opacity)` / `setLayerColors(colors)`
 - `setTrafficLinks(links)` / `setTrafficVisible(visible)`
+- `setServerSlotHighlight(cabinetIds | null)` — view-only free-slot highlight (same look as server placement, no click-to-install)
 - `setGridSize(cols, rows, spineSlots)` — rebuilds layout on suite upgrade
 - `setPlacementMode(active)` — enter/exit interactive placement
 - `setOnTileClick(callback)` / `setOnTileHover(callback)` — placement callbacks
@@ -897,8 +903,8 @@ A `setInterval` in `App.tsx` calls `tick()` at the rate determined by `gameSpeed
 ### Phaser
 
 - Single scene (`DataCenterScene`) handles all rendering
-- All visuals drawn with `Phaser.GameObjects.Graphics` (no sprites/images)
-- Three-face isometric cube rendering via `drawIsoCube()` for consistent 3D look
+- All visuals are procedural (no image assets). The classic renderer draws with `Phaser.GameObjects.Graphics` via `drawIsoCube()`; the v2 renderer (`src/game/hardware/`) draws hardware with Canvas 2D once per variant and shows it as cached-texture Images. `setRendererStyle()` switches between them (see `docs/HARDWARE_VISUALS_PLAN.md`)
+- Three-face isometric cube rendering via `drawIsoCube()` (classic) or `drawBox()` (v2) for a consistent 3D look
 - Public API methods on the scene class called from `GameCanvas.tsx`
 - Traffic packet animation driven by Phaser's `update()` loop with a phase counter
 - Dynamic grid resizing via `setGridSize()` on suite tier upgrades
@@ -907,7 +913,7 @@ A `setInterval` in `App.tsx` calls `tick()` at the rate determined by `gameSpeed
 ### Testing
 
 - Tests use **Vitest** with `jsdom` environment
-- Test files located at `src/stores/gameStore.test.ts` and `src/stores/__tests__/gameStore.test.ts`
+- Test files located at `src/stores/gameStore.test.ts`, `src/stores/__tests__/gameStore.test.ts`, `src/stores/rendererPreference.test.ts`, and `src/game/hardware/*.test.ts` (v2 art geometry, cache keys, and a draw smoke test over every variant)
 - Store tests use helper pattern: `getState()` / `setState()` wrappers around `useGameStore`
 - `setupBasicDataCenter()` helper creates a standard test fixture (sandbox mode, cabinet with server + leaf + spine)
 - `beforeEach` resets store state via `getState().resetGame()`

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useGameStore, MAX_SAVE_SLOTS, SUITE_TIERS, TUTORIAL_STEPS } from '@/stores/gameStore'
+import { shouldShowRendererToggle } from '@/stores/rendererPreference'
 import type { SaveSlotMeta, LeaderboardCategory } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
 import { Save, Upload, RotateCw, Play, Trash2, Plus, AlertTriangle, Volume2, VolumeX, Trophy, BookOpen } from 'lucide-react'
@@ -14,6 +15,35 @@ function formatDate(ts: number): string {
   const d = new Date(ts)
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) +
     ' ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+}
+
+/** Experimental hardware renderer switch — hidden from production players while v2 is opt-in */
+function RendererSettings() {
+  const rendererStyle = useGameStore((s) => s.rendererStyle)
+  const setRendererStyle = useGameStore((s) => s.setRendererStyle)
+  if (!shouldShowRendererToggle(rendererStyle, import.meta.env)) return null
+
+  return (
+    <div className="border-t border-border pt-3">
+      <span className="text-xs font-bold text-muted-foreground tracking-widest mb-2 block">EXPERIMENTAL</span>
+      <div className="flex gap-1.5">
+        {(['classic', 'v2'] as const).map((style) => (
+          <Button
+            key={style}
+            variant={rendererStyle === style ? 'default' : 'outline'}
+            size="xs"
+            className={`text-[9px] flex-1 ${rendererStyle === style ? 'bg-neon-green/20 text-neon-green border-neon-green/30' : ''}`}
+            onClick={() => setRendererStyle(style)}
+          >
+            {style === 'classic' ? 'Classic hardware' : 'Detailed hardware (v2)'}
+          </Button>
+        ))}
+      </div>
+      <p className="text-[10px] text-muted-foreground mt-1.5">
+        Preview of the new hardware art. Rendering only — your game is unaffected.
+      </p>
+    </div>
+  )
 }
 
 function SaveSlotCard({ meta, isActive, onLoad, onSave, onDelete }: {
@@ -237,6 +267,8 @@ export function SettingsPanel() {
           Toggle contextual tips and guided walkthrough.
         </p>
       </div>
+
+      <RendererSettings />
 
       {/* Audio Settings */}
       <div className="border-t border-border pt-3">
