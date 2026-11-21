@@ -51,6 +51,7 @@ src/
 │   ├── TutorialOverlay.tsx     # Guided tutorial step overlay and contextual tip popups
 │   ├── WelcomeModal.tsx        # First-launch welcome modal with tutorial start/skip
 │   ├── LandingPage.tsx         # Animated landing page with isometric data center visualization
+│   ├── LandingHero.tsx         # Landing hero canvas: the v2 hardware pieces baked once, plus animated LEDs, traffic and earnings
 │   ├── RegionSelectModal.tsx   # Region selection modal for choosing starting data center location
 │   ├── ui/                     # shadcn/ui primitives
 │   │   ├── badge.tsx
@@ -576,7 +577,7 @@ The UI uses a **sidebar-driven navigation pattern**:
 - **`HUD.tsx`** — Legacy monolithic control panel (still present, ~2940 lines)
 - **`TutorialOverlay.tsx`** — Guided tutorial step-by-step overlay and contextual tip popups
 - **`WelcomeModal.tsx`** — First-launch welcome modal offering tutorial start or skip
-- **`LandingPage.tsx`** — Animated landing page with procedural isometric data center SVG visualization, feature cards, and play button; shown as the game's entry screen
+- **`LandingPage.tsx`** — Animated landing page with an isometric data center hero (`LandingHero.tsx`, drawn with the same v2 hardware pieces as the game, no Phaser), feature cards, and play button; shown as the game's entry screen
 - **`RegionSelectModal.tsx`** — Region selection modal presenting 5 curated starter regions (Ashburn, Nordics, Dallas, London, Singapore) with difficulty ratings and region profile stats
 
 ### React-Phaser Bridge — `src/components/GameCanvas.tsx`
