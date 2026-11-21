@@ -4404,6 +4404,16 @@ class DataCenterScene extends Phaser.Scene {
     })
   }
 
+  /** Set the camera zoom directly, clamped to the same range as wheel and pinch zoom */
+  setCameraZoom(zoom: number) {
+    this.zoomLevel = Math.max(0.3, Math.min(2.5, zoom))
+    this.cameras.main.setZoom(this.zoomLevel)
+  }
+
+  getCameraZoom(): number {
+    return this.zoomLevel
+  }
+
   /** Reset camera to default position and zoom, centered on content */
   resetCamera() {
     this.zoomLevel = 1
