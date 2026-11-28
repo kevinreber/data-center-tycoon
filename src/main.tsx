@@ -4,9 +4,11 @@ import { Analytics } from '@vercel/analytics/react'
 import './index.css'
 import App from './App.tsx'
 import { initAnalytics } from './lib/analytics'
+import { startFunnelTracking } from './lib/funnel'
 import { useGameStore } from './stores/gameStore'
 
 initAnalytics()
+startFunnelTracking(useGameStore)
 
 // Dev-only: expose the store on window so we can drive the app from playwright/devtools for screenshots & debugging.
 if (import.meta.env.DEV) {
