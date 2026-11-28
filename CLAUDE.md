@@ -104,6 +104,8 @@ src/
 │   │   └── gameStore.test.ts   # Vitest tests for Phase 5+ systems (~4475 lines)
 │   └── CLAUDE.md               # Store-specific coding rules (see Sub-module Rules below)
 └── lib/
+    ├── analytics.ts            # GA4 tag loader, trackPageView, trackEvent (log with ?debug_mode=true)
+    ├── funnel.ts               # GA4 launch funnel: store subscriber that sends each milestone event once per page load
     └── utils.ts                # cn() utility for Tailwind class merging
 ```
 

@@ -64,4 +64,10 @@ export const trackPageView = (path: string, title?: string): void => {
   })
 }
 
+export const trackEvent = (name: string, params?: Record<string, unknown>): void => {
+  if (isDebugMode()) console.log('[GA] event', name, params ?? {})
+  if (!isAnalyticsEnabled()) return
+  window.gtag?.('event', name, params ?? {})
+}
+
 export { measurementId as gaMeasurementId }

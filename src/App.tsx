@@ -14,6 +14,7 @@ import { useGameStore } from '@/stores/gameStore'
 import type { GameSpeed } from '@/stores/gameStore'
 import { Zap, DollarSign, Thermometer, Activity, Pause, Play, FastForward, Trophy, X, Flame, Eye, ExternalLink, Globe, ArrowLeft, Skull, RotateCcw } from 'lucide-react'
 import { LandingPage } from '@/components/LandingPage'
+import { trackFunnelEvent } from '@/lib/funnel'
 import { Button } from '@/components/ui/button'
 import {
   Tooltip,
@@ -100,7 +101,7 @@ function App() {
 
   return (
     <TooltipProvider>
-      {showLanding && <LandingPage onPlay={() => setShowLanding(false)} />}
+      {showLanding && <LandingPage onPlay={() => { trackFunnelEvent('game_started'); setShowLanding(false) }} />}
       <div className="h-screen flex flex-col bg-background text-foreground font-mono overflow-hidden">
         {/* Top bar */}
         <header className="flex items-center justify-between px-2 md:px-4 py-1.5 md:py-2 border-b border-border bg-card gap-2">
