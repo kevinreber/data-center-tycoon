@@ -5,6 +5,9 @@ A web-based, 2D isometric Tycoon game (think Roller Coaster Tycoon) where the pl
 
 <img width="1619" height="990" alt="Fabric Tycoon enterprise demo: isometric data center floor with detailed server racks, spine switches and live leaf-to-spine traffic, with the Network panel and a cabinet's detail panel open" src="docs/images/screenshot.jpg" />
 
+<img width="680" alt="The enterprise demo running at 2x: traffic flows from the racks up to the spine switches, then a row of racks overheats, glows red and throttles" src="docs/images/demo.gif" />
+
+The demo floor running live: leaf-to-spine traffic, then one row overheating into thermal throttling. [Try it in your browser](https://data-center-tycoon.vercel.app/?demo=true).
 
 ## 🕹 Core Gameplay Loop
 1. **Build:** Place racks, cooling units, and power sources in an isometric grid.
